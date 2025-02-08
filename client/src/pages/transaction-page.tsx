@@ -19,12 +19,16 @@ export default function TransactionPage() {
   const { user } = useAuth();
 
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
-    queryKey: ["/api/transactions", id],
+    queryKey: [`/api/transactions/${id}`],
     enabled: !!id,
+    retry: 1,
+    onError: (error) => {
+      console.error('Transaction fetch error:', error);
+    }
   });
 
   const { data: checklist } = useQuery<Checklist>({
-    queryKey: ["/api/checklists", id, user?.role],
+    queryKey: [`/api/checklists/${id}/${user?.role}`],
     enabled: !!id && !!user?.role,
   });
 
@@ -41,7 +45,7 @@ export default function TransactionPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-destructive">Error Loading Transaction</h2>
-          <p className="text-muted-foreground">{error.message}</p>
+          <p className="text-muted-foreground mt-2">{error.message}</p>
           <Button className="mt-4" onClick={() => setLocation("/")}>
             Return Home
           </Button>
