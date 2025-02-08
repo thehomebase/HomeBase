@@ -1,10 +1,16 @@
-import { users, transactions, checklists, messages } from "@shared/schema";
-import type { InsertUser, InsertTransaction, InsertChecklist, InsertMessage } from "@shared/schema";
-import type { User, Transaction, Checklist, Message } from "@shared/schema";
+import { 
+  users, transactions, checklists, messages,
+  type User, type Transaction, type Checklist, type Message,
+  type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage 
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, and, or } from "drizzle-orm";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import connectPg from "connect-pg-simple";
+import { pool } from "./db";
+import { sql } from 'drizzle-orm/sql'
 
-const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   // User operations
@@ -28,103 +34,101 @@ export interface IStorage {
   getMessages(transactionId: number): Promise<Message[]>;
 
   // Session store
-  sessionStore: session.SessionStore;
+  sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private transactions: Map<number, Transaction>;
-  private checklists: Map<number, Checklist>;
-  private messages: Map<number, Message>;
-  private currentId: { [key: string]: number };
-  sessionStore: session.SessionStore;
+export class DatabaseStorage implements IStorage {
+  sessionStore: session.Store;
 
   constructor() {
-    this.users = new Map();
-    this.transactions = new Map();
-    this.checklists = new Map();
-    this.messages = new Map();
-    this.currentId = { users: 1, transactions: 1, checklists: 1, messages: 1 };
-    this.sessionStore = new MemoryStore({ checkPeriod: 86400000 });
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true,
+    });
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentId.users++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
-    const id = this.currentId.transactions++;
-    const transaction: Transaction = { ...insertTransaction, id };
-    this.transactions.set(id, transaction);
+    const [transaction] = await db.insert(transactions).values(insertTransaction).returning();
     return transaction;
   }
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
-    return this.transactions.get(id);
+    const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
+    return transaction;
   }
 
   async getTransactionsByUser(userId: number): Promise<Transaction[]> {
-    return Array.from(this.transactions.values()).filter(t => 
-      t.agentId === userId || t.participants.some(p => p.userId === userId)
+    return await db.select().from(transactions).where(
+      or(
+        eq(transactions.agentId, userId),
+        sql`${userId} = ANY(${transactions.participants}->>'userId')`
+      )
     );
   }
 
   async updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction> {
-    const transaction = await this.getTransaction(id);
-    if (!transaction) throw new Error("Transaction not found");
-    
-    const updated = { ...transaction, ...data };
-    this.transactions.set(id, updated);
-    return updated;
+    const [transaction] = await db
+      .update(transactions)
+      .set(data)
+      .where(eq(transactions.id, id))
+      .returning();
+    return transaction;
   }
 
   async createChecklist(insertChecklist: InsertChecklist): Promise<Checklist> {
-    const id = this.currentId.checklists++;
-    const checklist: Checklist = { ...insertChecklist, id };
-    this.checklists.set(id, checklist);
+    const [checklist] = await db.insert(checklists).values(insertChecklist).returning();
     return checklist;
   }
 
   async getChecklist(transactionId: number, role: string): Promise<Checklist | undefined> {
-    return Array.from(this.checklists.values()).find(
-      c => c.transactionId === transactionId && c.role === role
-    );
+    const [checklist] = await db
+      .select()
+      .from(checklists)
+      .where(
+        and(
+          eq(checklists.transactionId, transactionId),
+          eq(checklists.role, role)
+        )
+      );
+    return checklist;
   }
 
   async updateChecklist(id: number, items: Checklist["items"]): Promise<Checklist> {
-    const checklist = this.checklists.get(id);
-    if (!checklist) throw new Error("Checklist not found");
-    
-    const updated = { ...checklist, items };
-    this.checklists.set(id, updated);
-    return updated;
+    const [checklist] = await db
+      .update(checklists)
+      .set({ items })
+      .where(eq(checklists.id, id))
+      .returning();
+    return checklist;
   }
 
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
-    const id = this.currentId.messages++;
-    const message: Message = { ...insertMessage, id };
-    this.messages.set(id, message);
+    const [message] = await db.insert(messages).values(insertMessage).returning();
     return message;
   }
 
   async getMessages(transactionId: number): Promise<Message[]> {
-    return Array.from(this.messages.values())
-      .filter(m => m.transactionId === transactionId)
-      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    return await db
+      .select()
+      .from(messages)
+      .where(eq(messages.transactionId, transactionId))
+      .orderBy(messages.timestamp);
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
