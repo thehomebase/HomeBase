@@ -12,6 +12,13 @@ import { z } from "zod";
 import { useLocation } from "wouter";
 import { Home, Plus, LogOut } from "lucide-react";
 
+interface Transaction {
+  id: string;
+  address: string;
+  status: string;
+  participants: any[]; // Replace 'any' with the actual participant type if known
+}
+
 const createTransactionSchema = z.object({
   address: z.string().min(1),
   accessCode: z.string().min(6),
@@ -25,8 +32,9 @@ export default function HomePage() {
     defaultValues: { address: "", accessCode: "" },
   });
 
-  const { data: transactions } = useQuery({
+  const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
+    enabled: !!user,
   });
 
   const createTransactionMutation = useMutation({
@@ -117,7 +125,7 @@ export default function HomePage() {
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {transactions?.map((transaction) => (
+          {transactions.map((transaction) => (
             <Card key={transaction.id} className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => setLocation(`/transaction/${transaction.id}`)}>
               <CardHeader>
                 <CardTitle className="text-lg">{transaction.address}</CardTitle>
@@ -131,7 +139,7 @@ export default function HomePage() {
             </Card>
           ))}
 
-          {transactions?.length === 0 && (
+          {transactions.length === 0 && (
             <div className="col-span-full text-center py-12 text-muted-foreground">
               No transactions found. {user?.role === "agent" ? "Create one to get started!" : "Ask your agent for an access code to join a transaction."}
             </div>

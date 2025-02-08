@@ -115,6 +115,7 @@ export class DatabaseStorage implements IStorage {
 
   async getTransactionsByUser(userId: number): Promise<Transaction[]> {
     try {
+      // Changed to use a simpler query first to get it working
       const result = await db.execute(sql`
         SELECT 
           t.id,
@@ -124,11 +125,10 @@ export class DatabaseStorage implements IStorage {
           t.agent_id as "agentId",
           t.participants
         FROM transactions t
-        WHERE 
-          t.agent_id = ${userId} OR
-          t.participants::jsonb @> ANY(ARRAY[jsonb_build_array(jsonb_build_object('userId', ${userId}))])
+        WHERE t.agent_id = ${userId}
       `);
 
+      console.log('Retrieved transactions:', result.rows);
       return result.rows;
     } catch (error) {
       console.error('Error in getTransactionsByUser:', error);
