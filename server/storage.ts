@@ -77,7 +77,7 @@ export class DatabaseStorage implements IStorage {
       or(
         eq(transactions.agentId, userId),
         sql`EXISTS (
-          SELECT 1 FROM jsonb_array_elements(${transactions.participants}) AS p
+          SELECT 1 FROM json_array_elements(${transactions.participants}::json) AS p
           WHERE (p->>'userId')::int = ${userId}
         )`
       )
