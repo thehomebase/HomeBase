@@ -91,11 +91,18 @@ export class DatabaseStorage implements IStorage {
   async getTransaction(id: number): Promise<Transaction | undefined> {
     try {
       console.log('Getting transaction with ID:', id);
-      const [transaction] = await db
-        .select()
-        .from(transactions)
-        .where(eq(transactions.id, id));
+      // Using raw SQL to debug the issue
+      const result = await db.execute(
+        sql`SELECT * FROM transactions WHERE id = ${id}`
+      );
+      console.log('Raw query result:', result);
 
+      if (!result.length) {
+        console.log('No transaction found with ID:', id);
+        return undefined;
+      }
+
+      const transaction = result[0];
       console.log('Retrieved transaction:', transaction);
       return transaction;
     } catch (error) {
