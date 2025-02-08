@@ -85,47 +85,37 @@ export class DatabaseStorage implements IStorage {
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
     try {
-      const result = await db
+      console.log('Getting transaction with ID:', id);
+      const [transaction] = await db
         .select()
         .from(transactions)
-        .where(eq(transactions.id, id))
-        .execute();
+        .where(eq(transactions.id, id));
 
-      console.log('Get transaction query result:', result);
-
-      if (result.length === 0) {
-        console.log('No transaction found with ID:', id);
-        return undefined;
-      }
-
-      const transaction = result[0];
       console.log('Retrieved transaction:', transaction);
       return transaction;
     } catch (error) {
-      console.error('Error fetching transaction:', error);
+      console.error('Error in getTransaction:', error);
       throw error;
     }
   }
 
   async getTransactionsByUser(userId: number): Promise<Transaction[]> {
     try {
-      const result = await db
+      console.log('Getting transactions for user:', userId);
+      const userTransactions = await db
         .select()
         .from(transactions)
         .where(
           or(
             eq(transactions.agentId, userId),
-            sql`EXISTS (
-              SELECT 1 FROM json_array_elements(${transactions.participants}::json) AS p
-              WHERE (p->>'userId')::int = ${userId}
-            )`
+            sql`${transactions.participants}::jsonb @> jsonb_build_array(jsonb_build_object('userId', ${userId}))`
           )
         );
 
-      console.log('Retrieved transactions:', result);
-      return result;
+      console.log('Retrieved transactions:', userTransactions);
+      return userTransactions;
     } catch (error) {
-      console.error('Error fetching transactions:', error);
+      console.error('Error in getTransactionsByUser:', error);
       return [];
     }
   }
