@@ -13,21 +13,22 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Transaction, Checklist } from "@shared/schema";
 
 export default function TransactionPage() {
-  const params = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
 
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
-    queryKey: ["/api/transactions", params.id],
-    enabled: !!params.id,
+    queryKey: ["/api/transactions", id],
+    enabled: !!id,
   });
 
   const { data: checklist } = useQuery<Checklist>({
-    queryKey: ["/api/checklists", params.id, user?.role],
-    enabled: !!params.id && !!user?.role,
+    queryKey: ["/api/checklists", id, user?.role],
+    enabled: !!id && !!user?.role,
   });
 
-  console.log('Transaction params:', params);
+  // Debug logs
+  console.log('Transaction ID:', id);
   console.log('Transaction data:', transaction);
   console.log('Loading state:', isLoadingTransaction);
   console.log('Error:', error);
@@ -114,14 +115,14 @@ export default function TransactionPage() {
                 </TabsList>
                 <TabsContent value="progress" className="mt-6">
                   <ProgressChecklist 
-                    transactionId={Number(params.id)}
+                    transactionId={Number(id)}
                     checklist={checklist}
                     userRole={user?.role || ""}
                   />
                 </TabsContent>
                 <TabsContent value="chat" className="mt-6">
                   <Chat 
-                    transactionId={Number(params.id)}
+                    transactionId={Number(id)}
                     userId={user?.id || 0}
                   />
                 </TabsContent>
