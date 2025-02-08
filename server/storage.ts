@@ -68,20 +68,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
-    const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
-    return transaction;
+    try {
+      const [transaction] = await db
+        .select()
+        .from(transactions)
+        .where(eq(transactions.id, id));
+      return transaction;
+    } catch (error) {
+      console.error('Error fetching transaction:', error);
+      return undefined;
+    }
   }
 
   async getTransactionsByUser(userId: number): Promise<Transaction[]> {
-    return await db.select().from(transactions).where(
-      or(
-        eq(transactions.agentId, userId),
-        sql`EXISTS (
-          SELECT 1 FROM json_array_elements(${transactions.participants}::json) AS p
-          WHERE (p->>'userId')::int = ${userId}
-        )`
-      )
-    );
+    try {
+      return await db
+        .select()
+        .from(transactions)
+        .where(
+          or(
+            eq(transactions.agentId, userId),
+            sql`EXISTS (
+              SELECT 1 FROM json_array_elements(${transactions.participants}::json) AS p
+              WHERE (p->>'userId')::int = ${userId}
+            )`
+          )
+        );
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      return [];
+    }
   }
 
   async updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction> {

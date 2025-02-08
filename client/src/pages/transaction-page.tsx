@@ -17,7 +17,7 @@ export default function TransactionPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
 
-  const { data: transaction, isLoading: isLoadingTransaction } = useQuery<Transaction>({
+  const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
     queryKey: [`/api/transactions/${params.id}`],
     enabled: !!params.id,
   });
@@ -27,10 +27,41 @@ export default function TransactionPage() {
     enabled: !!params.id && !!user?.role,
   });
 
-  if (isLoadingTransaction || !transaction) {
+  console.log('Transaction data:', transaction);
+  console.log('Loading state:', isLoadingTransaction);
+  console.log('Error:', error);
+
+  if (isLoadingTransaction) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-destructive">Error Loading Transaction</h2>
+          <p className="text-muted-foreground">{error.message}</p>
+          <Button className="mt-4" onClick={() => setLocation("/")}>
+            Return Home
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!transaction) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold">Transaction Not Found</h2>
+          <Button className="mt-4" onClick={() => setLocation("/")}>
+            Return Home
+          </Button>
+        </div>
       </div>
     );
   }
