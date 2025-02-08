@@ -13,17 +13,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Transaction, Checklist } from "@shared/schema";
 
 export default function TransactionPage() {
-  const { id } = useParams();
+  const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
 
   const { data: transaction, isLoading: isLoadingTransaction } = useQuery<Transaction>({
-    queryKey: ["/api/transactions", id],
+    queryKey: [`/api/transactions/${params.id}`],
+    enabled: !!params.id,
   });
 
   const { data: checklist } = useQuery<Checklist>({
-    queryKey: ["/api/checklists", id, user?.role],
-    enabled: !!user?.role,
+    queryKey: [`/api/checklists/${params.id}/${user?.role}`],
+    enabled: !!params.id && !!user?.role,
   });
 
   if (isLoadingTransaction || !transaction) {
@@ -58,7 +59,7 @@ export default function TransactionPage() {
                   <DialogTitle>Transaction Participants</DialogTitle>
                 </DialogHeader>
                 <ScrollArea className="h-[300px]">
-                  {transaction.participants.map((participant) => (
+                  {transaction.participants?.map((participant) => (
                     <div key={participant.userId} className="py-2 border-b last:border-0">
                       <p className="font-medium">{participant.role}</p>
                     </div>
@@ -81,14 +82,14 @@ export default function TransactionPage() {
                 </TabsList>
                 <TabsContent value="progress" className="mt-6">
                   <ProgressChecklist 
-                    transactionId={Number(id)}
+                    transactionId={Number(params.id)}
                     checklist={checklist}
                     userRole={user?.role || ""}
                   />
                 </TabsContent>
                 <TabsContent value="chat" className="mt-6">
                   <Chat 
-                    transactionId={Number(id)}
+                    transactionId={Number(params.id)}
                     userId={user?.id || 0}
                   />
                 </TabsContent>
