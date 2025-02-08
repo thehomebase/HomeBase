@@ -63,8 +63,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
-    const [transaction] = await db.insert(transactions).values(insertTransaction).returning();
-    return transaction;
+    try {
+      const [transaction] = await db
+        .insert(transactions)
+        .values({
+          address: insertTransaction.address,
+          accessCode: insertTransaction.accessCode,
+          status: insertTransaction.status,
+          agentId: insertTransaction.agentId,
+          participants: insertTransaction.participants,
+        })
+        .returning();
+      return transaction;
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      throw error;
+    }
   }
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
@@ -73,6 +87,8 @@ export class DatabaseStorage implements IStorage {
         .select()
         .from(transactions)
         .where(eq(transactions.id, id));
+
+      console.log('Retrieved transaction:', transaction);
       return transaction;
     } catch (error) {
       console.error('Error fetching transaction:', error);
@@ -82,7 +98,7 @@ export class DatabaseStorage implements IStorage {
 
   async getTransactionsByUser(userId: number): Promise<Transaction[]> {
     try {
-      return await db
+      const result = await db
         .select()
         .from(transactions)
         .where(
@@ -94,6 +110,9 @@ export class DatabaseStorage implements IStorage {
             )`
           )
         );
+
+      console.log('Retrieved transactions:', result);
+      return result;
     } catch (error) {
       console.error('Error fetching transactions:', error);
       return [];
