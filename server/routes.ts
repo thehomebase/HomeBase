@@ -18,9 +18,25 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/transactions/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const transaction = await storage.getTransaction(Number(req.params.id));
-    if (!transaction) return res.sendStatus(404);
-    res.json(transaction);
+
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      console.error('Invalid transaction ID:', req.params.id);
+      return res.status(400).send('Invalid transaction ID');
+    }
+
+    try {
+      const transaction = await storage.getTransaction(id);
+      if (!transaction) {
+        console.error('Transaction not found:', id);
+        return res.status(404).send('Transaction not found');
+      }
+      console.log('Retrieved transaction:', transaction);
+      res.json(transaction);
+    } catch (error) {
+      console.error('Error fetching transaction:', error);
+      res.status(500).send('Error fetching transaction');
+    }
   });
 
   app.post("/api/transactions", async (req, res) => {

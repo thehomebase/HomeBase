@@ -71,9 +71,11 @@ export class DatabaseStorage implements IStorage {
           accessCode: insertTransaction.accessCode,
           status: insertTransaction.status,
           agentId: insertTransaction.agentId,
-          participants: insertTransaction.participants,
+          participants: insertTransaction.participants || [],
         })
         .returning();
+
+      console.log('Created transaction:', transaction);
       return transaction;
     } catch (error) {
       console.error('Error creating transaction:', error);
@@ -83,16 +85,25 @@ export class DatabaseStorage implements IStorage {
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
     try {
-      const [transaction] = await db
+      const result = await db
         .select()
         .from(transactions)
-        .where(eq(transactions.id, id));
+        .where(eq(transactions.id, id))
+        .execute();
 
+      console.log('Get transaction query result:', result);
+
+      if (result.length === 0) {
+        console.log('No transaction found with ID:', id);
+        return undefined;
+      }
+
+      const transaction = result[0];
       console.log('Retrieved transaction:', transaction);
       return transaction;
     } catch (error) {
       console.error('Error fetching transaction:', error);
-      return undefined;
+      throw error;
     }
   }
 
