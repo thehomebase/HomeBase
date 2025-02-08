@@ -18,15 +18,16 @@ export default function TransactionPage() {
   const { user } = useAuth();
 
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
-    queryKey: [`/api/transactions/${params.id}`],
+    queryKey: ["/api/transactions", params.id],
     enabled: !!params.id,
   });
 
   const { data: checklist } = useQuery<Checklist>({
-    queryKey: [`/api/checklists/${params.id}/${user?.role}`],
+    queryKey: ["/api/checklists", params.id, user?.role],
     enabled: !!params.id && !!user?.role,
   });
 
+  console.log('Transaction params:', params);
   console.log('Transaction data:', transaction);
   console.log('Loading state:', isLoadingTransaction);
   console.log('Error:', error);
