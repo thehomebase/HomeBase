@@ -10,22 +10,29 @@ import Chat from "@/components/chat";
 import ProgressChecklist from "@/components/progress-checklist";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Transaction, Checklist } from "@shared/schema";
 
 export default function TransactionPage() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
 
-  const { data: transaction } = useQuery({
+  const { data: transaction, isLoading: isLoadingTransaction } = useQuery<Transaction>({
     queryKey: ["/api/transactions", id],
   });
 
-  const { data: checklist } = useQuery({
+  const { data: checklist } = useQuery<Checklist>({
     queryKey: ["/api/checklists", id, user?.role],
     enabled: !!user?.role,
   });
 
-  if (!transaction) return null;
+  if (isLoadingTransaction || !transaction) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

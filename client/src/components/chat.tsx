@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send } from "lucide-react";
+import { Message } from "@shared/schema";
 
 interface ChatProps {
   transactionId: number;
@@ -16,7 +17,7 @@ export default function Chat({ transactionId, userId }: ChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [socket, setSocket] = useState<WebSocket | null>(null);
 
-  const { data: messages } = useQuery({
+  const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages", transactionId],
   });
 
@@ -67,11 +68,19 @@ export default function Chat({ transactionId, userId }: ChatProps) {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[600px]">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-[600px]">
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
-          {messages?.map((msg) => (
+          {messages.map((msg) => (
             <div
               key={msg.id}
               className={`flex ${msg.userId === userId ? "justify-end" : "justify-start"}`}
