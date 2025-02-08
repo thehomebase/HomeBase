@@ -19,16 +19,20 @@ export default function TransactionPage() {
   const { user } = useAuth();
 
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
-    queryKey: [`/api/transactions/${id}`],
+    queryKey: ["/api/transactions", id],
+    queryFn: async () => {
+      const response = await fetch(`/api/transactions/${id}`);
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      return response.json();
+    },
     enabled: !!id,
-    retry: 1,
-    onError: (error) => {
-      console.error('Transaction fetch error:', error);
-    }
+    retry: false
   });
 
   const { data: checklist } = useQuery<Checklist>({
-    queryKey: [`/api/checklists/${id}/${user?.role}`],
+    queryKey: ["/api/checklists", id, user?.role],
     enabled: !!id && !!user?.role,
   });
 
