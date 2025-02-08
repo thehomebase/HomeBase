@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Transaction, Checklist } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
+import { queryClient } from "@/lib/queryClient";
 
 export default function TransactionPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +22,10 @@ export default function TransactionPage() {
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
     queryKey: ["/api/transactions", Number(id)],
     enabled: !!id && Number(id) > 0,
+    retry: 1,
+    onError: (error) => {
+      console.error('Error fetching transaction:', error);
+    }
   });
 
   const { data: checklist } = useQuery<Checklist>({
@@ -41,7 +46,9 @@ export default function TransactionPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-destructive">Error Loading Transaction</h2>
-          <p className="text-muted-foreground mt-2">Unable to load transaction details</p>
+          <p className="text-muted-foreground mt-2">
+            {error instanceof Error ? error.message : 'Unable to load transaction details'}
+          </p>
           <Button className="mt-4" onClick={() => setLocation("/")}>
             Return Home
           </Button>
@@ -55,7 +62,9 @@ export default function TransactionPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-xl font-semibold">Transaction Not Found</h2>
-          <p className="text-muted-foreground mt-2">This transaction may have been deleted or you may not have access to it.</p>
+          <p className="text-muted-foreground mt-2">
+            This transaction may have been deleted or you may not have access to it.
+          </p>
           <Button className="mt-4" onClick={() => setLocation("/")}>
             Return Home
           </Button>
