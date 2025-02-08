@@ -19,11 +19,11 @@ export default function TransactionPage() {
   const { user } = useAuth();
 
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
-    queryKey: ["/api/transactions", id],
+    queryKey: ["/api/transactions", Number(id)],
     queryFn: async () => {
       const response = await fetch(`/api/transactions/${id}`);
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error('Failed to load transaction');
       }
       return response.json();
     },
@@ -32,7 +32,7 @@ export default function TransactionPage() {
   });
 
   const { data: checklist } = useQuery<Checklist>({
-    queryKey: ["/api/checklists", id, user?.role],
+    queryKey: ["/api/checklists", Number(id), user?.role],
     enabled: !!id && !!user?.role,
   });
 
@@ -49,7 +49,7 @@ export default function TransactionPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-destructive">Error Loading Transaction</h2>
-          <p className="text-muted-foreground mt-2">{error.message}</p>
+          <p className="text-muted-foreground mt-2">Unable to load transaction details</p>
           <Button className="mt-4" onClick={() => setLocation("/")}>
             Return Home
           </Button>
@@ -63,7 +63,7 @@ export default function TransactionPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-xl font-semibold">Transaction Not Found</h2>
-          <p className="text-muted-foreground mt-2">This transaction may have been deleted or you may not have access to it.</p>
+          <p className="text-muted-foreground mt-2">The requested transaction could not be found.</p>
           <Button className="mt-4" onClick={() => setLocation("/")}>
             Return Home
           </Button>
@@ -163,14 +163,14 @@ export default function TransactionPage() {
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="progress" className="mt-6">
-                    <ProgressChecklist 
+                    <ProgressChecklist
                       transactionId={Number(id)}
                       checklist={checklist}
                       userRole={user?.role || ""}
                     />
                   </TabsContent>
                   <TabsContent value="chat" className="mt-6">
-                    <Chat 
+                    <Chat
                       transactionId={Number(id)}
                       userId={user?.id || 0}
                     />
