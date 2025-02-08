@@ -20,13 +20,20 @@ export default function TransactionPage() {
 
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
     queryKey: ["/api/transactions", Number(id)],
+    queryFn: async () => {
+      console.log('Fetching transaction with ID:', id);
+      const response = await fetch(`/api/transactions/${id}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error fetching transaction:', errorText);
+        throw new Error(errorText);
+      }
+      const data = await response.json();
+      console.log('Received transaction data:', data);
+      return data;
+    },
     enabled: !!id && Number(id) > 0,
     retry: false
-  });
-
-  const { data: checklist } = useQuery<Checklist>({
-    queryKey: ["/api/checklists", Number(id), user?.role],
-    enabled: !!id && !!user?.role,
   });
 
   if (isLoadingTransaction) {
@@ -38,11 +45,12 @@ export default function TransactionPage() {
   }
 
   if (error) {
+    console.error('Transaction page error:', error);
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-destructive">Error Loading Transaction</h2>
-          <p className="text-muted-foreground mt-2">Unable to load transaction details</p>
+          <p className="text-muted-foreground mt-2">{error.message}</p>
           <Button className="mt-4" onClick={() => setLocation("/")}>
             Return Home
           </Button>
@@ -77,6 +85,11 @@ export default function TransactionPage() {
         return 'bg-gray-500/10 text-gray-500';
     }
   };
+
+  const { data: checklist } = useQuery<Checklist>({
+    queryKey: ["/api/checklists", Number(id), user?.role],
+    enabled: !!id && !!user?.role,
+  });
 
   return (
     <div className="min-h-screen bg-background">

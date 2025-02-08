@@ -41,6 +41,16 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send('Transaction not found');
       }
 
+      // Added check to ensure user has access to this transaction
+      const userHasAccess = 
+        transaction.agentId === req.user.id || 
+        transaction.participants.some(p => p.userId === req.user.id);
+
+      if (!userHasAccess) {
+        console.error('User does not have access to transaction:', id);
+        return res.status(403).send('Access denied');
+      }
+
       res.json(transaction);
     } catch (error) {
       console.error('Error fetching transaction:', error);
