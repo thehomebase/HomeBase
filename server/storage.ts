@@ -92,7 +92,7 @@ export class DatabaseStorage implements IStorage {
           t.access_code as "accessCode",
           t.status,
           t.agent_id as "agentId",
-          t.participants
+          COALESCE(t.participants, '[]'::jsonb) as participants
         FROM transactions t
         WHERE t.id = ${id}
       `);
@@ -104,8 +104,13 @@ export class DatabaseStorage implements IStorage {
         return undefined;
       }
 
+      // Parse participants if it's a string
       const transaction = result.rows[0];
-      console.log('Returning transaction:', transaction);
+      if (typeof transaction.participants === 'string') {
+        transaction.participants = JSON.parse(transaction.participants);
+      }
+
+      console.log('Returning formatted transaction:', transaction);
       return transaction;
     } catch (error) {
       console.error('Database error in getTransaction:', error);
