@@ -12,8 +12,13 @@ export function registerRoutes(app: Express): Server {
   // Transactions
   app.get("/api/transactions", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const transactions = await storage.getTransactionsByUser(req.user.id);
-    res.json(transactions);
+    try {
+      const transactions = await storage.getTransactionsByUser(req.user.id);
+      res.json(transactions);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      res.status(500).send('Error fetching transactions');
+    }
   });
 
   app.get("/api/transactions/:id", async (req, res) => {
@@ -44,11 +49,22 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/transactions", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
-    const parsed = insertTransactionSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).send(parsed.error.message);
-    const transaction = await storage.createTransaction(parsed.data);
-    res.status(201).json(transaction);
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const parsed = insertTransactionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).send(parsed.error.message);
+      }
+
+      const transaction = await storage.createTransaction(parsed.data);
+      res.status(201).json(transaction);
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      res.status(500).send('Error creating transaction');
+    }
   });
 
   // Checklists

@@ -66,6 +66,9 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log('Creating transaction with data:', insertTransaction);
 
+      const participantsArray = insertTransaction.participants || [];
+      console.log('Participants array:', participantsArray);
+
       const [transaction] = await db
         .insert(transactions)
         .values({
@@ -73,7 +76,7 @@ export class DatabaseStorage implements IStorage {
           accessCode: insertTransaction.accessCode,
           status: insertTransaction.status,
           agentId: insertTransaction.agentId,
-          participants: insertTransaction.participants || []
+          participants: participantsArray
         })
         .returning();
 
@@ -110,7 +113,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           or(
             eq(transactions.agentId, userId),
-            sql`${transactions.participants}::jsonb @> '[{"userId": ${userId}}]'::jsonb`
+            sql`${transactions.participants}::jsonb @> ANY(ARRAY['[{"userId":'||${userId}||'}]']::jsonb[])`
           )
         );
 
@@ -118,7 +121,7 @@ export class DatabaseStorage implements IStorage {
       return userTransactions;
     } catch (error) {
       console.error('Error in getTransactionsByUser:', error);
-      throw error;
+      return []; // Return empty array instead of throwing to prevent app crash
     }
   }
 
