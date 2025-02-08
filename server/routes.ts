@@ -13,7 +13,9 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/transactions", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
+      console.log('Getting transactions for user:', req.user.id);
       const transactions = await storage.getTransactionsByUser(req.user.id);
+      console.log('Retrieved transactions:', transactions);
       res.json(transactions);
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -22,7 +24,10 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/transactions/:id", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (!req.isAuthenticated()) {
+      console.log('User not authenticated');
+      return res.sendStatus(401);
+    }
 
     console.log('Fetching transaction with ID:', req.params.id);
     const id = parseInt(req.params.id);

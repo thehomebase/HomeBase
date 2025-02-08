@@ -48,13 +48,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    try {
+      const result = await db.execute(sql`SELECT * FROM users WHERE id = ${id}`);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error in getUser:', error);
+      return undefined;
+    }
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    try {
+      const result = await db.execute(sql`SELECT * FROM users WHERE username = ${username}`);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error in getUserByUsername:', error);
+      return undefined;
+    }
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -64,80 +74,70 @@ export class DatabaseStorage implements IStorage {
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     try {
-      console.log('Creating transaction with data:', insertTransaction);
-
-      const participantsArray = insertTransaction.participants || [];
-      console.log('Participants array:', participantsArray);
-
-      const [transaction] = await db
-        .insert(transactions)
-        .values({
-          address: insertTransaction.address,
-          accessCode: insertTransaction.accessCode,
-          status: insertTransaction.status,
-          agentId: insertTransaction.agentId,
-          participants: participantsArray
-        })
-        .returning();
-
-      console.log('Created transaction:', transaction);
+      const [transaction] = await db.insert(transactions).values(insertTransaction).returning();
       return transaction;
     } catch (error) {
-      console.error('Error creating transaction:', error);
+      console.error('Error in createTransaction:', error);
       throw error;
     }
   }
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
     try {
-      console.log('Getting transaction with ID:', id);
-      const [transaction] = await db
-        .select({
-          id: transactions.id,
-          address: transactions.address,
-          accessCode: transactions.accessCode,
-          status: transactions.status,
-          agentId: transactions.agentId,
-          participants: transactions.participants
-        })
-        .from(transactions)
-        .where(eq(transactions.id, id));
+      console.log('Fetching transaction with raw SQL, ID:', id);
+      const result = await db.execute(sql`
+        SELECT 
+          t.id,
+          t.address,
+          t.access_code as "accessCode",
+          t.status,
+          t.agent_id as "agentId",
+          t.participants
+        FROM transactions t
+        WHERE t.id = ${id}
+      `);
 
-      console.log('Retrieved transaction:', transaction);
+      console.log('Raw database result:', result.rows);
+
+      if (result.rows.length === 0) {
+        console.log('No transaction found with ID:', id);
+        return undefined;
+      }
+
+      const transaction = result.rows[0];
+      console.log('Returning transaction:', transaction);
       return transaction;
     } catch (error) {
-      console.error('Error in getTransaction:', error);
+      console.error('Database error in getTransaction:', error);
       throw error;
     }
   }
 
   async getTransactionsByUser(userId: number): Promise<Transaction[]> {
     try {
-      console.log('Getting transactions for user:', userId);
-      const userTransactions = await db
-        .select()
-        .from(transactions)
-        .where(
-          or(
-            eq(transactions.agentId, userId),
-            sql`${transactions.participants}::jsonb @> ANY(ARRAY['[{"userId":'||${userId}||'}]']::jsonb[])`
-          )
-        );
+      const result = await db.execute(sql`
+        SELECT 
+          t.id,
+          t.address,
+          t.access_code as "accessCode",
+          t.status,
+          t.agent_id as "agentId",
+          t.participants
+        FROM transactions t
+        WHERE 
+          t.agent_id = ${userId} OR
+          t.participants::jsonb @> ANY(ARRAY[jsonb_build_array(jsonb_build_object('userId', ${userId}))])
+      `);
 
-      console.log('Retrieved transactions:', userTransactions);
-      return userTransactions;
+      return result.rows;
     } catch (error) {
       console.error('Error in getTransactionsByUser:', error);
-      return []; // Return empty array instead of throwing to prevent app crash
+      return [];
     }
   }
 
   async updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction> {
-    const [transaction] = await db
-      .update(transactions)
-      .set(data)
-      .where(eq(transactions.id, id))
-      .returning();
+    const [transaction] = await db.update(transactions).set(data).where(eq(transactions.id, id)).returning();
     return transaction;
   }
 
@@ -147,16 +147,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getChecklist(transactionId: number, role: string): Promise<Checklist | undefined> {
-    const [checklist] = await db
-      .select()
-      .from(checklists)
-      .where(
-        and(
-          eq(checklists.transactionId, transactionId),
-          eq(checklists.role, role)
-        )
-      );
-    return checklist;
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM checklists 
+        WHERE transaction_id = ${transactionId} AND role = ${role}
+      `);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error in getChecklist:', error);
+      return undefined;
+    }
   }
 
   async updateChecklist(id: number, items: Checklist["items"]): Promise<Checklist> {
@@ -174,11 +174,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMessages(transactionId: number): Promise<Message[]> {
-    return await db
-      .select()
-      .from(messages)
-      .where(eq(messages.transactionId, transactionId))
-      .orderBy(messages.timestamp);
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM messages 
+        WHERE transaction_id = ${transactionId}
+        ORDER BY timestamp ASC
+      `);
+      return result.rows;
+    } catch (error) {
+      console.error('Error in getMessages:', error);
+      return [];
+    }
   }
 }
 
