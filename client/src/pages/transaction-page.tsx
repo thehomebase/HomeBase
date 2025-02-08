@@ -20,14 +20,7 @@ export default function TransactionPage() {
 
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
     queryKey: ["/api/transactions", Number(id)],
-    queryFn: async () => {
-      const response = await fetch(`/api/transactions/${id}`);
-      if (!response.ok) {
-        throw new Error('Failed to load transaction');
-      }
-      return response.json();
-    },
-    enabled: !!id,
+    enabled: !!id && Number(id) > 0,
     retry: false
   });
 
