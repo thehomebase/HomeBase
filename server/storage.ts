@@ -76,7 +76,10 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(transactions).where(
       or(
         eq(transactions.agentId, userId),
-        sql`${userId} = ANY(${transactions.participants}->>'userId')`
+        sql`EXISTS (
+          SELECT 1 FROM jsonb_array_elements(${transactions.participants}) AS p
+          WHERE (p->>'userId')::int = ${userId}
+        )`
       )
     );
   }
