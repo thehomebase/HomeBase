@@ -4,7 +4,6 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import type { Checklist } from "@shared/schema";
-import { useToast } from "@/hooks/use-toast";
 
 interface ProgressChecklistProps {
   transactionId: number;
@@ -26,20 +25,11 @@ const DEFAULT_ITEMS = {
     { id: "c4", text: "Review closing documents", completed: false },
     { id: "c5", text: "Final walk-through", completed: false },
   ]
-};
+} as const;
 
 export function ProgressChecklist({ transactionId, userRole }: ProgressChecklistProps) {
-  const { toast } = useToast();
-  console.log("ProgressChecklist render:", { transactionId, userRole });
-
-  // Ensure transactionId is valid before making any requests
-  if (!transactionId || isNaN(transactionId)) {
-    console.error("Invalid transactionId:", transactionId);
-    return <div>Invalid transaction ID</div>;
-  }
-
   // Get existing checklist
-  const { data: checklist, isLoading } = useQuery<Checklist>({
+  const { data: checklist } = useQuery<Checklist>({
     queryKey: ["/api/checklists", transactionId, userRole],
     enabled: !!transactionId && !!userRole,
   });
@@ -51,25 +41,16 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
   // Single mutation to handle both create and update
   const updateChecklistMutation = useMutation({
     mutationFn: async (newItems: typeof defaultItems) => {
-      try {
-        if (checklist) {
-          // Update existing checklist
-          const response = await apiRequest("PATCH", `/api/checklists/${checklist.id}`, { 
-            items: newItems 
-          });
-          return response.json();
-        } else {
-          // Create new checklist with explicit transaction ID
-          const response = await apiRequest("POST", "/api/checklists", {
-            transactionId: Number(transactionId),
-            role: userRole,
-            items: newItems
-          });
-          return response.json();
-        }
-      } catch (error) {
-        console.error("Mutation error:", error);
-        throw error;
+      if (checklist) {
+        // Update existing checklist
+        await apiRequest("PATCH", `/api/checklists/${checklist.id}`, { items: newItems });
+      } else {
+        // Create new checklist
+        await apiRequest("POST", "/api/checklists", {
+          transactionId,
+          role: userRole,
+          items: newItems
+        });
       }
     },
     onSuccess: () => {
@@ -77,25 +58,16 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
     },
     onError: (error) => {
       console.error("Failed to update checklist:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update checklist. Please try again.",
-        variant: "destructive",
-      });
     }
   });
 
   const handleCheck = (itemId: string, checked: boolean) => {
-    console.log("Handling checkbox change:", { itemId, checked, transactionId, userRole });
+    console.log("Handling checkbox change:", { itemId, checked });
     const updatedItems = items.map(item =>
       item.id === itemId ? { ...item, completed: checked } : item
     );
     updateChecklistMutation.mutate(updatedItems);
   };
-
-  if (isLoading) {
-    return <div>Loading checklist...</div>;
-  }
 
   return (
     <div className="space-y-6">
@@ -112,15 +84,12 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
                 <Checkbox
                   id={item.id}
                   checked={item.completed}
-                  onCheckedChange={(checked) => {
-                    console.log("Checkbox clicked:", { itemId: item.id, checked });
-                    handleCheck(item.id, checked as boolean);
-                  }}
-                  className="h-5 w-5 cursor-pointer"
+                  onCheckedChange={(checked) => handleCheck(item.id, checked as boolean)}
+                  className="cursor-pointer"
                 />
                 <label
                   htmlFor={item.id}
-                  className={`text-sm cursor-pointer select-none ${
+                  className={`text-sm cursor-pointer ${
                     item.completed ? "line-through text-muted-foreground" : ""
                   }`}
                 >
