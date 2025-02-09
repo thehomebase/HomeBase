@@ -23,6 +23,7 @@ interface Transaction {
 const createTransactionSchema = z.object({
   address: z.string().min(1),
   accessCode: z.string().min(6),
+  type: z.enum(['buy', 'sell'])
 });
 
 export default function TransactionsPage() {
@@ -30,7 +31,7 @@ export default function TransactionsPage() {
   const { user } = useAuth();
   const form = useForm({
     resolver: zodResolver(createTransactionSchema),
-    defaultValues: { address: "", accessCode: "" },
+    defaultValues: { address: "", accessCode: "", type: "buy" },
   });
 
   const { data: transactions = [] } = useQuery<Transaction[]>({
@@ -97,6 +98,26 @@ export default function TransactionsPage() {
                           <Input {...field} placeholder="Min. 6 characters" />
                         </FormControl>
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem className="mb-4">
+                        <FormLabel>Transaction Type</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center space-x-2">
+                            <Toggle
+                              pressed={field.value === 'sell'}
+                              onPressedChange={(pressed) => field.onChange(pressed ? 'sell' : 'buy')}
+                              className="w-full data-[state=on]:bg-green-500"
+                            >
+                              {field.value === 'buy' ? 'Buy Transaction' : 'Sell Transaction'}
+                            </Toggle>
+                          </div>
+                        </FormControl>
                       </FormItem>
                     )}
                   />
