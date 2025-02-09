@@ -12,16 +12,16 @@ import { format } from "date-fns";
 
 interface Message {
   id: number;
-  content: string;
-  timestamp: string;
+  transactionId: number;
   userId: number;
   username: string;
   role: string;
-  transactionId: number;
+  content: string;
+  timestamp: string;
 }
 
 interface ChatProps {
-  transactionId: number;
+  transactionId: number | string;
 }
 
 export function Chat({ transactionId }: ChatProps) {
@@ -30,41 +30,45 @@ export function Chat({ transactionId }: ChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Convert transactionId to number and validate
-  const validTransactionId = Number(transactionId);
-  if (!validTransactionId || isNaN(validTransactionId)) {
+  // Ensure transactionId is a valid number
+  const numericTransactionId = typeof transactionId === 'string' ? parseInt(transactionId, 10) : transactionId;
+
+  // Validate transaction ID
+  if (isNaN(numericTransactionId)) {
     return (
-      <div className="p-4 text-destructive">
-        Error: Invalid transaction ID
+      <div className="p-4 border rounded-lg bg-destructive/10 text-destructive">
+        Invalid transaction ID provided
       </div>
     );
   }
 
-  const { data: messages = [], isLoading, error } = useQuery<Message[]>({
-    queryKey: ["/api/messages", validTransactionId],
+  const { data: messages = [], isLoading } = useQuery<Message[]>({
+    queryKey: ["/api/messages", numericTransactionId],
     queryFn: async () => {
-      const response = await apiRequest(
-        "GET",
-        `/api/messages?transactionId=${validTransactionId}`
-      );
-      if (!response.ok) {
-        throw new Error(await response.text() || "Failed to fetch messages");
+      try {
+        const response = await apiRequest("GET", `/api/messages?transactionId=${numericTransactionId}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch messages");
+        }
+        return response.json();
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+        throw error;
       }
-      return response.json();
     },
-    enabled: !!validTransactionId && !!user,
+    enabled: !!user && !!numericTransactionId,
     refetchInterval: 5000,
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (messageContent: string) => {
+    mutationFn: async (content: string) => {
       if (!user) {
-        throw new Error("Please log in to send messages");
+        throw new Error("Must be logged in to send messages");
       }
 
       const messageData = {
-        content: messageContent,
-        transactionId: validTransactionId,
+        content,
+        transactionId: numericTransactionId,
         userId: user.id,
         username: user.username,
         role: user.role,
@@ -72,25 +76,24 @@ export function Chat({ transactionId }: ChatProps) {
 
       const response = await apiRequest("POST", "/api/messages", messageData);
       if (!response.ok) {
-        throw new Error(await response.text() || "Failed to send message");
+        throw new Error("Failed to send message");
       }
-
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages", validTransactionId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages", numericTransactionId] });
       setMessage("");
     },
     onError: (error: Error) => {
-      console.error("Message send error:", error);
       toast({
-        title: "Error sending message",
+        title: "Error",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -101,26 +104,8 @@ export function Chat({ transactionId }: ChatProps) {
     e.preventDefault();
     const trimmedMessage = message.trim();
     if (!trimmedMessage) return;
-
     sendMessageMutation.mutate(trimmedMessage);
   };
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-[600px]">
-        <div className="text-center">
-          <p className="text-destructive mb-4">Failed to load messages</p>
-          <Button
-            onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ["/api/messages", validTransactionId] });
-            }}
-          >
-            Try Again
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -131,15 +116,13 @@ export function Chat({ transactionId }: ChatProps) {
   }
 
   return (
-    <div className="flex flex-col h-[600px] rounded-lg border">
+    <div className="flex flex-col h-[600px] rounded-lg border bg-background">
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex ${
-                msg.userId === user?.id ? "justify-end" : "justify-start"
-              }`}
+              className={`flex ${msg.userId === user?.id ? "justify-end" : "justify-start"}`}
             >
               <div
                 className={`max-w-[80%] rounded-lg p-3 ${
@@ -152,7 +135,7 @@ export function Chat({ transactionId }: ChatProps) {
                   <span className="font-medium">{msg.username}</span>
                   <span className="text-xs opacity-70">({msg.role})</span>
                 </div>
-                <p className="text-sm">{msg.content}</p>
+                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                 <span className="text-xs opacity-70 block mt-1">
                   {format(new Date(msg.timestamp), "MMM d, h:mm a")}
                 </span>
@@ -162,21 +145,23 @@ export function Chat({ transactionId }: ChatProps) {
         </div>
       </ScrollArea>
 
-      <form onSubmit={handleSubmit} className="p-4 border-t flex gap-2">
-        <Input
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Type your message..."
-          className="flex-1"
-          disabled={sendMessageMutation.isPending}
-        />
-        <Button
-          type="submit"
-          size="icon"
-          disabled={sendMessageMutation.isPending || !message.trim()}
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+      <form onSubmit={handleSubmit} className="p-4 border-t bg-background">
+        <div className="flex gap-2">
+          <Input
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Type your message..."
+            className="flex-1"
+            disabled={sendMessageMutation.isPending}
+          />
+          <Button
+            type="submit"
+            size="icon"
+            disabled={sendMessageMutation.isPending || !message.trim()}
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
       </form>
     </div>
   );

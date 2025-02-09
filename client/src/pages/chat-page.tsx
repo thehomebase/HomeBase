@@ -6,11 +6,13 @@ import { ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Link } from "wouter";
-import { Transaction } from "@shared/schema";
+import type { Transaction } from "@shared/schema";
 
 export default function ChatPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+
+  // Parse and validate transaction ID
   const parsedId = id ? parseInt(id, 10) : null;
 
   // Early return if no valid ID
@@ -34,8 +36,7 @@ export default function ChatPage() {
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/transactions/${parsedId}`);
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to fetch transaction");
+        throw new Error("Failed to fetch transaction");
       }
       return response.json();
     },
