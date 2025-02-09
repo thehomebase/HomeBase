@@ -187,6 +187,9 @@ export default function TransactionPage() {
   const currentPhase = transaction.checklist?.find(item => !item.completed)?.phase || 
     (transactionType === 'buy' ? "Pre-Offer" : "Pre-Listing Preparation");
 
+  // Ensure consistent progress display
+  const displayProgress = `${progress}% Complete`;
+
   return (
     <div>
       <header className="border-b">
@@ -239,7 +242,7 @@ export default function TransactionPage() {
               </div>
               <div className="space-y-2">
                 <Progress value={progress} className="h-2" />
-                <p className="text-sm text-muted-foreground">{progress}% Complete</p>
+                <p className="text-sm text-muted-foreground">{displayProgress}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
