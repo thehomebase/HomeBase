@@ -103,25 +103,11 @@ const updateTransaction = useMutation({
     return response.json();
   },
   onSuccess: async (updatedData) => {
+    queryClient.setQueryData(["/api/transactions", parsedId], updatedData);
     await queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
     setIsEditing(false);
-
-    const updatedTransaction = await queryClient.getQueryData(["/api/transactions", parsedId]);
-    if (updatedTransaction) {
-      form.reset({
-        contractPrice: updatedTransaction.contractPrice || undefined,
-        optionPeriodExpiration: updatedTransaction.optionPeriodExpiration || undefined,
-        optionFee: updatedTransaction.optionFee || undefined,
-        earnestMoney: updatedTransaction.earnestMoney || undefined,
-        downPayment: updatedTransaction.downPayment || undefined,
-        sellerConcessions: updatedTransaction.sellerConcessions || undefined,
-        closingDate: updatedTransaction.closingDate || undefined,
-        contractExecutionDate: updatedTransaction.contractExecutionDate || undefined,
-        status: updatedTransaction.status || undefined,
-        mlsNumber: updatedTransaction.mlsNumber || undefined,
-        financing: updatedTransaction.financing || undefined
-      });
-    }
+    
+    form.reset(updatedData);
 
     toast({
       title: "Success",
