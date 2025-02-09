@@ -43,7 +43,7 @@ interface Transaction {
 
 interface TransactionFormData {
   contractPrice?: number;
-  optionPeriodExpiration?: string;
+  option_period_expiration?: string;
   optionFee?: number;
   earnestMoney?: number;
   downPayment?: number;
@@ -88,7 +88,7 @@ const updateTransaction = useMutation({
       ...data,
       closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : undefined,
       contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : undefined,
-      optionPeriodExpiration: data.optionPeriodExpiration ? new Date(data.optionPeriodExpiration).toISOString() : undefined
+      option_period_expiration: data.option_period_expiration ? new Date(data.option_period_expiration).toISOString() : undefined
     };
 
     const cleanData = Object.fromEntries(
@@ -106,7 +106,7 @@ const updateTransaction = useMutation({
     queryClient.setQueryData(["/api/transactions", parsedId], updatedData);
     await queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
     setIsEditing(false);
-    
+
     form.reset(updatedData);
 
     toast({
@@ -127,7 +127,7 @@ const updateTransaction = useMutation({
     if (transaction) {
       form.reset({
         contractPrice: transaction.contractPrice,
-        optionPeriodExpiration: transaction.optionPeriodExpiration,
+        option_period_expiration: transaction.optionPeriodExpiration,
         optionFee: transaction.optionFee,
         earnestMoney: transaction.earnestMoney,
         downPayment: transaction.downPayment,
@@ -282,7 +282,7 @@ const updateTransaction = useMutation({
                     {isEditing ? (
                       <Input
                         type="date"
-                        {...form.register("optionPeriodExpiration")}
+                        {...form.register("option_period_expiration")}
                         className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
@@ -462,7 +462,7 @@ const updateTransaction = useMutation({
                         ...data,
                         closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : undefined,
                         contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : undefined,
-                        optionPeriodExpiration: data.optionPeriodExpiration ? new Date(data.optionPeriodExpiration).toISOString() : undefined
+                        option_period_expiration: data.option_period_expiration ? new Date(data.option_period_expiration).toISOString() : undefined
                       };
                       updateTransaction.mutate(formattedData);
                       setIsEditing(false);
