@@ -48,7 +48,7 @@ export default function TransactionPage() {
   // Parse and validate transaction ID
   const parsedId = id ? parseInt(id, 10) : null;
 
-  // Early return if no valid ID or user
+  // Early return if no user
   if (!user) {
     return (
       <div className="container mx-auto p-6">
@@ -64,21 +64,63 @@ export default function TransactionPage() {
     );
   }
 
+  // Early return if invalid ID
+  if (!parsedId || isNaN(parsedId)) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center">
+          <p className="text-xl text-destructive">Invalid transaction ID</p>
+          <Link href="/transactions">
+            <Button variant="outline" className="mt-4">
+              Back to Transactions
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   // Fetch transaction data
   const { data: transaction, isError, isLoading } = useQuery({
     queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
-      if (!parsedId || isNaN(parsedId)) {
-        throw new Error("Invalid transaction ID");
-      }
       const response = await apiRequest("GET", `/api/transactions/${parsedId}`);
       if (!response.ok) {
         throw new Error("Failed to fetch transaction");
       }
       return response.json();
     },
-    enabled: !!parsedId && !isNaN(parsedId),
+    enabled: !!parsedId && !!user,
+    retry: 1,
   });
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex justify-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (isError || !transaction) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center">
+          <p className="text-xl text-destructive">Error loading transaction</p>
+          <Link href="/transactions">
+            <Button variant="outline" className="mt-4">
+              Back to Transactions
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
 
   // Initialize form with transaction data
   const form = useForm<TransactionFormData>({
@@ -121,48 +163,6 @@ export default function TransactionPage() {
     },
   });
 
-  // Show loading state while fetching data
-  if (isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex justify-center">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state if data fetch failed or invalid ID
-  if (isError || !parsedId || isNaN(parsedId)) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">
-          <p className="text-xl text-destructive">Invalid transaction ID</p>
-          <Link href="/transactions">
-            <Button variant="outline" className="mt-4">
-              Back to Transactions
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (!transaction) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="text-center text-destructive">
-          <p>Error: Unable to load transaction data</p>
-          <Link href="/transactions">
-            <Button variant="outline" className="mt-4">
-              Back to Transactions
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   // Calculate progress based on completed checklist items
   const { data: checklist, isError: checklistError, isLoading: checklistLoading } = useQuery({
     queryKey: ["/api/transactions", parsedId, "checklist", user.role],
@@ -177,11 +177,11 @@ export default function TransactionPage() {
   });
 
   if (checklistLoading) {
-    return <div>Loading checklist...</div>; // Add a loading indicator
+    return <div>Loading checklist...</div>; 
   }
 
   if (checklistError) {
-    return <div>Error loading checklist: {checklistError.message}</div>; // Handle errors
+    return <div>Error loading checklist: {checklistError.message}</div>; 
   }
 
   const completedTasks = checklist?.items?.filter(item => item.completed).length ?? 0;

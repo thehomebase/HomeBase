@@ -40,12 +40,16 @@ export default function TransactionsPage() {
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: z.infer<typeof createTransactionSchema>) => {
-      await apiRequest("POST", "/api/transactions", {
+      const response = await apiRequest("POST", "/api/transactions", {
         ...data,
         agentId: user?.id,
         status: "active",
         participants: [],
       });
+      if (!response.ok) {
+        throw new Error('Failed to create transaction');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -111,7 +115,7 @@ export default function TransactionsPage() {
           <Card 
             key={transaction.id} 
             className="cursor-pointer hover:bg-accent/50 transition-colors" 
-            onClick={() => setLocation(`/transaction/${transaction.id}`)}
+            onClick={() => setLocation(`/transactions/${transaction.id}`)}
           >
             <CardHeader>
               <CardTitle className="text-lg">{transaction.address}</CardTitle>
