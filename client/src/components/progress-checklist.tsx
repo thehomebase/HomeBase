@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
@@ -139,13 +139,26 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
 
   const updateChecklistMutation = useMutation({
     mutationFn: async (updatedItem: ChecklistItem) => {
-      const response = await apiRequest("PATCH", `/api/checklists/${transactionId}/${updatedItem.id}`, {
-        completed: updatedItem.completed,
-      });
-      if (!response.ok) {
-        throw new Error("Failed to update checklist item");
+      try {
+        const response = await apiRequest("PATCH", `/api/checklists/${transactionId}`, {
+          items: [{
+            id: updatedItem.id,
+            text: updatedItem.text,
+            completed: updatedItem.completed,
+            phase: updatedItem.phase
+          }]
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Failed to update checklist item");
+        }
+
+        return response.json();
+      } catch (error) {
+        console.error('Error updating checklist:', error);
+        throw error;
       }
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/checklists", transactionId] });
@@ -196,7 +209,7 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
   const checklistItems = transactionType === 'buy' ? BUYER_CHECKLIST_ITEMS : SELLER_CHECKLIST_ITEMS;
   const phases = Array.from(new Set(checklistItems.map(item => item.phase)));
   const items = checklist || checklistItems.map(item => ({ ...item, completed: false }));
-  const completedItems = items.filter(item => item.completed).length;
+  const completedItems = items.filter((item: ChecklistItem) => item.completed).length;
   const progress = Math.round((completedItems / items.length) * 100);
 
   return (
@@ -224,8 +237,8 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
       <CardContent>
         <div className="space-y-4">
           {items
-            .filter(item => item.phase === activePhase)
-            .map((item) => (
+            .filter((item: ChecklistItem) => item.phase === activePhase)
+            .map((item: ChecklistItem) => (
               <div key={item.id} className="flex items-center space-x-2">
                 <Checkbox
                   id={item.id}
