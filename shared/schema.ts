@@ -42,7 +42,8 @@ export const transactions = pgTable("transactions", {
   earnestMoney: integer("earnest_money"),
   downPayment: integer("down_payment"),
   sellerConcessions: integer("seller_concessions"),
-  closingDate: text("closing_date")
+  closingDate: text("closing_date"),
+  contractExecutionDate: text("contract_execution_date")
 });
 
 export const checklists = pgTable("checklists", {

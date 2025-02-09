@@ -27,6 +27,7 @@ interface Transaction {
   downPayment?: number;
   sellerConcessions?: number;
   closingDate?: string;
+  contractExecutionDate?: string; // Added contract execution date
   checklist?: Array<{ id: string; text: string; completed: boolean }>;
   type: 'buy' | 'sell';
 }
@@ -39,6 +40,7 @@ interface TransactionFormData {
   downPayment?: number;
   sellerConcessions?: number;
   closingDate?: string;
+  contractExecutionDate?: string; // Added contract execution date
 }
 
 export default function TransactionPage() {
@@ -94,6 +96,7 @@ export default function TransactionPage() {
           downPayment: updatedTransaction.downPayment || undefined,
           sellerConcessions: updatedTransaction.sellerConcessions || undefined,
           closingDate: updatedTransaction.closingDate || undefined,
+          contractExecutionDate: updatedTransaction.contractExecutionDate || undefined, // Added contract execution date
         });
       }
 
@@ -121,6 +124,7 @@ export default function TransactionPage() {
         downPayment: transaction.downPayment,
         sellerConcessions: transaction.sellerConcessions,
         closingDate: transaction.closingDate,
+        contractExecutionDate: transaction.contractExecutionDate, // Added contract execution date
       });
     }
   }, [transaction, form]);
@@ -342,6 +346,21 @@ export default function TransactionPage() {
                   )}
                 </div>
                 <div>
+                  <p className="text-sm text-muted-foreground">Contract Execution Date</p> {/* Added Contract Execution Date */}
+                  {isEditing ? (
+                    <Input
+                      type="date"
+                      {...form.register("contractExecutionDate")}
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.contractExecutionDate
+                        ? new Date(transaction.contractExecutionDate).toLocaleDateString()
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
                   <p className="text-sm text-muted-foreground">Status</p>
                   <p className="font-medium capitalize">{transaction.status}</p>
                 </div>
@@ -405,7 +424,7 @@ export default function TransactionPage() {
           </CardContent>
         </Card>
 
-        
+
       </main>
     </div>
   );
