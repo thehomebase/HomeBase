@@ -339,6 +339,19 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.patch("/api/contacts/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+    try {
+      const contact = await storage.updateContact(Number(req.params.id), req.body);
+      res.json(contact);
+    } catch (error) {
+      console.error('Error updating contact:', error);
+      res.status(500).json({ error: 'Failed to update contact' });
+    }
+  });
+
   app.delete("/api/contacts/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {

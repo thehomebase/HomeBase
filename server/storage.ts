@@ -729,6 +729,41 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async updateContact(id: number, data: Partial<Contact>): Promise<Contact> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE contacts 
+        SET 
+          role = COALESCE(${data.role}, role),
+          first_name = COALESCE(${data.firstName}, first_name),
+          last_name = COALESCE(${data.lastName}, last_name),
+          email = COALESCE(${data.email}, email),
+          phone = COALESCE(${data.phone}, phone),
+          mobile_phone = COALESCE(${data.mobilePhone}, mobile_phone)
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      if (!result.rows[0]) {
+        throw new Error('Contact not found');
+      }
+
+      return {
+        id: result.rows[0].id,
+        role: result.rows[0].role,
+        firstName: result.rows[0].first_name,
+        lastName: result.rows[0].last_name,
+        email: result.rows[0].email,
+        phone: result.rows[0].phone,
+        mobilePhone: result.rows[0].mobile_phone,
+        transactionId: result.rows[0].transaction_id
+      };
+    } catch (error) {
+      console.error('Error in updateContact:', error);
+      throw error;
+    }
+  }
+
   async getClientsByAgent(agentId: number): Promise<Client[]> {
     try {
       const result = await db.execute(sql`
