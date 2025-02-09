@@ -14,7 +14,7 @@ import { Plus } from "lucide-react";
 import { NavTabs } from "@/components/ui/nav-tabs";
 
 interface Transaction {
-  id: string;
+  id: number;
   address: string;
   status: string;
   participants: any[];
@@ -108,7 +108,11 @@ export default function TransactionsPage() {
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {transactions.map((transaction) => (
-          <Card key={transaction.id} className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => setLocation(`/transaction/${transaction.id}`)}>
+          <Card 
+            key={transaction.id} 
+            className="cursor-pointer hover:bg-accent/50 transition-colors" 
+            onClick={() => setLocation(`/transaction/${transaction.id}`)}
+          >
             <CardHeader>
               <CardTitle className="text-lg">{transaction.address}</CardTitle>
             </CardHeader>

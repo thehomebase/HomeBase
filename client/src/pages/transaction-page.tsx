@@ -45,16 +45,13 @@ export default function TransactionPage() {
 
   // Parse and validate transaction ID
   const parsedId = id ? parseInt(id, 10) : null;
-  const isValidId = parsedId && !isNaN(parsedId);
 
   // Early return if no valid ID or user
-  if (!isValidId || !user) {
+  if (!user) {
     return (
       <div className="container mx-auto p-6">
         <div className="text-center">
-          <p className="text-xl text-destructive">
-            {!user ? "Please log in to access this page." : "Invalid transaction ID"}
-          </p>
+          <p className="text-xl text-destructive">Please log in to access this page.</p>
           <Link href="/transactions">
             <Button variant="outline" className="mt-4">
               Back to Transactions
@@ -69,18 +66,37 @@ export default function TransactionPage() {
   const { data: transaction, isError, isLoading } = useQuery<Transaction>({
     queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
+      if (!parsedId || isNaN(parsedId)) {
+        throw new Error("Invalid transaction ID");
+      }
       const response = await apiRequest("GET", `/api/transactions/${parsedId}`);
       if (!response.ok) {
         throw new Error("Failed to fetch transaction");
       }
       return response.json();
     },
-    enabled: isValidId && !!user,
+    enabled: !!parsedId && !isNaN(parsedId),
+  });
+
+  // Initialize form with transaction data
+  const form = useForm<TransactionFormData>({
+    defaultValues: {
+      contractPrice: transaction?.contractPrice,
+      optionPeriod: transaction?.optionPeriod,
+      optionFee: transaction?.optionFee,
+      earnestMoney: transaction?.earnestMoney,
+      downPayment: transaction?.downPayment,
+      sellerConcessions: transaction?.sellerConcessions,
+      closingDate: transaction?.closingDate,
+    },
   });
 
   // Handle mutation for updating transaction
   const updateTransaction = useMutation({
     mutationFn: async (data: TransactionFormData) => {
+      if (!parsedId || isNaN(parsedId)) {
+        throw new Error("Invalid transaction ID");
+      }
       const response = await apiRequest("PATCH", `/api/transactions/${parsedId}`, data);
       if (!response.ok) {
         throw new Error("Failed to update transaction");
@@ -89,19 +105,6 @@ export default function TransactionPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
-    },
-  });
-
-  // Initialize form with transaction data
-  const form = useForm<TransactionFormData>({
-    defaultValues: {
-      contractPrice: transaction?.contractPrice || undefined,
-      optionPeriod: transaction?.optionPeriod || undefined,
-      optionFee: transaction?.optionFee || undefined,
-      earnestMoney: transaction?.earnestMoney || undefined,
-      downPayment: transaction?.downPayment || undefined,
-      sellerConcessions: transaction?.sellerConcessions || undefined,
-      closingDate: transaction?.closingDate || undefined,
     },
   });
 
@@ -116,12 +119,12 @@ export default function TransactionPage() {
     );
   }
 
-  // Show error state if data fetch failed
-  if (isError || !transaction) {
+  // Show error state if data fetch failed or invalid ID
+  if (isError || !parsedId || isNaN(parsedId)) {
     return (
       <div className="container mx-auto p-6">
-        <div className="text-center text-destructive">
-          <p>Error: Unable to load transaction data.</p>
+        <div className="text-center">
+          <p className="text-xl text-destructive">Invalid transaction ID</p>
           <Link href="/transactions">
             <Button variant="outline" className="mt-4">
               Back to Transactions
@@ -132,7 +135,22 @@ export default function TransactionPage() {
     );
   }
 
-  // Calculate progress after we have the transaction data
+  if (!transaction) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center text-destructive">
+          <p>Error: Unable to load transaction data</p>
+          <Link href="/transactions">
+            <Button variant="outline" className="mt-4">
+              Back to Transactions
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate progress
   const completedTasks = transaction.checklist?.filter(item => item.completed).length ?? 0;
   const totalTasks = transaction.checklist?.length ?? 1;
   const progress = Math.round((completedTasks / totalTasks) * 100);
@@ -149,7 +167,7 @@ export default function TransactionPage() {
             </Link>
             <div>
               <h1 className="text-2xl font-bold">{transaction.address}</h1>
-              <p className="text-muted-foreground">Transaction ID: {id}</p>
+              <p className="text-muted-foreground">Transaction ID: {parsedId}</p>
             </div>
           </div>
         </div>
