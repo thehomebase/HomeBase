@@ -1,7 +1,7 @@
 import { 
-  users, transactions, checklists, messages,
-  type User, type Transaction, type Checklist, type Message,
-  type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage 
+  users, transactions, checklists, messages, clients,
+  type User, type Transaction, type Checklist, type Message, type Client,
+  type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient 
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or } from "drizzle-orm";
@@ -221,6 +221,59 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error in getMessages:', error);
       return [];
+    }
+  }
+
+  async getClientsByAgent(agentId: number): Promise<Client[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          id,
+          name,
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          agent_id as "agentId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM clients 
+        WHERE agent_id = ${agentId}
+        ORDER BY created_at DESC
+      `);
+
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        name: String(row.name),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt).toISOString(),
+        updatedAt: new Date(row.updatedAt).toISOString(),
+      }));
+    } catch (error) {
+      console.error('Error in getClientsByAgent:', error);
+      return [];
+    }
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    try {
+      const [client] = await db.insert(clients).values({
+        ...insertClient,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).returning();
+      return client;
+    } catch (error) {
+      console.error('Error in createClient:', error);
+      throw error;
     }
   }
 }
