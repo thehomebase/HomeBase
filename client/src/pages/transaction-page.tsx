@@ -83,7 +83,7 @@ export default function TransactionPage() {
     onSuccess: (updatedData) => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
       setIsEditing(false);
-      
+
       if (updatedData) {
         form.reset({
           contractPrice: updatedData.contractPrice || undefined,
@@ -95,7 +95,7 @@ export default function TransactionPage() {
           closingDate: updatedData.closingDate || undefined,
         });
       }
-      
+
       toast({
         title: "Success",
         description: "Transaction updated successfully",
@@ -108,19 +108,6 @@ export default function TransactionPage() {
         variant: "destructive",
       });
     }
-  });
-      toast({
-        title: "Success",
-        description: "Transaction updated successfully",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update transaction",
-        variant: "destructive",
-      });
-    },
   });
 
   React.useEffect(() => {
