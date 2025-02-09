@@ -9,11 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ClipboardCheck, MessageSquare } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, MessageSquare, UserPlus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import { ProgressChecklist } from "@/components/progress-checklist";
 import { Chat } from "@/components/chat";
+import { TransactionContacts } from "@/components/transaction-contacts";
 
 interface Transaction {
   id: number;
@@ -257,10 +258,14 @@ export default function TransactionPage() {
         <Card className="mt-6">
           <CardContent className="p-6">
             <Tabs defaultValue="progress">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="progress">
                   <ClipboardCheck className="h-4 w-4 mr-2" />
                   Progress
+                </TabsTrigger>
+                <TabsTrigger value="contacts">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Contacts
                 </TabsTrigger>
                 <TabsTrigger value="chat">
                   <MessageSquare className="h-4 w-4 mr-2" />
@@ -271,8 +276,11 @@ export default function TransactionPage() {
                 <ProgressChecklist 
                   transactionId={parsedId}
                   userRole={user.role || ""}
-                  transactionType={transaction.type as 'buy' | 'sell'}
+                  transactionType={transaction.type}
                 />
+              </TabsContent>
+              <TabsContent value="contacts" className="mt-6">
+                <TransactionContacts transactionId={parsedId} />
               </TabsContent>
               <TabsContent value="chat" className="mt-6">
                 <Chat transactionId={parsedId} />
