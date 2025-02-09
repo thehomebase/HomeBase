@@ -30,15 +30,6 @@ export default function Chat({ transactionId }: ChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Validation check for required props
-  if (!transactionId || isNaN(transactionId)) {
-    return (
-      <div className="flex items-center justify-center h-[600px]">
-        <p className="text-destructive">Invalid transaction ID</p>
-      </div>
-    );
-  }
-
   const { data: messages = [], isLoading, error } = useQuery<Message[]>({
     queryKey: ["/api/messages", transactionId],
     queryFn: async () => {
@@ -99,7 +90,7 @@ export default function Chat({ transactionId }: ChatProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedMessage = message.trim();
-    if (!trimmedMessage || !user || !transactionId) return;
+    if (!trimmedMessage || !user) return;
 
     sendMessageMutation.mutate(trimmedMessage);
   };
@@ -172,7 +163,7 @@ export default function Chat({ transactionId }: ChatProps) {
         <Button
           type="submit"
           size="icon"
-          disabled={sendMessageMutation.isPending || !user || !transactionId}
+          disabled={sendMessageMutation.isPending}
         >
           <Send className="h-4 w-4" />
         </Button>
