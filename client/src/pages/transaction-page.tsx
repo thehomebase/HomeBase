@@ -42,6 +42,7 @@ interface TransactionFormData {
   closingDate?: string;
   contractExecutionDate?: string; // Added contract execution date
   status?: string;
+  optionExpirationDate?: string; //Added optionExpirationDate
 }
 
 export default function TransactionPage() {
@@ -77,7 +78,7 @@ export default function TransactionPage() {
         ...data,
         closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : undefined,
         contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : undefined,
-        optionExpirationDate: data.optionExpirationDate ? new Date(data.optionExpirationDate).toISOString() : undefined
+        optionPeriodExpiration: data.optionExpirationDate ? new Date(data.optionExpirationDate).toISOString() : undefined
       };
 
       const cleanData = Object.fromEntries(
@@ -107,6 +108,7 @@ export default function TransactionPage() {
           closingDate: updatedTransaction.closingDate || undefined,
           contractExecutionDate: updatedTransaction.contractExecutionDate || undefined,
           status: updatedTransaction.status || undefined,
+          optionExpirationDate: updatedTransaction.optionPeriodExpiration || undefined //Added optionExpirationDate
         });
       }
 
@@ -135,6 +137,7 @@ export default function TransactionPage() {
         sellerConcessions: transaction.sellerConcessions,
         closingDate: transaction.closingDate,
         contractExecutionDate: transaction.contractExecutionDate, // Added contract execution date
+        optionExpirationDate: transaction.optionPeriodExpiration //Added optionExpirationDate
       });
     }
   }, [transaction, form]);
@@ -285,8 +288,8 @@ export default function TransactionPage() {
                       />
                     ) : (
                       <p className="font-medium">
-                        {transaction.optionExpirationDate
-                          ? new Date(transaction.optionExpirationDate).toLocaleDateString()
+                        {transaction.optionPeriodExpiration
+                          ? new Date(transaction.optionPeriodExpiration).toLocaleDateString()
                           : 'Not set'}
                       </p>
                     )}
@@ -460,7 +463,7 @@ export default function TransactionPage() {
                           ...data,
                           closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : undefined,
                           contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : undefined,
-                          optionExpirationDate: data.optionExpirationDate ? new Date(data.optionExpirationDate).toISOString() : undefined
+                          optionPeriodExpiration: data.optionExpirationDate ? new Date(data.optionExpirationDate).toISOString() : undefined
                         };
                         updateTransaction.mutate(formattedData);
                         setIsEditing(false);
