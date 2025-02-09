@@ -86,9 +86,9 @@ const updateTransaction = useMutation({
     // Format dates without timezone adjustment
     const formattedData = {
       ...data,
-      closingDate: data.closingDate,
-      contractExecutionDate: data.contractExecutionDate,
-      option_period_expiration: data.option_period_expiration
+      closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : null,
+      contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : null,
+      optionPeriodExpiration: data.option_period_expiration ? new Date(data.option_period_expiration).toISOString() : null
     };
 
     const cleanData = Object.fromEntries(
@@ -460,9 +460,9 @@ const updateTransaction = useMutation({
                     onClick={form.handleSubmit((data) => {
                       const formattedData = {
                         ...data,
-                        closingDate: data.closingDate,
-                        contractExecutionDate: data.contractExecutionDate,
-                        option_period_expiration: data.option_period_expiration
+                        closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : null,
+                        contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : null,
+                        option_period_expiration: data.option_period_expiration ? new Date(data.option_period_expiration).toISOString() : null
                       };
                       updateTransaction.mutate(formattedData);
                       setIsEditing(false);
