@@ -30,6 +30,16 @@ export function Chat({ transactionId }: ChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Early validation of transactionId
+  if (!transactionId || isNaN(Number(transactionId))) {
+    console.error("Invalid transaction ID:", transactionId);
+    return (
+      <div className="p-4 text-destructive">
+        Error: Invalid transaction ID
+      </div>
+    );
+  }
+
   const { data: messages = [], isLoading, error } = useQuery<Message[]>({
     queryKey: ["/api/messages", transactionId],
     queryFn: async () => {
@@ -53,16 +63,22 @@ export function Chat({ transactionId }: ChatProps) {
         throw new Error("Please log in to send messages");
       }
 
+      const parsedTransactionId = Number(transactionId);
+      if (!parsedTransactionId || isNaN(parsedTransactionId)) {
+        throw new Error("Invalid transaction ID");
+      }
+
       const messageData = {
         content: messageContent,
-        transactionId: Number(transactionId), // Ensure it's a number
+        transactionId: parsedTransactionId,
         userId: user.id,
         username: user.username,
         role: user.role,
       };
 
-      const response = await apiRequest("POST", "/api/messages", messageData);
+      console.log("Sending message with data:", messageData);
 
+      const response = await apiRequest("POST", "/api/messages", messageData);
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to send message");
@@ -75,6 +91,7 @@ export function Chat({ transactionId }: ChatProps) {
       setMessage("");
     },
     onError: (error: Error) => {
+      console.error("Message send error:", error);
       toast({
         title: "Error sending message",
         description: error.message,
