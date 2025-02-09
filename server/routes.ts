@@ -242,8 +242,17 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      const transactionId = Number(req.params.id);
-      const checklist = await storage.updateChecklist(transactionId, req.body.items);
+      const transaction = await storage.getTransaction(Number(req.params.id));
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      const existingChecklist = await storage.getChecklist(transaction.id, transaction.type);
+      if (!existingChecklist) {
+        return res.status(404).json({ error: "Checklist not found" });
+      }
+
+      const checklist = await storage.updateChecklist(existingChecklist.id, req.body.items);
       res.json(checklist);
     } catch (error) {
       console.error('Error updating checklist:', error);
