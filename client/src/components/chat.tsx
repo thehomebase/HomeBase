@@ -48,15 +48,22 @@ export function Chat({ transactionId }: ChatProps) {
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (newMessage: string) => {
-      const response = await apiRequest("POST", "/api/messages", {
-        content: newMessage.trim(),
-        transactionId: Number(transactionId),
-        userId: user?.id,
-        username: user?.username,
-        role: user?.role,
-      });
+    mutationFn: async (messageContent: string) => {
+      if (!user?.id || !user?.username || !user?.role) {
+        throw new Error("User information is incomplete");
+      }
 
+      const messageData = {
+        content: messageContent.trim(),
+        transactionId: transactionId,
+        userId: user.id,
+        username: user.username,
+        role: user.role
+      };
+
+      console.log('Sending message data:', messageData); // Debug log
+
+      const response = await apiRequest("POST", "/api/messages", messageData);
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to send message");
