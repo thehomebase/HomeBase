@@ -49,18 +49,20 @@ export default function Chat({ transactionId }: ChatProps) {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      if (!transactionId || !user) {
-        throw new Error("Missing required fields");
+      if (!user?.id || !transactionId) {
+        throw new Error("You must be logged in to send messages");
       }
 
-      const response = await apiRequest("POST", "/api/messages", {
+      const messageData = {
         content,
         transactionId,
         userId: user.id,
         username: user.username,
         role: user.role,
         timestamp: new Date().toISOString(),
-      });
+      };
+
+      const response = await apiRequest("POST", "/api/messages", messageData);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -90,7 +92,34 @@ export default function Chat({ transactionId }: ChatProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedMessage = message.trim();
-    if (!trimmedMessage || !user) return;
+
+    // Validate all required fields
+    if (!trimmedMessage) {
+      toast({
+        title: "Error",
+        description: "Message cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to send messages",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!transactionId) {
+      toast({
+        title: "Error",
+        description: "Invalid transaction ID",
+        variant: "destructive",
+      });
+      return;
+    }
 
     sendMessageMutation.mutate(trimmedMessage);
   };
