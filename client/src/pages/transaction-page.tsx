@@ -231,11 +231,11 @@ export default function TransactionPage() {
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <p className="text-sm text-muted-foreground">Contract Price</p>
-                <p className="font-medium">${transaction?.contractPrice || 'Not set'}</p>
+                <p className="font-medium">{transaction?.contractPrice ? `$${transaction.contractPrice}` : ''}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Closing Date</p>
-                <p className="font-medium">{transaction?.closingDate || 'Not set'}</p>
+                <p className="font-medium">{transaction?.closingDate || ''}</p>
               </div>
             </div>
 

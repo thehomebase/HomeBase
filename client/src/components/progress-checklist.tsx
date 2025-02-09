@@ -19,7 +19,8 @@ const DEFAULT_ITEMS = [
 export function ProgressChecklist({ transactionId, userRole }: ProgressChecklistProps) {
   const [items, setItems] = useState(DEFAULT_ITEMS);
 
-  const progress = Math.round((items.filter(item => item.completed).length / items.length) * 100);
+  const completedItems = items.filter(item => item.completed).length;
+  const progress = items.length > 0 ? Math.round((completedItems / items.length) * 100) : 0;
 
   const handleCheck = (itemId: string, checked: boolean) => {
     setItems(items.map(item =>
