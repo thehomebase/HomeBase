@@ -21,6 +21,20 @@ export default function TransactionPage() {
   
   const queryClient = useQueryClient();
   
+  // Calculate progress and next task
+  const progress = React.useMemo(() => {
+    if (!transaction) return 0;
+    const completedTasks = (transaction.checklist || []).filter(item => item.completed).length;
+    const totalTasks = (transaction.checklist || []).length || 1;
+    return Math.round((completedTasks / totalTasks) * 100);
+  }, [transaction]);
+
+  const nextIncompleteTask = React.useMemo(() => {
+    if (!transaction?.checklist) return null;
+    const nextTask = transaction.checklist.find(item => !item.completed);
+    return nextTask?.text || null;
+  }, [transaction]);
+
   const updateTransaction = useMutation({
     mutationFn: async (data: Partial<Transaction>) => {
       const response = await apiRequest(
@@ -184,7 +198,22 @@ export default function TransactionPage() {
                     </div>
                     {user?.role === 'agent' && (
                       <div className="col-span-2 flex justify-end">
-                        <Button type="submit">
+                        <Button 
+                          type="submit"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            const formData = {
+                              contractPrice: form.getValues('contractPrice'),
+                              optionPeriod: form.getValues('optionPeriod'),
+                              optionFee: form.getValues('optionFee'),
+                              earnestMoney: form.getValues('earnestMoney'),
+                              downPayment: form.getValues('downPayment'),
+                              sellerConcessions: form.getValues('sellerConcessions'),
+                              closingDate: form.getValues('closingDate'),
+                            };
+                            updateTransaction.mutate(formData);
+                          }}
+                        >
                           Save Changes
                         </Button>
                       </div>
@@ -193,6 +222,35 @@ export default function TransactionPage() {
                 </div>
               </TabsContent>
             </Tabs>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Transaction Summary</h3>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Contract Price</p>
+                <p className="font-medium">${transaction?.contractPrice || 'Not set'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Closing Date</p>
+                <p className="font-medium">{transaction?.closingDate || 'Not set'}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">Progress</h4>
+              <Progress value={progress} className="h-2" />
+              <p className="text-sm text-muted-foreground">{progress}% Complete</p>
+              
+              {nextIncompleteTask && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium">Next Step:</p>
+                  <p className="text-sm text-muted-foreground">{nextIncompleteTask}</p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </main>
