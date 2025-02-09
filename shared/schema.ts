@@ -51,7 +51,7 @@ export const checklists = pgTable("checklists", {
 
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
-  transactionId: integer("transaction_id").notNull(), // Changed from nullable to required
+  transactionId: integer("transaction_id").notNull(),
   userId: integer("user_id").notNull(),
   username: text("username").notNull(),
   role: text("role").notNull(),
@@ -59,7 +59,6 @@ export const messages = pgTable("messages", {
   timestamp: text("timestamp").notNull(),
 });
 
-// Add relations
 export const transactionsRelations = relations(transactions, ({ many }) => ({
   messages: many(messages),
   checklists: many(checklists),
