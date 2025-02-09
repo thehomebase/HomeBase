@@ -53,16 +53,19 @@ export function Chat({ transactionId }: ChatProps) {
         throw new Error("Please log in to send messages");
       }
 
+      if (!transactionId || isNaN(transactionId)) {
+        throw new Error("Invalid transaction ID");
+      }
+
       const messageData = {
         content: messageContent,
-        transactionId: transactionId,
+        transactionId,
         userId: user.id,
         username: user.username,
-        role: user.role
+        role: user.role,
       };
 
       const response = await apiRequest("POST", "/api/messages", messageData);
-
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to send message");
@@ -96,6 +99,14 @@ export function Chat({ transactionId }: ChatProps) {
 
     sendMessageMutation.mutate(trimmedMessage);
   };
+
+  if (!user) {
+    return (
+      <div className="p-4 text-center">
+        <p className="text-muted-foreground">Please log in to participate in the chat.</p>
+      </div>
+    );
+  }
 
   if (error) {
     return (

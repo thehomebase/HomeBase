@@ -21,6 +21,9 @@ export default function TransactionPage() {
   const { data: transaction, isError, isLoading } = useQuery<Transaction>({
     queryKey: ['/api/transactions', parsedId],
     queryFn: async () => {
+      if (!parsedId || isNaN(parsedId)) {
+        throw new Error('Invalid transaction ID');
+      }
       const response = await apiRequest('GET', `/api/transactions/${parsedId}`);
       if (!response.ok) {
         const errorText = await response.text();
@@ -31,6 +34,14 @@ export default function TransactionPage() {
     enabled: !!parsedId && !!user?.id,
     retry: false
   });
+
+  if (!user) {
+    return (
+      <div className="p-6">
+        <p className="text-center text-destructive">Please log in to view transactions</p>
+      </div>
+    );
+  }
 
   if (!parsedId || isNaN(parsedId)) {
     return (
@@ -45,7 +56,11 @@ export default function TransactionPage() {
   }
 
   if (isLoading) {
-    return <div className="p-6">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
   }
 
   if (isError || !transaction) {
@@ -98,9 +113,7 @@ export default function TransactionPage() {
                 />
               </TabsContent>
               <TabsContent value="chat" className="mt-6">
-                {transaction && (
-                  <Chat transactionId={parsedId} />
-                )}
+                <Chat transactionId={parsedId} />
               </TabsContent>
             </Tabs>
           </CardContent>
