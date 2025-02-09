@@ -83,6 +83,7 @@ export default function TransactionPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
+      setIsEditing(false);
       toast({
         title: "Success",
         description: "Transaction updated successfully",
