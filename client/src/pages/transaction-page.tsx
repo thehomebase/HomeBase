@@ -287,8 +287,8 @@ const updateTransaction = useMutation({
                       />
                     ) : (
                       <p className="font-medium">
-                        {transaction.optionPeriodExpiration
-                          ? new Date(transaction.optionPeriodExpiration).toLocaleDateString()
+                        {transaction.option_period_expiration
+                          ? new Date(transaction.option_period_expiration).toLocaleDateString()
                           : 'Not set'}
                       </p>
                     )}
