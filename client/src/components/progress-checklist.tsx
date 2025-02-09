@@ -29,43 +29,43 @@ interface ProgressChecklistProps {
 // This is for SELLER transactions (selling a property)
 const SELLER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
   // Pre-Listing Preparation
-  { id: "assess-value", text: "Assess Home Value: Hire appraiser or use online tools", phase: "Pre-Listing Preparation" },
-  { id: "home-inspection", text: "Conduct Pre-Listing Inspection", phase: "Pre-Listing Preparation" },
-  { id: "repairs", text: "Complete Repairs and Upgrades", phase: "Pre-Listing Preparation" },
-  { id: "declutter", text: "Declutter and Depersonalize", phase: "Pre-Listing Preparation" },
-  { id: "staging", text: "Stage the Home", phase: "Pre-Listing Preparation" },
-  { id: "curb-appeal", text: "Enhance Curb Appeal", phase: "Pre-Listing Preparation" },
+  { id: "assess-value", text: "Assess Home Value: Hire a real estate appraiser or use online tools to determine a competitive listing price", phase: "Pre-Listing Preparation" },
+  { id: "home-inspection", text: "Conduct pre-listing inspection to identify any issues that might need fixing before listing", phase: "Pre-Listing Preparation" },
+  { id: "repairs", text: "Make necessary repairs or upgrades based on inspection. Focus on high-impact areas like kitchens and bathrooms", phase: "Pre-Listing Preparation" },
+  { id: "declutter", text: "Remove personal items and declutter to make the home more appealing to potential buyers", phase: "Pre-Listing Preparation" },
+  { id: "staging", text: "Either stage the home yourself or hire a professional to enhance its appeal", phase: "Pre-Listing Preparation" },
+  { id: "curb-appeal", text: "Enhance the exterior; mow the lawn, plant flowers, paint the front door if needed", phase: "Pre-Listing Preparation" },
 
   // Listing Phase
-  { id: "select-agent", text: "Select Real Estate Agent", phase: "Listing Phase" },
-  { id: "photos", text: "Obtain Professional Photography", phase: "Listing Phase" },
-  { id: "listing-desc", text: "Write Compelling Listing", phase: "Listing Phase" },
-  { id: "showings", text: "Set Up Showings", phase: "Listing Phase" },
+  { id: "select-agent", text: "Choose an agent with good local market knowledge and successful sales records", phase: "Listing Phase" },
+  { id: "photos", text: "Invest in high-quality photos and possibly a virtual tour for online listings", phase: "Listing Phase" },
+  { id: "listing-desc", text: "Write a compelling listing: Highlight unique features, recent upgrades, and neighborhood attractions", phase: "Listing Phase" },
+  { id: "showings", text: "Coordinate with your agent for open houses and private showings, ensuring the home is always ready", phase: "Listing Phase" },
 
   // Offer and Negotiation
-  { id: "review-offers", text: "Review Offers", phase: "Offer and Negotiation" },
-  { id: "counter-offers", text: "Handle Counter Offers", phase: "Offer and Negotiation" },
-  { id: "accept-offer", text: "Accept Final Offer", phase: "Offer and Negotiation" },
+  { id: "review-offers", text: "Analyze each offer with your agent, focusing on price, contingencies, and the buyer's financial status", phase: "Offer and Negotiation" },
+  { id: "counter-offers", text: "Be prepared to negotiate; consider terms beyond just price, like closing dates or included furnishings", phase: "Offer and Negotiation" },
+  { id: "accept-offer", text: "Once you agree on terms, sign the purchase agreement", phase: "Offer and Negotiation" },
 
   // Post-Acceptance
-  { id: "home-appraisal", text: "Coordinate Home Appraisal", phase: "Post-Acceptance" },
-  { id: "buyer-inspection", text: "Facilitate Buyer's Inspection", phase: "Post-Acceptance" },
-  { id: "disclosures", text: "Complete Property Disclosures", phase: "Post-Acceptance" },
-  { id: "title-search", text: "Ensure Clean Title Search", phase: "Post-Acceptance" },
+  { id: "appraisal", text: "Coordinate with the buyer's lender for the appraisal. Be ready to address any discrepancies if the appraisal comes in low", phase: "Post-Acceptance" },
+  { id: "buyer-inspection", text: "Allow for the buyer's inspection, and be open to negotiating repairs or price adjustments", phase: "Post-Acceptance" },
+  { id: "disclosures", text: "Complete and provide all necessary property disclosure documents about known defects or issues", phase: "Post-Acceptance" },
+  { id: "title-search", text: "Ensure there are no liens or issues with the title that could delay or derail the sale", phase: "Post-Acceptance" },
 
   // Closing Preparation
-  { id: "cancel-utilities", text: "Cancel/Transfer Utilities", phase: "Closing Preparation" },
-  { id: "moving-prep", text: "Schedule Moving Preparations", phase: "Closing Preparation" },
-  { id: "final-walkthrough", text: "Schedule Final Walkthrough", phase: "Closing Preparation" },
+  { id: "cancel-utilities", text: "Arrange to cancel or transfer utilities like water, gas, and electricity on the closing date", phase: "Closing Preparation" },
+  { id: "moving-prep", text: "Schedule movers or plan your move. Consider packing non-essential items early", phase: "Closing Preparation" },
+  { id: "final-walkthrough", text: "Agree to a time for the buyer's final walkthrough, usually 24-48 hours before closing", phase: "Closing Preparation" },
 
   // Closing
-  { id: "review-docs", text: "Review Closing Documents", phase: "Closing" },
-  { id: "sign-docs", text: "Sign Closing Documents", phase: "Closing" },
-  { id: "hand-over-keys", text: "Hand Over Keys", phase: "Closing" },
+  { id: "review-docs", text: "Go over all documents with your agent or attorney to ensure everything is correct", phase: "Closing" },
+  { id: "sign-docs", text: "Attend the closing either in person or via electronic means if permitted", phase: "Closing" },
+  { id: "hand-over-keys", text: "After receiving payment confirmation, provide keys and garage door openers to the new owner", phase: "Closing" },
 
   // Post-Closing
-  { id: "change-address", text: "Update Change of Address", phase: "Post-Closing" },
-  { id: "complete-move", text: "Complete Moving Process", phase: "Post-Closing" }
+  { id: "change-address", text: "Update your address with banks, employers, subscriptions, etc", phase: "Post-Closing" },
+  { id: "complete-move", text: "Ensure all personal belongings are moved out, and the house is left in agreed-upon condition", phase: "Post-Closing" }
 ];
 
 // This is for BUYER transactions (buying a property)
