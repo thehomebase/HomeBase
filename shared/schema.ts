@@ -40,9 +40,17 @@ export const messages = pgTable("messages", {
   timestamp: text("timestamp").notNull(),
 });
 
+const checklistItemSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  completed: z.boolean()
+});
+
 export const insertUserSchema = createInsertSchema(users);
 export const insertTransactionSchema = createInsertSchema(transactions);
-export const insertChecklistSchema = createInsertSchema(checklists);
+export const insertChecklistSchema = createInsertSchema(checklists).extend({
+  items: z.array(checklistItemSchema)
+});
 export const insertMessageSchema = createInsertSchema(messages);
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

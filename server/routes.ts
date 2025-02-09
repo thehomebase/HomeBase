@@ -82,22 +82,43 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/checklists", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const parsed = insertChecklistSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).send(parsed.error.message);
-    const checklist = await storage.createChecklist(parsed.data);
-    res.status(201).json(checklist);
+
+    try {
+      const parsed = insertChecklistSchema.safeParse(req.body);
+      if (!parsed.success) {
+        console.error('Validation error:', parsed.error);
+        return res.status(400).json(parsed.error);
+      }
+
+      const checklist = await storage.createChecklist(parsed.data);
+      res.status(201).json(checklist);
+    } catch (error) {
+      console.error('Error creating checklist:', error);
+      res.status(500).send('Error creating checklist');
+    }
   });
 
   app.patch("/api/checklists/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const parsed = z.array(z.object({
-      id: z.string(),
-      text: z.string(),
-      completed: z.boolean(),
-    })).safeParse(req.body.items);
-    if (!parsed.success) return res.status(400).send(parsed.error.message);
-    const checklist = await storage.updateChecklist(Number(req.params.id), parsed.data);
-    res.json(checklist);
+
+    try {
+      const parsed = z.array(z.object({
+        id: z.string(),
+        text: z.string(),
+        completed: z.boolean(),
+      })).safeParse(req.body.items);
+
+      if (!parsed.success) {
+        console.error('Validation error:', parsed.error);
+        return res.status(400).json(parsed.error);
+      }
+
+      const checklist = await storage.updateChecklist(Number(req.params.id), parsed.data);
+      res.json(checklist);
+    } catch (error) {
+      console.error('Error updating checklist:', error);
+      res.status(500).send('Error updating checklist');
+    }
   });
 
   // Messages
