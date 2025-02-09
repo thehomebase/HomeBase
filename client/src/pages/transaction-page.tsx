@@ -75,9 +75,9 @@ export default function TransactionPage() {
                   <ClipboardCheck className="h-4 w-4 mr-2" />
                   Progress
                 </TabsTrigger>
-                <TabsTrigger value="chat">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Chat
+                <TabsTrigger value="details">
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  Details
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="progress" className="mt-6">
@@ -86,8 +86,39 @@ export default function TransactionPage() {
                   userRole={user?.role || ""}
                 />
               </TabsContent>
-              <TabsContent value="chat" className="mt-6">
-                <Chat transactionId={Number(id)} />
+              <TabsContent value="details" className="mt-6">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Contract Price</p>
+                      <p className="text-lg">${transaction?.contractPrice?.toLocaleString() || 'Not set'}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Option Period</p>
+                      <p className="text-lg">{transaction?.optionPeriod || 'Not set'} days</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Option Fee</p>
+                      <p className="text-lg">${transaction?.optionFee?.toLocaleString() || 'Not set'}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Earnest Money</p>
+                      <p className="text-lg">${transaction?.earnestMoney?.toLocaleString() || 'Not set'}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Down Payment</p>
+                      <p className="text-lg">${transaction?.downPayment?.toLocaleString() || 'Not set'}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Seller Concessions</p>
+                      <p className="text-lg">${transaction?.sellerConcessions?.toLocaleString() || 'Not set'}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Closing Date</p>
+                      <p className="text-lg">{transaction?.closingDate || 'Not set'}</p>
+                    </div>
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
           </CardContent>

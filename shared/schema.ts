@@ -35,6 +35,13 @@ export const transactions = pgTable("transactions", {
     userId: number;
     role: string;
   }[]>(),
+  contractPrice: integer("contract_price"),
+  optionPeriod: integer("option_period"),
+  optionFee: integer("option_fee"),
+  earnestMoney: integer("earnest_money"),
+  downPayment: integer("down_payment"),
+  sellerConcessions: integer("seller_concessions"),
+  closingDate: text("closing_date")
 });
 
 export const checklists = pgTable("checklists", {
