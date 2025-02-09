@@ -3,7 +3,7 @@ import { useParams, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ClipboardCheck, Clock, ArrowLeft } from 'lucide-react';
+import { ClipboardCheck, MessageSquare, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { ProgressChecklist } from '@/components/progress-checklist';
@@ -64,8 +64,8 @@ export default function TransactionPage() {
                   Progress
                 </TabsTrigger>
                 <TabsTrigger value="chat">
-                  <Clock className="h-4 w-4 mr-2" />
-                  Activity
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Chat
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="progress" className="mt-6">
