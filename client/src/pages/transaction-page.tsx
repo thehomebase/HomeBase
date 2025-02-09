@@ -16,17 +16,10 @@ export default function TransactionPage() {
 
   console.log("TransactionPage mounted, ID:", id);
 
-  const { data: transaction, isError, isLoading } = useQuery({
+  const { data: transaction, isError, error, isLoading } = useQuery({
     queryKey: ['/api/transactions', id],
-    enabled: !!id,
-    placeholderData: {
-      id: Number(id),
-      address: '123 Easy Street',
-      accessCode: '123456',
-      status: 'active',
-      agentId: 1,
-      participants: []
-    }
+    enabled: !!id && !!user?.id,
+    retry: false
   });
 
   console.log("Current transaction data:", transaction);

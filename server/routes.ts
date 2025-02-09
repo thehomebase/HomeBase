@@ -27,21 +27,27 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const id = Number(req.params.id);
-      console.log('Processing request for transaction ID:', id);
+      console.log('Processing request for transaction ID:', id, 'User:', req.user);
 
       const transaction = await storage.getTransaction(id);
-      console.log('Transaction retrieved:', transaction);
-
+      
       if (!transaction) {
-        console.log('No transaction found with ID:', id);
-        return res.status(404).send('Transaction not found');
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+
+      const userHasAccess = 
+        transaction.agentId === req.user.id || 
+        (transaction.participants && transaction.participants.some(p => p.userId === req.user.id));
+
+      if (!userHasAccess) {
+        return res.status(403).json({ error: 'Access denied' });
       }
 
       res.json(transaction);
 
     } catch (error) {
       console.error('Error fetching transaction:', error);
-      res.status(500).send('Error fetching transaction');
+      res.status(500).json({ error: 'Error fetching transaction' });
     }
   });
 
