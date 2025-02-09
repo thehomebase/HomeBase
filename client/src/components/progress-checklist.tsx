@@ -1,31 +1,124 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProgressChecklistProps {
   transactionId: number;
   userRole: string;
 }
 
-const DEFAULT_ITEMS = [
-  { id: "1", text: "Initial consultation with client", completed: false },
-  { id: "2", text: "Property listing agreement signed", completed: false },
-  { id: "3", text: "Schedule professional photography", completed: false },
-  { id: "4", text: "List property on MLS", completed: false },
-  { id: "5", text: "Schedule open houses", completed: false },
-];
+interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
 
 export function ProgressChecklist({ transactionId, userRole }: ProgressChecklistProps) {
-  const [items, setItems] = useState(DEFAULT_ITEMS);
+  const { toast } = useToast();
 
+  const { data: checklist, isLoading } = useQuery({
+    queryKey: ["/api/checklists", transactionId, userRole],
+    queryFn: async () => {
+      const response = await apiRequest(
+        "GET",
+        `/api/checklists/${transactionId}/${userRole}`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch checklist");
+      }
+      return response.json();
+    },
+    enabled: !!transactionId && !!userRole,
+  });
+
+  const updateChecklistMutation = useMutation({
+    mutationFn: async (items: ChecklistItem[]) => {
+      const response = await apiRequest(
+        "PATCH",
+        `/api/checklists/${checklist?.id}`,
+        { items }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to update checklist");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/checklists", transactionId, userRole] 
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createChecklistMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/checklists", {
+        transactionId,
+        role: userRole,
+        items: DEFAULT_ITEMS,
+      });
+      if (!response.ok) {
+        throw new Error("Failed to create checklist");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/checklists", transactionId, userRole] 
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create a new checklist if one doesn't exist
+  useEffect(() => {
+    if (!isLoading && !checklist) {
+      createChecklistMutation.mutate();
+    }
+  }, [isLoading, checklist]);
+
+  const DEFAULT_ITEMS = [
+    { id: "1", text: "Initial consultation with client", completed: false },
+    { id: "2", text: "Property listing agreement signed", completed: false },
+    { id: "3", text: "Schedule professional photography", completed: false },
+    { id: "4", text: "List property on MLS", completed: false },
+    { id: "5", text: "Schedule open houses", completed: false },
+  ];
+
+  const items = checklist?.items || DEFAULT_ITEMS;
   const progress = Math.round((items.filter(item => item.completed).length / items.length) * 100);
 
   const handleCheck = (itemId: string, checked: boolean) => {
-    setItems(items.map(item =>
+    const updatedItems = items.map(item =>
       item.id === itemId ? { ...item, completed: checked } : item
-    ));
+    );
+    updateChecklistMutation.mutate(updatedItems);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[300px]">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -43,10 +136,13 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
                   id={item.id}
                   checked={item.completed}
                   onCheckedChange={(checked) => handleCheck(item.id, checked as boolean)}
+                  disabled={updateChecklistMutation.isPending}
                 />
                 <label
                   htmlFor={item.id}
-                  className={`text-sm ${item.completed ? "line-through text-muted-foreground" : ""}`}
+                  className={`text-sm ${
+                    item.completed ? "line-through text-muted-foreground" : ""
+                  }`}
                 >
                   {item.text}
                 </label>
