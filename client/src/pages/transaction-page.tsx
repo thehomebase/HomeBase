@@ -80,19 +80,20 @@ export default function TransactionPage() {
       }
       return response.json();
     },
-    onSuccess: (updatedData) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
+    onSuccess: async (updatedData) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
       setIsEditing(false);
 
-      if (updatedData) {
+      const updatedTransaction = await queryClient.getQueryData(["/api/transactions", parsedId]);
+      if (updatedTransaction) {
         form.reset({
-          contractPrice: updatedData.contractPrice || undefined,
-          optionPeriod: updatedData.optionPeriod || undefined,
-          optionFee: updatedData.optionFee || undefined,
-          earnestMoney: updatedData.earnestMoney || undefined,
-          downPayment: updatedData.downPayment || undefined,
-          sellerConcessions: updatedData.sellerConcessions || undefined,
-          closingDate: updatedData.closingDate || undefined,
+          contractPrice: updatedTransaction.contractPrice || undefined,
+          optionPeriod: updatedTransaction.optionPeriod || undefined,
+          optionFee: updatedTransaction.optionFee || undefined,
+          earnestMoney: updatedTransaction.earnestMoney || undefined,
+          downPayment: updatedTransaction.downPayment || undefined,
+          sellerConcessions: updatedTransaction.sellerConcessions || undefined,
+          closingDate: updatedTransaction.closingDate || undefined,
         });
       }
 
