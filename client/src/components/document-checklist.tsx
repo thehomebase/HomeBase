@@ -70,14 +70,8 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       }
       return response.json();
     },
-    onSuccess: () => {
-      const currentDocs = [...documents];
-      currentDocs.push({
-        id: String(Date.now()),
-        name: newDocument,
-        status: 'not_applicable'
-      });
-      queryClient.setQueryData(["/api/documents", transactionId], currentDocs);
+    onSuccess: (newDoc) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
       setNewDocument("");
     },
   });
