@@ -83,12 +83,12 @@ const updateTransaction = useMutation({
       throw new Error("Invalid transaction ID");
     }
 
-    // Format dates without timezone adjustment
+    // Format dates with Central Time handling
     const formattedData = {
       ...data,
-      closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : null,
-      contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : null,
-      optionPeriodExpiration: data.option_period_expiration ? new Date(data.option_period_expiration).toISOString() : null
+      closingDate: data.closingDate ? new Date(data.closingDate + 'T12:00:00-06:00').toISOString() : null,
+      contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate + 'T12:00:00-06:00').toISOString() : null,
+      option_period_expiration: data.option_period_expiration ? new Date(data.option_period_expiration + 'T12:00:00-06:00').toISOString() : null
     };
 
     const cleanData = Object.fromEntries(
@@ -288,7 +288,7 @@ const updateTransaction = useMutation({
                     ) : (
                       <p className="font-medium">
                         {transaction.optionPeriodExpiration
-                          ? new Date(transaction.optionPeriodExpiration).toLocaleDateString()
+                          ? new Date(transaction.optionPeriodExpiration).toLocaleDateString('en-US', { timeZone: 'America/Chicago' })
                           : 'Not set'}
                       </p>
                     )}
@@ -372,7 +372,7 @@ const updateTransaction = useMutation({
                     ) : (
                       <p className="font-medium">
                         {transaction.closingDate
-                          ? new Date(transaction.closingDate).toLocaleDateString()
+                          ? new Date(transaction.closingDate).toLocaleDateString('en-US', { timeZone: 'America/Chicago' })
                           : 'Not set'}
                       </p>
                     )}
@@ -388,7 +388,7 @@ const updateTransaction = useMutation({
                     ) : (
                       <p className="font-medium">
                         {transaction.contractExecutionDate
-                          ? new Date(transaction.contractExecutionDate).toLocaleDateString()
+                          ? new Date(transaction.contractExecutionDate).toLocaleDateString('en-US', { timeZone: 'America/Chicago' })
                           : 'Not set'}
                       </p>
                     )}
