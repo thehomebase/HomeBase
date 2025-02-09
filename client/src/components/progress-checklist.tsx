@@ -29,9 +29,9 @@ interface ProgressChecklistProps {
 // This is for SELLER transactions (selling a property)
 const SELLER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
   // Pre-Listing Preparation
-  { id: "assess-value", text: "Assess Home Value", phase: "Pre-Listing Preparation" },
+  { id: "assess-value", text: "Assess Home Value: Hire appraiser or use online tools", phase: "Pre-Listing Preparation" },
   { id: "home-inspection", text: "Conduct Pre-Listing Inspection", phase: "Pre-Listing Preparation" },
-  { id: "repairs", text: "Complete Necessary Repairs", phase: "Pre-Listing Preparation" },
+  { id: "repairs", text: "Complete Repairs and Upgrades", phase: "Pre-Listing Preparation" },
   { id: "declutter", text: "Declutter and Depersonalize", phase: "Pre-Listing Preparation" },
   { id: "staging", text: "Stage the Home", phase: "Pre-Listing Preparation" },
   { id: "curb-appeal", text: "Enhance Curb Appeal", phase: "Pre-Listing Preparation" },
@@ -46,6 +46,26 @@ const SELLER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
   { id: "review-offers", text: "Review Offers", phase: "Offer and Negotiation" },
   { id: "counter-offers", text: "Handle Counter Offers", phase: "Offer and Negotiation" },
   { id: "accept-offer", text: "Accept Final Offer", phase: "Offer and Negotiation" },
+
+  // Post-Acceptance
+  { id: "home-appraisal", text: "Coordinate Home Appraisal", phase: "Post-Acceptance" },
+  { id: "buyer-inspection", text: "Facilitate Buyer's Inspection", phase: "Post-Acceptance" },
+  { id: "disclosures", text: "Complete Property Disclosures", phase: "Post-Acceptance" },
+  { id: "title-search", text: "Ensure Clean Title Search", phase: "Post-Acceptance" },
+
+  // Closing Preparation
+  { id: "cancel-utilities", text: "Cancel/Transfer Utilities", phase: "Closing Preparation" },
+  { id: "moving-prep", text: "Schedule Moving Preparations", phase: "Closing Preparation" },
+  { id: "final-walkthrough", text: "Schedule Final Walkthrough", phase: "Closing Preparation" },
+
+  // Closing
+  { id: "review-docs", text: "Review Closing Documents", phase: "Closing" },
+  { id: "sign-docs", text: "Sign Closing Documents", phase: "Closing" },
+  { id: "hand-over-keys", text: "Hand Over Keys", phase: "Closing" },
+
+  // Post-Closing
+  { id: "change-address", text: "Update Change of Address", phase: "Post-Closing" },
+  { id: "complete-move", text: "Complete Moving Process", phase: "Post-Closing" }
 
   // Post-Acceptance
   { id: "appraisal", text: "Complete Home Appraisal", phase: "Post-Acceptance" },
