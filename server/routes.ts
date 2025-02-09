@@ -317,10 +317,36 @@ export function registerRoutes(app: Express): Server {
       };
 
       const contact = await storage.createContact(contactData);
+      if (!contact) {
+        return res.status(500).json({ error: 'Failed to create contact' });
+      }
       res.json(contact);
     } catch (error) {
       console.error('Error creating contact:', error);
-      res.status(500).json({ error: 'Failed to create contact' });
+      const message = error instanceof Error ? error.message : 'Failed to create contact';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.get("/api/contacts/:transactionId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const contacts = await storage.getContactsByTransaction(Number(req.params.transactionId));
+      res.json(contacts);
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
+      res.status(500).json({ error: 'Failed to fetch contacts' });
+    }
+  });
+
+  app.delete("/api/contacts/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      await storage.deleteContact(Number(req.params.id));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting contact:', error);
+      res.status(500).json({ error: 'Failed to delete contact' });
     }
   });
 

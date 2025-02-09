@@ -638,14 +638,49 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getContactsByTransaction(transactionId: number) {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM contacts WHERE transaction_id = ${transactionId}
+      `);
+      
+      return result.rows.map(row => ({
+        id: row.id,
+        role: row.role,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        email: row.email,
+        phone: row.phone,
+        mobilePhone: row.mobile_phone,
+        transactionId: row.transaction_id
+      }));
+    } catch (error) {
+      console.error('Error in getContactsByTransaction:', error);
+      throw error;
+    }
+  }
+
+  async deleteContact(id: number) {
+    try {
+      const result = await db.execute(sql`
+        DELETE FROM contacts WHERE id = ${id} RETURNING id
+      `);
+      if (!result.rows[0]) {
+        throw new Error('Contact not found');
+      }
+      return true;
+    } catch (error) {
+      console.error('Error in deleteContact:', error);
+      throw error;
+    }
+  }
+
   async createContact(data: any) {
     try {
-      // Validate required fields
       if (!data.role || !data.firstName || !data.lastName || !data.email || !data.transactionId) {
         throw new Error('Missing required fields');
       }
 
-      // Validate transaction exists
       const transactionExists = await db.execute(sql`
         SELECT EXISTS(SELECT 1 FROM transactions WHERE id = ${data.transactionId})
       `);
