@@ -28,7 +28,7 @@ interface Transaction {
   sellerConcessions?: number;
   closingDate?: string;
   contractExecutionDate?: string; // Added contract execution date
-  checklist?: Array<{ id: string; text: string; completed: boolean }>;
+  checklist?: Array<{ id: string; text: string; completed: boolean; phase?: string }>;
   type: 'buy' | 'sell';
 }
 
@@ -41,6 +41,7 @@ interface TransactionFormData {
   sellerConcessions?: number;
   closingDate?: string;
   contractExecutionDate?: string; // Added contract execution date
+  status?: string;
 }
 
 export default function TransactionPage() {
@@ -182,6 +183,7 @@ export default function TransactionPage() {
   const completedTasks = transaction.checklist?.filter(item => item.completed)?.length ?? 0;
   const totalTasks = transaction.checklist?.length ?? 1;
   const progress = Math.round((completedTasks / totalTasks) * 100);
+  const transactionType = transaction.type;
   const currentPhase = transaction.checklist?.find(item => !item.completed)?.phase || 
     (transactionType === 'buy' ? "Pre-Offer" : "Pre-Listing Preparation");
 
@@ -214,30 +216,31 @@ export default function TransactionPage() {
                   <p className="font-medium">{currentPhase}</p>
                 </div>
                 {user.role === 'agent' && (
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsEditing(!isEditing)}
-                  >
-                    {isEditing ? (
-                      <>
-                        <X className="h-4 w-4 mr-2" />
-                        Cancel
-                      </>
-                    ) : (
-                      <>
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Edit Details
-                      </>
-                    )}
-                  </Button>
-                </div>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsEditing(!isEditing)}
+                    >
+                      {isEditing ? (
+                        <>
+                          <X className="h-4 w-4 mr-2" />
+                          Cancel
+                        </>
+                      ) : (
+                        <>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Edit Details
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="space-y-4">
-                <div>
+                <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Current Phase</p>
-                  <p className="font-medium">{currentPhase}</p>
+                  <p className="text-sm">{currentPhase}</p>
                 </div>
                 <div className="space-y-2">
                   <Progress value={progress} className="h-2" />
@@ -245,224 +248,224 @@ export default function TransactionPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Transaction Type</p>
-                  <p className="font-medium capitalize">
-                    {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Contract Price</p>
-                  {isEditing ? (
-                    <Input
-                      type="number"
-                      {...form.register("contractPrice")}
-                      placeholder="Enter contract price"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.contractPrice 
-                        ? `$${transaction.contractPrice.toLocaleString()}` 
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Option Period</p>
-                  {isEditing ? (
-                    <Input
-                      type="number"
-                      {...form.register("optionPeriod")}
-                      placeholder="Enter option period"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.optionPeriod 
-                        ? `${transaction.optionPeriod} days` 
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Option Fee</p>
-                  {isEditing ? (
-                    <Input
-                      type="number"
-                      {...form.register("optionFee")}
-                      placeholder="Enter option fee"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.optionFee 
-                        ? `$${transaction.optionFee.toLocaleString()}` 
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Earnest Money</p>
-                  {isEditing ? (
-                    <Input
-                      type="number"
-                      {...form.register("earnestMoney")}
-                      placeholder="Enter earnest money"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.earnestMoney 
-                        ? `$${transaction.earnestMoney.toLocaleString()}` 
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Down Payment</p>
-                  {isEditing ? (
-                    <Input
-                      type="number"
-                      {...form.register("downPayment")}
-                      placeholder="Enter down payment"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.downPayment 
-                        ? `$${transaction.downPayment.toLocaleString()}` 
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Seller Concessions</p>
-                  {isEditing ? (
-                    <Input
-                      type="number"
-                      {...form.register("sellerConcessions")}
-                      placeholder="Enter seller concessions"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.sellerConcessions 
-                        ? `$${transaction.sellerConcessions.toLocaleString()}` 
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Closing Date</p>
-                  {isEditing ? (
-                    <Input
-                      type="date"
-                      {...form.register("closingDate")}
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.closingDate 
-                        ? new Date(transaction.closingDate).toLocaleDateString() 
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Contract Execution Date</p> {/* Added Contract Execution Date */}
-                  {isEditing ? (
-                    <Input
-                      type="date"
-                      {...form.register("contractExecutionDate")}
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.contractExecutionDate
-                        ? new Date(transaction.contractExecutionDate).toLocaleDateString()
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  {isEditing ? (
-                    <select
-                      className="w-full px-3 py-2 border rounded-md"
-                      value={transaction.status}
-                      {...form.register("status")}
-                    >
-                      <option value="coming_soon">Coming Soon</option>
-                      <option value="active">Active</option>
-                      <option value="active_option">Active Option Contract</option>
-                      <option value="pending">Pending</option>
-                      <option value="closed">Closed</option>
-                      <option value="withdrawn">Withdrawn</option>
-                      <option value="canceled">Canceled</option>
-                    </select>
-                  ) : (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Transaction Type</p>
                     <p className="font-medium capitalize">
-                      {transaction.status === 'active_option' 
-                        ? 'Active Option Contract'
-                        : transaction.status?.replace('_', ' ')}
+                      {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
                     </p>
-                  )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Contract Price</p>
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        {...form.register("contractPrice")}
+                        placeholder="Enter contract price"
+                      />
+                    ) : (
+                      <p className="font-medium">
+                        {transaction.contractPrice
+                          ? `$${transaction.contractPrice.toLocaleString()}`
+                          : 'Not set'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Option Period</p>
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        {...form.register("optionPeriod")}
+                        placeholder="Enter option period"
+                      />
+                    ) : (
+                      <p className="font-medium">
+                        {transaction.optionPeriod
+                          ? `${transaction.optionPeriod} days`
+                          : 'Not set'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Option Fee</p>
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        {...form.register("optionFee")}
+                        placeholder="Enter option fee"
+                      />
+                    ) : (
+                      <p className="font-medium">
+                        {transaction.optionFee
+                          ? `$${transaction.optionFee.toLocaleString()}`
+                          : 'Not set'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Earnest Money</p>
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        {...form.register("earnestMoney")}
+                        placeholder="Enter earnest money"
+                      />
+                    ) : (
+                      <p className="font-medium">
+                        {transaction.earnestMoney
+                          ? `$${transaction.earnestMoney.toLocaleString()}`
+                          : 'Not set'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Down Payment</p>
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        {...form.register("downPayment")}
+                        placeholder="Enter down payment"
+                      />
+                    ) : (
+                      <p className="font-medium">
+                        {transaction.downPayment
+                          ? `$${transaction.downPayment.toLocaleString()}`
+                          : 'Not set'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Seller Concessions</p>
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        {...form.register("sellerConcessions")}
+                        placeholder="Enter seller concessions"
+                      />
+                    ) : (
+                      <p className="font-medium">
+                        {transaction.sellerConcessions
+                          ? `$${transaction.sellerConcessions.toLocaleString()}`
+                          : 'Not set'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Closing Date</p>
+                    {isEditing ? (
+                      <Input
+                        type="date"
+                        {...form.register("closingDate")}
+                      />
+                    ) : (
+                      <p className="font-medium">
+                        {transaction.closingDate
+                          ? new Date(transaction.closingDate).toLocaleDateString()
+                          : 'Not set'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Contract Execution Date</p> {/* Added Contract Execution Date */}
+                    {isEditing ? (
+                      <Input
+                        type="date"
+                        {...form.register("contractExecutionDate")}
+                      />
+                    ) : (
+                      <p className="font-medium">
+                        {transaction.contractExecutionDate
+                          ? new Date(transaction.contractExecutionDate).toLocaleDateString()
+                          : 'Not set'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Status</p>
+                    {isEditing ? (
+                      <select
+                        className="w-full px-3 py-2 border rounded-md"
+                        value={transaction.status}
+                        {...form.register("status")}
+                      >
+                        <option value="coming_soon">Coming Soon</option>
+                        <option value="active">Active</option>
+                        <option value="active_option">Active Option Contract</option>
+                        <option value="pending">Pending</option>
+                        <option value="closed">Closed</option>
+                        <option value="withdrawn">Withdrawn</option>
+                        <option value="canceled">Canceled</option>
+                      </select>
+                    ) : (
+                      <p className="font-medium capitalize">
+                        {transaction.status === 'active_option'
+                          ? 'Active Option Contract'
+                          : transaction.status?.replace('_', ' ')}
+                      </p>
+                    )}
+                  </div>
                 </div>
+
+                {isEditing && (
+                  <div className="flex justify-end mt-4">
+                    <Button
+                      type="button"
+                      onClick={form.handleSubmit((data) => {
+                        updateTransaction.mutate(data);
+                        setIsEditing(false);
+                      })}
+                      disabled={updateTransaction.isPending}
+                    >
+                      Save Changes
+                    </Button>
+                  </div>
+                )}
               </div>
 
-              {isEditing && (
-                <div className="flex justify-end mt-4">
-                  <Button 
-                    type="button" 
-                    onClick={form.handleSubmit((data) => {
-                      updateTransaction.mutate(data);
-                      setIsEditing(false);
-                    })} 
-                    disabled={updateTransaction.isPending}
-                  >
-                    Save Changes
-                  </Button>
-                </div>
-              )}
-            </div>
+              <div className="mt-6 space-y-2">
+                <h4 className="text-sm font-medium">Progress</h4>
+                <Progress value={progress} className="h-2" />
+                <p className="text-sm text-muted-foreground">{progress}% Complete</p>
+              </div>
+            </CardContent>
+          </Card>
 
-            <div className="mt-6 space-y-2">
-              <h4 className="text-sm font-medium">Progress</h4>
-              <Progress value={progress} className="h-2" />
-              <p className="text-sm text-muted-foreground">{progress}% Complete</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="mt-6">
-          <CardContent className="p-6">
-            <Tabs defaultValue="progress">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="progress">
-                  <ClipboardCheck className="h-4 w-4 mr-2" />
-                  Progress
-                </TabsTrigger>
-                <TabsTrigger value="contacts">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Contacts
-                </TabsTrigger>
-                <TabsTrigger value="chat">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Chat
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="progress" className="mt-6">
-                <ProgressChecklist 
-                  transactionId={parsedId}
-                  userRole={user.role || ""}
-                  transactionType={transaction.type}
-                />
-              </TabsContent>
-              <TabsContent value="contacts" className="mt-6">
-                <TransactionContacts transactionId={parsedId} />
-              </TabsContent>
-              <TabsContent value="chat" className="mt-6">
-                <Chat transactionId={parsedId} />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+          <Card className="mt-6">
+            <CardContent className="p-6">
+              <Tabs defaultValue="progress">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="progress">
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    Progress
+                  </TabsTrigger>
+                  <TabsTrigger value="contacts">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Contacts
+                  </TabsTrigger>
+                  <TabsTrigger value="chat">
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Chat
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="progress" className="mt-6">
+                  <ProgressChecklist
+                    transactionId={parsedId}
+                    userRole={user.role || ""}
+                    transactionType={transaction.type}
+                  />
+                </TabsContent>
+                <TabsContent value="contacts" className="mt-6">
+                  <TransactionContacts transactionId={parsedId} />
+                </TabsContent>
+                <TabsContent value="chat" className="mt-6">
+                  <Chat transactionId={parsedId} />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
 
 
-      </main>
-    </div>
-  );
+        </main>
+      </div>
+    );
 }
