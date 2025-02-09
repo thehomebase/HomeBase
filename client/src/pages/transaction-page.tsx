@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { ProgressChecklist } from '@/components/progress-checklist';
 import { Chat } from '@/components/chat';
+import { Logo } from '@/components/ui/logo';
 import type { Transaction } from '@shared/schema';
 
 export default function TransactionPage() {
@@ -41,12 +42,13 @@ export default function TransactionPage() {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Button onClick={() => setLocation('/')} variant="ghost" className="mr-4">
+          <div className="flex items-center">
+            <Logo />
+            <Button onClick={() => setLocation('/')} variant="ghost" className="ml-4">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div className="flex-1">
+            <div className="flex-1 ml-4">
               <h1 className="text-2xl font-bold">{transaction?.address}</h1>
               <p className="text-sm text-muted-foreground">Transaction ID: {id}</p>
             </div>
