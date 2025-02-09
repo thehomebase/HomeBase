@@ -213,38 +213,35 @@ export default function TransactionPage() {
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-4">Transaction Summary</h3>
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-muted-foreground">Current Phase</p>
-                  <p className="font-medium">{currentPhase}</p>
+              <div>
+                <p className="text-sm text-muted-foreground">Current Phase</p>
+                <p className="font-medium">{currentPhase}</p>
+                <div className="mt-2">
+                  <Progress value={progress} className="h-2" />
+                  <p className="text-sm text-muted-foreground mt-1">{progress}% Complete</p>
                 </div>
-                {user.role === 'agent' && (
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsEditing(!isEditing)}
-                    >
-                      {isEditing ? (
-                        <>
-                          <X className="h-4 w-4 mr-2" />
-                          Cancel
-                        </>
-                      ) : (
-                        <>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Edit Details
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
               </div>
-              <div className="space-y-2">
-                <Progress value={progress} className="h-2" />
-                <p className="text-sm text-muted-foreground">{displayProgress}</p>
-              </div>
-
+              {user.role === 'agent' && (
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsEditing(!isEditing)}
+                  >
+                    {isEditing ? (
+                      <>
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel
+                      </>
+                    ) : (
+                      <>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit Details
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                     <p className="text-sm text-muted-foreground">Transaction Type</p>
@@ -420,7 +417,7 @@ export default function TransactionPage() {
                 )}
               </div>
 
-              
+
             </CardContent>
           </Card>
 
