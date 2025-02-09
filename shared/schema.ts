@@ -30,7 +30,7 @@ export const transactions = pgTable("transactions", {
   accessCode: text("access_code").notNull(),
   status: text("status").notNull(),
   agentId: integer("agent_id").notNull(),
-  clientId: integer("client_id").notNull(),
+  clientId: integer("client_id"), // Made optional
   participants: json("participants").notNull().$type<{
     userId: number;
     role: string;

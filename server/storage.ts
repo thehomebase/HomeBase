@@ -103,8 +103,61 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
-    const result = await db.insert(transactions).values(insertTransaction).returning();
-    return result[0];
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO transactions (
+          address,
+          access_code,
+          status,
+          agent_id,
+          client_id,
+          participants,
+          contract_price,
+          option_period,
+          option_fee,
+          earnest_money,
+          down_payment,
+          seller_concessions,
+          closing_date
+        ) VALUES (
+          ${insertTransaction.address},
+          ${insertTransaction.accessCode},
+          ${insertTransaction.status},
+          ${insertTransaction.agentId},
+          ${insertTransaction.clientId || null},
+          ${JSON.stringify(insertTransaction.participants)}::jsonb,
+          ${insertTransaction.contractPrice || null},
+          ${insertTransaction.optionPeriod || null},
+          ${insertTransaction.optionFee || null},
+          ${insertTransaction.earnestMoney || null},
+          ${insertTransaction.downPayment || null},
+          ${insertTransaction.sellerConcessions || null},
+          ${insertTransaction.closingDate || null}
+        )
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        address: String(row.address),
+        accessCode: String(row.access_code),
+        status: String(row.status),
+        agentId: Number(row.agent_id),
+        clientId: row.client_id ? Number(row.client_id) : null,
+        participants: Array.isArray(row.participants) ? row.participants : [],
+        contractPrice: row.contract_price ? Number(row.contract_price) : null,
+        optionPeriod: row.option_period ? Number(row.option_period) : null,
+        optionFee: row.option_fee ? Number(row.option_fee) : null,
+        earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
+        downPayment: row.down_payment ? Number(row.down_payment) : null,
+        sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
+        closingDate: row.closing_date || null
+      };
+    } catch (error) {
+      console.error('Error in createTransaction:', error);
+      throw error;
+    }
   }
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
@@ -191,7 +244,7 @@ export class DatabaseStorage implements IStorage {
           t.access_code::text as "accessCode",
           t.status::text,
           t.agent_id::integer as "agentId",
-          t.client_id::integer as "clientId",
+          COALESCE(t.client_id, null)::integer as "clientId",
           t.participants::jsonb,
           t.contract_price::numeric as "contractPrice",
           t.option_period::integer as "optionPeriod",
@@ -211,7 +264,7 @@ export class DatabaseStorage implements IStorage {
         accessCode: String(row.accessCode),
         status: String(row.status),
         agentId: Number(row.agentId),
-        clientId: Number(row.clientId),
+        clientId: row.clientId ? Number(row.clientId) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
         contractPrice: row.contractPrice ? Number(row.contractPrice) : null,
         optionPeriod: row.optionPeriod ? Number(row.optionPeriod) : null,
