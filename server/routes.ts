@@ -250,11 +250,18 @@ export function registerRoutes(app: Express): Server {
 
       let checklist = await storage.getChecklist(transactionId, transaction.type);
       if (!checklist) {
-        // Create checklist if it doesn't exist
-        checklist = await storage.createChecklist({
-          transactionId,
-          role: transaction.type,
-        });
+        try {
+          checklist = await storage.createChecklist({
+            transactionId,
+            role: transaction.type,
+          });
+        } catch (createError) {
+          // If creation fails due to duplicate, try fetching again
+          checklist = await storage.getChecklist(transactionId, transaction.type);
+          if (!checklist) {
+            throw createError;
+          }
+        }
       }
 
       const updatedChecklist = await storage.updateChecklist(checklist.id, req.body.items);
