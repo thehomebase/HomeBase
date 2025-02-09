@@ -14,6 +14,8 @@ if (!process.env.DATABASE_URL) {
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle({ client: pool, schema });
 
+import { pgTable } from 'drizzle-orm/pg-core';
+
 export const transactions = pgTable('transactions', {
   id: serial('id').primaryKey(),
   type: text('type').notNull(),
