@@ -103,6 +103,8 @@ export class DatabaseStorage implements IStorage {
       const transaction = result.rows[0];
       if (typeof transaction.participants === 'string') {
         transaction.participants = JSON.parse(transaction.participants);
+      } else if (!Array.isArray(transaction.participants)) {
+        transaction.participants = [];
       }
 
       return transaction;
