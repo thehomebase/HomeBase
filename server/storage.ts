@@ -365,23 +365,49 @@ export class DatabaseStorage implements IStorage {
 
   async updateChecklist(id: number, items: Checklist["items"]): Promise<Checklist> {
     try {
+      // Validate inputs
+      if (!id || !Array.isArray(items)) {
+        throw new Error('Invalid input: id and valid items array are required');
+      }
+
+      // Validate each item in the array
+      items.forEach(item => {
+        if (!item.id || typeof item.text !== 'string' || typeof item.completed !== 'boolean' || !item.phase) {
+          throw new Error('Invalid item format');
+        }
+      });
+
+      // First verify if the checklist exists
+      const checklistCheck = await db.execute(sql`
+        SELECT EXISTS(
+          SELECT 1 FROM checklists 
+          WHERE id = ${id}
+        );
+      `);
+
+      const checklistExists = checklistCheck.rows[0]?.exists;
+      if (!checklistExists) {
+        throw new Error(`Checklist with ID ${id} does not exist`);
+      }
+
+      // Update the checklist with proper error handling
       const result = await db.execute(sql`
-        UPDATE checklists
+        UPDATE checklists 
         SET items = ${JSON.stringify(items)}::jsonb
         WHERE id = ${id}
-        RETURNING 
-          id,
-          transaction_id as "transactionId",
-          role,
-          items
+        RETURNING id, transaction_id, role, items
       `);
+
+      if (!result.rows[0]) {
+        throw new Error('Failed to update checklist');
+      }
 
       const row = result.rows[0];
       return {
         id: Number(row.id),
-        transactionId: Number(row.transactionId),
+        transactionId: Number(row.transaction_id),
         role: String(row.role),
-        items: row.items
+        items: Array.isArray(row.items) ? row.items : []
       };
     } catch (error) {
       console.error('Error in updateChecklist:', error);
