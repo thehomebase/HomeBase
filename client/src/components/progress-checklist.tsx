@@ -152,11 +152,14 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
       );
 
       const response = await apiRequest("PATCH", `/api/checklists/${transactionId}`, {
-        items: updatedItems
+        items: updatedItems,
+        role: userRole,
+        transactionId: transactionId
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update checklist");
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to update checklist");
       }
 
       return response.json() as Promise<Checklist>;
