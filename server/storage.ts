@@ -84,12 +84,28 @@ export class DatabaseStorage implements IStorage {
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
     try {
-      const result = await db.query(transactions)
-        .select()
-        .where(eq(transactions.id, id))
-        .limit(1);
-      
-      return result[0];
+      const result = await db.execute(sql`
+        SELECT 
+          id,
+          address,
+          access_code as "accessCode",
+          status,
+          agent_id as "agentId",
+          COALESCE(participants, '[]'::jsonb) as participants
+        FROM transactions 
+        WHERE id = ${id}
+      `);
+
+      if (result.rows.length === 0) {
+        return undefined;
+      }
+
+      const transaction = result.rows[0];
+      if (typeof transaction.participants === 'string') {
+        transaction.participants = JSON.parse(transaction.participants);
+      }
+
+      return transaction;
     } catch (error) {
       console.error('Database error in getTransaction:', error);
       throw error;
