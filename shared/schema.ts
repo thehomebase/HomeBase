@@ -1,5 +1,5 @@
-import { pgTable, text, serial, integer, boolean, json, timestamp } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
+import { pgTable, serial, text, timestamp, integer, boolean, json, numeric } from 'drizzle-orm/pg-core';
+import { createInsertSchema } from 'drizzle-zod';
 import { z } from "zod";
 
 export const users = pgTable("users", {
@@ -67,6 +67,17 @@ export const messages = pgTable("messages", {
   timestamp: text("timestamp").notNull(),
 });
 
+export const contacts = pgTable('contacts', {
+  id: serial('id').primaryKey(),
+  role: text('role').notNull(),
+  firstName: text('first_name').notNull(),
+  lastName: text('last_name').notNull(),
+  email: text('email').notNull(),
+  phone: text('phone'),
+  mobilePhone: text('mobile_phone'),
+  transactionId: integer('transaction_id').notNull()
+});
+
 const checklistItemSchema = z.object({
   id: z.string(),
   text: z.string(),
@@ -84,15 +95,18 @@ export const insertChecklistSchema = createInsertSchema(checklists).extend({
   items: z.array(checklistItemSchema)
 });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
+export const insertContactSchema = createInsertSchema(contacts);
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type InsertChecklist = z.infer<typeof insertChecklistSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type InsertContact = z.infer<typeof insertContactSchema>;
 
 export type User = typeof users.$inferSelect;
 export type Client = typeof clients.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type Checklist = typeof checklists.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+export type Contact = typeof contacts.$inferSelect;
