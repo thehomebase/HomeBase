@@ -105,13 +105,23 @@ export class DatabaseStorage implements IStorage {
       const transaction = result.rows[0];
       console.log('Retrieved transaction:', transaction);
 
+      // Ensure participants is an array
       if (!transaction.participants) {
         transaction.participants = [];
       } else if (typeof transaction.participants === 'string') {
         transaction.participants = JSON.parse(transaction.participants);
       }
 
-      return transaction;
+      // Cast numeric fields to ensure correct types
+      return {
+        id: Number(transaction.id),
+        address: String(transaction.address),
+        accessCode: String(transaction.accessCode),
+        status: String(transaction.status),
+        agentId: Number(transaction.agentId),
+        participants: Array.isArray(transaction.participants) ? transaction.participants : []
+      };
+
     } catch (error) {
       console.error('Database error in getTransaction:', error);
       throw error;

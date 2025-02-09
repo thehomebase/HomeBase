@@ -27,9 +27,14 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      const transaction = await storage.getTransaction(Number(req.params.id));
+      const id = Number(req.params.id);
+      console.log('Processing request for transaction ID:', id);
+
+      const transaction = await storage.getTransaction(id);
+      console.log('Transaction retrieved:', transaction);
 
       if (!transaction) {
+        console.log('No transaction found with ID:', id);
         return res.status(404).send('Transaction not found');
       }
 
