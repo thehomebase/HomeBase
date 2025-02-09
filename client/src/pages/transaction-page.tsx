@@ -29,7 +29,7 @@ export default function TransactionPage() {
       }
       return response.json();
     },
-    enabled: isValidId && !!user,
+    enabled: !!parsedId && !!user,
     retry: false
   });
 
