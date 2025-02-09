@@ -272,6 +272,8 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
     },
     onSuccess: (data) => {
       queryClient.setQueryData(["/api/checklists", transactionId], data);
+      // Invalidate transaction query to update progress bar
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId] });
       toast({
         title: "Progress updated",
         description: "Your changes have been saved.",
