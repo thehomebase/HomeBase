@@ -75,10 +75,7 @@ export default function TransactionPage() {
                 />
               </TabsContent>
               <TabsContent value="chat" className="mt-6">
-                <Chat
-                  transactionId={Number(id)}
-                  userId={user?.id || 0}
-                />
+                <Chat transactionId={Number(id)} />
               </TabsContent>
             </Tabs>
           </CardContent>
