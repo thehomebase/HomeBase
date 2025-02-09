@@ -15,14 +15,10 @@ export default function TransactionPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
 
-  console.log("TransactionPage mounted, ID:", id);
-
-  const { data: transaction, isError, error, isLoading } = useQuery<Transaction>({
+  const { data: transaction, isError, isLoading } = useQuery<Transaction>({
     queryKey: ['/api/transactions', Number(id)],
     enabled: !!id && !!user?.id
   });
-
-  console.log("Current transaction data:", transaction);
 
   if (isLoading) {
     return <div className="p-6">Loading...</div>;

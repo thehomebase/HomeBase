@@ -10,13 +10,7 @@ interface ProgressChecklistProps {
   userRole: string;
 }
 
-type ChecklistItem = {
-  id: string;
-  text: string;
-  completed: boolean;
-};
-
-const DEFAULT_ITEMS: Record<string, ChecklistItem[]> = {
+const DEFAULT_ITEMS = {
   agent: [
     { id: "a1", text: "Initial consultation with client", completed: false },
     { id: "a2", text: "Property listing agreement signed", completed: false },
@@ -60,15 +54,15 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
     enabled: !!transactionId && !!userRole,
   });
 
-  const items = checklist?.items || DEFAULT_ITEMS[userRole] || [];
+  const items = checklist?.items || DEFAULT_ITEMS[userRole as keyof typeof DEFAULT_ITEMS] || [];
   const progress = Math.round((items.filter((item) => item.completed).length / items.length) * 100);
 
   const createChecklistMutation = useMutation({
-    mutationFn: async (items: ChecklistItem[]) => {
+    mutationFn: async () => {
       await apiRequest("POST", "/api/checklists", {
         transactionId,
         role: userRole,
-        items,
+        items: DEFAULT_ITEMS[userRole as keyof typeof DEFAULT_ITEMS] || [],
       });
     },
     onSuccess: () => {
@@ -77,11 +71,11 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
   });
 
   const updateChecklistMutation = useMutation({
-    mutationFn: async (items: ChecklistItem[]) => {
+    mutationFn: async (updatedItems: typeof items) => {
       if (checklist?.id) {
-        await apiRequest("PATCH", `/api/checklists/${checklist.id}`, { items });
+        await apiRequest("PATCH", `/api/checklists/${checklist.id}`, { items: updatedItems });
       } else {
-        await createChecklistMutation.mutateAsync(items);
+        await createChecklistMutation.mutateAsync();
       }
     },
     onSuccess: () => {
