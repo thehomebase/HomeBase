@@ -79,7 +79,17 @@ export default function TransactionPage() {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to update transaction");
       }
-      return response.json();
+      const updatedTransaction = await response.json();
+      return updatedTransaction;
+    },
+    onSuccess: (updatedData) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
+      setIsEditing(false);
+      form.reset(updatedData);
+      toast({
+        title: "Success",
+        description: "Transaction updated successfully",
+      });
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
