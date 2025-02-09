@@ -162,53 +162,40 @@ export class DatabaseStorage implements IStorage {
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
     try {
-      console.log('Database query - fetching transaction with ID:', id);
-
-      // First check if transaction exists
-      const existsCheck = await db.execute(sql`
-        SELECT EXISTS(
-          SELECT 1 FROM transactions WHERE id = ${id}
-        );
-      `);
-
-      const exists = existsCheck.rows[0]?.exists;
-      console.log('Transaction exists check:', exists);
-
-      if (!exists) {
-        console.log('Transaction not found with ID:', id);
+      if (!id || isNaN(id)) {
+        console.log('Invalid transaction ID provided:', id);
         return undefined;
       }
 
-      // If it exists, get the full transaction with explicit type casting
+      console.log('Fetching transaction with ID:', id);
       const result = await db.execute(sql`
         SELECT 
-          id::integer,
-          address::text,
-          access_code::text as "accessCode",
-          status::text,
-          agent_id::integer as "agentId",
-          client_id::integer as "clientId",
-          participants::jsonb,
-          contract_price::numeric as "contractPrice",
-          option_period::integer as "optionPeriod",
-          option_fee::numeric as "optionFee",
-          earnest_money::numeric as "earnestMoney",
-          down_payment::numeric as "downPayment",
-          seller_concessions::numeric as "sellerConcessions",
-          closing_date::text as "closingDate"
+          id,
+          address,
+          access_code as "accessCode",
+          status,
+          agent_id as "agentId",
+          client_id as "clientId",
+          participants,
+          contract_price as "contractPrice",
+          option_period as "optionPeriod",
+          option_fee as "optionFee",
+          earnest_money as "earnestMoney",
+          down_payment as "downPayment",
+          seller_concessions as "sellerConcessions",
+          closing_date as "closingDate"
         FROM transactions 
         WHERE id = ${id}
       `);
 
-      if (result.rows.length === 0) {
-        console.log('No rows returned for existing transaction:', id);
+      console.log('Query result:', result.rows);
+
+      if (!result.rows || result.rows.length === 0) {
+        console.log('No transaction found with ID:', id);
         return undefined;
       }
 
       const row = result.rows[0];
-      console.log('Raw transaction data:', row);
-
-      // Construct a properly typed transaction object
       const transaction: Transaction = {
         id: Number(row.id),
         address: String(row.address),
@@ -231,7 +218,10 @@ export class DatabaseStorage implements IStorage {
 
     } catch (error) {
       console.error('Error in getTransaction:', error);
-      return undefined;
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+      }
+      throw error;
     }
   }
 
