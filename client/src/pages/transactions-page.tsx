@@ -14,10 +14,10 @@ import { Plus } from "lucide-react";
 import { NavTabs } from "@/components/ui/nav-tabs";
 
 interface Transaction {
-  id: number;  // Changed from string to number
+  id: string;
   address: string;
   status: string;
-  participants: { userId: number; role: string; }[];
+  participants: any[];
 }
 
 const createTransactionSchema = z.object({
@@ -33,7 +33,7 @@ export default function TransactionsPage() {
     defaultValues: { address: "", accessCode: "" },
   });
 
-  const { data: transactions = [], isLoading } = useQuery<Transaction[]>({
+  const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     enabled: !!user,
   });
@@ -51,14 +51,6 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
     },
   });
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-[600px]">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
-    );
-  }
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -116,11 +108,7 @@ export default function TransactionsPage() {
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {transactions.map((transaction) => (
-          <Card 
-            key={transaction.id} 
-            className="cursor-pointer hover:bg-accent/50 transition-colors" 
-            onClick={() => setLocation(`/transaction/${transaction.id}`)}
-          >
+          <Card key={transaction.id} className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => setLocation(`/transaction/${transaction.id}`)}>
             <CardHeader>
               <CardTitle className="text-lg">{transaction.address}</CardTitle>
             </CardHeader>

@@ -21,18 +21,42 @@ interface Message {
 }
 
 interface ChatProps {
-  transactionId: number;
+  transactionId: number | string;
 }
 
 export function Chat({ transactionId }: ChatProps) {
   const { user } = useAuth();
   const [message, setMessage] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Ensure transactionId is a valid number
+  const numericTransactionId = typeof transactionId === 'string' ? parseInt(transactionId, 10) : transactionId;
+
+  // Validate transaction ID
+  if (isNaN(numericTransactionId)) {
+    return (
+      <div className="p-4 border rounded-lg bg-destructive/10 text-destructive">
+        Invalid transaction ID provided
+      </div>
+    );
+  }
+
   const { data: messages = [], isLoading } = useQuery<Message[]>({
-    queryKey: ["/api/messages", transactionId],
-    enabled: !!user && !!transactionId,
+    queryKey: ["/api/messages", numericTransactionId],
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("GET", `/api/messages?transactionId=${numericTransactionId}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch messages");
+        }
+        return response.json();
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+        throw error;
+      }
+    },
+    enabled: !!user && !!numericTransactionId,
     refetchInterval: 5000,
   });
 
@@ -44,7 +68,7 @@ export function Chat({ transactionId }: ChatProps) {
 
       const messageData = {
         content,
-        transactionId,
+        transactionId: numericTransactionId,
         userId: user.id,
         username: user.username,
         role: user.role,
@@ -57,7 +81,7 @@ export function Chat({ transactionId }: ChatProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages", transactionId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages", numericTransactionId] });
       setMessage("");
     },
     onError: (error: Error) => {
@@ -71,8 +95,8 @@ export function Chat({ transactionId }: ChatProps) {
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
@@ -93,9 +117,9 @@ export function Chat({ transactionId }: ChatProps) {
 
   return (
     <div className="flex flex-col h-[600px] rounded-lg border bg-background">
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
-          {messages.map((msg: Message) => (
+          {messages.map((msg) => (
             <div
               key={msg.id}
               className={`flex ${msg.userId === user?.id ? "justify-end" : "justify-start"}`}
@@ -118,7 +142,6 @@ export function Chat({ transactionId }: ChatProps) {
               </div>
             </div>
           ))}
-          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
@@ -143,5 +166,3 @@ export function Chat({ transactionId }: ChatProps) {
     </div>
   );
 }
-
-export default Chat;
