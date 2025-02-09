@@ -66,8 +66,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: 'Transaction not found' });
       }
 
-      const userHasAccess = 
-        transaction.agentId === req.user.id || 
+      const userHasAccess =
+        transaction.agentId === req.user.id ||
         (transaction.participants && transaction.participants.some(p => p.userId === req.user.id));
 
       if (!userHasAccess) {
@@ -153,18 +153,48 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Messages
-  app.get("/api/messages/:transactionId", async (req, res) => {
+  app.get("/api/messages", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const messages = await storage.getMessages(Number(req.params.transactionId));
-    res.json(messages);
+    try {
+      const messages = await storage.getMessages();
+      // Fetch user details for each message
+      const messagesWithUserDetails = await Promise.all(
+        messages.map(async (message) => {
+          const user = await storage.getUser(message.userId);
+          return {
+            ...message,
+            username: user?.username || 'Unknown User',
+            role: user?.role || 'unknown',
+          };
+        })
+      );
+      res.json(messagesWithUserDetails);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      res.status(500).send('Error fetching messages');
+    }
   });
 
   app.post("/api/messages", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const parsed = insertMessageSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).send(parsed.error.message);
-    const message = await storage.createMessage(parsed.data);
-    res.status(201).json(message);
+    try {
+      const parsed = insertMessageSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).send(parsed.error.message);
+      }
+
+      const message = await storage.createMessage(parsed.data);
+      const user = await storage.getUser(message.userId);
+
+      res.status(201).json({
+        ...message,
+        username: user?.username || 'Unknown User',
+        role: user?.role || 'unknown',
+      });
+    } catch (error) {
+      console.error('Error creating message:', error);
+      res.status(500).send('Error creating message');
+    }
   });
 
   const httpServer = createServer(app);
