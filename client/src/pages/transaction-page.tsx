@@ -16,32 +16,20 @@ export default function TransactionPage() {
   
   const parsedId = id ? parseInt(id, 10) : null;
   const isValidId = parsedId && !isNaN(parsedId);
-
-  if (!isValidId) {
-    return (
-      <div className="container mx-auto p-6">
-        <Link href="/transactions">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="text-center text-destructive mt-4">
-          Invalid transaction ID. Please return to transactions page.
-        </div>
-      </div>
-    );
-  }
   
   const { data: transaction, isError, error } = useQuery({
     queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
+      if (!isValidId) {
+        throw new Error("Invalid transaction ID");
+      }
       const response = await apiRequest("GET", `/api/transactions/${parsedId}`);
       if (!response.ok) {
         throw new Error("Failed to fetch transaction");
       }
       return response.json();
     },
-    enabled: !!parsedId && !isNaN(parsedId) && !!user,
+    enabled: !!parsedId && !!user,
     retry: false
   });
 
