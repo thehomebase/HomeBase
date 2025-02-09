@@ -31,7 +31,7 @@ export interface IStorage {
 
   // Message operations
   createMessage(message: InsertMessage): Promise<Message>;
-  getMessages(transactionId: number): Promise<Message[]>;
+  getMessages(transactionId?: number): Promise<Message[]>;
 
   // Session store
   sessionStore: session.Store;
@@ -210,13 +210,20 @@ export class DatabaseStorage implements IStorage {
     return message;
   }
 
-  async getMessages(transactionId: number): Promise<Message[]> {
+  async getMessages(transactionId?: number): Promise<Message[]> {
     try {
-      const result = await db.execute(sql`
-        SELECT * FROM messages 
-        WHERE transaction_id = ${transactionId}
-        ORDER BY timestamp ASC
-      `);
+      let query = sql`
+        SELECT * FROM messages
+      `;
+
+      if (transactionId) {
+        query = sql`
+          SELECT * FROM messages 
+          WHERE transaction_id = ${transactionId}
+        `;
+      }
+
+      const result = await db.execute(sql`${query} ORDER BY timestamp ASC`);
       return result.rows;
     } catch (error) {
       console.error('Error in getMessages:', error);
