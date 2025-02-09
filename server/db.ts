@@ -2,6 +2,7 @@ import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
 import * as schema from "@shared/schema";
+import { serial, text, integer, timestamp, pgTable } from 'drizzle-orm/pg-core';
 
 neonConfig.webSocketConstructor = ws;
 
@@ -13,8 +14,6 @@ if (!process.env.DATABASE_URL) {
 
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle({ client: pool, schema });
-
-import { pgTable } from 'drizzle-orm/pg-core';
 
 export const transactions = pgTable('transactions', {
   id: serial('id').primaryKey(),
