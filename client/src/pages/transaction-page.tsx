@@ -18,14 +18,17 @@ export default function TransactionPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
 
+  // Ensure ID is valid before making the query
+  const transactionId = id ? parseInt(id, 10) : null;
+  const isValidId = !isNaN(Number(transactionId)) && transactionId > 0;
+
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
-    queryKey: ["/api/transactions", Number(id)],
-    enabled: !!id && !!user && Number(id) > 0,
-    retry: 1,
+    queryKey: ["/api/transactions", transactionId],
+    enabled: !!user && isValidId,
   });
 
   const { data: checklist } = useQuery<Checklist>({
-    queryKey: ["/api/checklists", Number(id), user?.role],
+    queryKey: ["/api/checklists", transactionId, user?.role],
     enabled: !!transaction && !!user?.role,
   });
 
@@ -37,6 +40,20 @@ export default function TransactionPage() {
           <p className="text-muted-foreground mt-2">Please log in to view this transaction.</p>
           <Button className="mt-4" onClick={() => setLocation("/auth")}>
             Go to Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isValidId) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold">Invalid Transaction ID</h2>
+          <p className="text-muted-foreground mt-2">The transaction ID provided is invalid.</p>
+          <Button className="mt-4" onClick={() => setLocation("/")}>
+            Return Home
           </Button>
         </div>
       </div>
@@ -74,7 +91,7 @@ export default function TransactionPage() {
         <div className="text-center">
           <h2 className="text-xl font-semibold">Transaction Not Found</h2>
           <p className="text-muted-foreground mt-2">
-            This transaction may have been deleted or you may not have access to it.
+            The requested transaction could not be found.
           </p>
           <Button className="mt-4" onClick={() => setLocation("/")}>
             Return Home
@@ -114,7 +131,6 @@ export default function TransactionPage() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Property Information */}
           <div className="lg:col-span-2 space-y-6">
             <div className="flex items-start justify-between">
               <div>
@@ -176,14 +192,14 @@ export default function TransactionPage() {
                   </TabsList>
                   <TabsContent value="progress" className="mt-6">
                     <ProgressChecklist
-                      transactionId={Number(id)}
+                      transactionId={transactionId!}
                       checklist={checklist}
                       userRole={user?.role || ""}
                     />
                   </TabsContent>
                   <TabsContent value="chat" className="mt-6">
                     <Chat
-                      transactionId={Number(id)}
+                      transactionId={transactionId!}
                       userId={user?.id || 0}
                     />
                   </TabsContent>
@@ -192,7 +208,6 @@ export default function TransactionPage() {
             </Card>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -227,3 +242,16 @@ export default function TransactionPage() {
     </div>
   );
 }
+
+const getStatusColor = (status: string) => {
+  switch (status.toLowerCase()) {
+    case "active":
+      return "bg-green-500/10 text-green-500";
+    case "pending":
+      return "bg-yellow-500/10 text-yellow-500";
+    case "completed":
+      return "bg-blue-500/10 text-blue-500";
+    default:
+      return "bg-gray-500/10 text-gray-500";
+  }
+};

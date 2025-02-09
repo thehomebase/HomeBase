@@ -13,9 +13,7 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/transactions", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      console.log('Getting transactions for user:', req.user.id);
       const transactions = await storage.getTransactionsByUser(req.user.id);
-      console.log('Retrieved transactions:', transactions);
       res.json(transactions);
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -25,35 +23,31 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/transactions/:id", async (req, res) => {
     if (!req.isAuthenticated()) {
-      console.log('User not authenticated');
       return res.sendStatus(401);
     }
 
-    console.log('Fetching transaction with ID:', req.params.id);
-    console.log('User making request:', req.user);
-    const id = parseInt(req.params.id);
-
-    if (isNaN(id)) {
-      console.error('Invalid transaction ID:', req.params.id);
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id) || id <= 0) {
       return res.status(400).send('Invalid transaction ID');
     }
 
     try {
       const transaction = await storage.getTransaction(id);
-      console.log('Retrieved transaction:', transaction);
 
       if (!transaction) {
-        console.error('Transaction not found:', id);
         return res.status(404).send('Transaction not found');
       }
 
-      // Added check to ensure user has access to this transaction
-      const userHasAccess = 
-        transaction.agentId === req.user.id || 
-        transaction.participants.some(p => p.userId === req.user.id);
+      // For agents, allow access to any transaction they created
+      if (req.user.role === 'agent') {
+        if (transaction.agentId === req.user.id) {
+          return res.json(transaction);
+        }
+      }
 
-      if (!userHasAccess) {
-        console.error('User does not have access to transaction:', id);
+      // For other roles, check if they're a participant
+      const isParticipant = transaction.participants?.some(p => p.userId === req.user.id);
+      if (!isParticipant) {
         return res.status(403).send('Access denied');
       }
 
