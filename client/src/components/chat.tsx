@@ -30,6 +30,16 @@ export function Chat({ transactionId }: ChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Validate transactionId
+  if (!transactionId || isNaN(transactionId)) {
+    console.error("Invalid transaction ID provided to Chat component:", transactionId);
+    return (
+      <div className="flex items-center justify-center h-[600px]">
+        <p className="text-destructive">Invalid transaction ID</p>
+      </div>
+    );
+  }
+
   const { data: messages = [], isLoading, error } = useQuery<Message[]>({
     queryKey: ["/api/messages", transactionId],
     queryFn: async () => {
@@ -44,43 +54,29 @@ export function Chat({ transactionId }: ChatProps) {
       return response.json();
     },
     enabled: !!transactionId && !!user,
-    refetchInterval: 5000, // Poll every 5 seconds for new messages
+    refetchInterval: 5000,
   });
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      // Validate all required fields before sending
       if (!user?.id || !user?.username || !user?.role) {
         throw new Error("User information is incomplete");
       }
 
-      if (!transactionId || isNaN(transactionId)) {
-        console.error('Invalid transaction ID:', transactionId);
-        throw new Error("Transaction ID is required");
-      }
-
-      if (!content.trim()) {
-        throw new Error("Message content cannot be empty");
-      }
-
       const messageData = {
         content: content.trim(),
-        transactionId: transactionId,
+        transactionId,
         userId: user.id,
         username: user.username,
         role: user.role,
         timestamp: new Date().toISOString(),
       };
 
-      console.log('Sending message data:', messageData); // Debug log
-
       const response = await apiRequest("POST", "/api/messages", messageData);
-
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to send message");
       }
-
       return response.json();
     },
     onSuccess: () => {
@@ -88,7 +84,7 @@ export function Chat({ transactionId }: ChatProps) {
       setMessage("");
     },
     onError: (error: Error) => {
-      console.error('Message send error:', error);
+      console.error("Message send error:", error);
       toast({
         title: "Error sending message",
         description: error.message,
@@ -107,7 +103,6 @@ export function Chat({ transactionId }: ChatProps) {
     e.preventDefault();
     const trimmedMessage = message.trim();
 
-    // Validate all required fields
     if (!trimmedMessage) {
       toast({
         title: "Error",
