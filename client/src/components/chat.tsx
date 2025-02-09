@@ -53,12 +53,19 @@ export function Chat({ transactionId }: ChatProps) {
         throw new Error("User information is incomplete");
       }
 
+      // Ensure transactionId is a number and valid
+      const tid = Number(transactionId);
+      if (!tid || isNaN(tid)) {
+        throw new Error("Invalid transaction ID");
+      }
+
       const messageData = {
         content: messageContent.trim(),
-        transactionId: transactionId,
+        transactionId: tid,
         userId: user.id,
         username: user.username,
-        role: user.role
+        role: user.role,
+        timestamp: new Date().toISOString()
       };
 
       console.log('Sending message data:', messageData); // Debug log
@@ -75,6 +82,7 @@ export function Chat({ transactionId }: ChatProps) {
       setMessage("");
     },
     onError: (error: Error) => {
+      console.error('Message send error:', error);
       toast({
         title: "Error sending message",
         description: error.message,
@@ -95,15 +103,6 @@ export function Chat({ transactionId }: ChatProps) {
       toast({
         title: "Error",
         description: "Message cannot be empty",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!user?.id || !user?.username || !user?.role) {
-      toast({
-        title: "Error",
-        description: "User information is incomplete. Please log in again.",
         variant: "destructive",
       });
       return;
