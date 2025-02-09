@@ -32,6 +32,12 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
   const { toast } = useToast();
   console.log("ProgressChecklist render:", { transactionId, userRole });
 
+  // Ensure transactionId is valid before making any requests
+  if (!transactionId || isNaN(transactionId)) {
+    console.error("Invalid transactionId:", transactionId);
+    return <div>Invalid transaction ID</div>;
+  }
+
   // Get existing checklist
   const { data: checklist, isLoading } = useQuery<Checklist>({
     queryKey: ["/api/checklists", transactionId, userRole],
@@ -48,12 +54,14 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
       try {
         if (checklist) {
           // Update existing checklist
-          const response = await apiRequest("PATCH", `/api/checklists/${checklist.id}`, { items: newItems });
+          const response = await apiRequest("PATCH", `/api/checklists/${checklist.id}`, { 
+            items: newItems 
+          });
           return response.json();
         } else {
-          // Create new checklist
+          // Create new checklist with explicit transaction ID
           const response = await apiRequest("POST", "/api/checklists", {
-            transactionId,
+            transactionId: Number(transactionId),
             role: userRole,
             items: newItems
           });
