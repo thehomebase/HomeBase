@@ -31,10 +31,14 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   const { toast } = useToast();
   const [newDocument, setNewDocument] = useState("");
 
-  const { data: documents = defaultDocuments, isLoading } = useQuery({
+  const { data: documents = [], isLoading } = useQuery({
     queryKey: ["/api/documents", transactionId],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/documents/${transactionId}`);
+      if (response.ok) {
+        const docs = await response.json();
+        return docs.length ? docs : defaultDocuments;
+      }
       if (!response.ok) {
         throw new Error("Failed to fetch documents");
       }
