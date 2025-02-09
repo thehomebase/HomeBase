@@ -24,9 +24,9 @@ export default function TransactionPage() {
   
   // Calculate progress and next task
   const progress = React.useMemo(() => {
-    if (!transaction) return 0;
-    const completedTasks = (transaction.checklist || []).filter(item => item.completed).length;
-    const totalTasks = (transaction.checklist || []).length || 1;
+    if (!transaction?.checklist) return 0;
+    const completedTasks = transaction.checklist.filter(item => item.completed).length;
+    const totalTasks = transaction.checklist.length || 1;
     return Math.round((completedTasks / totalTasks) * 100);
   }, [transaction]);
 
