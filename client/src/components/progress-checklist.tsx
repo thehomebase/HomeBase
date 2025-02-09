@@ -140,6 +140,9 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
   const updateChecklistMutation = useMutation({
     mutationFn: async (updatedItem: ChecklistItem) => {
       try {
+        // Log the data being sent for debugging
+        console.log('Sending update:', updatedItem);
+
         const response = await apiRequest("PATCH", `/api/checklists/${transactionId}`, {
           items: [{
             id: updatedItem.id,

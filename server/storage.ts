@@ -365,17 +365,13 @@ export class DatabaseStorage implements IStorage {
 
   async updateChecklist(id: number, items: Checklist["items"]): Promise<Checklist> {
     try {
-      // Validate inputs
+      // Log the received data for debugging
+      console.log('Updating checklist:', { id, items });
+
+      // Basic validation
       if (!id || !Array.isArray(items)) {
         throw new Error('Invalid input: id and valid items array are required');
       }
-
-      // Validate each item in the array
-      items.forEach(item => {
-        if (!item.id || typeof item.text !== 'string' || typeof item.completed !== 'boolean' || !item.phase) {
-          throw new Error('Invalid item format');
-        }
-      });
 
       // First verify if the checklist exists
       const checklistCheck = await db.execute(sql`
@@ -390,7 +386,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Checklist with ID ${id} does not exist`);
       }
 
-      // Update the checklist with proper error handling
+      // Update the checklist
       const result = await db.execute(sql`
         UPDATE checklists 
         SET items = ${JSON.stringify(items)}::jsonb
