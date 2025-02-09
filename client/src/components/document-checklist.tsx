@@ -15,11 +15,11 @@ interface Document {
 }
 
 const defaultDocuments = [
-  { id: '1', name: 'Purchase Agreement', status: 'waiting_signatures' },
-  { id: '2', name: 'Seller's Disclosure', status: 'not_applicable' },
-  { id: '3', name: 'Lead-Based Paint Disclosure', status: 'not_applicable' },
-  { id: '4', name: 'Property Survey', status: 'waiting_others' },
-  { id: '5', name: 'Home Inspection Report', status: 'not_applicable' },
+  { id: "1", name: "Purchase Agreement", status: "waiting_signatures" },
+  { id: "2", name: "Seller's Disclosure", status: "not_applicable" },
+  { id: "3", name: "Lead-Based Paint Disclosure", status: "not_applicable" },
+  { id: "4", name: "Property Survey", status: "waiting_others" },
+  { id: "5", name: "Home Inspection Report", status: "not_applicable" },
   { id: '6', name: 'Appraisal Report', status: 'not_applicable' },
   { id: '7', name: 'Title Report', status: 'not_applicable' },
   { id: '8', name: 'Closing Disclosure', status: 'not_applicable' },
