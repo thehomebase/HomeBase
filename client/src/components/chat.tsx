@@ -24,7 +24,7 @@ interface ChatProps {
   transactionId: number;
 }
 
-export default function Chat({ transactionId }: ChatProps) {
+export function Chat({ transactionId }: ChatProps) {
   const { user } = useAuth();
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -52,6 +52,11 @@ export default function Chat({ transactionId }: ChatProps) {
       // Validate all required fields before sending
       if (!user?.id || !user?.username || !user?.role) {
         throw new Error("User information is incomplete");
+      }
+
+      if (!transactionId || isNaN(transactionId)) {
+        console.error('Invalid transaction ID:', transactionId);
+        throw new Error("Transaction ID is required");
       }
 
       if (!content.trim()) {
@@ -83,6 +88,7 @@ export default function Chat({ transactionId }: ChatProps) {
       setMessage("");
     },
     onError: (error: Error) => {
+      console.error('Message send error:', error);
       toast({
         title: "Error sending message",
         description: error.message,
@@ -200,5 +206,3 @@ export default function Chat({ transactionId }: ChatProps) {
     </div>
   );
 }
-
-export { Chat };

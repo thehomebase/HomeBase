@@ -11,11 +11,12 @@ import { Transaction } from "@shared/schema";
 export default function ChatPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const transactionId = parseInt(id || "0");
+  const transactionId = id ? parseInt(id) : null;
 
   const { data: transaction, isLoading: isLoadingTransaction } = useQuery<Transaction>({
     queryKey: ["/api/transactions", transactionId],
     queryFn: async () => {
+      if (!transactionId) throw new Error("Transaction ID is required");
       const response = await apiRequest("GET", `/api/transactions/${transactionId}`);
       if (!response.ok) {
         const errorText = await response.text();
