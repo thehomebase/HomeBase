@@ -209,12 +209,144 @@ export default function TransactionPage() {
                 </div>
               )}
               
-              {isEditing ? (
-                <form onSubmit={form.handleSubmit((data) => {
-                  updateTransaction.mutate(data);
-                  setIsEditing(false);
-                })} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Transaction Type</p>
+                  <p className="font-medium capitalize">
+                    {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Contract Price</p>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      {...form.register("contractPrice")}
+                      placeholder="Enter contract price"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.contractPrice 
+                        ? `$${transaction.contractPrice.toLocaleString()}` 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Option Period</p>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      {...form.register("optionPeriod")}
+                      placeholder="Enter option period"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.optionPeriod 
+                        ? `${transaction.optionPeriod} days` 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Option Fee</p>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      {...form.register("optionFee")}
+                      placeholder="Enter option fee"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.optionFee 
+                        ? `$${transaction.optionFee.toLocaleString()}` 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Earnest Money</p>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      {...form.register("earnestMoney")}
+                      placeholder="Enter earnest money"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.earnestMoney 
+                        ? `$${transaction.earnestMoney.toLocaleString()}` 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Down Payment</p>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      {...form.register("downPayment")}
+                      placeholder="Enter down payment"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.downPayment 
+                        ? `$${transaction.downPayment.toLocaleString()}` 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Seller Concessions</p>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      {...form.register("sellerConcessions")}
+                      placeholder="Enter seller concessions"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.sellerConcessions 
+                        ? `$${transaction.sellerConcessions.toLocaleString()}` 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Closing Date</p>
+                  {isEditing ? (
+                    <Input
+                      type="date"
+                      {...form.register("closingDate")}
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.closingDate 
+                        ? new Date(transaction.closingDate).toLocaleDateString() 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <p className="font-medium capitalize">{transaction.status}</p>
+                </div>
+              </div>
+              
+              {isEditing && (
+                <div className="flex justify-end">
+                  <Button 
+                    type="button" 
+                    onClick={form.handleSubmit((data) => {
+                      updateTransaction.mutate(data);
+                      setIsEditing(false);
+                    })} 
+                    disabled={updateTransaction.isPending}
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              )}
                     <div>
                       <p className="text-sm text-muted-foreground">Transaction Type</p>
                       <p className="font-medium capitalize">
