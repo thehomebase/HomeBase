@@ -92,8 +92,10 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         throw new Error("Failed to remove document");
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
+    onSuccess: (_, deletedId) => {
+      const currentDocs = queryClient.getQueryData<Document[]>(["/api/documents", transactionId]) || [];
+      const updatedDocs = currentDocs.filter(doc => doc.id !== deletedId);
+      queryClient.setQueryData(["/api/documents", transactionId], updatedDocs);
       toast({
         title: "Success",
         description: "Document removed successfully",
