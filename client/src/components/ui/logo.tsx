@@ -10,8 +10,11 @@ export function Logo({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
       <img
         src="/homebaselogo.png"
         alt="Homebase Logo"
-        className="h-12 w-auto" 
-        style={{ minWidth: '160px' }} 
+        className="h-8 md:h-10 w-auto object-contain transition-all" 
+        style={{ 
+          maxWidth: '140px',
+          aspectRatio: 'auto'
+        }} 
       />
     </div>
   );

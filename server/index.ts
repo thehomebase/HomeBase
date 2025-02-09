@@ -59,10 +59,41 @@ app.use((req, res, next) => {
       serveStatic(app);
     }
 
+    // Try different ports if the default port is in use
+    const tryPort = async (startPort: number): Promise<number> => {
+      for (let port = startPort; port < startPort + 10; port++) {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const onError = (error: Error & { code?: string }) => {
+              if (error.code === 'EADDRINUSE') {
+                console.log(`Port ${port} in use, trying next port...`);
+                server.removeListener('error', onError);
+                reject(error);
+              } else {
+                console.error(`Failed to bind to port ${port}:`, error);
+                reject(error);
+              }
+            };
+
+            server.once('error', onError);
+            server.listen(port, '0.0.0.0', () => {
+              server.removeListener('error', onError);
+              resolve();
+            });
+          });
+          return port;
+        } catch (err: unknown) {
+          const error = err as Error & { code?: string };
+          if (error.code !== 'EADDRINUSE') throw error;
+        }
+      }
+      throw new Error('No available ports found');
+    };
+
     const PORT = Number(process.env.PORT || 5000);
-    server.listen(PORT, '0.0.0.0', () => {
-      log(`Server running on port ${PORT}`);
-    });
+    const actualPort = await tryPort(PORT);
+    log(`Server running on port ${actualPort}`);
+
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

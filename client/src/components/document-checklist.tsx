@@ -52,11 +52,9 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       return response.json();
     },
     onSuccess: (updatedDoc) => {
-      const currentDocs = queryClient.getQueryData<Document[]>(["/api/documents", transactionId]) || [];
-      const updatedDocs = currentDocs.map(doc => 
-        doc.id === updatedDoc.id ? updatedDoc : doc
+      queryClient.setQueryData(["/api/documents", transactionId], (oldData: Document[] = []) => 
+        oldData.map(doc => doc.id === updatedDoc.id ? updatedDoc : doc)
       );
-      queryClient.setQueryData(["/api/documents", transactionId], updatedDocs);
       toast({
         title: "Success",
         description: "Document status updated successfully",
@@ -71,13 +69,13 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         status: 'not_applicable'
       });
       if (!response.ok) {
-        throw new Error("Failed to add document");
+        const error = await response.json();
+        throw new Error(error.message || "Failed to add document");
       }
       return response.json();
     },
     onSuccess: (newDoc) => {
-      const existingDocs = queryClient.getQueryData<Document[]>(["/api/documents", transactionId]) || [];
-      queryClient.setQueryData(["/api/documents", transactionId], [...existingDocs, newDoc]);
+      queryClient.setQueryData(["/api/documents", transactionId], (oldData: Document[] = []) => [...oldData, newDoc]);
       setNewDocument("");
       toast({
         title: "Success",
@@ -101,9 +99,9 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       }
     },
     onSuccess: (_, deletedId) => {
-      const currentDocs = queryClient.getQueryData<Document[]>(["/api/documents", transactionId]) || [];
-      const updatedDocs = currentDocs.filter(doc => doc.id !== deletedId);
-      queryClient.setQueryData(["/api/documents", transactionId], updatedDocs);
+      queryClient.setQueryData(["/api/documents", transactionId], (oldData: Document[] = []) => 
+        oldData.filter(doc => doc.id !== deletedId)
+      );
       toast({
         title: "Success",
         description: "Document removed successfully",
@@ -115,7 +113,8 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     return <div>Loading...</div>;
   }
 
-  const handleAddDocument = () => {
+  const handleAddDocument = (e: React.FormEvent) => {
+    e.preventDefault();
     if (newDocument.trim()) {
       addDocumentMutation.mutate(newDocument.trim());
     }
@@ -129,7 +128,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         <div></div>
       </div>
 
-      {documents.map((doc) => (
+      {documents.map((doc: Document) => (
         <div key={doc.id} className="grid grid-cols-[1fr,200px,40px] gap-4 items-center">
           <div>{doc.name}</div>
           <select
@@ -157,25 +156,20 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       ))}
 
       {user?.role === 'agent' && (
-        <div className="grid grid-cols-[1fr,auto] gap-4 items-center pt-4 border-t">
+        <form onSubmit={handleAddDocument} className="grid grid-cols-[1fr,auto] gap-4 items-center pt-4 border-t">
           <Input
             placeholder="New document name..."
             value={newDocument}
             onChange={(e) => setNewDocument(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                handleAddDocument();
-              }
-            }}
           />
           <Button
-            onClick={handleAddDocument}
+            type="submit"
             disabled={!newDocument.trim() || addDocumentMutation.isPending}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Document
           </Button>
-        </div>
+        </form>
       )}
     </div>
   );
