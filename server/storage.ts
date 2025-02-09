@@ -237,24 +237,57 @@ export class DatabaseStorage implements IStorage {
 
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
     const [message] = await db.insert(messages).values(insertMessage).returning();
-    return message;
+
+    // Fetch user details to include in the response
+    const user = await this.getUser(message.userId);
+    return {
+      ...message,
+      username: user?.username || 'Unknown User',
+      role: user?.role || 'unknown'
+    };
   }
 
   async getMessages(transactionId?: number): Promise<Message[]> {
     try {
       let query = sql`
-        SELECT * FROM messages
+        SELECT 
+          m.id,
+          m.transaction_id as "transactionId",
+          m.user_id as "userId",
+          m.content,
+          m.timestamp,
+          u.username,
+          u.role
+        FROM messages m
+        LEFT JOIN users u ON m.user_id = u.id
       `;
 
       if (transactionId) {
         query = sql`
-          SELECT * FROM messages 
-          WHERE transaction_id = ${transactionId}
+          SELECT 
+            m.id,
+            m.transaction_id as "transactionId",
+            m.user_id as "userId",
+            m.content,
+            m.timestamp,
+            u.username,
+            u.role
+          FROM messages m
+          LEFT JOIN users u ON m.user_id = u.id
+          WHERE m.transaction_id = ${transactionId}
         `;
       }
 
-      const result = await db.execute(sql`${query} ORDER BY timestamp ASC`);
-      return result.rows;
+      const result = await db.execute(sql`${query} ORDER BY m.timestamp ASC`);
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        transactionId: row.transactionId ? Number(row.transactionId) : null,
+        userId: Number(row.userId),
+        content: String(row.content),
+        timestamp: String(row.timestamp),
+        username: row.username ? String(row.username) : 'Unknown User',
+        role: row.role ? String(row.role) : 'unknown'
+      }));
     } catch (error) {
       console.error('Error in getMessages:', error);
       return [];

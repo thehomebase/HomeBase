@@ -52,6 +52,8 @@ export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
   transactionId: integer("transaction_id"),
   userId: integer("user_id").notNull(),
+  username: text("username").notNull(),
+  role: text("role").notNull(),
   content: text("content").notNull(),
   timestamp: text("timestamp").notNull(),
 });

@@ -35,6 +35,8 @@ export default function ChatPage() {
       const response = await apiRequest("POST", "/api/messages", {
         content,
         userId: user?.id,
+        username: user?.username,
+        role: user?.role,
         timestamp: new Date().toISOString(),
       });
       if (!response.ok) {

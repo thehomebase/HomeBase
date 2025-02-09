@@ -157,25 +157,7 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const messages = await storage.getMessages();
-      // Fetch user details for each message
-      const messagesWithUserDetails = await Promise.all(
-        messages.map(async (message) => {
-          const user = await storage.getUser(message.userId);
-          if (!user) {
-            return {
-              ...message,
-              username: 'Unknown User',
-              role: 'unknown',
-            };
-          }
-          return {
-            ...message,
-            username: user.username,
-            role: user.role,
-          };
-        })
-      );
-      res.json(messagesWithUserDetails);
+      res.json(messages);
     } catch (error) {
       console.error('Error fetching messages:', error);
       res.status(500).send('Error fetching messages');
@@ -185,22 +167,17 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/messages", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      const parsed = insertMessageSchema.safeParse(req.body);
+      const parsed = insertMessageSchema.safeParse({
+        ...req.body,
+        userId: req.user.id
+      });
+
       if (!parsed.success) {
         return res.status(400).send(parsed.error.message);
       }
 
       const message = await storage.createMessage(parsed.data);
-      const user = await storage.getUser(message.userId);
-      if (!user) {
-        return res.status(500).send('Error retrieving user details');
-      }
-
-      res.status(201).json({
-        ...message,
-        username: user.username,
-        role: user.role,
-      });
+      res.status(201).json(message);
     } catch (error) {
       console.error('Error creating message:', error);
       res.status(500).send('Error creating message');
