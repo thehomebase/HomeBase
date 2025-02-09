@@ -334,7 +334,7 @@ export default function TransactionPage() {
               </div>
               
               {isEditing && (
-                <div className="flex justify-end">
+                <div className="flex justify-end mt-4">
                   <Button 
                     type="button" 
                     onClick={form.handleSubmit((data) => {
@@ -347,9 +347,6 @@ export default function TransactionPage() {
                   </Button>
                 </div>
               )}
-                    <div>
-                      <p className="text-sm text-muted-foreground">Transaction Type</p>
-                      <p className="font-medium capitalize">
                         {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
                       </p>
                     </div>
