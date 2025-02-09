@@ -72,8 +72,16 @@ export default function TransactionPage() {
         throw new Error("Invalid transaction ID");
       }
 
+      // Format dates as ISO strings
+      const formattedData = {
+        ...data,
+        closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : undefined,
+        contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : undefined,
+        optionExpirationDate: data.optionExpirationDate ? new Date(data.optionExpirationDate).toISOString() : undefined
+      };
+
       const cleanData = Object.fromEntries(
-        Object.entries(data).filter(([_, value]) => value !== undefined && value !== '')
+        Object.entries(formattedData).filter(([_, value]) => value !== undefined && value !== '')
       );
 
       const response = await apiRequest("PATCH", `/api/transactions/${parsedId}`, cleanData);
