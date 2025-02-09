@@ -161,10 +161,17 @@ export function registerRoutes(app: Express): Server {
       const messagesWithUserDetails = await Promise.all(
         messages.map(async (message) => {
           const user = await storage.getUser(message.userId);
+          if (!user) {
+            return {
+              ...message,
+              username: 'Unknown User',
+              role: 'unknown',
+            };
+          }
           return {
             ...message,
-            username: user?.username || 'Unknown User',
-            role: user?.role || 'unknown',
+            username: user.username,
+            role: user.role,
           };
         })
       );
@@ -185,11 +192,14 @@ export function registerRoutes(app: Express): Server {
 
       const message = await storage.createMessage(parsed.data);
       const user = await storage.getUser(message.userId);
+      if (!user) {
+        return res.status(500).send('Error retrieving user details');
+      }
 
       res.status(201).json({
         ...message,
-        username: user?.username || 'Unknown User',
-        role: user?.role || 'unknown',
+        username: user.username,
+        role: user.role,
       });
     } catch (error) {
       console.error('Error creating message:', error);
