@@ -156,7 +156,8 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/messages", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      const messages = await storage.getMessages();
+      const transactionId = req.query.transactionId ? Number(req.query.transactionId) : undefined;
+      const messages = await storage.getMessages(transactionId);
       res.json(messages);
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -167,15 +168,24 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/messages", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
+      // Ensure transactionId is present and valid
+      if (!req.body.transactionId) {
+        return res.status(400).send("Transaction ID is required");
+      }
+
       const messageData = {
         content: req.body.content,
         userId: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
         timestamp: new Date().toISOString(),
-        transactionId: req.body.transactionId || null
+        transactionId: Number(req.body.transactionId)
       };
 
+      // Validate the incoming data
       const parsed = insertMessageSchema.safeParse(messageData);
       if (!parsed.success) {
+        console.error('Message validation error:', parsed.error);
         return res.status(400).send(parsed.error.message);
       }
 

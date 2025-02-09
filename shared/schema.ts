@@ -50,7 +50,7 @@ export const checklists = pgTable("checklists", {
 
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
-  transactionId: integer("transaction_id"),
+  transactionId: integer("transaction_id").notNull(),
   userId: integer("user_id").notNull(),
   username: text("username").notNull(),
   role: text("role").notNull(),

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send } from "lucide-react";
 import { Message } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatProps {
   transactionId: number;
@@ -15,23 +16,43 @@ interface ChatProps {
 function Chat({ transactionId, userId }: ChatProps) {
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages", transactionId],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/messages?transactionId=${transactionId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch messages');
+      }
+      return response.json();
+    },
+    refetchInterval: 5000, // Poll every 5 seconds for new messages
   });
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      await apiRequest("POST", "/api/messages", {
-        transactionId,
-        userId,
+      const response = await apiRequest("POST", "/api/messages", {
         content,
+        transactionId,
         timestamp: new Date().toISOString(),
       });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to send message");
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages", transactionId] });
       setMessage("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error sending message",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -43,9 +64,8 @@ function Chat({ transactionId, userId }: ChatProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim()) {
-      sendMessageMutation.mutate(message.trim());
-    }
+    if (!message.trim()) return;
+    sendMessageMutation.mutate(message.trim());
   };
 
   if (isLoading) {
@@ -72,6 +92,10 @@ function Chat({ transactionId, userId }: ChatProps) {
                     : "bg-secondary"
                 }`}
               >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-medium">{msg.username}</span>
+                  <span className="text-xs opacity-70">({msg.role})</span>
+                </div>
                 <p className="text-sm">{msg.content}</p>
                 <span className="text-xs opacity-70">
                   {new Date(msg.timestamp).toLocaleTimeString()}

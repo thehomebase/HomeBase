@@ -5,7 +5,6 @@ import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import TransactionsPage from "@/pages/transactions-page";
 import ClientsPage from "@/pages/clients-page";
-import ChatPage from "@/pages/chat-page";
 import TransactionPage from "@/pages/transaction-page";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "./hooks/use-auth";
@@ -16,7 +15,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import React from "react";
-
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -49,7 +47,6 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/" component={TransactionsPage} />
       <ProtectedRoute path="/clients" component={ClientsPage} />
-      <ProtectedRoute path="/chat" component={ChatPage} />
       <ProtectedRoute path="/transaction/:id" component={TransactionPage} />
       <Route component={NotFound} />
     </Switch>
