@@ -30,6 +30,15 @@ export default function Chat({ transactionId }: ChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Validation check for required props
+  if (!transactionId || isNaN(transactionId)) {
+    return (
+      <div className="flex items-center justify-center h-[600px]">
+        <p className="text-destructive">Invalid transaction ID</p>
+      </div>
+    );
+  }
+
   const { data: messages = [], isLoading, error } = useQuery<Message[]>({
     queryKey: ["/api/messages", transactionId],
     queryFn: async () => {
@@ -49,14 +58,19 @@ export default function Chat({ transactionId }: ChatProps) {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
+      if (!transactionId || !user) {
+        throw new Error("Missing required fields");
+      }
+
       const response = await apiRequest("POST", "/api/messages", {
         content,
         transactionId,
-        userId: user?.id,
-        username: user?.username,
-        role: user?.role,
+        userId: user.id,
+        username: user.username,
+        role: user.role,
         timestamp: new Date().toISOString(),
       });
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to send message");
@@ -69,7 +83,7 @@ export default function Chat({ transactionId }: ChatProps) {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: "Error sending message",
         description: error.message,
         variant: "destructive",
       });
@@ -84,15 +98,17 @@ export default function Chat({ transactionId }: ChatProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || !user) return;
-    sendMessageMutation.mutate(message.trim());
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage || !user || !transactionId) return;
+
+    sendMessageMutation.mutate(trimmedMessage);
   };
 
   if (error) {
     return (
       <div className="flex items-center justify-center h-[600px]">
         <div className="text-center">
-          <p className="text-red-500 mb-4">Failed to load messages</p>
+          <p className="text-destructive mb-4">Failed to load messages</p>
           <Button
             onClick={() => {
               queryClient.invalidateQueries({ queryKey: ["/api/messages", transactionId] });
@@ -156,7 +172,7 @@ export default function Chat({ transactionId }: ChatProps) {
         <Button
           type="submit"
           size="icon"
-          disabled={sendMessageMutation.isPending || !user}
+          disabled={sendMessageMutation.isPending || !user || !transactionId}
         >
           <Send className="h-4 w-4" />
         </Button>
