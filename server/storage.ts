@@ -1,7 +1,7 @@
 import { 
   users, transactions, checklists, messages, clients,
   type User, type Transaction, type Checklist, type Message, type Client,
-  type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient 
+  type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or } from "drizzle-orm";
@@ -31,7 +31,11 @@ export interface IStorage {
 
   // Message operations
   createMessage(message: InsertMessage): Promise<Message>;
-  getMessages(transactionId?: number): Promise<Message[]>;
+  getMessages(transactionId: number): Promise<Message[]>;
+
+  // Client operations
+  getClientsByAgent(agentId: number): Promise<Client[]>;
+  createClient(insertClient: InsertClient): Promise<Client>;
 
   // Session store
   sessionStore: session.Store;
@@ -139,6 +143,7 @@ export class DatabaseStorage implements IStorage {
           COALESCE(access_code, '123456')::text as "accessCode",
           COALESCE(status, 'pending')::text as status,
           COALESCE(agent_id, 1)::integer as "agentId",
+          COALESCE(client_id, 1)::integer as "clientId",
           COALESCE(participants, '[]'::jsonb)::jsonb as participants
         FROM transactions 
         WHERE id = ${id}
@@ -159,6 +164,7 @@ export class DatabaseStorage implements IStorage {
         accessCode: String(row.accessCode),
         status: String(row.status),
         agentId: Number(row.agentId),
+        clientId: Number(row.clientId),
         participants: Array.isArray(row.participants) ? row.participants : []
       };
 
@@ -175,6 +181,7 @@ export class DatabaseStorage implements IStorage {
         accessCode: '123456',
         status: 'pending',
         agentId: 1,
+        clientId: 1,
         participants: []
       };
     }
@@ -190,13 +197,22 @@ export class DatabaseStorage implements IStorage {
           t.access_code as "accessCode",
           t.status,
           t.agent_id as "agentId",
+          t.client_id as "clientId",
           t.participants
         FROM transactions t
         WHERE t.agent_id = ${userId}
       `);
 
       console.log('Retrieved transactions:', result.rows);
-      return result.rows;
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        address: String(row.address),
+        accessCode: String(row.accessCode),
+        status: String(row.status),
+        agentId: Number(row.agentId),
+        clientId: Number(row.clientId),
+        participants: Array.isArray(row.participants) ? row.participants : []
+      }));
     } catch (error) {
       console.error('Error in getTransactionsByUser:', error);
       return [];
@@ -216,10 +232,22 @@ export class DatabaseStorage implements IStorage {
   async getChecklist(transactionId: number, role: string): Promise<Checklist | undefined> {
     try {
       const result = await db.execute(sql`
-        SELECT * FROM checklists 
+        SELECT id, transaction_id as "transactionId", role, items
+        FROM checklists 
         WHERE transaction_id = ${transactionId} AND role = ${role}
       `);
-      return result.rows[0];
+
+      if (result.rows.length === 0) {
+        return undefined;
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        transactionId: Number(row.transactionId),
+        role: String(row.role),
+        items: Array.isArray(row.items) ? row.items : []
+      };
     } catch (error) {
       console.error('Error in getChecklist:', error);
       return undefined;
@@ -237,42 +265,34 @@ export class DatabaseStorage implements IStorage {
 
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
     try {
-      // First create the message with basic fields
       const result = await db.execute(sql`
         INSERT INTO messages (
           user_id,
           content,
           timestamp,
-          transaction_id
+          transaction_id,
+          username,
+          role
         ) VALUES (
           ${insertMessage.userId},
           ${insertMessage.content},
           ${insertMessage.timestamp},
-          ${insertMessage.transactionId}
+          ${insertMessage.transactionId},
+          ${insertMessage.username},
+          ${insertMessage.role}
         )
         RETURNING *
       `);
 
       const message = result.rows[0];
-
-      // Then get the user info
-      const userResult = await db.execute(sql`
-        SELECT username, role
-        FROM users
-        WHERE id = ${insertMessage.userId}
-      `);
-
-      const user = userResult.rows[0];
-
-      // Return the complete message with user info
       return {
         id: Number(message.id),
-        transactionId: message.transaction_id ? Number(message.transaction_id) : null,
+        transactionId: Number(message.transaction_id),
         userId: Number(message.user_id),
         content: String(message.content),
         timestamp: String(message.timestamp),
-        username: user ? String(user.username) : 'Unknown User',
-        role: user ? String(user.role) : 'unknown'
+        username: String(message.username),
+        role: String(message.role)
       };
     } catch (error) {
       console.error('Error in createMessage:', error);
@@ -280,39 +300,31 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getMessages(transactionId?: number): Promise<Message[]> {
+  async getMessages(transactionId: number): Promise<Message[]> {
     try {
-      let query = sql`
+      const query = sql`
         SELECT 
           m.id,
           m.transaction_id as "transactionId",
           m.user_id as "userId",
           m.content,
           m.timestamp,
-          u.username,
-          u.role
+          m.username,
+          m.role
         FROM messages m
-        LEFT JOIN users u ON m.user_id = u.id
+        WHERE m.transaction_id = ${transactionId}
+        ORDER BY m.timestamp ASC
       `;
-
-      if (transactionId) {
-        query = sql`
-          ${query}
-          WHERE m.transaction_id = ${transactionId}
-        `;
-      }
-
-      query = sql`${query} ORDER BY m.timestamp ASC`;
 
       const result = await db.execute(query);
       return result.rows.map(row => ({
         id: Number(row.id),
-        transactionId: row.transactionId ? Number(row.transactionId) : null,
+        transactionId: Number(row.transactionId),
         userId: Number(row.userId),
         content: String(row.content),
         timestamp: String(row.timestamp),
-        username: row.username ? String(row.username) : 'Unknown User',
-        role: row.role ? String(row.role) : 'unknown'
+        username: String(row.username),
+        role: String(row.role)
       }));
     } catch (error) {
       console.error('Error in getMessages:', error);
@@ -352,8 +364,8 @@ export class DatabaseStorage implements IStorage {
         status: String(row.status),
         notes: row.notes ? String(row.notes) : null,
         agentId: Number(row.agentId),
-        createdAt: new Date(row.createdAt).toISOString(),
-        updatedAt: new Date(row.updatedAt).toISOString(),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt),
       }));
     } catch (error) {
       console.error('Error in getClientsByAgent:', error);
