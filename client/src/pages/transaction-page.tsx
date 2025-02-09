@@ -15,12 +15,11 @@ export default function TransactionPage() {
   const { user } = useAuth();
   
   const parsedId = id ? parseInt(id, 10) : null;
-  const isValidId = parsedId && !isNaN(parsedId);
   
   const { data: transaction, isError, error } = useQuery({
     queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
-      if (!isValidId) {
+      if (!parsedId || isNaN(parsedId)) {
         throw new Error("Invalid transaction ID");
       }
       const response = await apiRequest("GET", `/api/transactions/${parsedId}`);
@@ -29,7 +28,7 @@ export default function TransactionPage() {
       }
       return response.json();
     },
-    enabled: !!parsedId && !!user,
+    enabled: !!parsedId && !isNaN(parsedId) && !!user,
     retry: false
   });
 
