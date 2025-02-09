@@ -1,7 +1,6 @@
 import { pgTable, text, serial, integer, boolean, json, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -51,25 +50,13 @@ export const checklists = pgTable("checklists", {
 
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
-  transactionId: integer("transaction_id").notNull(),
+  transactionId: integer("transaction_id"),
   userId: integer("user_id").notNull(),
   username: text("username").notNull(),
   role: text("role").notNull(),
   content: text("content").notNull(),
   timestamp: text("timestamp").notNull(),
 });
-
-export const transactionsRelations = relations(transactions, ({ many }) => ({
-  messages: many(messages),
-  checklists: many(checklists),
-}));
-
-export const messagesRelations = relations(messages, ({ one }) => ({
-  transaction: one(transactions, {
-    fields: [messages.transactionId],
-    references: [transactions.id],
-  }),
-}));
 
 const checklistItemSchema = z.object({
   id: z.string(),

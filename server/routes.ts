@@ -153,10 +153,10 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Messages
-  app.get("/api/messages/:transactionId", async (req, res) => {
+  app.get("/api/messages", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      const messages = await storage.getMessages(Number(req.params.transactionId));
+      const messages = await storage.getMessages();
       res.json(messages);
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -171,9 +171,7 @@ export function registerRoutes(app: Express): Server {
         content: req.body.content,
         userId: req.user.id,
         timestamp: new Date().toISOString(),
-        transactionId: Number(req.body.transactionId), // Ensure transactionId is required
-        username: req.user.username,
-        role: req.user.role
+        transactionId: req.body.transactionId || null
       };
 
       const parsed = insertMessageSchema.safeParse(messageData);

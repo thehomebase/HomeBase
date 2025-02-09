@@ -6,33 +6,27 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send } from "lucide-react";
 import { Message } from "@shared/schema";
-import { useAuth } from "@/hooks/use-auth";
 
 interface ChatProps {
   transactionId: number;
+  userId: number;
 }
 
-export function Chat({ transactionId }: ChatProps) {
+function Chat({ transactionId, userId }: ChatProps) {
   const [message, setMessage] = useState("");
-  const { user } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages", transactionId],
-    queryFn: async () => {
-      const response = await fetch(`/api/messages/${transactionId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch messages');
-      }
-      return response.json();
-    },
   });
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       await apiRequest("POST", "/api/messages", {
         transactionId,
+        userId,
         content,
+        timestamp: new Date().toISOString(),
       });
     },
     onSuccess: () => {
@@ -49,8 +43,9 @@ export function Chat({ transactionId }: ChatProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim()) return;
-    sendMessageMutation.mutate(message);
+    if (message.trim()) {
+      sendMessageMutation.mutate(message.trim());
+    }
   };
 
   if (isLoading) {
@@ -68,21 +63,15 @@ export function Chat({ transactionId }: ChatProps) {
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex ${msg.userId === user?.id ? "justify-end" : "justify-start"}`}
+              className={`flex ${msg.userId === userId ? "justify-end" : "justify-start"}`}
             >
               <div
                 className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                  msg.userId === user?.id
+                  msg.userId === userId
                     ? "bg-primary text-primary-foreground"
                     : "bg-secondary"
                 }`}
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium">{msg.username}</span>
-                  <span className="text-xs text-muted-foreground">
-                    ({msg.role})
-                  </span>
-                </div>
                 <p className="text-sm">{msg.content}</p>
                 <span className="text-xs opacity-70">
                   {new Date(msg.timestamp).toLocaleTimeString()}
@@ -108,4 +97,5 @@ export function Chat({ transactionId }: ChatProps) {
   );
 }
 
+export { Chat };
 export default Chat;
