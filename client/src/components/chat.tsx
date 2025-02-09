@@ -49,18 +49,29 @@ export default function Chat({ transactionId }: ChatProps) {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      if (!user?.id || !transactionId) {
-        throw new Error("You must be logged in to send messages");
+      // Validate all required fields before sending
+      if (!user?.id || !user?.username || !user?.role) {
+        throw new Error("User information is incomplete");
+      }
+
+      if (!transactionId || typeof transactionId !== 'number') {
+        throw new Error("Invalid transaction ID");
+      }
+
+      if (!content.trim()) {
+        throw new Error("Message content cannot be empty");
       }
 
       const messageData = {
-        content,
-        transactionId,
+        content: content.trim(),
+        transactionId: transactionId,
         userId: user.id,
         username: user.username,
         role: user.role,
         timestamp: new Date().toISOString(),
       };
+
+      console.log('Sending message data:', messageData); // Debug log
 
       const response = await apiRequest("POST", "/api/messages", messageData);
 
@@ -68,6 +79,7 @@ export default function Chat({ transactionId }: ChatProps) {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to send message");
       }
+
       return response.json();
     },
     onSuccess: () => {
@@ -103,16 +115,16 @@ export default function Chat({ transactionId }: ChatProps) {
       return;
     }
 
-    if (!user?.id) {
+    if (!user?.id || !user?.username || !user?.role) {
       toast({
         title: "Error",
-        description: "You must be logged in to send messages",
+        description: "User information is incomplete. Please log in again.",
         variant: "destructive",
       });
       return;
     }
 
-    if (!transactionId) {
+    if (!transactionId || typeof transactionId !== 'number') {
       toast({
         title: "Error",
         description: "Invalid transaction ID",
@@ -192,7 +204,7 @@ export default function Chat({ transactionId }: ChatProps) {
         <Button
           type="submit"
           size="icon"
-          disabled={sendMessageMutation.isPending}
+          disabled={sendMessageMutation.isPending || !user?.id || !transactionId}
         >
           <Send className="h-4 w-4" />
         </Button>
