@@ -202,20 +202,70 @@ export default function TransactionPage() {
         <Card className="mt-6">
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-4">Transaction Summary</h3>
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Contract Price</p>
                 <p className="font-medium">
-                  {transaction.contractPrice ? `$${transaction.contractPrice.toLocaleString()}` : 'Not set'}
+                  {transaction.contractPrice 
+                    ? `$${transaction.contractPrice.toLocaleString()}` 
+                    : 'Not set'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Option Period</p>
+                <p className="font-medium">
+                  {transaction.optionPeriod 
+                    ? `${transaction.optionPeriod} days` 
+                    : 'Not set'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Option Fee</p>
+                <p className="font-medium">
+                  {transaction.optionFee 
+                    ? `$${transaction.optionFee.toLocaleString()}` 
+                    : 'Not set'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Earnest Money</p>
+                <p className="font-medium">
+                  {transaction.earnestMoney 
+                    ? `$${transaction.earnestMoney.toLocaleString()}` 
+                    : 'Not set'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Down Payment</p>
+                <p className="font-medium">
+                  {transaction.downPayment 
+                    ? `$${transaction.downPayment.toLocaleString()}` 
+                    : 'Not set'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Seller Concessions</p>
+                <p className="font-medium">
+                  {transaction.sellerConcessions 
+                    ? `$${transaction.sellerConcessions.toLocaleString()}` 
+                    : 'Not set'}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Closing Date</p>
-                <p className="font-medium">{transaction.closingDate || 'Not set'}</p>
+                <p className="font-medium">
+                  {transaction.closingDate 
+                    ? new Date(transaction.closingDate).toLocaleDateString() 
+                    : 'Not set'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Status</p>
+                <p className="font-medium capitalize">{transaction.status}</p>
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="mt-6 space-y-2">
               <h4 className="text-sm font-medium">Progress</h4>
               <Progress value={progress} className="h-2" />
               <p className="text-sm text-muted-foreground">{progress}% Complete</p>
