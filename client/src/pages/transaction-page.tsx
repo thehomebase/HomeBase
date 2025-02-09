@@ -14,16 +14,22 @@ export default function TransactionPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   
+  const parsedId = id ? parseInt(id, 10) : null;
+  const isValidId = parsedId && !isNaN(parsedId);
+  
   const { data: transaction, isError, error } = useQuery({
-    queryKey: ["/api/transactions", id],
+    queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
-      const response = await apiRequest("GET", `/api/transactions/${id}`);
+      if (!isValidId) {
+        throw new Error("Invalid transaction ID");
+      }
+      const response = await apiRequest("GET", `/api/transactions/${parsedId}`);
       if (!response.ok) {
         throw new Error("Failed to fetch transaction");
       }
       return response.json();
     },
-    enabled: !!id && !!user,
+    enabled: isValidId && !!user,
     retry: false
   });
 
