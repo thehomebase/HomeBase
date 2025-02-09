@@ -54,10 +54,6 @@ export default function Chat({ transactionId }: ChatProps) {
         throw new Error("User information is incomplete");
       }
 
-      if (!transactionId || typeof transactionId !== 'number') {
-        throw new Error("Invalid transaction ID");
-      }
-
       if (!content.trim()) {
         throw new Error("Message content cannot be empty");
       }
@@ -119,15 +115,6 @@ export default function Chat({ transactionId }: ChatProps) {
       toast({
         title: "Error",
         description: "User information is incomplete. Please log in again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!transactionId || typeof transactionId !== 'number') {
-      toast({
-        title: "Error",
-        description: "Invalid transaction ID",
         variant: "destructive",
       });
       return;
@@ -204,7 +191,7 @@ export default function Chat({ transactionId }: ChatProps) {
         <Button
           type="submit"
           size="icon"
-          disabled={sendMessageMutation.isPending || !user?.id || !transactionId}
+          disabled={sendMessageMutation.isPending || !message.trim()}
           aria-label="Send message"
         >
           <Send className="h-4 w-4" />
