@@ -356,14 +356,20 @@ export class DatabaseStorage implements IStorage {
           // Convert camelCase to snake_case for SQL
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
-          if (key === 'participants' && Array.isArray(value)) {
-            cleanData[snakeKey] = JSON.stringify(value);
-          } else if (value === null) {
-            cleanData[snakeKey] = null;
-          } else if (typeof value === 'number') {
-            cleanData[snakeKey] = value;
-          } else {
-            cleanData[snakeKey] = String(value);
+          // Only include fields that exist in our schema
+          if (['address', 'access_code', 'status', 'type', 'agent_id', 'client_id', 
+               'participants', 'contract_price', 'option_period', 'option_fee', 
+               'earnest_money', 'down_payment', 'seller_concessions', 'closing_date',
+               'contract_execution_date'].includes(snakeKey)) {
+            if (key === 'participants' && Array.isArray(value)) {
+              cleanData[snakeKey] = JSON.stringify(value);
+            } else if (value === null) {
+              cleanData[snakeKey] = null;
+            } else if (typeof value === 'number') {
+              cleanData[snakeKey] = value;
+            } else {
+              cleanData[snakeKey] = String(value);
+            }
           }
         }
       });
@@ -376,8 +382,8 @@ export class DatabaseStorage implements IStorage {
         if (value === null) {
           return sql`${sql.identifier([key])} = NULL`;
         }
-        if (typeof value === 'object') {
-          return sql`${sql.identifier([key])} = ${JSON.stringify(value)}::jsonb`;
+        if (key === 'participants') {
+          return sql`${sql.identifier([key])} = ${value}::jsonb`;
         }
         return sql`${sql.identifier([key])} = ${value}`;
       });
@@ -409,7 +415,8 @@ export class DatabaseStorage implements IStorage {
         downPayment: row.down_payment ? Number(row.down_payment) : null,
         sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
         closingDate: row.closing_date || null,
-        type: row.type
+        type: row.type,
+        contractExecutionDate: row.contract_execution_date || null
       };
     } catch (error) {
       console.error('Error in updateTransaction:', error);
@@ -859,7 +866,7 @@ export class DatabaseStorage implements IStorage {
     try {
       const result = await db.execute(sql`
         INSERT INTO documents (name, status, transaction_id)
-        VALUES (${document.name}, ${document.status}, ${document.transactionId})
+        VALUES (${document.name}, ${document.status},${document.transactionId})
         RETURNING *
       `);
 

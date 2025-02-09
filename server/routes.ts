@@ -162,15 +162,22 @@ export function registerRoutes(app: Express): Server {
       const id = Number(req.params.id);
       const data = {
         ...req.body,
-        optionExpirationDate: req.body.optionExpirationDate || null,
         closingDate: req.body.closingDate || null,
         contractExecutionDate: req.body.contractExecutionDate || null
       };
+
+      // Remove any undefined or invalid fields
+      Object.keys(data).forEach(key => {
+        if (data[key] === undefined) {
+          delete data[key];
+        }
+      });
+
       const transaction = await storage.updateTransaction(id, data);
       res.json(transaction);
     } catch (error) {
       console.error('Error updating transaction:', error);
-      res.status(500).json({ error: 'Error updating transaction', details: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Error updating transaction' });
     }
   });
 
