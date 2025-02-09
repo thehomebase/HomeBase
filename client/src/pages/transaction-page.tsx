@@ -1,4 +1,3 @@
-
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
@@ -13,10 +12,12 @@ import { Chat } from "@/components/chat";
 export default function TransactionPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  
+
+  // Parse and validate the transaction ID
   const parsedId = id ? parseInt(id, 10) : null;
-  
-  const { data: transaction, isError, error } = useQuery({
+
+  // Query for transaction data
+  const { data: transaction, isError } = useQuery({
     queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
       if (!parsedId || isNaN(parsedId)) {
@@ -32,7 +33,8 @@ export default function TransactionPage() {
     retry: false
   });
 
-  if (isError) {
+  // Show error state if transaction ID is invalid or fetch failed
+  if (!parsedId || isNaN(parsedId) || isError) {
     return (
       <div className="container mx-auto p-6">
         <Link href="/transactions">
@@ -41,7 +43,7 @@ export default function TransactionPage() {
           </Button>
         </Link>
         <div className="text-center text-destructive mt-4">
-          Error: Unable to load transaction
+          Error: Invalid transaction ID or unable to load transaction
         </div>
       </div>
     );
@@ -58,8 +60,8 @@ export default function TransactionPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold">{transaction?.address}</h1>
-              <p className="text-muted-foreground">Transaction ID: {id}</p>
+              <h1 className="text-2xl font-bold">{transaction?.address || 'Loading...'}</h1>
+              <p className="text-muted-foreground">Transaction ID: {parsedId}</p>
             </div>
           </div>
         </div>
@@ -81,12 +83,12 @@ export default function TransactionPage() {
               </TabsList>
               <TabsContent value="progress" className="mt-6">
                 <ProgressChecklist
-                  transactionId={Number(id)}
+                  transactionId={parsedId}
                   userRole={user?.role || ""}
                 />
               </TabsContent>
               <TabsContent value="chat" className="mt-6">
-                <Chat transactionId={Number(id)} />
+                <Chat transactionId={parsedId} />
               </TabsContent>
             </Tabs>
           </CardContent>
