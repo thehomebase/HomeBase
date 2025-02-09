@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ClipboardCheck, MessageSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { useToast } from "@/hooks/use-toast";
 import { ProgressChecklist } from "@/components/progress-checklist";
 import { Chat } from "@/components/chat";
 
@@ -42,6 +43,7 @@ export default function TransactionPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // Parse and validate transaction ID
   const parsedId = id ? parseInt(id, 10) : null;
@@ -63,7 +65,7 @@ export default function TransactionPage() {
   }
 
   // Fetch transaction data
-  const { data: transaction, isError, isLoading } = useQuery<Transaction>({
+  const { data: transaction, isError, isLoading } = useQuery({
     queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
       if (!parsedId || isNaN(parsedId)) {
@@ -105,6 +107,17 @@ export default function TransactionPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
+      toast({
+        title: "Success",
+        description: "Transaction updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update transaction",
+        variant: "destructive",
+      });
     },
   });
 
@@ -150,9 +163,29 @@ export default function TransactionPage() {
     );
   }
 
-  // Calculate progress
-  const completedTasks = transaction.checklist?.filter(item => item.completed).length ?? 0;
-  const totalTasks = transaction.checklist?.length ?? 1;
+  // Calculate progress based on completed checklist items
+  const { data: checklist, isError: checklistError, isLoading: checklistLoading } = useQuery({
+    queryKey: ["/api/transactions", parsedId, "checklist", user.role],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/transactions/${parsedId}/checklist/${user.role}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch checklist");
+      }
+      return response.json();
+    },
+    enabled: !!parsedId && !!user.role,
+  });
+
+  if (checklistLoading) {
+    return <div>Loading checklist...</div>; // Add a loading indicator
+  }
+
+  if (checklistError) {
+    return <div>Error loading checklist: {checklistError.message}</div>; // Handle errors
+  }
+
+  const completedTasks = checklist?.items?.filter(item => item.completed).length ?? 0;
+  const totalTasks = checklist?.items?.length ?? 1;
   const progress = Math.round((completedTasks / totalTasks) * 100);
 
   return (
@@ -207,7 +240,7 @@ export default function TransactionPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Contract Price</p>
                 <p className="font-medium">
-                  {transaction.contractPrice ? `$${transaction.contractPrice}` : 'Not set'}
+                  {transaction.contractPrice ? `$${transaction.contractPrice.toLocaleString()}` : 'Not set'}
                 </p>
               </div>
               <div>

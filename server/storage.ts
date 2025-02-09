@@ -290,17 +290,56 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createChecklist(insertChecklist: InsertChecklist): Promise<Checklist> {
-    const [checklist] = await db.insert(checklists).values(insertChecklist).returning();
-    return checklist;
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO checklists (
+          transaction_id,
+          role,
+          items
+        ) VALUES (
+          ${insertChecklist.transactionId},
+          ${insertChecklist.role},
+          ${JSON.stringify(insertChecklist.items)}::jsonb
+        )
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        transactionId: Number(row.transaction_id),
+        role: String(row.role),
+        items: row.items
+      };
+    } catch (error) {
+      console.error('Error in createChecklist:', error);
+      throw error;
+    }
   }
 
   async getChecklist(transactionId: number, role: string): Promise<Checklist | undefined> {
     try {
       const result = await db.execute(sql`
-        SELECT * FROM checklists 
+        SELECT 
+          id,
+          transaction_id as "transactionId",
+          role,
+          items
+        FROM checklists 
         WHERE transaction_id = ${transactionId} AND role = ${role}
       `);
-      return result.rows[0];
+
+      if (result.rows.length === 0) {
+        return undefined;
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        transactionId: Number(row.transactionId),
+        role: String(row.role),
+        items: row.items
+      };
     } catch (error) {
       console.error('Error in getChecklist:', error);
       return undefined;
@@ -308,12 +347,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateChecklist(id: number, items: Checklist["items"]): Promise<Checklist> {
-    const [checklist] = await db
-      .update(checklists)
-      .set({ items })
-      .where(eq(checklists.id, id))
-      .returning();
-    return checklist;
+    try {
+      const result = await db.execute(sql`
+        UPDATE checklists
+        SET items = ${JSON.stringify(items)}::jsonb
+        WHERE id = ${id}
+        RETURNING 
+          id,
+          transaction_id as "transactionId",
+          role,
+          items
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        transactionId: Number(row.transactionId),
+        role: String(row.role),
+        items: row.items
+      };
+    } catch (error) {
+      console.error('Error in updateChecklist:', error);
+      throw error;
+    }
   }
 
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
