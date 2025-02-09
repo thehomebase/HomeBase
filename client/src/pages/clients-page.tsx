@@ -11,18 +11,26 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Mail, Phone } from "lucide-react";
+import { Plus, Mail, Phone, ChevronUp, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+
+type SortConfig = {
+  key: keyof Client;
+  direction: 'asc' | 'desc';
+} | null;
 
 export default function ClientsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
 
   const form = useForm<InsertClient>({
     resolver: zodResolver(insertClientSchema),
     defaultValues: {
-      name: "",
+      firstName: "",
+      lastName: "",
       email: "",
       phone: "",
       address: "",
@@ -65,7 +73,6 @@ export default function ClientsPage() {
   });
 
   const onSubmit = (data: InsertClient) => {
-    // Ensure agentId is included
     const submitData = {
       ...data,
       agentId: user?.id as number,
@@ -73,24 +80,77 @@ export default function ClientsPage() {
     createClientMutation.mutate(submitData);
   };
 
-  const sellers = clients.filter(client => client.type === 'seller');
-  const buyers = clients.filter(client => client.type === 'buyer');
+  const sortData = (data: Client[], config: SortConfig) => {
+    if (!config) return data;
+
+    return [...data].sort((a, b) => {
+      const aValue = a[config.key];
+      const bValue = b[config.key];
+
+      if (aValue === null) return config.direction === 'asc' ? -1 : 1;
+      if (bValue === null) return config.direction === 'asc' ? 1 : -1;
+
+      if (aValue < bValue) return config.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return config.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const requestSort = (key: keyof Client) => {
+    setSortConfig((currentConfig) => {
+      if (!currentConfig || currentConfig.key !== key) {
+        return { key, direction: 'asc' };
+      }
+      if (currentConfig.direction === 'asc') {
+        return { key, direction: 'desc' };
+      }
+      return null;
+    });
+  };
+
+  const getSortIcon = (columnKey: keyof Client) => {
+    if (!sortConfig || sortConfig.key !== columnKey) {
+      return null;
+    }
+    return sortConfig.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+  };
+
+  const sellers = sortData(clients.filter(client => client.type === 'seller'), sortConfig);
+  const buyers = sortData(clients.filter(client => client.type === 'buyer'), sortConfig);
 
   const ClientTable = ({ clients }: { clients: Client[] }) => (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Name</TableHead>
+          <TableHead className="cursor-pointer" onClick={() => requestSort('firstName')}>
+            <div className="flex items-center gap-1">
+              First Name {getSortIcon('firstName')}
+            </div>
+          </TableHead>
+          <TableHead className="cursor-pointer" onClick={() => requestSort('lastName')}>
+            <div className="flex items-center gap-1">
+              Last Name {getSortIcon('lastName')}
+            </div>
+          </TableHead>
           <TableHead>Contact</TableHead>
           <TableHead>Address</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Added</TableHead>
+          <TableHead className="cursor-pointer" onClick={() => requestSort('status')}>
+            <div className="flex items-center gap-1">
+              Status {getSortIcon('status')}
+            </div>
+          </TableHead>
+          <TableHead className="cursor-pointer" onClick={() => requestSort('createdAt')}>
+            <div className="flex items-center gap-1">
+              Added {getSortIcon('createdAt')}
+            </div>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {clients.map((client) => (
           <TableRow key={client.id}>
-            <TableCell className="font-medium">{client.name}</TableCell>
+            <TableCell className="font-medium">{client.firstName}</TableCell>
+            <TableCell className="font-medium">{client.lastName}</TableCell>
             <TableCell>
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
@@ -120,7 +180,7 @@ export default function ClientsPage() {
         ))}
         {clients.length === 0 && (
           <TableRow>
-            <TableCell colSpan={5} className="text-center text-muted-foreground">
+            <TableCell colSpan={6} className="text-center text-muted-foreground">
               No clients found. Add your first client to get started!
             </TableCell>
           </TableRow>
@@ -146,19 +206,34 @@ export default function ClientsPage() {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
