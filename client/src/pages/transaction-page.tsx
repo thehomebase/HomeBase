@@ -42,13 +42,15 @@ export default function TransactionPage() {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center">
-            <Logo />
-            <Button onClick={() => setLocation('/')} variant="ghost" className="ml-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div className="flex-1 ml-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <Logo className="h-10" />
+              <Button onClick={() => setLocation('/')} variant="ghost">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+            </div>
+            <div className="text-right">
               <h1 className="text-2xl font-bold">{transaction?.address}</h1>
               <p className="text-sm text-muted-foreground">Transaction ID: {id}</p>
             </div>
