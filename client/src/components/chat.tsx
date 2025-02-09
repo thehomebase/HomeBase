@@ -7,23 +7,31 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send } from "lucide-react";
 import { Message } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 interface ChatProps {
   transactionId: number;
-  userId: number;
 }
 
-function Chat({ transactionId, userId }: ChatProps) {
+function Chat({ transactionId }: ChatProps) {
+  const { user } = useAuth();
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // Validate required props
+  if (!transactionId || !user) {
+    console.error('Missing required props:', { transactionId, user });
+    return <div>Error: Missing required data</div>;
+  }
 
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages", transactionId],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/messages?transactionId=${transactionId}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch messages');
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to fetch messages');
       }
       return response.json();
     },
@@ -46,6 +54,10 @@ function Chat({ transactionId, userId }: ChatProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages", transactionId] });
       setMessage("");
+      toast({
+        title: "Message sent",
+        description: "Your message has been sent successfully.",
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -83,11 +95,11 @@ function Chat({ transactionId, userId }: ChatProps) {
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex ${msg.userId === userId ? "justify-end" : "justify-start"}`}
+              className={`flex ${msg.userId === user.id ? "justify-end" : "justify-start"}`}
             >
               <div
                 className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                  msg.userId === userId
+                  msg.userId === user.id
                     ? "bg-primary text-primary-foreground"
                     : "bg-secondary"
                 }`}
@@ -112,6 +124,7 @@ function Chat({ transactionId, userId }: ChatProps) {
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Type a message..."
           className="flex-1"
+          disabled={sendMessageMutation.isPending}
         />
         <Button type="submit" size="icon" disabled={sendMessageMutation.isPending}>
           <Send className="h-4 w-4" />
