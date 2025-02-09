@@ -7,6 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Trash2 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface Contact {
   id?: number;
@@ -46,6 +54,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
     email: "",
   });
 
+  // Query to fetch contacts
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["/api/contacts", transactionId],
     queryFn: async () => {
@@ -57,6 +66,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
     },
   });
 
+  // Mutation to add a contact
   const addContactMutation = useMutation({
     mutationFn: async (contact: Omit<Contact, "id">) => {
       const response = await apiRequest("POST", "/api/contacts", contact);
@@ -84,6 +94,30 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to add contact",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation to delete a contact
+  const deleteContactMutation = useMutation({
+    mutationFn: async (contactId: number) => {
+      const response = await apiRequest("DELETE", `/api/contacts/${contactId}`);
+      if (!response.ok) {
+        throw new Error("Failed to delete contact");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts", transactionId] });
+      toast({
+        title: "Contact deleted",
+        description: "The contact has been deleted successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete contact",
         variant: "destructive",
       });
     },
@@ -122,7 +156,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
               <Label htmlFor="role">Role *</Label>
               <select
                 id="role"
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full px-3 py-2 border rounded-md bg-background"
                 value={newContact.role}
                 onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
                 required
@@ -199,44 +233,53 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
         </CardContent>
       </Card>
 
-      <div className="grid gap-4">
-        {contacts.map((contact) => (
-          <Card key={contact.id}>
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="font-medium">{contact.role}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {contact.firstName} {contact.lastName}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => contact.id && deleteContactMutation.mutate(contact.id)}
-                  disabled={deleteContactMutation.isPending}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Email</Label>
-                  <p className="text-sm">{contact.email}</p>
-                </div>
-                <div>
-                  <Label>Phone</Label>
-                  <p className="text-sm">{contact.phone || "Not provided"}</p>
-                </div>
-                <div>
-                  <Label>Mobile Phone</Label>
-                  <p className="text-sm">{contact.mobilePhone || "Not provided"}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Contact List</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Role</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Mobile</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {contacts.map((contact) => (
+                <TableRow key={contact.id}>
+                  <TableCell>{contact.role}</TableCell>
+                  <TableCell>{`${contact.firstName} ${contact.lastName}`}</TableCell>
+                  <TableCell>{contact.email}</TableCell>
+                  <TableCell>{contact.phone || "N/A"}</TableCell>
+                  <TableCell>{contact.mobilePhone || "N/A"}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => contact.id && deleteContactMutation.mutate(contact.id)}
+                      disabled={deleteContactMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {contacts.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    No contacts added yet
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
