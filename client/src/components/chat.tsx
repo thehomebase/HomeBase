@@ -27,7 +27,7 @@ interface ChatProps {
 export function Chat({ transactionId }: ChatProps) {
   const { user } = useAuth();
   const [message, setMessage] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   // Ensure transactionId is a valid number
@@ -95,8 +95,8 @@ export function Chat({ transactionId }: ChatProps) {
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
@@ -117,9 +117,9 @@ export function Chat({ transactionId }: ChatProps) {
 
   return (
     <div className="flex flex-col h-[600px] rounded-lg border bg-background">
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
-          {messages.map((msg) => (
+          {messages.map((msg: Message) => (
             <div
               key={msg.id}
               className={`flex ${msg.userId === user?.id ? "justify-end" : "justify-start"}`}
@@ -142,6 +142,7 @@ export function Chat({ transactionId }: ChatProps) {
               </div>
             </div>
           ))}
+          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
@@ -166,3 +167,5 @@ export function Chat({ transactionId }: ChatProps) {
     </div>
   );
 }
+
+export default Chat;

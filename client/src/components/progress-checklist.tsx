@@ -17,10 +17,15 @@ interface ChecklistItem {
   completed: boolean;
 }
 
+interface Checklist {
+  id: string;
+  items: ChecklistItem[];
+}
+
 export function ProgressChecklist({ transactionId, userRole }: ProgressChecklistProps) {
   const { toast } = useToast();
 
-  const { data: checklist, isLoading } = useQuery({
+  const { data: checklist, isLoading } = useQuery<Checklist>({
     queryKey: ["/api/checklists", transactionId, userRole],
     queryFn: async () => {
       const response = await apiRequest(
@@ -87,14 +92,7 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
     },
   });
 
-  // Create a new checklist if one doesn't exist
-  useEffect(() => {
-    if (!isLoading && !checklist) {
-      createChecklistMutation.mutate();
-    }
-  }, [isLoading, checklist]);
-
-  const DEFAULT_ITEMS = [
+  const DEFAULT_ITEMS: ChecklistItem[] = [
     { id: "1", text: "Initial consultation with client", completed: false },
     { id: "2", text: "Property listing agreement signed", completed: false },
     { id: "3", text: "Schedule professional photography", completed: false },
@@ -102,11 +100,18 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
     { id: "5", text: "Schedule open houses", completed: false },
   ];
 
+  // Create a new checklist if one doesn't exist
+  useEffect(() => {
+    if (!isLoading && !checklist) {
+      createChecklistMutation.mutate();
+    }
+  }, [isLoading, checklist]);
+
   const items = checklist?.items || DEFAULT_ITEMS;
-  const progress = Math.round((items.filter(item => item.completed).length / items.length) * 100);
+  const progress = Math.round((items.filter((item: ChecklistItem) => item.completed).length / items.length) * 100);
 
   const handleCheck = (itemId: string, checked: boolean) => {
-    const updatedItems = items.map(item =>
+    const updatedItems = items.map((item: ChecklistItem) =>
       item.id === itemId ? { ...item, completed: checked } : item
     );
     updateChecklistMutation.mutate(updatedItems);
@@ -130,7 +135,7 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {items.map((item) => (
+            {items.map((item: ChecklistItem) => (
               <div key={item.id} className="flex items-center space-x-2">
                 <Checkbox
                   id={item.id}
