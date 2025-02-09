@@ -160,11 +160,17 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const id = Number(req.params.id);
-      const transaction = await storage.updateTransaction(id, req.body);
+      const data = {
+        ...req.body,
+        optionExpirationDate: req.body.optionExpirationDate || null,
+        closingDate: req.body.closingDate || null,
+        contractExecutionDate: req.body.contractExecutionDate || null
+      };
+      const transaction = await storage.updateTransaction(id, data);
       res.json(transaction);
     } catch (error) {
       console.error('Error updating transaction:', error);
-      res.status(500).send('Error updating transaction');
+      res.status(500).json({ error: 'Error updating transaction', details: error.message });
     }
   });
 
