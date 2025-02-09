@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
+import { Toggle } from "@/components/ui/toggle";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
@@ -82,20 +83,7 @@ export default function TransactionsPage() {
                       <FormItem>
                         <FormLabel>Property Address</FormLabel>
                         <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="accessCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Access Code</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Min. 6 characters" />
+                          <Input {...field} placeholder="Enter property address" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -105,19 +93,30 @@ export default function TransactionsPage() {
                     control={form.control}
                     name="type"
                     render={({ field }) => (
-                      <FormItem className="mb-4">
+                      <FormItem>
                         <FormLabel>Transaction Type</FormLabel>
                         <FormControl>
-                          <div className="flex items-center space-x-2">
-                            <Toggle
-                              pressed={field.value === 'sell'}
-                              onPressedChange={(pressed) => field.onChange(pressed ? 'sell' : 'buy')}
-                              className="w-full data-[state=on]:bg-green-500"
-                            >
-                              {field.value === 'buy' ? 'Buy Transaction' : 'Sell Transaction'}
-                            </Toggle>
-                          </div>
+                          <Toggle
+                            pressed={field.value === 'sell'}
+                            onPressedChange={(pressed) => field.onChange(pressed ? 'sell' : 'buy')}
+                            className="w-full data-[state=on]:bg-green-500"
+                          >
+                            {field.value === 'buy' ? 'Buy Transaction' : 'Sell Transaction'}
+                          </Toggle>
                         </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="accessCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Passkey</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="text" placeholder="Enter passkey (min. 6 characters)" />
+                        </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
