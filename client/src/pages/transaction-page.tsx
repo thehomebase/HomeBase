@@ -377,6 +377,39 @@ export default function TransactionPage() {
                     )}
                   </div>
                   <div>
+                    <p className="text-sm text-muted-foreground">MLS No.</p>
+                    {isEditing ? (
+                      <Input
+                        type="text"
+                        {...form.register("mlsNumber")}
+                        placeholder="Enter MLS number"
+                      />
+                    ) : (
+                      <p className="font-medium">
+                        {transaction.mlsNumber || 'Not set'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Financing</p>
+                    {isEditing ? (
+                      <select
+                        className="w-full px-3 py-2 border rounded-md"
+                        {...form.register("financing")}
+                      >
+                        <option value="">Select financing type</option>
+                        <option value="FHA">FHA</option>
+                        <option value="VA">VA</option>
+                        <option value="Conventional">Conventional</option>
+                        <option value="Cash">Cash</option>
+                      </select>
+                    ) : (
+                      <p className="font-medium">
+                        {transaction.financing || 'Not set'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
                     <p className="text-sm text-muted-foreground">Status</p>
                     {isEditing ? (
                       <select
