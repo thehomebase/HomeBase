@@ -204,18 +204,17 @@ export default function TransactionPage() {
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="optionPeriod">Option Period (days)</Label>
+                  <Label htmlFor="optionPeriodExpiration">Option Period Expiration</Label>
                   {user.role === 'agent' ? (
                     <Input
-                      id="optionPeriod"
-                      type="number"
-                      {...form.register("optionPeriod")}
-                      placeholder="Enter option period"
+                      id="optionPeriodExpiration"
+                      type="date"
+                      {...form.register("optionPeriodExpiration")}
                     />
                   ) : (
                     <p className="font-medium">
-                      {transaction.optionPeriod 
-                        ? `${transaction.optionPeriod} days` 
+                      {transaction.optionPeriodExpiration 
+                        ? new Date(transaction.optionPeriodExpiration).toLocaleDateString() 
                         : 'Not set'}
                     </p>
                   )}

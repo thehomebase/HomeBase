@@ -362,9 +362,15 @@ export class DatabaseStorage implements IStorage {
         throw new Error('No valid fields to update');
       }
 
-      const setColumns = Object.entries(cleanData).map(([key, value]) => 
-        sql`${sql.identifier([key])} = ${value}`
-      );
+      const setColumns = Object.entries(cleanData).map(([key, value]) => {
+        if (value === null) {
+          return sql`${sql.identifier([key])} = NULL`;
+        }
+        if (typeof value === 'object') {
+          return sql`${sql.identifier([key])} = ${JSON.stringify(value)}::jsonb`;
+        }
+        return sql`${sql.identifier([key])} = ${value}`;
+      });
 
       const result = await db.execute(sql`
         UPDATE transactions
