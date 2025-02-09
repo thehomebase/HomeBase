@@ -239,8 +239,10 @@ export default function TransactionPage() {
               </div>
               <div className="space-y-4">
                 <div className="space-y-2">
+                  <div className="space-y-4">
                   <p className="text-sm text-muted-foreground">Current Phase</p>
-                  <p className="text-sm">{currentPhase}</p>
+                  <p className="text-sm text-muted-foreground">{currentPhase}</p>
+                </div>
                 </div>
                 <div className="space-y-2">
                   <Progress value={progress} className="h-2" />
