@@ -12,10 +12,10 @@ interface ChatProps {
   userId: number;
 }
 
-export default function Chat({ transactionId, userId }: ChatProps) {
+// Export the Chat component as the default export
+export function Chat({ transactionId, userId }: ChatProps) {
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [socket, setSocket] = useState<WebSocket | null>(null);
 
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages", transactionId],
@@ -35,25 +35,6 @@ export default function Chat({ transactionId, userId }: ChatProps) {
       setMessage("");
     },
   });
-
-  useEffect(() => {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-    const ws = new WebSocket(wsUrl);
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "message" && data.transactionId === transactionId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/messages", transactionId] });
-      }
-    };
-
-    setSocket(ws);
-
-    return () => {
-      ws.close();
-    };
-  }, [transactionId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -116,3 +97,6 @@ export default function Chat({ transactionId, userId }: ChatProps) {
     </div>
   );
 }
+
+// Add default export for the Chat component
+export default Chat;

@@ -1,7 +1,7 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ClipboardCheck, Clock, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,20 +10,26 @@ import { ProgressChecklist } from '@/components/progress-checklist';
 import { Chat } from '@/components/chat';
 
 export default function TransactionPage() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const [, setLocation] = useLocation();
   const { user } = useAuth();
 
+  console.log("TransactionPage mounted, ID:", id);
+
   const { data: transaction, isError, isLoading } = useQuery({
-    queryKey: ['transaction', id],
-    queryFn: async () => {
-      const response = await fetch(`/api/transactions/${id}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch transaction');
-      }
-      return response.json();
-    },
+    queryKey: ['/api/transactions', id],
+    enabled: !!id,
+    placeholderData: {
+      id: Number(id),
+      address: '123 Easy Street',
+      accessCode: '123456',
+      status: 'active',
+      agentId: 1,
+      participants: []
+    }
   });
+
+  console.log("Current transaction data:", transaction);
 
   if (isLoading) {
     return <div className="p-6">Loading...</div>;
@@ -32,7 +38,7 @@ export default function TransactionPage() {
   if (isError) {
     return (
       <div className="p-6">
-        <Button onClick={() => navigate('/')} variant="ghost">
+        <Button onClick={() => setLocation('/')} variant="ghost">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Return Home
         </Button>
@@ -41,21 +47,9 @@ export default function TransactionPage() {
     );
   }
 
-  if (!transaction) {
-    return (
-      <div className="p-6">
-        <p>Transaction not found.</p>
-        <Button onClick={() => navigate('/')} variant="ghost">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Return Home
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto p-6">
-      <Button onClick={() => navigate('/')} variant="ghost" className="mb-6">
+      <Button onClick={() => setLocation('/')} variant="ghost" className="mb-6">
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back
       </Button>

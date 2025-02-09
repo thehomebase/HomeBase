@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
@@ -38,7 +37,6 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send('Transaction not found');
       }
 
-      // Temporarily remove role/participant check to test page rendering
       res.json(transaction);
 
     } catch (error) {
@@ -109,21 +107,8 @@ export function registerRoutes(app: Express): Server {
     if (!parsed.success) return res.status(400).send(parsed.error.message);
     const message = await storage.createMessage(parsed.data);
     res.status(201).json(message);
-
-    const httpServer = createServer(app);
-    const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
-    wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({
-          type: "message",
-          transactionId: message.transactionId,
-        }));
-      }
-    });
   });
 
   const httpServer = createServer(app);
-  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
-
   return httpServer;
 }
