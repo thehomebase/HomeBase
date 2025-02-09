@@ -30,16 +30,6 @@ export function Chat({ transactionId }: ChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Validate transactionId
-  if (!transactionId || isNaN(transactionId)) {
-    console.error("Invalid transaction ID provided to Chat component:", transactionId);
-    return (
-      <div className="flex items-center justify-center h-[600px]">
-        <p className="text-destructive">Invalid transaction ID</p>
-      </div>
-    );
-  }
-
   const { data: messages = [], isLoading, error } = useQuery<Message[]>({
     queryKey: ["/api/messages", transactionId],
     queryFn: async () => {
@@ -58,21 +48,15 @@ export function Chat({ transactionId }: ChatProps) {
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
-      if (!user?.id || !user?.username || !user?.role) {
-        throw new Error("User information is incomplete");
-      }
+    mutationFn: async (newMessage: string) => {
+      const response = await apiRequest("POST", "/api/messages", {
+        content: newMessage.trim(),
+        transactionId: Number(transactionId),
+        userId: user?.id,
+        username: user?.username,
+        role: user?.role,
+      });
 
-      const messageData = {
-        content: content.trim(),
-        transactionId,
-        userId: user.id,
-        username: user.username,
-        role: user.role,
-        timestamp: new Date().toISOString(),
-      };
-
-      const response = await apiRequest("POST", "/api/messages", messageData);
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to send message");
@@ -84,7 +68,6 @@ export function Chat({ transactionId }: ChatProps) {
       setMessage("");
     },
     onError: (error: Error) => {
-      console.error("Message send error:", error);
       toast({
         title: "Error sending message",
         description: error.message,
@@ -101,9 +84,7 @@ export function Chat({ transactionId }: ChatProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedMessage = message.trim();
-
-    if (!trimmedMessage) {
+    if (!message.trim()) {
       toast({
         title: "Error",
         description: "Message cannot be empty",
@@ -121,7 +102,7 @@ export function Chat({ transactionId }: ChatProps) {
       return;
     }
 
-    sendMessageMutation.mutate(trimmedMessage);
+    sendMessageMutation.mutate(message);
   };
 
   if (error) {
