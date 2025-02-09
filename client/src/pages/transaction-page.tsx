@@ -86,9 +86,9 @@ const updateTransaction = useMutation({
     // Format dates as ISO strings
     const formattedData = {
       ...data,
-      closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : undefined,
-      contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : undefined,
-      option_period_expiration: data.option_period_expiration ? new Date(data.option_period_expiration).toISOString() : undefined
+      closingDate: data.closingDate ? new Date(data.closingDate + 'T00:00:00').toISOString() : undefined,
+      contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate + 'T00:00:00').toISOString() : undefined,
+      option_period_expiration: data.option_period_expiration ? new Date(data.option_period_expiration + 'T00:00:00').toISOString() : undefined
     };
 
     const cleanData = Object.fromEntries(
@@ -460,9 +460,9 @@ const updateTransaction = useMutation({
                     onClick={form.handleSubmit((data) => {
                       const formattedData = {
                         ...data,
-                        closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : undefined,
-                        contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : undefined,
-                        option_period_expiration: data.option_period_expiration ? new Date(data.option_period_expiration).toISOString() : undefined
+                        closingDate: data.closingDate ? new Date(data.closingDate + 'T00:00:00').toISOString() : undefined,
+                        contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate + 'T00:00:00').toISOString() : undefined,
+                        option_period_expiration: data.option_period_expiration ? new Date(data.option_period_expiration + 'T00:00:00').toISOString() : undefined
                       };
                       updateTransaction.mutate(formattedData);
                       setIsEditing(false);
