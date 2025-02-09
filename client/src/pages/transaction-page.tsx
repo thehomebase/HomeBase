@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { ProgressChecklist } from '@/components/progress-checklist';
 import { Chat } from '@/components/chat';
+import { apiRequest } from '@/lib/queryClient';
 import type { Transaction } from '@shared/schema';
 
 export default function TransactionPage() {
@@ -15,24 +16,46 @@ export default function TransactionPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
 
+  const parsedId = id ? parseInt(id, 10) : null;
+
   const { data: transaction, isError, isLoading } = useQuery<Transaction>({
-    queryKey: ['/api/transactions', Number(id)],
-    enabled: !!id && !!user?.id,
+    queryKey: ['/api/transactions', parsedId],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/transactions/${parsedId}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to fetch transaction');
+      }
+      return response.json();
+    },
+    enabled: !!parsedId && !!user?.id,
     retry: false
   });
 
-  if (isLoading) {
-    return <div className="p-6">Loading...</div>;
-  }
-
-  if (isError) {
+  if (!parsedId || isNaN(parsedId)) {
     return (
       <div className="p-6">
         <Button onClick={() => setLocation('/')} variant="ghost">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Return Home
         </Button>
-        <p className="mt-4">Unable to load transaction. Please try again.</p>
+        <p className="mt-4 text-destructive">Invalid transaction ID</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return <div className="p-6">Loading...</div>;
+  }
+
+  if (isError || !transaction) {
+    return (
+      <div className="p-6">
+        <Button onClick={() => setLocation('/')} variant="ghost">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Return Home
+        </Button>
+        <p className="mt-4 text-destructive">Unable to load transaction. Please try again.</p>
       </div>
     );
   }
@@ -47,8 +70,8 @@ export default function TransactionPage() {
               Back
             </Button>
             <div className="text-right">
-              <h1 className="text-2xl font-bold">{transaction?.address}</h1>
-              <p className="text-sm text-muted-foreground">Transaction ID: {id}</p>
+              <h1 className="text-2xl font-bold">{transaction.address}</h1>
+              <p className="text-sm text-muted-foreground">Transaction #{parsedId}</p>
             </div>
           </div>
         </div>
@@ -70,12 +93,14 @@ export default function TransactionPage() {
               </TabsList>
               <TabsContent value="progress" className="mt-6">
                 <ProgressChecklist
-                  transactionId={Number(id)}
+                  transactionId={parsedId}
                   userRole={user?.role || ""}
                 />
               </TabsContent>
               <TabsContent value="chat" className="mt-6">
-                <Chat transactionId={Number(id)} />
+                {transaction && (
+                  <Chat transactionId={parsedId} />
+                )}
               </TabsContent>
             </Tabs>
           </CardContent>
