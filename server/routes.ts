@@ -30,13 +30,13 @@ export function registerRoutes(app: Express): Server {
       console.log('Processing request for transaction ID:', id, 'User:', req.user);
 
       const transaction = await storage.getTransaction(id);
-      
+
       if (!transaction) {
         return res.status(404).json({ error: 'Transaction not found' });
       }
 
-      const userHasAccess = 
-        transaction.agentId === req.user.id || 
+      const userHasAccess =
+        transaction.agentId === req.user.id ||
         (transaction.participants && transaction.participants.some(p => p.userId === req.user.id));
 
       if (!userHasAccess) {
@@ -73,11 +73,16 @@ export function registerRoutes(app: Express): Server {
   // Checklists
   app.get("/api/checklists/:transactionId/:role", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const checklist = await storage.getChecklist(
-      Number(req.params.transactionId),
-      req.params.role
-    );
-    res.json(checklist);
+    try {
+      const checklist = await storage.getChecklist(
+        Number(req.params.transactionId),
+        req.params.role
+      );
+      res.json(checklist);
+    } catch (error) {
+      console.error('Error fetching checklist:', error);
+      res.status(500).send('Error fetching checklist');
+    }
   });
 
   app.post("/api/checklists", async (req, res) => {
@@ -87,14 +92,14 @@ export function registerRoutes(app: Express): Server {
       const parsed = insertChecklistSchema.safeParse(req.body);
       if (!parsed.success) {
         console.error('Validation error:', parsed.error);
-        return res.status(400).json(parsed.error);
+        return res.status(400).json({ error: parsed.error.errors });
       }
 
       const checklist = await storage.createChecklist(parsed.data);
       res.status(201).json(checklist);
     } catch (error) {
       console.error('Error creating checklist:', error);
-      res.status(500).send('Error creating checklist');
+      res.status(500).json({ error: 'Error creating checklist' });
     }
   });
 
@@ -110,14 +115,14 @@ export function registerRoutes(app: Express): Server {
 
       if (!parsed.success) {
         console.error('Validation error:', parsed.error);
-        return res.status(400).json(parsed.error);
+        return res.status(400).json({ error: parsed.error.errors });
       }
 
       const checklist = await storage.updateChecklist(Number(req.params.id), parsed.data);
       res.json(checklist);
     } catch (error) {
       console.error('Error updating checklist:', error);
-      res.status(500).send('Error updating checklist');
+      res.status(500).json({ error: 'Error updating checklist' });
     }
   });
 
