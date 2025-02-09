@@ -2,6 +2,78 @@ import React, { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+function getTooltipContent(itemId: string): string {
+  const tooltips: Record<string, string> = {
+    // Pre-Listing Preparation
+    "assess-value": "Consider both professional appraisal and online valuation tools. Recent comparable sales in the area are crucial for accurate pricing.",
+    "home-inspection": "A pre-listing inspection can identify issues early, allowing you to address them before they become negotiating points.",
+    "repairs-upgrades": "Focus on repairs that offer the best ROI. Kitchen and bathroom upgrades typically provide the highest return.",
+    "declutter": "Remove personal photos, excess furniture, and organize closets to make spaces appear larger.",
+    "staging": "Professional staging can help buyers visualize themselves in the space and typically leads to faster sales.",
+    "curb-appeal": "First impressions matter. Consider fresh paint, landscaping, and cleaning exterior surfaces.",
+    
+    // Listing Phase
+    "select-agent": "Look for agents with experience in your specific market and property type.",
+    "photos": "Professional photos can make your listing stand out online where most buyers start their search.",
+    "listing-desc": "Focus on unique features and recent upgrades. Use descriptive but accurate language.",
+    "showings": "Keep the home clean and available for showings. Consider using a lockbox for easier access.",
+    
+    // Offer and Negotiation
+    "review-offers": "Consider all terms, not just price. A lower offer with better terms might be more advantageous.",
+    "counter-offers": "Stay flexible on terms like closing date or included items to reach an agreement.",
+    "accept-offer": "Once accepted, the offer becomes a binding contract. Review all terms carefully.",
+    
+    // Post-Acceptance
+    "appraisal": "The appraisal protects the lender. Having recent comparable sales data ready can help.",
+    "buyer-inspection": "Be prepared to negotiate repairs or provide credits based on inspection findings.",
+    "disclosures": "Full disclosure protects you legally. When in doubt, disclose.",
+    "title-search": "Address any title issues early to prevent closing delays.",
+    
+    // Closing Preparation
+    "cancel-utilities": "Schedule utility transfers for the day after closing to ensure continuous service.",
+    "moving-prep": "Start packing early and label boxes clearly for easier unpacking.",
+    "final-walkthrough": "Remove all personal items and leave the property in clean condition.",
+    
+    // Closing
+    "review-docs": "Take time to understand each document. Don't hesitate to ask questions.",
+    "sign-docs": "Bring proper identification and any required documents to closing.",
+    "hand-over-keys": "Provide all keys, garage door openers, and access codes.",
+    
+    // Post-Closing
+    "change-address": "Update your address with USPS, credit cards, and subscriptions.",
+    "complete-move": "Double-check all spaces, including attic and basement, before final move-out.",
+
+    // Buyer Checklist Items
+    "buying-criteria": "Define your must-haves vs. nice-to-haves. Consider location, size, and amenities.",
+    "hire-agent": "Interview multiple agents to find one who understands your needs and communication style.",
+    "get-preapproval": "Get preapproved before house hunting to understand your budget and strengthen offers.",
+    "preliminary-inspection": "Look for obvious red flags during viewings like water damage or foundation issues.",
+    "attend-viewings": "Take notes and photos during viewings to help remember details of each property.",
+    "submit-offer": "Include all terms and contingencies in writing. Your agent can advise on competitive offers.",
+    "negotiate-terms": "Consider both price and other terms like closing date and included items.",
+    "earnest-money": "Typically 1-3% of purchase price to show good faith in the transaction.",
+    "home-inspection": "Choose a thorough inspector and attend the inspection if possible.",
+    "order-appraisal": "Required by most lenders to ensure the property value supports the loan amount.",
+    "additional-checks": "Consider specialized inspections for specific concerns like radon or termites.",
+    "review-title": "Title insurance protects against ownership disputes or liens.",
+    "title-insurance": "Required by lenders but also important for buyer protection.",
+    "finalize-mortgage": "Provide all required documentation promptly to avoid closing delays.",
+    "lock-rate": "Discuss rate lock timing with your lender to secure the best rate.",
+    "secure-insurance": "Shop multiple insurance providers for the best coverage and rates.",
+    "arrange-utilities": "Set up utilities in your name starting on the closing date.",
+    "prepare-moving": "Get multiple moving quotes and start packing non-essential items early.",
+    "secure-funds": "Arrange for closing funds well in advance of closing date.",
+    "wire-funds": "Double-check wire instructions to avoid fraud.",
+    "power-of-attorney": "If needed, arrange for power of attorney well before closing.",
+    "change-locks": "Change all exterior door locks and garage codes after closing.",
+    "file-homestead": "File for homestead exemption if available in your area.",
+    "begin-maintenance": "Start a home maintenance schedule and register major appliances."
+  };
+
+  return tooltips[itemId] || "Complete this task to progress through the transaction.";
+}
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -296,12 +368,21 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
                   }}
                   disabled={updateChecklistMutation.isPending}
                 />
-                <label
-                  htmlFor={item.id}
-                  className={`text-sm ${item.completed ? "line-through text-muted-foreground" : ""}`}
-                >
-                  {item.text}
-                </label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <label
+                        htmlFor={item.id}
+                        className={`text-sm cursor-help ${item.completed ? "line-through text-muted-foreground" : ""}`}
+                      >
+                        {item.text}
+                      </label>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs">{getTooltipContent(item.id)}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             ))}
         </div>
