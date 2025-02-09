@@ -3,10 +3,41 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema } from "@shared/schema";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
+
+  // Clients
+  app.get("/api/clients", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const clients = await storage.getClientsByAgent(req.user.id);
+      res.json(clients);
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+      res.status(500).send('Error fetching clients');
+    }
+  });
+
+  app.post("/api/clients", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const parsed = insertClientSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).send(parsed.error.message);
+      }
+
+      const client = await storage.createClient(parsed.data);
+      res.status(201).json(client);
+    } catch (error) {
+      console.error('Error creating client:', error);
+      res.status(500).send('Error creating client');
+    }
+  });
 
   // Transactions
   app.get("/api/transactions", async (req, res) => {
@@ -30,7 +61,7 @@ export function registerRoutes(app: Express): Server {
       console.log('Processing request for transaction ID:', id, 'User:', req.user);
 
       const transaction = await storage.getTransaction(id);
-      
+
       if (!transaction) {
         return res.status(404).json({ error: 'Transaction not found' });
       }
