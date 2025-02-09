@@ -8,9 +8,17 @@ import { eq, and, or } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
-import { sql } from 'drizzle-orm/sql'
+import { sql } from 'drizzle-orm/sql';
 
 const PostgresSessionStore = connectPg(session);
+
+// Define ChecklistItem type to match the frontend
+interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  phase: string;
+}
 
 export interface IStorage {
   // User operations
@@ -27,7 +35,7 @@ export interface IStorage {
   // Checklist operations
   createChecklist(checklist: InsertChecklist): Promise<Checklist>;
   getChecklist(transactionId: number, role: string): Promise<Checklist | undefined>;
-  updateChecklist(id: number, items: Checklist["items"]): Promise<Checklist>;
+  updateChecklist(id: number, items: ChecklistItem[]): Promise<Checklist>;
 
   // Message operations
   createMessage(message: InsertMessage): Promise<Message>;
@@ -152,7 +160,7 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
         downPayment: row.down_payment ? Number(row.down_payment) : null,
         sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
-        closingDate: row.closing_date || null
+        closingDate: row.closing_date ? String(row.closing_date) : null
       };
     } catch (error) {
       console.error('Error in createTransaction:', error);
@@ -210,7 +218,7 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
         downPayment: row.downPayment ? Number(row.downPayment) : null,
         sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
-        closingDate: row.closingDate || null
+        closingDate: row.closingDate ? String(row.closingDate) : null
       };
 
       console.log('Processed transaction:', transaction);
@@ -271,12 +279,66 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction> {
-    const result = await db
-      .update(transactions)
-      .set(data)
-      .where(eq(transactions.id, id))
-      .returning();
-    return result[0];
+    try {
+      // Remove any undefined values and format the data
+      const cleanData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined) {
+          // Convert camelCase to snake_case for SQL
+          const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+          if (key === 'participants' && Array.isArray(value)) {
+            cleanData[snakeKey] = JSON.stringify(value);
+          } else if (value === null) {
+            cleanData[snakeKey] = null;
+          } else if (typeof value === 'number') {
+            cleanData[snakeKey] = value;
+          } else {
+            cleanData[snakeKey] = String(value);
+          }
+        }
+      });
+
+      if (Object.keys(cleanData).length === 0) {
+        throw new Error('No valid fields to update');
+      }
+
+      const setColumns = Object.entries(cleanData).map(([key, value]) => 
+        sql`${sql.identifier([key])} = ${value}`
+      );
+
+      const result = await db.execute(sql`
+        UPDATE transactions
+        SET ${sql.join(setColumns, sql`, `)}
+        WHERE id = ${id}
+        RETURNING *;
+      `);
+
+      if (!result.rows[0]) {
+        throw new Error('Failed to update transaction');
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        address: String(row.address),
+        accessCode: String(row.access_code),
+        status: String(row.status),
+        agentId: Number(row.agent_id),
+        clientId: row.client_id ? Number(row.client_id) : null,
+        participants: Array.isArray(row.participants) ? row.participants : [],
+        contractPrice: row.contract_price ? Number(row.contract_price) : null,
+        optionPeriod: row.option_period ? Number(row.option_period) : null,
+        optionFee: row.option_fee ? Number(row.option_fee) : null,
+        earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
+        downPayment: row.down_payment ? Number(row.down_payment) : null,
+        sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
+        closingDate: row.closing_date || null
+      };
+    } catch (error) {
+      console.error('Error in updateTransaction:', error);
+      throw error;
+    }
   }
 
   async createChecklist(insertChecklist: InsertChecklist): Promise<Checklist> {
@@ -299,8 +361,8 @@ export class DatabaseStorage implements IStorage {
 
       // Initialize the checklist based on transaction type.  Placeholder for BUYER_CHECKLIST_ITEMS
       const BUYER_CHECKLIST_ITEMS = [
-        {id:1, description: 'Item 1', completed:false},
-        {id:2, description: 'Item 2', completed:false}
+        {id:'1', text: 'Item 1', completed:false, phase: 'initial'},
+        {id:'2', text: 'Item 2', completed:false, phase: 'initial'}
       ]; // Placeholder -  Replace with actual checklist items
 
       const checklistItems = BUYER_CHECKLIST_ITEMS.map(item => ({
@@ -363,33 +425,38 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateChecklist(id: number, items: Checklist["items"]): Promise<Checklist> {
+  async updateChecklist(id: number, items: ChecklistItem[]): Promise<Checklist> {
     try {
-      // Log the received data for debugging
-      console.log('Updating checklist:', { id, items });
+      console.log('Starting updateChecklist with:', { id, items });
 
-      // Basic validation
-      if (!id || !Array.isArray(items)) {
-        throw new Error('Invalid input: id and valid items array are required');
+      if (!id || isNaN(id)) {
+        throw new Error('Invalid checklist ID');
       }
+
+      if (!Array.isArray(items)) {
+        throw new Error('Items must be an array');
+      }
+
+      // Validate each item in the array
+      items.forEach(item => {
+        if (!item.id || typeof item.text !== 'string' || typeof item.completed !== 'boolean' || !item.phase) {
+          throw new Error('Invalid checklist item format');
+        }
+      });
 
       // First verify if the checklist exists
-      const checklistCheck = await db.execute(sql`
-        SELECT EXISTS(
-          SELECT 1 FROM checklists 
-          WHERE id = ${id}
-        );
+      const existingChecklist = await db.execute(sql`
+        SELECT id FROM checklists WHERE id = ${id}
       `);
 
-      const checklistExists = checklistCheck.rows[0]?.exists;
-      if (!checklistExists) {
-        throw new Error(`Checklist with ID ${id} does not exist`);
+      if (!existingChecklist.rows.length) {
+        throw new Error('Checklist not found');
       }
 
-      // Update the checklist
+      // Update the checklist items using proper JSON casting
       const result = await db.execute(sql`
         UPDATE checklists 
-        SET items = ${JSON.stringify(items)}::jsonb
+        SET items = ${sql.raw(`'${JSON.stringify(items)}'::jsonb`)}
         WHERE id = ${id}
         RETURNING id, transaction_id, role, items
       `);
@@ -399,11 +466,13 @@ export class DatabaseStorage implements IStorage {
       }
 
       const row = result.rows[0];
+      console.log('Successfully updated checklist:', row);
+
       return {
         id: Number(row.id),
         transactionId: Number(row.transaction_id),
         role: String(row.role),
-        items: Array.isArray(row.items) ? row.items : []
+        items: row.items as ChecklistItem[]
       };
     } catch (error) {
       console.error('Error in updateChecklist:', error);

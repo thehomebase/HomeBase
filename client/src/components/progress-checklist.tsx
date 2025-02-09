@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
@@ -11,6 +11,13 @@ interface ChecklistItem {
   text: string;
   completed: boolean;
   phase: string;
+}
+
+interface Checklist {
+  id: number;
+  transactionId: number;
+  role: string;
+  items: ChecklistItem[];
 }
 
 interface ProgressChecklistProps {
@@ -120,64 +127,98 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
     transactionType === 'buy' ? "Pre-Offer" : "Pre-Listing Preparation"
   );
 
+  // Query to fetch checklist data
   const { data: checklist, isLoading, error } = useQuery({
     queryKey: ["/api/checklists", transactionId],
     queryFn: async () => {
-      try {
-        const response = await apiRequest("GET", `/api/checklists/${transactionId}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch checklist");
-        }
-        const data = await response.json();
-        return data;
-      } catch (err) {
-        console.error('Error fetching checklist:', err);
-        return null;
+      const response = await apiRequest("GET", `/api/checklists/${transactionId}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch checklist");
       }
+      return response.json() as Promise<Checklist>;
     },
   });
 
+  // Mutation to update checklist items
   const updateChecklistMutation = useMutation({
     mutationFn: async (updatedItem: ChecklistItem) => {
-      try {
-        // Log the data being sent for debugging
-        console.log('Sending update:', updatedItem);
-
-        const response = await apiRequest("PATCH", `/api/checklists/${transactionId}`, {
-          items: [{
-            id: updatedItem.id,
-            text: updatedItem.text,
-            completed: updatedItem.completed,
-            phase: updatedItem.phase
-          }]
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || "Failed to update checklist item");
-        }
-
-        return response.json();
-      } catch (error) {
-        console.error('Error updating checklist:', error);
-        throw error;
+      const currentChecklist = queryClient.getQueryData<Checklist>(["/api/checklists", transactionId]);
+      if (!currentChecklist) {
+        throw new Error("No checklist data available");
       }
+
+      const updatedItems = currentChecklist.items.map(item =>
+        item.id === updatedItem.id ? updatedItem : item
+      );
+
+      const response = await apiRequest("PATCH", `/api/checklists/${transactionId}`, {
+        items: updatedItems
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update checklist");
+      }
+
+      return response.json() as Promise<Checklist>;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/checklists", transactionId] });
+    onMutate: async (newItem) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/checklists", transactionId] });
+
+      const previousChecklist = queryClient.getQueryData<Checklist>(["/api/checklists", transactionId]);
+
+      if (previousChecklist) {
+        const optimisticChecklist = {
+          ...previousChecklist,
+          items: previousChecklist.items.map(item =>
+            item.id === newItem.id ? newItem : item
+          )
+        };
+
+        queryClient.setQueryData<Checklist>(
+          ["/api/checklists", transactionId],
+          optimisticChecklist
+        );
+      }
+
+      return { previousChecklist };
+    },
+    onError: (error, _, context) => {
+      if (context?.previousChecklist) {
+        queryClient.setQueryData(
+          ["/api/checklists", transactionId],
+          context.previousChecklist
+        );
+      }
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update progress",
+        variant: "destructive",
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["/api/checklists", transactionId], data);
       toast({
         title: "Progress updated",
         description: "Your changes have been saved.",
       });
     },
-    onError: (err: any) => {
-      toast({
-        title: "Error",
-        description: `Failed to update progress: ${err.message}`,
-        variant: "destructive",
-      });
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/checklists", transactionId] });
     },
   });
+
+  // Get the base checklist items based on transaction type
+  const baseChecklistItems = transactionType === 'buy' ? BUYER_CHECKLIST_ITEMS : SELLER_CHECKLIST_ITEMS;
+
+  // Use checklist data if available, otherwise use base items
+  const items = checklist?.items || baseChecklistItems.map(item => ({ ...item, completed: false }));
+
+  // Calculate progress
+  const completedItems = items.filter(item => item.completed).length;
+  const progress = Math.round((completedItems / items.length) * 100);
+
+  // Get unique phases
+  const phases = Array.from(new Set(items.map(item => item.phase)));
 
   if (isLoading) {
     return (
@@ -203,17 +244,13 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
           <CardTitle>Error loading checklist</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-red-500">{error.message}</p>
+          <p className="text-red-500">
+            {error instanceof Error ? error.message : 'An error occurred'}
+          </p>
         </CardContent>
       </Card>
     );
   }
-
-  const checklistItems = transactionType === 'buy' ? BUYER_CHECKLIST_ITEMS : SELLER_CHECKLIST_ITEMS;
-  const phases = Array.from(new Set(checklistItems.map(item => item.phase)));
-  const items = checklist || checklistItems.map(item => ({ ...item, completed: false }));
-  const completedItems = items.filter((item: ChecklistItem) => item.completed).length;
-  const progress = Math.round((completedItems / items.length) * 100);
 
   return (
     <Card>
@@ -240,8 +277,8 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
       <CardContent>
         <div className="space-y-4">
           {items
-            .filter((item: ChecklistItem) => item.phase === activePhase)
-            .map((item: ChecklistItem) => (
+            .filter(item => item.phase === activePhase)
+            .map(item => (
               <div key={item.id} className="flex items-center space-x-2">
                 <Checkbox
                   id={item.id}
@@ -250,7 +287,7 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
                     if (typeof checked === 'boolean') {
                       updateChecklistMutation.mutate({
                         ...item,
-                        completed: checked,
+                        completed: checked
                       });
                     }
                   }}
