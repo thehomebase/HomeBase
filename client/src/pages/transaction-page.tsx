@@ -81,9 +81,18 @@ export default function TransactionPage() {
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
       setIsEditing(false);
+      form.reset({
+        contractPrice: data.contractPrice,
+        optionPeriod: data.optionPeriod,
+        optionFee: data.optionFee,
+        earnestMoney: data.earnestMoney,
+        downPayment: data.downPayment,
+        sellerConcessions: data.sellerConcessions,
+        closingDate: data.closingDate,
+      });
       toast({
         title: "Success",
         description: "Transaction updated successfully",
