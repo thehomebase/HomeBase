@@ -49,7 +49,7 @@ const DEFAULT_ITEMS = {
   ],
 };
 
-export default function ProgressChecklist({
+export function ProgressChecklist({
   transactionId,
   checklist,
   userRole,
@@ -112,3 +112,5 @@ export default function ProgressChecklist({
     </div>
   );
 }
+
+export default ProgressChecklist;

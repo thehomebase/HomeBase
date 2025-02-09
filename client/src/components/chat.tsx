@@ -12,8 +12,7 @@ interface ChatProps {
   userId: number;
 }
 
-// Export the Chat component as the default export
-export function Chat({ transactionId, userId }: ChatProps) {
+function Chat({ transactionId, userId }: ChatProps) {
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -98,5 +97,5 @@ export function Chat({ transactionId, userId }: ChatProps) {
   );
 }
 
-// Add default export for the Chat component
+export { Chat };
 export default Chat;
