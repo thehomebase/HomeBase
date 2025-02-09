@@ -51,8 +51,16 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       }
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
+    onSuccess: (updatedDoc) => {
+      const currentDocs = queryClient.getQueryData<Document[]>(["/api/documents", transactionId]) || [];
+      const updatedDocs = currentDocs.map(doc => 
+        doc.id === updatedDoc.id ? updatedDoc : doc
+      );
+      queryClient.setQueryData(["/api/documents", transactionId], updatedDocs);
+      toast({
+        title: "Success",
+        description: "Document status updated successfully",
+      });
     },
   });
 
