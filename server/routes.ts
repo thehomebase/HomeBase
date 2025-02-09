@@ -167,11 +167,14 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/messages", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      const parsed = insertMessageSchema.safeParse({
-        ...req.body,
-        userId: req.user.id
-      });
+      const messageData = {
+        content: req.body.content,
+        userId: req.user.id,
+        timestamp: new Date().toISOString(),
+        transactionId: req.body.transactionId || null
+      };
 
+      const parsed = insertMessageSchema.safeParse(messageData);
       if (!parsed.success) {
         return res.status(400).send(parsed.error.message);
       }

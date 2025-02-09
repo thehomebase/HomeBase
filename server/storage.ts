@@ -236,15 +236,48 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
-    const [message] = await db.insert(messages).values(insertMessage).returning();
+    try {
+      // First create the message with basic fields
+      const result = await db.execute(sql`
+        INSERT INTO messages (
+          user_id,
+          content,
+          timestamp,
+          transaction_id
+        ) VALUES (
+          ${insertMessage.userId},
+          ${insertMessage.content},
+          ${insertMessage.timestamp},
+          ${insertMessage.transactionId}
+        )
+        RETURNING *
+      `);
 
-    // Fetch user details to include in the response
-    const user = await this.getUser(message.userId);
-    return {
-      ...message,
-      username: user?.username || 'Unknown User',
-      role: user?.role || 'unknown'
-    };
+      const message = result.rows[0];
+
+      // Then get the user info
+      const userResult = await db.execute(sql`
+        SELECT username, role
+        FROM users
+        WHERE id = ${insertMessage.userId}
+      `);
+
+      const user = userResult.rows[0];
+
+      // Return the complete message with user info
+      return {
+        id: Number(message.id),
+        transactionId: message.transaction_id ? Number(message.transaction_id) : null,
+        userId: Number(message.user_id),
+        content: String(message.content),
+        timestamp: String(message.timestamp),
+        username: user ? String(user.username) : 'Unknown User',
+        role: user ? String(user.role) : 'unknown'
+      };
+    } catch (error) {
+      console.error('Error in createMessage:', error);
+      throw error;
+    }
   }
 
   async getMessages(transactionId?: number): Promise<Message[]> {
@@ -264,21 +297,14 @@ export class DatabaseStorage implements IStorage {
 
       if (transactionId) {
         query = sql`
-          SELECT 
-            m.id,
-            m.transaction_id as "transactionId",
-            m.user_id as "userId",
-            m.content,
-            m.timestamp,
-            u.username,
-            u.role
-          FROM messages m
-          LEFT JOIN users u ON m.user_id = u.id
+          ${query}
           WHERE m.transaction_id = ${transactionId}
         `;
       }
 
-      const result = await db.execute(sql`${query} ORDER BY m.timestamp ASC`);
+      query = sql`${query} ORDER BY m.timestamp ASC`;
+
+      const result = await db.execute(query);
       return result.rows.map(row => ({
         id: Number(row.id),
         transactionId: row.transactionId ? Number(row.transactionId) : null,
