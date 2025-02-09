@@ -50,7 +50,7 @@ export const checklists = pgTable("checklists", {
 
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
-  transactionId: integer("transaction_id").notNull(),
+  transactionId: integer("transaction_id"),
   userId: integer("user_id").notNull(),
   content: text("content").notNull(),
   timestamp: text("timestamp").notNull(),
@@ -71,7 +71,7 @@ export const insertTransactionSchema = createInsertSchema(transactions);
 export const insertChecklistSchema = createInsertSchema(checklists).extend({
   items: z.array(checklistItemSchema)
 });
-export const insertMessageSchema = createInsertSchema(messages);
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertClient = z.infer<typeof insertClientSchema>;

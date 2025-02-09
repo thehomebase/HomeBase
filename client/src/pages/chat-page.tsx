@@ -38,17 +38,19 @@ export default function ChatPage() {
         timestamp: new Date().toISOString(),
       });
       if (!response.ok) {
-        throw new Error("Failed to send message");
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to send message");
       }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
       setMessage("");
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: "Failed to send message",
+        description: error.message,
         variant: "destructive",
       });
     },
