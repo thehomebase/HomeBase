@@ -49,8 +49,23 @@ export class DatabaseStorage implements IStorage {
 
   async getUser(id: number): Promise<User | undefined> {
     try {
-      const result = await db.execute(sql`SELECT * FROM users WHERE id = ${id}`);
-      return result.rows[0];
+      const result = await db.execute(sql`
+        SELECT id, username, password, role 
+        FROM users 
+        WHERE id = ${id}
+      `);
+
+      if (result.rows.length === 0) {
+        return undefined;
+      }
+
+      const user = result.rows[0];
+      return {
+        id: Number(user.id),
+        username: String(user.username),
+        password: String(user.password),
+        role: String(user.role)
+      };
     } catch (error) {
       console.error('Error in getUser:', error);
       return undefined;
@@ -59,8 +74,23 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
-      const result = await db.execute(sql`SELECT * FROM users WHERE username = ${username}`);
-      return result.rows[0];
+      const result = await db.execute(sql`
+        SELECT id, username, password, role 
+        FROM users 
+        WHERE username = ${username}
+      `);
+
+      if (result.rows.length === 0) {
+        return undefined;
+      }
+
+      const user = result.rows[0];
+      return {
+        id: Number(user.id),
+        username: String(user.username),
+        password: String(user.password),
+        role: String(user.role)
+      };
     } catch (error) {
       console.error('Error in getUserByUsername:', error);
       return undefined;
