@@ -96,13 +96,24 @@ export default function TransactionsPage() {
                       <FormItem>
                         <FormLabel>Transaction Type</FormLabel>
                         <FormControl>
-                          <Toggle
-                            pressed={field.value === 'sell'}
-                            onPressedChange={(pressed) => field.onChange(pressed ? 'sell' : 'buy')}
-                            className="w-full data-[state=on]:bg-green-500"
-                          >
-                            {field.value === 'buy' ? 'Buy Transaction' : 'Sell Transaction'}
-                          </Toggle>
+                          <div className="grid grid-cols-2 gap-4">
+                            <Button
+                              type="button"
+                              variant={field.value === 'buy' ? 'default' : 'outline'}
+                              className={field.value === 'buy' ? 'bg-green-500 hover:bg-green-600' : ''}
+                              onClick={() => field.onChange('buy')}
+                            >
+                              Buy
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={field.value === 'sell' ? 'default' : 'outline'}
+                              className={field.value === 'sell' ? 'bg-red-500 hover:bg-red-600' : ''}
+                              onClick={() => field.onChange('sell')}
+                            >
+                              Sell
+                            </Button>
+                          </div>
                         </FormControl>
                       </FormItem>
                     )}
