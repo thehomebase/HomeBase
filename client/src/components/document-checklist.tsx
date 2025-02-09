@@ -7,6 +7,18 @@ import { Plus, Trash2 } from "lucide-react";
 import { Input } from "./ui/input";
 import { useToast } from "@/hooks/use-toast";
 
+const defaultDocuments = [
+  { id: "iabs", name: "IABS", status: "not_applicable" },
+  { id: "buyer_rep", name: "Buyer Rep Agreement", status: "not_applicable" },
+  { id: "listing_agreement", name: "Listing Agreement", status: "not_applicable" },
+  { id: "seller_disclosure", name: "Seller's Disclosure", status: "not_applicable" },
+  { id: "property_survey", name: "Property Survey", status: "not_applicable" },
+  { id: "lead_paint", name: "Lead-Based Paint Disclosure", status: "not_applicable" },
+  { id: "purchase_agreement", name: "Purchase Agreement", status: "not_applicable" },
+  { id: "hoa_addendum", name: "HOA Addendum", status: "not_applicable" },
+  { id: "inspection", name: "Home Inspection Report", status: "not_applicable" }
+];
+
 interface Document {
   id: string;
   name: string;
@@ -19,7 +31,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   const { toast } = useToast();
   const [newDocument, setNewDocument] = useState("");
 
-  const { data: documents = [], isLoading } = useQuery({
+  const { data: documents = defaultDocuments, isLoading } = useQuery({
     queryKey: ["/api/documents", transactionId],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/documents/${transactionId}`);
