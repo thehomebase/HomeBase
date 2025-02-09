@@ -21,7 +21,7 @@ interface Transaction {
   address: string;
   status: string;
   contractPrice?: number;
-  optionPeriod?: number;
+  optionPeriodExpiration?: string; // Changed field name
   optionFee?: number;
   earnestMoney?: number;
   downPayment?: number;
@@ -33,7 +33,7 @@ interface Transaction {
 
 interface TransactionFormData {
   contractPrice?: number;
-  optionPeriod?: number;
+  optionPeriodExpiration?: string; // Changed field name
   optionFee?: number;
   earnestMoney?: number;
   downPayment?: number;
@@ -93,7 +93,7 @@ export default function TransactionPage() {
     if (transaction) {
       form.reset({
         contractPrice: transaction.contractPrice,
-        optionPeriod: transaction.optionPeriod,
+        optionPeriodExpiration: transaction.optionPeriodExpiration, // Changed field name
         optionFee: transaction.optionFee,
         earnestMoney: transaction.earnestMoney,
         downPayment: transaction.downPayment,
@@ -209,7 +209,7 @@ export default function TransactionPage() {
                     <Input
                       id="optionPeriodExpiration"
                       type="date"
-                      {...form.register("optionPeriodExpiration")}
+                      {...form.register("optionPeriodExpiration")} // Changed field name
                     />
                   ) : (
                     <p className="font-medium">
@@ -376,12 +376,12 @@ export default function TransactionPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="optionPeriod">Option Period (days)</Label>
+                  <Label htmlFor="optionPeriodExpiration">Option Period Expiration</Label> {/* Changed label and input name */}
                   <Input
-                    id="optionPeriod"
-                    type="number"
-                    {...form.register("optionPeriod")}
-                    placeholder="Enter option period"
+                    id="optionPeriodExpiration"
+                    type="date"
+                    {...form.register("optionPeriodExpiration")} {/* Changed input name */}
+                    placeholder="Enter option period expiration date"
                   />
                 </div>
                 <div className="space-y-2">
