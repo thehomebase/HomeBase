@@ -47,10 +47,17 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/transactions/:id">
+        {(params) => (
+          <ProtectedRoute
+            path="/transactions/:id"
+            component={() => <TransactionPage />}
+          />
+        )}
+      </Route>
       <ProtectedRoute path="/" component={TransactionsPage} />
       <ProtectedRoute path="/transactions" component={TransactionsPage} />
       <ProtectedRoute path="/clients" component={ClientsPage} />
-      <ProtectedRoute path="/transactions/:id" component={TransactionPage} />
       <Route component={NotFound} />
     </Switch>
   );
