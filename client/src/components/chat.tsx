@@ -21,7 +21,7 @@ interface Message {
 }
 
 interface ChatProps {
-  transactionId: number;
+  transactionId: number | null;
 }
 
 export function Chat({ transactionId }: ChatProps) {
@@ -30,17 +30,16 @@ export function Chat({ transactionId }: ChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Early validation of transactionId
-  if (!transactionId || isNaN(Number(transactionId))) {
-    console.error("Invalid transaction ID:", transactionId);
+  // Validate transaction ID
+  if (!transactionId || isNaN(transactionId)) {
     return (
       <div className="p-4 text-destructive">
-        Error: Invalid transaction ID
+        Transaction ID is required to load chat messages.
       </div>
     );
   }
 
-  const { data: messages = [], isLoading, error } = useQuery<Message[]>({
+  const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages", transactionId],
     queryFn: async () => {
       const response = await apiRequest(
@@ -48,8 +47,7 @@ export function Chat({ transactionId }: ChatProps) {
         `/api/messages?transactionId=${transactionId}`
       );
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to fetch messages");
+        throw new Error("Failed to fetch messages");
       }
       return response.json();
     },
@@ -58,32 +56,24 @@ export function Chat({ transactionId }: ChatProps) {
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (messageContent: string) => {
+    mutationFn: async (content: string) => {
       if (!user) {
         throw new Error("Please log in to send messages");
       }
 
-      const parsedTransactionId = Number(transactionId);
-      if (!parsedTransactionId || isNaN(parsedTransactionId)) {
-        throw new Error("Invalid transaction ID");
-      }
-
       const messageData = {
-        content: messageContent,
-        transactionId: parsedTransactionId,
+        content,
+        transactionId,
         userId: user.id,
         username: user.username,
         role: user.role,
       };
-
-      console.log("Sending message with data:", messageData);
 
       const response = await apiRequest("POST", "/api/messages", messageData);
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to send message");
       }
-
       return response.json();
     },
     onSuccess: () => {
@@ -91,7 +81,6 @@ export function Chat({ transactionId }: ChatProps) {
       setMessage("");
     },
     onError: (error: Error) => {
-      console.error("Message send error:", error);
       toast({
         title: "Error sending message",
         description: error.message,
@@ -113,23 +102,6 @@ export function Chat({ transactionId }: ChatProps) {
 
     sendMessageMutation.mutate(trimmedMessage);
   };
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-[600px]">
-        <div className="text-center">
-          <p className="text-destructive mb-4">Failed to load messages</p>
-          <Button
-            onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ["/api/messages", transactionId] });
-            }}
-          >
-            Try Again
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (

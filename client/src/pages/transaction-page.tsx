@@ -14,18 +14,31 @@ export default function TransactionPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const parsedId = id ? parseInt(id, 10) : null;
 
   const { data: transaction, isError, isLoading } = useQuery<Transaction>({
-    queryKey: ['/api/transactions', Number(id)],
-    enabled: !!id && !!user?.id,
+    queryKey: ['/api/transactions', parsedId],
+    enabled: !!parsedId && !!user?.id,
     retry: false
   });
+
+  if (!parsedId || isNaN(parsedId)) {
+    return (
+      <div className="p-6">
+        <Button onClick={() => setLocation('/')} variant="ghost">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Return Home
+        </Button>
+        <p className="mt-4 text-destructive">Invalid transaction ID</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return <div className="p-6">Loading...</div>;
   }
 
-  if (isError) {
+  if (isError || !transaction) {
     return (
       <div className="p-6">
         <Button onClick={() => setLocation('/')} variant="ghost">
@@ -47,8 +60,8 @@ export default function TransactionPage() {
               Back
             </Button>
             <div className="text-right">
-              <h1 className="text-2xl font-bold">{transaction?.address}</h1>
-              <p className="text-sm text-muted-foreground">Transaction ID: {id}</p>
+              <h1 className="text-2xl font-bold">{transaction.address}</h1>
+              <p className="text-sm text-muted-foreground">Transaction ID: {parsedId}</p>
             </div>
           </div>
         </div>
@@ -57,7 +70,7 @@ export default function TransactionPage() {
       <main className="container mx-auto p-6">
         <Card>
           <CardContent className="p-6">
-            <Tabs defaultValue="progress">
+            <Tabs defaultValue="chat">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="progress">
                   <ClipboardCheck className="h-4 w-4 mr-2" />
@@ -70,12 +83,12 @@ export default function TransactionPage() {
               </TabsList>
               <TabsContent value="progress" className="mt-6">
                 <ProgressChecklist
-                  transactionId={Number(id)}
+                  transactionId={parsedId}
                   userRole={user?.role || ""}
                 />
               </TabsContent>
               <TabsContent value="chat" className="mt-6">
-                <Chat transactionId={Number(id)} />
+                <Chat transactionId={parsedId} />
               </TabsContent>
             </Tabs>
           </CardContent>
