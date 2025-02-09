@@ -215,7 +215,7 @@ export class DatabaseStorage implements IStorage {
         accessCode: String(row.accessCode),
         status: String(row.status),
         agentId: Number(row.agentId),
-        clientId: Number(row.clientId),
+        clientId: row.clientId ? Number(row.clientId) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
         contractPrice: row.contractPrice ? Number(row.contractPrice) : null,
         optionPeriod: row.optionPeriod ? Number(row.optionPeriod) : null,
