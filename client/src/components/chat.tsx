@@ -205,6 +205,7 @@ export default function Chat({ transactionId }: ChatProps) {
           type="submit"
           size="icon"
           disabled={sendMessageMutation.isPending || !user?.id || !transactionId}
+          aria-label="Send message"
         >
           <Send className="h-4 w-4" />
         </Button>
