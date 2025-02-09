@@ -180,12 +180,21 @@ export default function TransactionPage() {
     );
   }
 
-  const completedTasks = transaction.checklist?.filter(item => item.completed)?.length ?? 0;
-  const totalTasks = transaction.checklist?.length ?? 1;
-  const progress = Math.round((completedTasks / totalTasks) * 100);
   const transactionType = transaction.type;
-  const currentPhase = transaction.checklist?.find(item => !item.completed)?.phase || 
-    (transactionType === 'buy' ? "Pre-Offer" : "Pre-Listing Preparation");
+  const checklist = transaction.checklist || [];
+  
+  // Get all unique phases in order
+  const phases = Array.from(new Set(checklist.map(item => item.phase)));
+  
+  // Find current phase (first phase with incomplete items)
+  const currentPhase = phases.find(phase => 
+    checklist.some(item => item.phase === phase && !item.completed)
+  ) || phases[phases.length - 1];
+
+  // Calculate progress
+  const completedTasks = checklist.filter(item => item.completed).length;
+  const totalTasks = checklist.length || 1;
+  const progress = Math.round((completedTasks / totalTasks) * 100);
 
   // Ensure consistent progress display
   const displayProgress = `${progress}% Complete`;
