@@ -22,7 +22,7 @@ function Chat({ transactionId }: ChatProps) {
   // Validate required props
   if (!transactionId || !user) {
     console.error('Missing required props:', { transactionId, user });
-    return <div>Error: Missing required data</div>;
+    return <div className="p-4 text-red-500">Error: Unable to load chat. Please try again.</div>;
   }
 
   const { data: messages = [], isLoading } = useQuery<Message[]>({
