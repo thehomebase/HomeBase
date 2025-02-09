@@ -281,6 +281,33 @@ export class DatabaseStorage implements IStorage {
 
   async createChecklist(insertChecklist: InsertChecklist): Promise<Checklist> {
     try {
+      // First check if a checklist already exists
+      const existingChecklist = await this.getChecklist(
+        insertChecklist.transactionId,
+        insertChecklist.role
+      );
+
+      if (existingChecklist) {
+        return existingChecklist;
+      }
+
+      // Get the transaction to check its type
+      const transaction = await this.getTransaction(insertChecklist.transactionId);
+      if (!transaction) {
+        throw new Error('Transaction not found');
+      }
+
+      // Initialize the checklist based on transaction type.  Placeholder for BUYER_CHECKLIST_ITEMS
+      const BUYER_CHECKLIST_ITEMS = [
+        {id:1, description: 'Item 1', completed:false},
+        {id:2, description: 'Item 2', completed:false}
+      ]; // Placeholder -  Replace with actual checklist items
+
+      const checklistItems = BUYER_CHECKLIST_ITEMS.map(item => ({
+        ...item,
+        completed: false
+      }));
+
       const result = await db.execute(sql`
         INSERT INTO checklists (
           transaction_id,
@@ -289,7 +316,7 @@ export class DatabaseStorage implements IStorage {
         ) VALUES (
           ${insertChecklist.transactionId},
           ${insertChecklist.role},
-          ${JSON.stringify(insertChecklist.items)}::jsonb
+          ${JSON.stringify(checklistItems)}::jsonb
         )
         RETURNING *
       `);

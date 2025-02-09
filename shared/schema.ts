@@ -29,8 +29,9 @@ export const transactions = pgTable("transactions", {
   address: text("address").notNull(),
   accessCode: text("access_code").notNull(),
   status: text("status").notNull(),
+  type: text("type").notNull().default('buy'), // 'buy' or 'sell'
   agentId: integer("agent_id").notNull(),
-  clientId: integer("client_id"), // Made optional
+  clientId: integer("client_id"),
   participants: json("participants").notNull().$type<{
     userId: number;
     role: string;
@@ -52,6 +53,7 @@ export const checklists = pgTable("checklists", {
     id: string;
     text: string;
     completed: boolean;
+    phase: string;
   }[]>(),
 });
 
@@ -68,7 +70,8 @@ export const messages = pgTable("messages", {
 const checklistItemSchema = z.object({
   id: z.string(),
   text: z.string(),
-  completed: z.boolean()
+  completed: z.boolean(),
+  phase: z.string()
 });
 
 export const insertUserSchema = createInsertSchema(users);
