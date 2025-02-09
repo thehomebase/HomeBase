@@ -1,54 +1,60 @@
-import React from 'react';
-import { useParams, useLocation } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ClipboardCheck, MessageSquare, ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/hooks/use-auth';
-import { ProgressChecklist } from '@/components/progress-checklist';
-import { Chat } from '@/components/chat';
-import type { Transaction } from '@shared/schema';
+
+import { useParams, Link } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, ClipboardCheck, MessageSquare } from "lucide-react";
+import { ProgressChecklist } from "@/components/progress-checklist";
+import { Chat } from "@/components/chat";
 
 export default function TransactionPage() {
   const { id } = useParams<{ id: string }>();
-  const [, setLocation] = useLocation();
   const { user } = useAuth();
-
-  const { data: transaction, isError, isLoading } = useQuery<Transaction>({
-    queryKey: ['/api/transactions', Number(id)],
-    enabled: !!id && !!user?.id,
+  
+  const { data: transaction, isError, error } = useQuery({
+    queryKey: ["/api/transactions", id],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/transactions/${id}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch transaction");
+      }
+      return response.json();
+    },
+    enabled: !!id && !!user,
     retry: false
   });
 
-  if (isLoading) {
-    return <div className="p-6">Loading...</div>;
-  }
-
   if (isError) {
     return (
-      <div className="p-6">
-        <Button onClick={() => setLocation('/')} variant="ghost">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Return Home
-        </Button>
-        <p className="mt-4">Unable to load transaction. Please try again.</p>
+      <div className="container mx-auto p-6">
+        <Link href="/transactions">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <div className="text-center text-destructive mt-4">
+          Error: Unable to load transaction
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div>
       <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Button onClick={() => setLocation('/')} variant="ghost">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div className="text-right">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Link href="/transactions">
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
               <h1 className="text-2xl font-bold">{transaction?.address}</h1>
-              <p className="text-sm text-muted-foreground">Transaction ID: {id}</p>
+              <p className="text-muted-foreground">Transaction ID: {id}</p>
             </div>
           </div>
         </div>
