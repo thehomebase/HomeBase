@@ -1,5 +1,5 @@
 import React from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,6 @@ interface TransactionContactsProps {
 }
 
 export function TransactionContacts({ transactionId }: TransactionContactsProps) {
-  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [newContact, setNewContact] = React.useState<Partial<Contact>>({
     role: "",
@@ -54,7 +53,6 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
     email: "",
   });
 
-  // Query to fetch contacts
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["/api/contacts", transactionId],
     queryFn: async () => {
@@ -62,21 +60,23 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
       if (!response.ok) {
         throw new Error("Failed to fetch contacts");
       }
-      return response.json() as Promise<Contact[]>;
+      return response.json();
     },
   });
 
-  // Mutation to add a contact
   const addContactMutation = useMutation({
-    mutationFn: async (contact: Omit<Contact, "id">) => {
-      const response = await apiRequest("POST", "/api/contacts", contact);
+    mutationFn: async (data: Partial<Contact>) => {
+      const contactData = {
+        ...data,
+        transactionId,
+      };
+      const response = await apiRequest("POST", "/api/contacts", contactData);
       if (!response.ok) {
         throw new Error("Failed to add contact");
       }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts", transactionId] });
       setNewContact({
         role: "",
         firstName: "",
@@ -86,8 +86,8 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
         email: "",
       });
       toast({
-        title: "Contact added",
-        description: "The contact has been added successfully.",
+        title: "Success",
+        description: "Contact added successfully",
       });
     },
     onError: (error) => {
@@ -99,7 +99,6 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
     },
   });
 
-  // Mutation to delete a contact
   const deleteContactMutation = useMutation({
     mutationFn: async (contactId: number) => {
       const response = await apiRequest("DELETE", `/api/contacts/${contactId}`);
@@ -108,10 +107,9 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts", transactionId] });
       toast({
-        title: "Contact deleted",
-        description: "The contact has been deleted successfully.",
+        title: "Success",
+        description: "Contact deleted successfully",
       });
     },
     onError: (error) => {
@@ -123,17 +121,19 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
     },
   });
 
-  const handleAddContact = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     if (!newContact.role || !newContact.firstName || !newContact.lastName || !newContact.email) {
       toast({
-        title: "Validation Error",
+        title: "Error",
         description: "Please fill in all required fields",
         variant: "destructive",
       });
       return;
     }
-    addContactMutation.mutate({ ...newContact, transactionId } as Contact);
+
+    addContactMutation.mutate(newContact);
   };
 
   if (isLoading) {
@@ -151,7 +151,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
           <CardTitle className="text-lg">Add New Contact</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleAddContact} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="role">Role *</Label>
               <select
