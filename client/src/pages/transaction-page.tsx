@@ -107,14 +107,8 @@ export default function TransactionPage() {
         description: error instanceof Error ? error.message : "Failed to update transaction",
         variant: "destructive",
       });
-    },
-        optionPeriod: data.optionPeriod,
-        optionFee: data.optionFee,
-        earnestMoney: data.earnestMoney,
-        downPayment: data.downPayment,
-        sellerConcessions: data.sellerConcessions,
-        closingDate: data.closingDate,
-      });
+    }
+  });
       toast({
         title: "Success",
         description: "Transaction updated successfully",
