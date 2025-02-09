@@ -5,15 +5,74 @@ import { setupAuth } from "./auth";
 import { z } from "zod";
 import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema } from "@shared/schema";
 
-// Placeholder for checklist items -  replace with your actual data
+// Seller checklist items
 const SELLER_CHECKLIST_ITEMS = [
-  { id: 'seller-item-1', text: 'Seller Checklist Item 1' },
-  { id: 'seller-item-2', text: 'Seller Checklist Item 2' }
+  { id: "assess-value", text: "Assess Home Value", phase: "Pre-Listing Preparation" },
+  { id: "home-inspection", text: "Conduct Pre-Listing Inspection", phase: "Pre-Listing Preparation" },
+  { id: "repairs", text: "Complete Necessary Repairs", phase: "Pre-Listing Preparation" },
+  { id: "declutter", text: "Declutter and Depersonalize", phase: "Pre-Listing Preparation" },
+  { id: "staging", text: "Stage the Home", phase: "Pre-Listing Preparation" },
+  { id: "curb-appeal", text: "Enhance Curb Appeal", phase: "Pre-Listing Preparation" },
+  { id: "select-agent", text: "Select Real Estate Agent", phase: "Listing Phase" },
+  { id: "photos", text: "Obtain Professional Photography", phase: "Listing Phase" },
+  { id: "listing-desc", text: "Write Compelling Listing", phase: "Listing Phase" },
+  { id: "showings", text: "Set Up Showings", phase: "Listing Phase" },
+  { id: "review-offers", text: "Review Offers", phase: "Offer and Negotiation" },
+  { id: "counter-offers", text: "Handle Counter Offers", phase: "Offer and Negotiation" },
+  { id: "accept-offer", text: "Accept Final Offer", phase: "Offer and Negotiation" },
+  { id: "appraisal", text: "Complete Home Appraisal", phase: "Post-Acceptance" },
+  { id: "buyer-inspection", text: "Facilitate Buyer's Inspection", phase: "Post-Acceptance" },
+  { id: "disclosures", text: "Complete Property Disclosures", phase: "Post-Acceptance" },
+  { id: "title-search", text: "Complete Title Search", phase: "Post-Acceptance" },
+  { id: "utilities", text: "Cancel/Transfer Utilities", phase: "Closing Preparation" },
+  { id: "moving", text: "Arrange Moving Plans", phase: "Closing Preparation" },
+  { id: "walkthrough", text: "Schedule Final Walkthrough", phase: "Closing Preparation" },
+  { id: "review-docs", text: "Review Closing Documents", phase: "Closing" },
+  { id: "sign-docs", text: "Sign Closing Documents", phase: "Closing" },
+  { id: "keys", text: "Hand Over Keys", phase: "Closing" },
+  { id: "address-change", text: "Update Address Information", phase: "Post-Closing" },
+  { id: "final-move", text: "Complete Moving Process", phase: "Post-Closing" }
 ];
 
+// Buyer checklist items
 const BUYER_CHECKLIST_ITEMS = [
-  { id: 'buyer-item-1', text: 'Buyer Checklist Item 1' },
-  { id: 'buyer-item-2', text: 'Buyer Checklist Item 2' }
+  { id: "buying-criteria", text: "Determine buying criteria", phase: "Pre-Offer" },
+  { id: "hire-agent", text: "Hire a real estate agent", phase: "Pre-Offer" },
+  { id: "get-preapproval", text: "Hire a lender & get pre-approved", phase: "Pre-Offer" },
+  { id: "review-disclosures", text: "Review property disclosures", phase: "Pre-Offer" },
+  { id: "preliminary-inspection", text: "Conduct preliminary inspections", phase: "Pre-Offer" },
+  { id: "attend-viewings", text: "Attend open houses or viewings", phase: "Pre-Offer" },
+  { id: "submit-offer", text: "Write and submit an offer", phase: "Offer and Negotiation" },
+  { id: "negotiate-terms", text: "Negotiate terms if counteroffer received", phase: "Offer and Negotiation" },
+  { id: "review-contingencies", text: "Review and agree on contingencies", phase: "Offer and Negotiation" },
+  { id: "sign-acceptance", text: "Sign offer acceptance or counteroffer", phase: "Offer and Negotiation" },
+  { id: "earnest-money", text: "Include earnest money deposit", phase: "Offer and Negotiation" },
+  { id: "home-inspection", text: "Schedule and conduct home inspection", phase: "Due Diligence" },
+  { id: "review-inspection", text: "Review inspection report", phase: "Due Diligence" },
+  { id: "negotiate-repairs", text: "Negotiate repairs or price adjustments", phase: "Due Diligence" },
+  { id: "order-appraisal", text: "Order appraisal", phase: "Due Diligence" },
+  { id: "review-appraisal", text: "Review appraisal report", phase: "Due Diligence" },
+  { id: "additional-checks", text: "Perform additional due diligence", phase: "Due Diligence" },
+  { id: "review-title", text: "Review title report", phase: "Due Diligence" },
+  { id: "title-insurance", text: "Obtain title insurance", phase: "Due Diligence" },
+  { id: "finalize-mortgage", text: "Finalize mortgage details", phase: "Due Diligence" },
+  { id: "lock-rate", text: "Lock in mortgage rate", phase: "Due Diligence" },
+  { id: "final-walkthrough", text: "Final walkthrough of property", phase: "Closing Preparation" },
+  { id: "confirm-conditions", text: "Confirm all conditions of sale", phase: "Closing Preparation" },
+  { id: "secure-insurance", text: "Secure homeowners insurance", phase: "Closing Preparation" },
+  { id: "arrange-utilities", text: "Arrange for utilities transfer", phase: "Closing Preparation" },
+  { id: "prepare-moving", text: "Prepare for moving", phase: "Closing Preparation" },
+  { id: "review-closing-docs", text: "Review closing documents", phase: "Closing Preparation" },
+  { id: "secure-funds", text: "Secure funds for closing", phase: "Closing Preparation" },
+  { id: "wire-funds", text: "Wire funds or obtain cashier's check", phase: "Closing Preparation" },
+  { id: "power-of-attorney", text: "Sign power of attorney if needed", phase: "Closing Preparation" },
+  { id: "attend-closing", text: "Attend closing", phase: "Closing" },
+  { id: "sign-documents", text: "Sign all closing documents", phase: "Closing" },
+  { id: "receive-keys", text: "Receive keys to the property", phase: "Closing" },
+  { id: "change-locks", text: "Change locks and security systems", phase: "Post-Closing" },
+  { id: "update-address", text: "Update address with relevant parties", phase: "Post-Closing" },
+  { id: "file-homestead", text: "File homestead exemption if applicable", phase: "Post-Closing" },
+  { id: "begin-maintenance", text: "Begin maintenance and warranty registration", phase: "Post-Closing" }
 ];
 
 
