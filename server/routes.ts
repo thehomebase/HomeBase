@@ -119,11 +119,17 @@ export function registerRoutes(app: Express): Server {
   // Checklists
   app.get("/api/checklists/:transactionId/:role", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const checklist = await storage.getChecklist(
-      Number(req.params.transactionId),
-      req.params.role
-    );
-    res.json(checklist);
+    try {
+      const checklist = await storage.getChecklist(
+        Number(req.params.transactionId),
+        req.params.role
+      );
+      res.setHeader('Content-Type', 'application/json');
+      res.json(checklist || []);
+    } catch (error) {
+      console.error('Error fetching checklist:', error);
+      res.status(500).json({ error: 'Failed to fetch checklist' });
+    }
   });
 
   app.post("/api/checklists", async (req, res) => {
