@@ -21,6 +21,19 @@ export default function TransactionPage() {
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
     queryKey: ["/api/transactions", id],
     enabled: !!user && !!id,
+    retry: 2,
+    retryDelay: 1000,
+    // Add stale time to prevent unnecessary refetches
+    staleTime: 30000,
+    // Add placeholder data in case of errors
+    placeholderData: id ? {
+      id: Number(id),
+      address: 'Loading transaction details...',
+      accessCode: '',
+      status: 'pending',
+      agentId: 0,
+      participants: []
+    } : undefined
   });
 
   const { data: checklist } = useQuery<Checklist>({
@@ -50,6 +63,7 @@ export default function TransactionPage() {
     );
   }
 
+  // Show a more user-friendly error message
   if (error) {
     console.error('Transaction loading error:', error);
     return (

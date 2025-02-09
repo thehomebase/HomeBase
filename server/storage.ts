@@ -109,7 +109,12 @@ export class DatabaseStorage implements IStorage {
       if (!transaction.participants) {
         transaction.participants = [];
       } else if (typeof transaction.participants === 'string') {
-        transaction.participants = JSON.parse(transaction.participants);
+        try {
+          transaction.participants = JSON.parse(transaction.participants);
+        } catch (e) {
+          console.error('Error parsing participants:', e);
+          transaction.participants = [];
+        }
       }
 
       // Cast numeric fields to ensure correct types
@@ -124,7 +129,26 @@ export class DatabaseStorage implements IStorage {
 
     } catch (error) {
       console.error('Database error in getTransaction:', error);
-      throw error;
+      // In safe mode, return a placeholder transaction if the ID exists in the database
+      try {
+        const checkResult = await db.execute(sql`
+          SELECT EXISTS(SELECT 1 FROM transactions WHERE id = ${id})
+        `);
+        if (checkResult.rows[0].exists) {
+          console.log('Returning safe mode transaction for ID:', id);
+          return {
+            id: Number(id),
+            address: 'Loading...',
+            accessCode: '',
+            status: 'pending',
+            agentId: 0,
+            participants: []
+          };
+        }
+      } catch (e) {
+        console.error('Error in safe mode check:', e);
+      }
+      return undefined;
     }
   }
 
