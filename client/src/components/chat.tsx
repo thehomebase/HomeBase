@@ -30,9 +30,9 @@ export function Chat({ transactionId }: ChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Early validation of transactionId
-  if (!transactionId || isNaN(Number(transactionId))) {
-    console.error("Invalid transaction ID:", transactionId);
+  // Convert transactionId to number and validate
+  const validTransactionId = Number(transactionId);
+  if (!validTransactionId || isNaN(validTransactionId)) {
     return (
       <div className="p-4 text-destructive">
         Error: Invalid transaction ID
@@ -41,19 +41,18 @@ export function Chat({ transactionId }: ChatProps) {
   }
 
   const { data: messages = [], isLoading, error } = useQuery<Message[]>({
-    queryKey: ["/api/messages", transactionId],
+    queryKey: ["/api/messages", validTransactionId],
     queryFn: async () => {
       const response = await apiRequest(
         "GET",
-        `/api/messages?transactionId=${transactionId}`
+        `/api/messages?transactionId=${validTransactionId}`
       );
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to fetch messages");
+        throw new Error(await response.text() || "Failed to fetch messages");
       }
       return response.json();
     },
-    enabled: !!transactionId && !!user,
+    enabled: !!validTransactionId && !!user,
     refetchInterval: 5000,
   });
 
@@ -63,31 +62,23 @@ export function Chat({ transactionId }: ChatProps) {
         throw new Error("Please log in to send messages");
       }
 
-      const parsedTransactionId = Number(transactionId);
-      if (!parsedTransactionId || isNaN(parsedTransactionId)) {
-        throw new Error("Invalid transaction ID");
-      }
-
       const messageData = {
         content: messageContent,
-        transactionId: parsedTransactionId,
+        transactionId: validTransactionId,
         userId: user.id,
         username: user.username,
         role: user.role,
       };
 
-      console.log("Sending message with data:", messageData);
-
       const response = await apiRequest("POST", "/api/messages", messageData);
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to send message");
+        throw new Error(await response.text() || "Failed to send message");
       }
 
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages", transactionId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages", validTransactionId] });
       setMessage("");
     },
     onError: (error: Error) => {
@@ -121,7 +112,7 @@ export function Chat({ transactionId }: ChatProps) {
           <p className="text-destructive mb-4">Failed to load messages</p>
           <Button
             onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ["/api/messages", transactionId] });
+              queryClient.invalidateQueries({ queryKey: ["/api/messages", validTransactionId] });
             }}
           >
             Try Again
