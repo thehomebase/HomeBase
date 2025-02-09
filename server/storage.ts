@@ -178,7 +178,8 @@ export class DatabaseStorage implements IStorage {
           earnest_money,
           down_payment,
           seller_concessions,
-          closing_date
+          closing_date,
+          type
         ) VALUES (
           ${insertTransaction.address},
           ${insertTransaction.accessCode},
@@ -192,7 +193,8 @@ export class DatabaseStorage implements IStorage {
           ${insertTransaction.earnestMoney || null},
           ${insertTransaction.downPayment || null},
           ${insertTransaction.sellerConcessions || null},
-          ${insertTransaction.closingDate || null}
+          ${insertTransaction.closingDate || null},
+          ${insertTransaction.type}
         )
         RETURNING *
       `);
@@ -212,7 +214,8 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
         downPayment: row.down_payment ? Number(row.down_payment) : null,
         sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
-        closingDate: row.closing_date ? String(row.closing_date) : null
+        closingDate: row.closing_date ? String(row.closing_date) : null,
+        type: row.type
       };
     } catch (error) {
       console.error('Error in createTransaction:', error);
@@ -234,6 +237,7 @@ export class DatabaseStorage implements IStorage {
           address,
           access_code as "accessCode",
           status,
+          type,
           agent_id as "agentId",
           client_id as "clientId",
           participants,
@@ -261,6 +265,7 @@ export class DatabaseStorage implements IStorage {
         address: String(row.address),
         accessCode: String(row.accessCode),
         status: String(row.status),
+        type: String(row.type),
         agentId: Number(row.agentId),
         clientId: row.clientId ? Number(row.clientId) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
@@ -270,7 +275,7 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
         downPayment: row.downPayment ? Number(row.downPayment) : null,
         sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
-        closingDate: row.closingDate ? String(row.closingDate) : null
+        closingDate: row.closingDate || null
       };
 
       console.log('Processed transaction:', transaction);
@@ -302,7 +307,8 @@ export class DatabaseStorage implements IStorage {
           t.earnest_money::numeric as "earnestMoney",
           t.down_payment::numeric as "downPayment",
           t.seller_concessions::numeric as "sellerConcessions",
-          t.closing_date::text as "closingDate"
+          t.closing_date::text as "closingDate",
+          t.type::text as "type"
         FROM transactions t
         WHERE t.agent_id = ${userId}
         ORDER BY t.id DESC
@@ -322,7 +328,8 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
         downPayment: row.downPayment ? Number(row.downPayment) : null,
         sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
-        closingDate: row.closingDate || null
+        closingDate: row.closingDate || null,
+        type: row.type
       }));
     } catch (error) {
       console.error('Error in getTransactionsByUser:', error);
@@ -385,7 +392,8 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
         downPayment: row.down_payment ? Number(row.down_payment) : null,
         sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
-        closingDate: row.closing_date || null
+        closingDate: row.closing_date || null,
+        type: row.type
       };
     } catch (error) {
       console.error('Error in updateTransaction:', error);
