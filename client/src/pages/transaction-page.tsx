@@ -182,10 +182,10 @@ export default function TransactionPage() {
 
   const transactionType = transaction.type;
   const checklist = transaction.checklist || [];
-  
+
   // Get all unique phases in order
   const phases = Array.from(new Set(checklist.map(item => item.phase)));
-  
+
   // Find current phase (first phase with incomplete items)
   const currentPhase = phases.find(phase => 
     checklist.some(item => item.phase === phase && !item.completed)
@@ -257,6 +257,7 @@ export default function TransactionPage() {
                         type="number"
                         {...form.register("contractPrice")}
                         placeholder="Enter contract price"
+                        className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
                       <p className="font-medium">
@@ -273,6 +274,7 @@ export default function TransactionPage() {
                         type="number"
                         {...form.register("optionPeriod")}
                         placeholder="Enter option period"
+                        className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
                       <p className="font-medium">
@@ -289,6 +291,7 @@ export default function TransactionPage() {
                         type="number"
                         {...form.register("optionFee")}
                         placeholder="Enter option fee"
+                        className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
                       <p className="font-medium">
@@ -305,6 +308,7 @@ export default function TransactionPage() {
                         type="number"
                         {...form.register("earnestMoney")}
                         placeholder="Enter earnest money"
+                        className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
                       <p className="font-medium">
@@ -321,6 +325,7 @@ export default function TransactionPage() {
                         type="number"
                         {...form.register("downPayment")}
                         placeholder="Enter down payment"
+                        className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
                       <p className="font-medium">
@@ -337,6 +342,7 @@ export default function TransactionPage() {
                         type="number"
                         {...form.register("sellerConcessions")}
                         placeholder="Enter seller concessions"
+                        className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
                       <p className="font-medium">
@@ -352,6 +358,7 @@ export default function TransactionPage() {
                       <Input
                         type="date"
                         {...form.register("closingDate")}
+                        className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
                       <p className="font-medium">
@@ -367,6 +374,7 @@ export default function TransactionPage() {
                       <Input
                         type="date"
                         {...form.register("contractExecutionDate")}
+                        className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
                       <p className="font-medium">
@@ -383,6 +391,7 @@ export default function TransactionPage() {
                         type="text"
                         {...form.register("mlsNumber")}
                         placeholder="Enter MLS number"
+                        className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
                       <p className="font-medium">
@@ -394,7 +403,7 @@ export default function TransactionPage() {
                     <p className="text-sm text-muted-foreground">Financing</p>
                     {isEditing ? (
                       <select
-                        className="w-full px-3 py-2 border rounded-md"
+                        className="w-full h-9 px-3 rounded-md border"
                         {...form.register("financing")}
                       >
                         <option value="">Select financing type</option>
@@ -413,7 +422,7 @@ export default function TransactionPage() {
                     <p className="text-sm text-muted-foreground">Status</p>
                     {isEditing ? (
                       <select
-                        className="w-full px-3 py-2 border rounded-md"
+                        className="w-full h-9 px-3 rounded-md border"
                         value={transaction.status}
                         {...form.register("status")}
                       >
