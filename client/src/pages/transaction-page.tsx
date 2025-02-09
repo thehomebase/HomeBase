@@ -1,9 +1,9 @@
 import React from 'react';
 import { useParams, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ClipboardCheck, Clock, ArrowLeft } from 'lucide-react';
+import { ClipboardCheck, Clock, ArrowLeft, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { ProgressChecklist } from '@/components/progress-checklist';
@@ -41,13 +41,23 @@ export default function TransactionPage() {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <Button onClick={() => setLocation('/')} variant="ghost" className="mb-6">
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back
-      </Button>
+    <div className="min-h-screen bg-background">
+      <header className="border-b">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Button onClick={() => setLocation('/')} variant="ghost" className="mr-4">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold">{transaction?.address}</h1>
+              <p className="text-sm text-muted-foreground">Transaction ID: {id}</p>
+            </div>
+          </div>
+        </div>
+      </header>
 
-      <div className="grid gap-6">
+      <main className="container mx-auto p-6">
         <Card>
           <CardContent className="p-6">
             <Tabs defaultValue="progress">
@@ -77,7 +87,7 @@ export default function TransactionPage() {
             </Tabs>
           </CardContent>
         </Card>
-      </div>
+      </main>
     </div>
   );
 }

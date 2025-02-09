@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -47,17 +47,27 @@ const DEFAULT_ITEMS = {
     { id: "c4", text: "Review closing documents", completed: false },
     { id: "c5", text: "Final walk-through", completed: false },
   ],
-};
+} as const;
 
 export function ProgressChecklist({
   transactionId,
   checklist,
   userRole,
 }: ProgressChecklistProps) {
+  // Fetch existing checklist if not provided
+  const { data: fetchedChecklist } = useQuery({
+    queryKey: ["/api/checklists", transactionId, userRole],
+    enabled: !checklist && !!transactionId && !!userRole,
+  });
+
+  const currentChecklist = checklist || fetchedChecklist;
+  const items = currentChecklist?.items || DEFAULT_ITEMS[userRole as keyof typeof DEFAULT_ITEMS] || [];
+  const progress = Math.round((items.filter((item) => item.completed).length / items.length) * 100);
+
   const updateChecklistMutation = useMutation({
-    mutationFn: async (items: Checklist["items"]) => {
-      if (checklist) {
-        await apiRequest("PATCH", `/api/checklists/${checklist.id}`, { items });
+    mutationFn: async (items: typeof DEFAULT_ITEMS[keyof typeof DEFAULT_ITEMS]) => {
+      if (currentChecklist?.id) {
+        await apiRequest("PATCH", `/api/checklists/${currentChecklist.id}`, { items });
       } else {
         await apiRequest("POST", "/api/checklists", {
           transactionId,
@@ -70,9 +80,6 @@ export function ProgressChecklist({
       queryClient.invalidateQueries({ queryKey: ["/api/checklists", transactionId, userRole] });
     },
   });
-
-  const items = checklist?.items || DEFAULT_ITEMS[userRole as keyof typeof DEFAULT_ITEMS] || [];
-  const progress = Math.round((items.filter((item) => item.completed).length / items.length) * 100);
 
   const handleCheck = (itemId: string, checked: boolean) => {
     const updatedItems = items.map((item) =>
