@@ -5,6 +5,18 @@ import { setupAuth } from "./auth";
 import { z } from "zod";
 import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema } from "@shared/schema";
 
+// Placeholder for checklist items -  replace with your actual data
+const SELLER_CHECKLIST_ITEMS = [
+  { id: 'seller-item-1', text: 'Seller Checklist Item 1' },
+  { id: 'seller-item-2', text: 'Seller Checklist Item 2' }
+];
+
+const BUYER_CHECKLIST_ITEMS = [
+  { id: 'buyer-item-1', text: 'Buyer Checklist Item 1' },
+  { id: 'buyer-item-2', text: 'Buyer Checklist Item 2' }
+];
+
+
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
@@ -117,20 +129,37 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Checklists
-  app.get("/api/checklists/:transactionId/:role", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+  app.get("/api/checklists/:transactionId", async (req, res) => {
+    const transactionId = parseInt(req.params.transactionId, 10);
+
     try {
-      const checklist = await storage.getChecklist(
-        Number(req.params.transactionId),
-        req.params.role
-      );
-      res.setHeader('Content-Type', 'application/json');
-      res.json(checklist || []);
+      const transaction = await storage.getTransaction(transactionId);
+
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      const checklist = await storage.getChecklist(transactionId, transaction.type);
+
+      // If no checklist exists yet, create default items based on transaction type
+      if (!checklist) {
+        const defaultItems = transaction.type === 'sell' ?
+          SELLER_CHECKLIST_ITEMS.map(item => ({ ...item, completed: false })) :
+          BUYER_CHECKLIST_ITEMS.map(item => ({ ...item, completed: false }));
+
+        return res.json({
+          transactionId,
+          items: defaultItems
+        });
+      }
+
+      res.json(checklist);
     } catch (error) {
       console.error('Error fetching checklist:', error);
       res.status(500).json({ error: 'Failed to fetch checklist' });
     }
   });
+
 
   app.post("/api/checklists", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
