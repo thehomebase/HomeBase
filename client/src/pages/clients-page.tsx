@@ -13,10 +13,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Mail, Phone } from "lucide-react";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ClientsPage() {
   const { user } = useAuth();
-  const form = useForm({
+  const { toast } = useToast();
+
+  const form = useForm<InsertClient>({
     resolver: zodResolver(insertClientSchema),
     defaultValues: {
       name: "",
@@ -26,6 +29,7 @@ export default function ClientsPage() {
       type: "seller",
       status: "active",
       notes: "",
+      agentId: user?.id || 0,
     },
   });
 
@@ -36,16 +40,38 @@ export default function ClientsPage() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
-      await apiRequest("POST", "/api/clients", {
-        ...data,
-        agentId: user?.id,
-      });
+      const response = await apiRequest("POST", "/api/clients", data);
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error);
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       form.reset();
+      toast({
+        title: "Success",
+        description: "Client added successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
+
+  const onSubmit = (data: InsertClient) => {
+    // Ensure agentId is included
+    const submitData = {
+      ...data,
+      agentId: user?.id as number,
+    };
+    createClientMutation.mutate(submitData);
+  };
 
   const sellers = clients.filter(client => client.type === 'seller');
   const buyers = clients.filter(client => client.type === 'buyer');
@@ -119,7 +145,7 @@ export default function ClientsPage() {
               <DialogTitle>Add New Client</DialogTitle>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit((data) => createClientMutation.mutate(data))} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="name"
@@ -210,8 +236,12 @@ export default function ClientsPage() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full" disabled={createClientMutation.isPending}>
-                  Add Client
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={createClientMutation.isPending}
+                >
+                  {createClientMutation.isPending ? 'Adding...' : 'Add Client'}
                 </Button>
               </form>
             </Form>
