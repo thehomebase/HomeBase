@@ -67,9 +67,16 @@ export default function TransactionPage() {
       if (!parsedId || isNaN(parsedId)) {
         throw new Error("Invalid transaction ID");
       }
-      const response = await apiRequest("PATCH", `/api/transactions/${parsedId}`, data);
+      
+      // Clean up the data before sending
+      const cleanData = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => value !== undefined && value !== '')
+      );
+      
+      const response = await apiRequest("PATCH", `/api/transactions/${parsedId}`, cleanData);
       if (!response.ok) {
-        throw new Error("Failed to update transaction");
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to update transaction");
       }
       return response.json();
     },
@@ -80,10 +87,10 @@ export default function TransactionPage() {
         description: "Transaction updated successfully",
       });
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: "Error",
-        description: "Failed to update transaction",
+        description: error instanceof Error ? error.message : "Failed to update transaction",
         variant: "destructive",
       });
     },
