@@ -19,7 +19,8 @@ interface ProgressChecklistProps {
   transactionType?: 'buy' | 'sell';
 }
 
-const BUYER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
+// This is for SELLER transactions (selling a property)
+const SELLER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
   // Pre-Listing Preparation
   { id: "assess-value", text: "Assess Home Value", phase: "Pre-Listing Preparation" },
   { id: "home-inspection", text: "Conduct Pre-Listing Inspection", phase: "Pre-Listing Preparation" },
@@ -60,7 +61,8 @@ const BUYER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
   { id: "final-move", text: "Complete Moving Process", phase: "Post-Closing" }
 ];
 
-const SELLER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
+// This is for BUYER transactions (buying a property)
+const BUYER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
   // Pre-Offer
   { id: "buying-criteria", text: "Determine buying criteria", phase: "Pre-Offer" },
   { id: "hire-agent", text: "Hire a real estate agent", phase: "Pre-Offer" },
@@ -115,17 +117,23 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activePhase, setActivePhase] = useState<string>(
-    transactionType === 'buy' ? "Pre-Listing Preparation" : "Pre-Offer"
+    transactionType === 'buy' ? "Pre-Offer" : "Pre-Listing Preparation"
   );
 
   const { data: checklist, isLoading, error } = useQuery({
     queryKey: ["/api/checklists", transactionId],
     queryFn: async () => {
-      const response = await apiRequest("GET", `/api/checklists/${transactionId}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch checklist");
+      try {
+        const response = await apiRequest("GET", `/api/checklists/${transactionId}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch checklist");
+        }
+        const data = await response.json();
+        return data;
+      } catch (err) {
+        console.error('Error fetching checklist:', err);
+        return null;
       }
-      return response.json();
     },
   });
 
