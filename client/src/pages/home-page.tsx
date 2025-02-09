@@ -10,13 +10,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
-import { Home, Plus, LogOut } from "lucide-react";
+import { Plus, LogOut } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
 
 interface Transaction {
   id: string;
   address: string;
   status: string;
-  participants: any[]; // Replace 'any' with the actual participant type if known
+  participants: any[]; 
 }
 
 const createTransactionSchema = z.object({
@@ -55,10 +56,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Home className="h-6 w-6" />
-            <h1 className="text-xl font-bold">Transaction Manager</h1>
-          </div>
+          <Logo />
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">
               Logged in as {user?.username} ({user?.role})

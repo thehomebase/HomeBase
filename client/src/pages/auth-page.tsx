@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Logo } from "@/components/ui/logo";
 
 const loginSchema = insertUserSchema.pick({ username: true, password: true });
 const registerSchema = insertUserSchema;
@@ -39,7 +40,7 @@ export default function AuthPage() {
       <div className="w-full max-w-5xl grid md:grid-cols-2 gap-8">
         <div className="space-y-6">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold">Real Estate Transaction Manager</h1>
+            <Logo className="mb-4" />
             <p className="text-muted-foreground">
               Streamline your real estate transactions with our collaborative platform.
             </p>
