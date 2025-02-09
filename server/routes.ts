@@ -242,21 +242,8 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      const { items, role, transactionId } = req.body;
-      
-      const parsed = z.array(z.object({
-        id: z.string(),
-        text: z.string(),
-        completed: z.boolean(),
-        phase: z.string(),
-      })).safeParse(items);
-
-      if (!parsed.success) {
-        console.error('Validation error:', parsed.error);
-        return res.status(400).json(parsed.error);
-      }
-
-      const checklist = await storage.updateChecklist(Number(req.params.id), parsed.data);
+      const transactionId = Number(req.params.id);
+      const checklist = await storage.updateChecklist(transactionId, req.body.items);
       res.json(checklist);
     } catch (error) {
       console.error('Error updating checklist:', error);
