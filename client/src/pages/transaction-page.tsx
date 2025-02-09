@@ -83,12 +83,12 @@ const updateTransaction = useMutation({
       throw new Error("Invalid transaction ID");
     }
 
-    // Format dates as ISO strings with UTC timezone
+    // Format dates accounting for timezone
     const formattedData = {
       ...data,
-      closingDate: data.closingDate ? new Date(data.closingDate).toISOString().split('T')[0] : undefined,
-      contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString().split('T')[0] : undefined,
-      option_period_expiration: data.option_period_expiration ? new Date(data.option_period_expiration).toISOString().split('T')[0] : undefined
+      closingDate: data.closingDate ? new Date(data.closingDate + 'T12:00:00-06:00').toISOString() : undefined,
+      contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate + 'T12:00:00-06:00').toISOString() : undefined,
+      option_period_expiration: data.option_period_expiration ? new Date(data.option_period_expiration + 'T12:00:00-06:00').toISOString() : undefined
     };
 
     const cleanData = Object.fromEntries(
