@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertClientSchema, type Client } from "@shared/schema";
+import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Mail, Phone } from "lucide-react";
@@ -35,7 +35,7 @@ export default function ClientsPage() {
   });
 
   const createClientMutation = useMutation({
-    mutationFn: async (data: typeof form.getValues) => {
+    mutationFn: async (data: InsertClient) => {
       await apiRequest("POST", "/api/clients", {
         ...data,
         agentId: user?.id,
@@ -43,6 +43,7 @@ export default function ClientsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      form.reset();
     },
   });
 
@@ -79,8 +80,8 @@ export default function ClientsPage() {
             <TableCell>{client.address}</TableCell>
             <TableCell>
               <span className={`px-2 py-1 rounded-full text-xs ${
-                client.status === 'active' 
-                  ? 'bg-green-100 text-green-800' 
+                client.status === 'active'
+                  ? 'bg-green-100 text-green-800'
                   : client.status === 'pending'
                   ? 'bg-yellow-100 text-yellow-800'
                   : 'bg-gray-100 text-gray-800'
