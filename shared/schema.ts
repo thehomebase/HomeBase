@@ -25,6 +25,7 @@ export const clients = pgTable("clients", {
 });
 
 export const transactions = pgTable("transactions", {
+  option_period_expiration: timestamp("option_period_expiration"),
   id: serial("id").primaryKey(),
   address: text("address").notNull(),
   accessCode: text("access_code").notNull(),
