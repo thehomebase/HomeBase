@@ -16,6 +16,7 @@ interface ChecklistItem {
 interface ProgressChecklistProps {
   transactionId: number;
   userRole: string;
+  transactionType?: 'buy' | 'sell';
 }
 
 const BUYER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
@@ -59,10 +60,63 @@ const BUYER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
   { id: "final-move", text: "Complete Moving Process", phase: "Post-Closing" }
 ];
 
-export function ProgressChecklist({ transactionId, userRole }: ProgressChecklistProps) {
+const SELLER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
+  // Pre-Offer
+  { id: "buying-criteria", text: "Determine buying criteria", phase: "Pre-Offer" },
+  { id: "hire-agent", text: "Hire a real estate agent", phase: "Pre-Offer" },
+  { id: "get-preapproval", text: "Hire a lender & get pre-approved", phase: "Pre-Offer" },
+  { id: "review-disclosures", text: "Review property disclosures", phase: "Pre-Offer" },
+  { id: "preliminary-inspection", text: "Conduct preliminary inspections", phase: "Pre-Offer" },
+  { id: "attend-viewings", text: "Attend open houses or viewings", phase: "Pre-Offer" },
+
+  // Offer and Negotiation
+  { id: "submit-offer", text: "Write and submit an offer", phase: "Offer and Negotiation" },
+  { id: "negotiate-terms", text: "Negotiate terms if counteroffer received", phase: "Offer and Negotiation" },
+  { id: "review-contingencies", text: "Review and agree on contingencies", phase: "Offer and Negotiation" },
+  { id: "sign-acceptance", text: "Sign offer acceptance or counteroffer", phase: "Offer and Negotiation" },
+  { id: "earnest-money", text: "Include earnest money deposit", phase: "Offer and Negotiation" },
+
+  // Due Diligence
+  { id: "home-inspection", text: "Schedule and conduct home inspection", phase: "Due Diligence" },
+  { id: "review-inspection", text: "Review inspection report", phase: "Due Diligence" },
+  { id: "negotiate-repairs", text: "Negotiate repairs or price adjustments", phase: "Due Diligence" },
+  { id: "order-appraisal", text: "Order appraisal", phase: "Due Diligence" },
+  { id: "review-appraisal", text: "Review appraisal report", phase: "Due Diligence" },
+  { id: "additional-checks", text: "Perform additional due diligence", phase: "Due Diligence" },
+  { id: "review-title", text: "Review title report", phase: "Due Diligence" },
+  { id: "title-insurance", text: "Obtain title insurance", phase: "Due Diligence" },
+  { id: "finalize-mortgage", text: "Finalize mortgage details", phase: "Due Diligence" },
+  { id: "lock-rate", text: "Lock in mortgage rate", phase: "Due Diligence" },
+
+  // Closing Preparation
+  { id: "final-walkthrough", text: "Final walkthrough of property", phase: "Closing Preparation" },
+  { id: "confirm-conditions", text: "Confirm all conditions of sale", phase: "Closing Preparation" },
+  { id: "secure-insurance", text: "Secure homeowners insurance", phase: "Closing Preparation" },
+  { id: "arrange-utilities", text: "Arrange for utilities transfer", phase: "Closing Preparation" },
+  { id: "prepare-moving", text: "Prepare for moving", phase: "Closing Preparation" },
+  { id: "review-closing-docs", text: "Review closing documents", phase: "Closing Preparation" },
+  { id: "secure-funds", text: "Secure funds for closing", phase: "Closing Preparation" },
+  { id: "wire-funds", text: "Wire funds or obtain cashier's check", phase: "Closing Preparation" },
+  { id: "power-of-attorney", text: "Sign power of attorney if needed", phase: "Closing Preparation" },
+
+  // Closing
+  { id: "attend-closing", text: "Attend closing", phase: "Closing" },
+  { id: "sign-documents", text: "Sign all closing documents", phase: "Closing" },
+  { id: "receive-keys", text: "Receive keys to the property", phase: "Closing" },
+
+  // Post-Closing
+  { id: "change-locks", text: "Change locks and security systems", phase: "Post-Closing" },
+  { id: "update-address", text: "Update address with relevant parties", phase: "Post-Closing" },
+  { id: "file-homestead", text: "File homestead exemption if applicable", phase: "Post-Closing" },
+  { id: "begin-maintenance", text: "Begin maintenance and warranty registration", phase: "Post-Closing" }
+];
+
+export function ProgressChecklist({ transactionId, userRole, transactionType = 'buy' }: ProgressChecklistProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [activePhase, setActivePhase] = useState<string>("Pre-Listing Preparation");
+  const [activePhase, setActivePhase] = useState<string>(
+    transactionType === 'buy' ? "Pre-Listing Preparation" : "Pre-Offer"
+  );
 
   const { data: checklist, isLoading, error } = useQuery({
     queryKey: ["/api/checklists", transactionId],
@@ -131,8 +185,9 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
     );
   }
 
-  const phases = Array.from(new Set(BUYER_CHECKLIST_ITEMS.map(item => item.phase)));
-  const items = checklist || BUYER_CHECKLIST_ITEMS.map(item => ({ ...item, completed: false }));
+  const checklistItems = transactionType === 'buy' ? BUYER_CHECKLIST_ITEMS : SELLER_CHECKLIST_ITEMS;
+  const phases = Array.from(new Set(checklistItems.map(item => item.phase)));
+  const items = checklist || checklistItems.map(item => ({ ...item, completed: false }));
   const completedItems = items.filter(item => item.completed).length;
   const progress = Math.round((completedItems / items.length) * 100);
 

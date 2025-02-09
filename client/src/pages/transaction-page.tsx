@@ -27,6 +27,7 @@ interface Transaction {
   sellerConcessions?: number;
   closingDate?: string;
   checklist?: Array<{ id: string; text: string; completed: boolean }>;
+  type: 'buy' | 'sell'; // Added transaction type
 }
 
 interface TransactionFormData {
@@ -190,6 +191,7 @@ export default function TransactionPage() {
                 <ProgressChecklist 
                   transactionId={parsedId}
                   userRole={user.role || ""}
+                  transactionType={transaction.type as 'buy' | 'sell'}
                 />
               </TabsContent>
               <TabsContent value="chat" className="mt-6">
