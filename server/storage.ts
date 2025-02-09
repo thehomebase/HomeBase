@@ -229,7 +229,8 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(sql`
         SELECT 
           id,
-          name,
+          first_name as "firstName",
+          last_name as "lastName",
           email,
           phone,
           address,
@@ -246,7 +247,8 @@ export class DatabaseStorage implements IStorage {
 
       return result.rows.map(row => ({
         id: Number(row.id),
-        name: String(row.name),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
         email: row.email ? String(row.email) : null,
         phone: row.phone ? String(row.phone) : null,
         address: row.address ? String(row.address) : null,
