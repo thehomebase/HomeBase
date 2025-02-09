@@ -86,14 +86,14 @@ export class DatabaseStorage implements IStorage {
     try {
       const result = await db.execute(sql`
         SELECT 
-          id,
-          address,
-          access_code as "accessCode",
-          status,
-          agent_id as "agentId",
-          COALESCE(participants, '[]'::jsonb) as participants
-        FROM transactions 
-        WHERE id = ${id}
+          t.id,
+          t.address,
+          t.access_code as "accessCode",
+          t.status,
+          t.agent_id as "agentId",
+          COALESCE(t.participants, '[]'::jsonb) as participants
+        FROM transactions t
+        WHERE t.id = ${id}
       `);
 
       if (result.rows.length === 0) {
@@ -101,10 +101,12 @@ export class DatabaseStorage implements IStorage {
       }
 
       const transaction = result.rows[0];
-      if (typeof transaction.participants === 'string') {
-        transaction.participants = JSON.parse(transaction.participants);
-      } else if (!Array.isArray(transaction.participants)) {
+      console.log('Retrieved transaction:', transaction);
+      
+      if (!transaction.participants) {
         transaction.participants = [];
+      } else if (typeof transaction.participants === 'string') {
+        transaction.participants = JSON.parse(transaction.participants);
       }
 
       return transaction;
