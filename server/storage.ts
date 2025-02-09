@@ -43,16 +43,35 @@ export interface IStorage {
 
   // Session store
   sessionStore: session.Store;
+  getClientsByAgent(agentId: number):Promise<Client[]>;
+  createClient(insertClient:InsertClient):Promise<Client>;
 }
 
 export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
+  private BUYER_CHECKLIST_ITEMS: ChecklistItem[];
+  private SELLER_CHECKLIST_ITEMS: ChecklistItem[];
 
   constructor() {
     this.sessionStore = new PostgresSessionStore({
       pool,
       createTableIfMissing: true,
     });
+
+    // Initialize checklist items
+    this.BUYER_CHECKLIST_ITEMS = [
+      {id: "buying-criteria", text: "Determine buying criteria", phase: "Pre-Offer", completed: false},
+      {id: "hire-agent", text: "Hire a real estate agent", phase: "Pre-Offer", completed: false},
+      {id: "get-preapproval", text: "Hire a lender & get pre-approved", phase: "Pre-Offer", completed: false},
+      // ... rest of buyer items
+    ];
+
+    this.SELLER_CHECKLIST_ITEMS = [
+      {id: "assess-value", text: "Assess Home Value", phase: "Pre-Listing Preparation", completed: false},
+      {id: "home-inspection", text: "Conduct Pre-Listing Inspection", phase: "Pre-Listing Preparation", completed: false},
+      {id: "repairs", text: "Complete Necessary Repairs", phase: "Pre-Listing Preparation", completed: false},
+      // ... rest of seller items
+    ];
   }
 
   async getUser(id: number): Promise<User | undefined> {
@@ -359,16 +378,10 @@ export class DatabaseStorage implements IStorage {
         throw new Error('Transaction not found');
       }
 
-      // Initialize the checklist based on transaction type.  Placeholder for BUYER_CHECKLIST_ITEMS
-      const BUYER_CHECKLIST_ITEMS = [
-        {id:'1', text: 'Item 1', completed:false, phase: 'initial'},
-        {id:'2', text: 'Item 2', completed:false, phase: 'initial'}
-      ]; // Placeholder -  Replace with actual checklist items
-
-      const checklistItems = BUYER_CHECKLIST_ITEMS.map(item => ({
-        ...item,
-        completed: false
-      }));
+      // Get the appropriate checklist items based on transaction type
+      const defaultItems = transaction.type === 'sell' ?
+        this.SELLER_CHECKLIST_ITEMS :
+        this.BUYER_CHECKLIST_ITEMS;
 
       const result = await db.execute(sql`
         INSERT INTO checklists (
@@ -378,7 +391,7 @@ export class DatabaseStorage implements IStorage {
         ) VALUES (
           ${insertChecklist.transactionId},
           ${insertChecklist.role},
-          ${JSON.stringify(checklistItems)}::jsonb
+          ${JSON.stringify(defaultItems)}::jsonb
         )
         RETURNING *
       `);
@@ -388,7 +401,7 @@ export class DatabaseStorage implements IStorage {
         id: Number(row.id),
         transactionId: Number(row.transaction_id),
         role: String(row.role),
-        items: row.items
+        items: row.items as ChecklistItem[]
       };
     } catch (error) {
       console.error('Error in createChecklist:', error);
@@ -413,11 +426,13 @@ export class DatabaseStorage implements IStorage {
       }
 
       const row = result.rows[0];
+      const items = row.items as ChecklistItem[];
+
       return {
         id: Number(row.id),
         transactionId: Number(row.transactionId),
         role: String(row.role),
-        items: row.items
+        items: items
       };
     } catch (error) {
       console.error('Error in getChecklist:', error);
@@ -453,10 +468,10 @@ export class DatabaseStorage implements IStorage {
         throw new Error('Checklist not found');
       }
 
-      // Update the checklist items using proper JSON casting
+      // Update the checklist items
       const result = await db.execute(sql`
         UPDATE checklists 
-        SET items = ${sql.raw(`'${JSON.stringify(items)}'::jsonb`)}
+        SET items = ${JSON.stringify(items)}::jsonb
         WHERE id = ${id}
         RETURNING id, transaction_id, role, items
       `);
@@ -466,8 +481,6 @@ export class DatabaseStorage implements IStorage {
       }
 
       const row = result.rows[0];
-      console.log('Successfully updated checklist:', row);
-
       return {
         id: Number(row.id),
         transactionId: Number(row.transaction_id),

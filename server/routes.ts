@@ -246,6 +246,7 @@ export function registerRoutes(app: Express): Server {
         id: z.string(),
         text: z.string(),
         completed: z.boolean(),
+        phase: z.string(),
       })).safeParse(req.body.items);
 
       if (!parsed.success) {

@@ -66,26 +66,6 @@ const SELLER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
   // Post-Closing
   { id: "change-address", text: "Update Change of Address", phase: "Post-Closing" },
   { id: "complete-move", text: "Complete Moving Process", phase: "Post-Closing" }
-
-  // Post-Acceptance
-  { id: "appraisal", text: "Complete Home Appraisal", phase: "Post-Acceptance" },
-  { id: "buyer-inspection", text: "Facilitate Buyer's Inspection", phase: "Post-Acceptance" },
-  { id: "disclosures", text: "Complete Property Disclosures", phase: "Post-Acceptance" },
-  { id: "title-search", text: "Complete Title Search", phase: "Post-Acceptance" },
-
-  // Closing Preparation
-  { id: "utilities", text: "Cancel/Transfer Utilities", phase: "Closing Preparation" },
-  { id: "moving", text: "Arrange Moving Plans", phase: "Closing Preparation" },
-  { id: "walkthrough", text: "Schedule Final Walkthrough", phase: "Closing Preparation" },
-
-  // Closing
-  { id: "review-docs", text: "Review Closing Documents", phase: "Closing" },
-  { id: "sign-docs", text: "Sign Closing Documents", phase: "Closing" },
-  { id: "keys", text: "Hand Over Keys", phase: "Closing" },
-
-  // Post-Closing
-  { id: "address-change", text: "Update Address Information", phase: "Post-Closing" },
-  { id: "final-move", text: "Complete Moving Process", phase: "Post-Closing" }
 ];
 
 // This is for BUYER transactions (buying a property)
