@@ -222,14 +222,6 @@ export default function TransactionPage() {
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-4">Transaction Summary</h3>
             <div className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Current Phase</p>
-                <p className="font-medium">{currentPhase}</p>
-                <div className="mt-2">
-                  <Progress value={progress} className="h-2" />
-                  <p className="text-sm text-muted-foreground mt-1">{progress}% Complete</p>
-                </div>
-              </div>
               {user.role === 'agent' && (
                 <div className="flex justify-end">
                   <Button
