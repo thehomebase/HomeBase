@@ -1,11 +1,11 @@
-import { useParams } from "wouter";
+import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Chat } from "@/components/chat";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Link } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { ArrowLeft } from "lucide-react";
+import { Chat } from "@/components/chat";
 import type { Transaction } from "@shared/schema";
 
 export default function ChatPage() {
@@ -31,7 +31,7 @@ export default function ChatPage() {
     );
   }
 
-  const { data: transaction, isLoading: isLoadingTransaction } = useQuery<Transaction>({
+  const { data: transaction, isError, isLoading } = useQuery<Transaction>({
     queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/transactions/${parsedId}`);
@@ -71,7 +71,7 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {isLoadingTransaction ? (
+      {isLoading ? (
         <div className="flex items-center justify-center h-[600px]">
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
         </div>

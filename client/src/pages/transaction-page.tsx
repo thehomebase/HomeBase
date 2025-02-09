@@ -56,7 +56,7 @@ export default function TransactionPage() {
   if (!parsedId || isNaN(parsedId) || isError || !transaction) {
     return (
       <div className="container mx-auto p-6">
-        <Link href="/transactions">
+        <Link to="/transactions">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -73,7 +73,7 @@ export default function TransactionPage() {
       <header className="border-b">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center gap-4">
-            <Link href="/transactions">
+            <Link to="/transactions">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
