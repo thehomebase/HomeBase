@@ -44,43 +44,10 @@ export default function TransactionPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
-  // Parse and validate transaction ID
   const parsedId = id ? parseInt(id, 10) : null;
 
-  // Early return if no user
-  if (!user) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">
-          <p className="text-xl text-destructive">Please log in to access this page.</p>
-          <Link href="/transactions">
-            <Button variant="outline" className="mt-4">
-              Back to Transactions
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const form = useForm<TransactionFormData>();
 
-  // Early return if invalid ID
-  if (!parsedId || isNaN(parsedId)) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">
-          <p className="text-xl text-destructive">Invalid transaction ID</p>
-          <Link href="/transactions">
-            <Button variant="outline" className="mt-4">
-              Back to Transactions
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // Fetch transaction data
   const { data: transaction, isError, isLoading } = useQuery({
     queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
@@ -91,51 +58,8 @@ export default function TransactionPage() {
       return response.json();
     },
     enabled: !!parsedId && !!user,
-    retry: 1,
   });
 
-  // Show loading state
-  if (isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex justify-center">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state
-  if (isError || !transaction) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">
-          <p className="text-xl text-destructive">Error loading transaction</p>
-          <Link href="/transactions">
-            <Button variant="outline" className="mt-4">
-              Back to Transactions
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-
-  // Initialize form with transaction data
-  const form = useForm<TransactionFormData>({
-    defaultValues: {
-      contractPrice: transaction?.contractPrice,
-      optionPeriod: transaction?.optionPeriod,
-      optionFee: transaction?.optionFee,
-      earnestMoney: transaction?.earnestMoney,
-      downPayment: transaction?.downPayment,
-      sellerConcessions: transaction?.sellerConcessions,
-      closingDate: transaction?.closingDate,
-    },
-  });
-
-  // Handle mutation for updating transaction
   const updateTransaction = useMutation({
     mutationFn: async (data: TransactionFormData) => {
       if (!parsedId || isNaN(parsedId)) {
@@ -163,29 +87,71 @@ export default function TransactionPage() {
     },
   });
 
-  // Calculate progress based on completed checklist items
-  const { data: checklist, isError: checklistError, isLoading: checklistLoading } = useQuery({
-    queryKey: ["/api/transactions", parsedId, "checklist", user.role],
-    queryFn: async () => {
-      const response = await apiRequest("GET", `/api/transactions/${parsedId}/checklist/${user.role}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch checklist");
-      }
-      return response.json();
-    },
-    enabled: !!parsedId && !!user.role,
-  });
+  React.useEffect(() => {
+    if (transaction) {
+      form.reset({
+        contractPrice: transaction.contractPrice,
+        optionPeriod: transaction.optionPeriod,
+        optionFee: transaction.optionFee,
+        earnestMoney: transaction.earnestMoney,
+        downPayment: transaction.downPayment,
+        sellerConcessions: transaction.sellerConcessions,
+        closingDate: transaction.closingDate,
+      });
+    }
+  }, [transaction, form]);
 
-  if (checklistLoading) {
-    return <div>Loading checklist...</div>; 
+  if (!user) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center">
+          <p className="text-xl text-destructive">Please log in to access this page.</p>
+          <Link href="/transactions">
+            <Button variant="outline" className="mt-4">Back to Transactions</Button>
+          </Link>
+        </div>
+      </div>
+    );
   }
 
-  if (checklistError) {
-    return <div>Error loading checklist: {checklistError.message}</div>; 
+  if (!parsedId || isNaN(parsedId)) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center">
+          <p className="text-xl text-destructive">Invalid transaction ID</p>
+          <Link href="/transactions">
+            <Button variant="outline" className="mt-4">Back to Transactions</Button>
+          </Link>
+        </div>
+      </div>
+    );
   }
 
-  const completedTasks = checklist?.items?.filter(item => item.completed).length ?? 0;
-  const totalTasks = checklist?.items?.length ?? 1;
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex justify-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !transaction) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center">
+          <p className="text-xl text-destructive">Error loading transaction</p>
+          <Link href="/transactions">
+            <Button variant="outline" className="mt-4">Back to Transactions</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const completedTasks = transaction.checklist?.filter(item => item.completed)?.length ?? 0;
+  const totalTasks = transaction.checklist?.length ?? 1;
   const progress = Math.round((completedTasks / totalTasks) * 100);
 
   return (
@@ -221,7 +187,7 @@ export default function TransactionPage() {
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="progress" className="mt-6">
-                <ProgressChecklist
+                <ProgressChecklist 
                   transactionId={parsedId}
                   userRole={user.role || ""}
                 />
