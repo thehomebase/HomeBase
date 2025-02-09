@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Trash2, Check, X } from "lucide-react";
 import {
   Table,
@@ -150,7 +150,8 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
           <TableHeader>
             <TableRow>
               <TableHead>Role</TableHead>
-              <TableHead>Name</TableHead>
+              <TableHead>First Name</TableHead>
+              <TableHead>Last Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Mobile</TableHead>
@@ -185,18 +186,18 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                     ))}
                   </select>
                 </TableCell>
-                <TableCell className="space-x-2">
+                <TableCell>
                   <Input
                     placeholder="First Name"
                     value={newContact.firstName}
                     onChange={(e) => setNewContact({ ...newContact, firstName: e.target.value })}
-                    className="w-[120px] inline-block"
                   />
+                </TableCell>
+                <TableCell>
                   <Input
                     placeholder="Last Name"
                     value={newContact.lastName}
                     onChange={(e) => setNewContact({ ...newContact, lastName: e.target.value })}
-                    className="w-[120px] inline-block"
                   />
                 </TableCell>
                 <TableCell>
@@ -244,10 +245,11 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                 </TableCell>
               </TableRow>
             )}
-            {contacts.map((contact) => (
+            {contacts.map((contact: Contact) => (
               <TableRow key={contact.id}>
                 <TableCell>{contact.role}</TableCell>
-                <TableCell>{`${contact.firstName} ${contact.lastName}`}</TableCell>
+                <TableCell>{contact.firstName}</TableCell>
+                <TableCell>{contact.lastName}</TableCell>
                 <TableCell>{contact.email}</TableCell>
                 <TableCell>{contact.phone || "N/A"}</TableCell>
                 <TableCell>{contact.mobilePhone || "N/A"}</TableCell>
@@ -265,7 +267,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
             ))}
             {contacts.length === 0 && !isAddingContact && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   No contacts added yet
                 </TableCell>
               </TableRow>
