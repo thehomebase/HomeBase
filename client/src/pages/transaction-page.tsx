@@ -16,33 +16,43 @@ import { ProgressChecklist } from "@/components/progress-checklist";
 import { DocumentChecklist } from "@/components/document-checklist";
 import { TransactionContacts } from "@/components/transaction-contacts";
 
+interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  phase?: string;
+}
+
 interface Transaction {
   id: number;
   address: string;
   status: string;
   contractPrice?: number;
-  optionPeriod?: number;
+  optionPeriodExpiration?: string;
   optionFee?: number;
   earnestMoney?: number;
   downPayment?: number;
   sellerConcessions?: number;
   closingDate?: string;
-  contractExecutionDate?: string; // Added contract execution date
-  checklist?: Array<{ id: string; text: string; completed: boolean; phase?: string }>;
+  contractExecutionDate?: string;
+  mlsNumber?: string;
+  financing?: string;
+  checklist?: Array<ChecklistItem>;
   type: 'buy' | 'sell';
 }
 
 interface TransactionFormData {
   contractPrice?: number;
-  optionPeriod?: number;
+  optionPeriodExpiration?: string;
   optionFee?: number;
   earnestMoney?: number;
   downPayment?: number;
   sellerConcessions?: number;
   closingDate?: string;
-  contractExecutionDate?: string; // Added contract execution date
+  contractExecutionDate?: string;
+  mlsNumber?: string;
+  financing?: string;
   status?: string;
-  optionExpirationDate?: string; //Added optionExpirationDate
 }
 
 export default function TransactionPage() {
@@ -67,77 +77,80 @@ export default function TransactionPage() {
     enabled: !!parsedId && !!user,
   });
 
-  const updateTransaction = useMutation({
-    mutationFn: async (data: TransactionFormData) => {
-      if (!parsedId || isNaN(parsedId)) {
-        throw new Error("Invalid transaction ID");
-      }
+const updateTransaction = useMutation({
+  mutationFn: async (data: TransactionFormData) => {
+    if (!parsedId || isNaN(parsedId)) {
+      throw new Error("Invalid transaction ID");
+    }
 
-      // Format dates as ISO strings
-      const formattedData = {
-        ...data,
-        closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : undefined,
-        contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : undefined,
-        optionPeriodExpiration: data.optionExpirationDate ? new Date(data.optionExpirationDate).toISOString() : undefined
-      };
+    // Format dates as ISO strings
+    const formattedData = {
+      ...data,
+      closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : undefined,
+      contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : undefined,
+      optionPeriodExpiration: data.optionPeriodExpiration ? new Date(data.optionPeriodExpiration).toISOString() : undefined
+    };
 
-      const cleanData = Object.fromEntries(
-        Object.entries(formattedData).filter(([_, value]) => value !== undefined && value !== '')
-      );
+    const cleanData = Object.fromEntries(
+      Object.entries(formattedData).filter(([_, value]) => value !== undefined && value !== '')
+    );
 
-      const response = await apiRequest("PATCH", `/api/transactions/${parsedId}`, cleanData);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to update transaction");
-      }
-      return response.json();
-    },
-    onSuccess: async (updatedData) => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
-      setIsEditing(false);
+    const response = await apiRequest("PATCH", `/api/transactions/${parsedId}`, cleanData);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || "Failed to update transaction");
+    }
+    return response.json();
+  },
+  onSuccess: async (updatedData) => {
+    await queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
+    setIsEditing(false);
 
-      const updatedTransaction = await queryClient.getQueryData(["/api/transactions", parsedId]);
-      if (updatedTransaction) {
-        form.reset({
-          contractPrice: updatedTransaction.contractPrice || undefined,
-          optionPeriod: updatedTransaction.optionPeriod || undefined,
-          optionFee: updatedTransaction.optionFee || undefined,
-          earnestMoney: updatedTransaction.earnestMoney || undefined,
-          downPayment: updatedTransaction.downPayment || undefined,
-          sellerConcessions: updatedTransaction.sellerConcessions || undefined,
-          closingDate: updatedTransaction.closingDate || undefined,
-          contractExecutionDate: updatedTransaction.contractExecutionDate || undefined,
-          status: updatedTransaction.status || undefined,
-          optionExpirationDate: updatedTransaction.optionPeriodExpiration || undefined //Added optionExpirationDate
-        });
-      }
-
-      toast({
-        title: "Success",
-        description: "Transaction updated successfully",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update transaction",
-        variant: "destructive",
+    const updatedTransaction = await queryClient.getQueryData(["/api/transactions", parsedId]);
+    if (updatedTransaction) {
+      form.reset({
+        contractPrice: updatedTransaction.contractPrice || undefined,
+        optionPeriodExpiration: updatedTransaction.optionPeriodExpiration || undefined,
+        optionFee: updatedTransaction.optionFee || undefined,
+        earnestMoney: updatedTransaction.earnestMoney || undefined,
+        downPayment: updatedTransaction.downPayment || undefined,
+        sellerConcessions: updatedTransaction.sellerConcessions || undefined,
+        closingDate: updatedTransaction.closingDate || undefined,
+        contractExecutionDate: updatedTransaction.contractExecutionDate || undefined,
+        status: updatedTransaction.status || undefined,
+        mlsNumber: updatedTransaction.mlsNumber || undefined,
+        financing: updatedTransaction.financing || undefined
       });
     }
-  });
+
+    toast({
+      title: "Success",
+      description: "Transaction updated successfully",
+    });
+  },
+  onError: (error) => {
+    toast({
+      title: "Error",
+      description: error instanceof Error ? error.message : "Failed to update transaction",
+      variant: "destructive",
+    });
+  }
+});
 
   React.useEffect(() => {
     if (transaction) {
       form.reset({
         contractPrice: transaction.contractPrice,
-        optionPeriod: transaction.optionPeriod,
+        optionPeriodExpiration: transaction.optionPeriodExpiration,
         optionFee: transaction.optionFee,
         earnestMoney: transaction.earnestMoney,
         downPayment: transaction.downPayment,
         sellerConcessions: transaction.sellerConcessions,
         closingDate: transaction.closingDate,
-        contractExecutionDate: transaction.contractExecutionDate, // Added contract execution date
-        optionExpirationDate: transaction.optionPeriodExpiration //Added optionExpirationDate
+        contractExecutionDate: transaction.contractExecutionDate,
+        mlsNumber: transaction.mlsNumber,
+        financing: transaction.financing,
+        status: transaction.status
       });
     }
   }, [transaction, form]);
@@ -283,7 +296,7 @@ export default function TransactionPage() {
                     {isEditing ? (
                       <Input
                         type="date"
-                        {...form.register("optionExpirationDate")}
+                        {...form.register("optionPeriodExpiration")}
                         className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
@@ -379,7 +392,7 @@ export default function TransactionPage() {
                     )}
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Contract Execution Date</p> {/* Added Contract Execution Date */}
+                    <p className="text-sm text-muted-foreground">Contract Execution Date</p> 
                     {isEditing ? (
                       <Input
                         type="date"
@@ -452,70 +465,69 @@ export default function TransactionPage() {
                       </p>
                     )}
                   </div>
-                </div>
-
-                {isEditing && (
-                  <div className="flex justify-end mt-4">
-                    <Button
-                      type="button"
-                      onClick={form.handleSubmit((data) => {
-                        const formattedData = {
-                          ...data,
-                          closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : undefined,
-                          contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : undefined,
-                          optionPeriodExpiration: data.optionExpirationDate ? new Date(data.optionExpirationDate).toISOString() : undefined
-                        };
-                        updateTransaction.mutate(formattedData);
-                        setIsEditing(false);
-                      })}
-                      disabled={updateTransaction.isPending}
-                    >
-                      Save Changes
-                    </Button>
-                  </div>
-                )}
               </div>
 
+              {isEditing && (
+                <div className="flex justify-end mt-4">
+                  <Button
+                    type="button"
+                    onClick={form.handleSubmit((data) => {
+                      const formattedData = {
+                        ...data,
+                        closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : undefined,
+                        contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : undefined,
+                        optionPeriodExpiration: data.optionPeriodExpiration ? new Date(data.optionPeriodExpiration).toISOString() : undefined
+                      };
+                      updateTransaction.mutate(formattedData);
+                      setIsEditing(false);
+                    })}
+                    disabled={updateTransaction.isPending}
+                  >
+                    Save Changes
+                  </Button>
+                </div>
+              )}
+            </div>
 
-            </CardContent>
-          </Card>
+          </CardContent>
+        </Card>
 
-          <Card className="mt-6">
-            <CardContent className="p-6">
-              <Tabs defaultValue="progress">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="progress">
-                    <ClipboardCheck className="h-4 w-4 mr-2" />
-                    Progress
-                  </TabsTrigger>
-                  <TabsTrigger value="contacts">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Contacts
-                  </TabsTrigger>
-                  <TabsTrigger value="documents">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Documents
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="progress" className="mt-6">
-                  <ProgressChecklist
-                    transactionId={parsedId}
-                    userRole={user.role || ""}
-                    transactionType={transaction.type}
-                  />
-                </TabsContent>
-                <TabsContent value="contacts" className="mt-6">
-                  <TransactionContacts transactionId={parsedId} />
-                </TabsContent>
-                <TabsContent value="documents" className="mt-6">
-                  <DocumentChecklist transactionId={parsedId} />
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+        <Card className="mt-6">
+          <CardContent className="p-6">
+            <Tabs defaultValue="progress">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="progress">
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  Progress
+                </TabsTrigger>
+                <TabsTrigger value="contacts">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Contacts
+                </TabsTrigger>
+                <TabsTrigger value="documents">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Documents
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="progress" className="mt-6">
+                <ProgressChecklist
+                  transactionId={parsedId}
+                  userRole={user.role || ""}
+                  transactionType={transaction.type}
+                />
+              </TabsContent>
+              <TabsContent value="contacts" className="mt-6">
+                <TransactionContacts transactionId={parsedId} />
+              </TabsContent>
+              <TabsContent value="documents" className="mt-6">
+                <DocumentChecklist transactionId={parsedId} />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
 
 
-        </main>
-      </div>
-    );
+      </main>
+    </div>
+  );
 }
