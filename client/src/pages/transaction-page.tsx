@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ClipboardCheck, MessageSquare, UserPlus } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, MessageSquare, UserPlus, Pencil, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import { ProgressChecklist } from "@/components/progress-checklist";
@@ -48,6 +48,7 @@ export default function TransactionPage() {
   const { toast } = useToast();
   const parsedId = id ? parseInt(id, 10) : null;
 
+  const [isEditing, setIsEditing] = React.useState(false);
   const form = useForm<TransactionFormData>();
 
   const { data: transaction, isError, isLoading } = useQuery({
@@ -185,31 +186,50 @@ export default function TransactionPage() {
         <Card>
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-4">Transaction Summary</h3>
-            <form onSubmit={form.handleSubmit((data) => updateTransaction.mutate(data))} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Transaction Type</p>
-                  <p className="font-medium capitalize">
-                    {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
-                  </p>
+            <div className="space-y-4">
+              {user.role === 'agent' && (
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsEditing(!isEditing)}
+                  >
+                    {isEditing ? (
+                      <>
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel
+                      </>
+                    ) : (
+                      <>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit Details
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <div>
-                  <Label htmlFor="contractPrice">Contract Price</Label>
-                  {user.role === 'agent' ? (
-                    <Input
-                      id="contractPrice"
-                      type="number"
-                      {...form.register("contractPrice")}
-                      placeholder="Enter contract price"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.contractPrice 
-                        ? `$${transaction.contractPrice.toLocaleString()}` 
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
+              )}
+              
+              {isEditing ? (
+                <form onSubmit={form.handleSubmit((data) => {
+                  updateTransaction.mutate(data);
+                  setIsEditing(false);
+                })} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Transaction Type</p>
+                      <p className="font-medium capitalize">
+                        {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="contractPrice">Contract Price</Label>
+                      <Input
+                        id="contractPrice"
+                        type="number"
+                        {...form.register("contractPrice")}
+                        placeholder="Enter contract price"
+                      />
+                    </div>
                 <div>
                   <Label htmlFor="optionPeriodExpiration">Option Period Expiration</Label>
                   {user.role === 'agent' ? (
