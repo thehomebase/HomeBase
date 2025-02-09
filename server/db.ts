@@ -13,3 +13,16 @@ if (!process.env.DATABASE_URL) {
 
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle({ client: pool, schema });
+
+export const transactions = pgTable('transactions', {
+  id: serial('id').primaryKey(),
+  type: text('type').notNull(),
+  status: text('status').notNull(),
+  agentId: integer('agent_id').notNull(),
+  clientId: integer('client_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  closingDate: timestamp('closing_date'),
+  contractExecutionDate: timestamp('contract_execution_date'),
+  option_period_expiration: timestamp('option_period_expiration'),
+});
