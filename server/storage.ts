@@ -130,11 +130,19 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(sql`
         SELECT 
           id::integer,
-          COALESCE(address, '123 Easy Street')::text as address,
-          COALESCE(access_code, '123456')::text as "accessCode",
-          COALESCE(status, 'pending')::text as status,
-          COALESCE(agent_id, 1)::integer as "agentId",
-          COALESCE(participants, '[]'::jsonb)::jsonb as participants
+          address::text,
+          access_code::text as "accessCode",
+          status::text,
+          agent_id::integer as "agentId",
+          client_id::integer as "clientId",
+          participants::jsonb,
+          contract_price::numeric as "contractPrice",
+          option_period::integer as "optionPeriod",
+          option_fee::numeric as "optionFee",
+          earnest_money::numeric as "earnestMoney",
+          down_payment::numeric as "downPayment",
+          seller_concessions::numeric as "sellerConcessions",
+          closing_date::text as "closingDate"
         FROM transactions 
         WHERE id = ${id}
       `);
@@ -154,7 +162,15 @@ export class DatabaseStorage implements IStorage {
         accessCode: String(row.accessCode),
         status: String(row.status),
         agentId: Number(row.agentId),
-        participants: Array.isArray(row.participants) ? row.participants : []
+        clientId: Number(row.clientId),
+        participants: Array.isArray(row.participants) ? row.participants : [],
+        contractPrice: row.contractPrice ? Number(row.contractPrice) : null,
+        optionPeriod: row.optionPeriod ? Number(row.optionPeriod) : null,
+        optionFee: row.optionFee ? Number(row.optionFee) : null,
+        earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
+        downPayment: row.downPayment ? Number(row.downPayment) : null,
+        sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
+        closingDate: row.closingDate || null
       };
 
       console.log('Processed transaction:', transaction);
@@ -162,36 +178,49 @@ export class DatabaseStorage implements IStorage {
 
     } catch (error) {
       console.error('Error in getTransaction:', error);
-      // If we encounter an error but know the transaction exists,
-      // return a safe fallback object
-      return {
-        id: Number(id),
-        address: '123 Easy Street',
-        accessCode: '123456',
-        status: 'pending',
-        agentId: 1,
-        participants: []
-      };
+      return undefined;
     }
   }
 
   async getTransactionsByUser(userId: number): Promise<Transaction[]> {
     try {
-      // Changed to use a simpler query first to get it working
       const result = await db.execute(sql`
         SELECT 
-          t.id,
-          t.address,
-          t.access_code as "accessCode",
-          t.status,
-          t.agent_id as "agentId",
-          t.participants
+          t.id::integer,
+          t.address::text,
+          t.access_code::text as "accessCode",
+          t.status::text,
+          t.agent_id::integer as "agentId",
+          t.client_id::integer as "clientId",
+          t.participants::jsonb,
+          t.contract_price::numeric as "contractPrice",
+          t.option_period::integer as "optionPeriod",
+          t.option_fee::numeric as "optionFee",
+          t.earnest_money::numeric as "earnestMoney",
+          t.down_payment::numeric as "downPayment",
+          t.seller_concessions::numeric as "sellerConcessions",
+          t.closing_date::text as "closingDate"
         FROM transactions t
         WHERE t.agent_id = ${userId}
+        ORDER BY t.id DESC
       `);
 
-      console.log('Retrieved transactions:', result.rows);
-      return result.rows;
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        address: String(row.address),
+        accessCode: String(row.accessCode),
+        status: String(row.status),
+        agentId: Number(row.agentId),
+        clientId: Number(row.clientId),
+        participants: Array.isArray(row.participants) ? row.participants : [],
+        contractPrice: row.contractPrice ? Number(row.contractPrice) : null,
+        optionPeriod: row.optionPeriod ? Number(row.optionPeriod) : null,
+        optionFee: row.optionFee ? Number(row.optionFee) : null,
+        earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
+        downPayment: row.downPayment ? Number(row.downPayment) : null,
+        sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
+        closingDate: row.closingDate || null
+      }));
     } catch (error) {
       console.error('Error in getTransactionsByUser:', error);
       return [];
