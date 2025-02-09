@@ -84,7 +84,6 @@ export default function TransactionPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
       setIsEditing(false);
       
-      // Reset form with the updated data
       if (updatedData) {
         form.reset({
           contractPrice: updatedData.contractPrice || undefined,
@@ -108,10 +107,7 @@ export default function TransactionPage() {
         description: error instanceof Error ? error.message : "Failed to update transaction",
         variant: "destructive",
       });
-    }
-      setIsEditing(false);
-      form.reset({
-        contractPrice: data.contractPrice,
+    },
         optionPeriod: data.optionPeriod,
         optionFee: data.optionFee,
         earnestMoney: data.earnestMoney,
