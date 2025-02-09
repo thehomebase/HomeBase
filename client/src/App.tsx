@@ -24,15 +24,17 @@ function Layout({ children }: { children: React.ReactNode }) {
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Logo />
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
-              Logged in as {user?.username} ({user?.role})
-            </span>
-            <Button variant="outline" size="sm" onClick={() => logoutMutation.mutate()}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
+          {user && (
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">
+                Logged in as {user.username} ({user.role})
+              </span>
+              <Button variant="outline" size="sm" onClick={() => logoutMutation.mutate()}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
+          )}
         </div>
       </header>
       {user && <NavTabs />}
@@ -46,8 +48,9 @@ function Router() {
     <Switch>
       <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/" component={TransactionsPage} />
+      <ProtectedRoute path="/transactions" component={TransactionsPage} />
       <ProtectedRoute path="/clients" component={ClientsPage} />
-      <ProtectedRoute path="/transaction/:id" component={TransactionPage} />
+      <ProtectedRoute path="/transactions/:id" component={TransactionPage} />
       <Route component={NotFound} />
     </Switch>
   );
