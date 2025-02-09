@@ -30,6 +30,7 @@ export function registerRoutes(app: Express): Server {
     }
 
     console.log('Fetching transaction with ID:', req.params.id);
+    console.log('User making request:', req.user);
     const id = parseInt(req.params.id);
 
     if (isNaN(id)) {

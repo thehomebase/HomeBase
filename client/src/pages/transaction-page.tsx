@@ -18,7 +18,6 @@ export default function TransactionPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
 
-  // Wait for user authentication before fetching transaction
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
     queryKey: ["/api/transactions", Number(id)],
     enabled: !!id && !!user && Number(id) > 0,
@@ -58,7 +57,7 @@ export default function TransactionPage() {
         <div className="text-center">
           <h2 className="text-xl font-semibold text-destructive">Error Loading Transaction</h2>
           <p className="text-muted-foreground mt-2">
-            {error instanceof Error ? error.message : 'Unable to load transaction details'}
+            {error instanceof Error ? error.message : "Unable to load transaction details"}
           </p>
           <Button className="mt-4" onClick={() => setLocation("/")}>
             Return Home
@@ -86,14 +85,14 @@ export default function TransactionPage() {
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'active':
-        return 'bg-green-500/10 text-green-500';
-      case 'pending':
-        return 'bg-yellow-500/10 text-yellow-500';
-      case 'completed':
-        return 'bg-blue-500/10 text-blue-500';
+      case "active":
+        return "bg-green-500/10 text-green-500";
+      case "pending":
+        return "bg-yellow-500/10 text-yellow-500";
+      case "completed":
+        return "bg-blue-500/10 text-blue-500";
       default:
-        return 'bg-gray-500/10 text-gray-500';
+        return "bg-gray-500/10 text-gray-500";
     }
   };
 
