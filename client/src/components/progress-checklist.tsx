@@ -54,7 +54,7 @@ function getTooltipContent(itemId: string): string {
     "submit-offer": "Include all terms and contingencies in writing. Your agent can advise on competitive offers.",
     "negotiate-terms": "Consider both price and other terms like closing date and included items.",
     "earnest-money": "Typically 1-3% of purchase price to show good faith in the transaction.",
-    "home-inspection": "Choose a thorough inspector and attend the inspection if possible.",
+    "schedule-inspection": "Choose a thorough inspector and attend the inspection if possible.",
     "order-appraisal": "Required by most lenders to ensure the property value supports the loan amount.",
     "additional-checks": "Consider specialized inspections for specific concerns like radon or termites.",
     "review-title": "Title insurance protects against ownership disputes or liens.",
