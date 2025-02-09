@@ -8,16 +8,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, ClipboardCheck, MessageSquare } from "lucide-react";
 import { ProgressChecklist } from "@/components/progress-checklist";
 import { Chat } from "@/components/chat";
+import type { Transaction } from "@shared/schema";
 
 export default function TransactionPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
 
-  // Parse and validate the transaction ID
+  // Parse and validate transaction ID
   const parsedId = id ? parseInt(id, 10) : null;
 
-  // Query for transaction data
-  const { data: transaction, isError } = useQuery({
+  const { data: transaction, isError, isLoading } = useQuery<Transaction>({
     queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
       if (!parsedId || isNaN(parsedId)) {
@@ -30,11 +30,30 @@ export default function TransactionPage() {
       return response.json();
     },
     enabled: !!parsedId && !isNaN(parsedId) && !!user,
-    retry: false
+    retry: 1
   });
 
-  // Show error state if transaction ID is invalid or fetch failed
-  if (!parsedId || isNaN(parsedId) || isError) {
+  if (!user) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center">
+          <p className="text-xl">Please log in to view transactions.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-[600px]">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!parsedId || isNaN(parsedId) || isError || !transaction) {
     return (
       <div className="container mx-auto p-6">
         <Link href="/transactions">
@@ -60,8 +79,8 @@ export default function TransactionPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold">{transaction?.address || 'Loading...'}</h1>
-              <p className="text-muted-foreground">Transaction ID: {parsedId}</p>
+              <h1 className="text-2xl font-bold">{transaction.address}</h1>
+              <p className="text-muted-foreground">Transaction ID: {transaction.id}</p>
             </div>
           </div>
         </div>
@@ -83,12 +102,12 @@ export default function TransactionPage() {
               </TabsList>
               <TabsContent value="progress" className="mt-6">
                 <ProgressChecklist
-                  transactionId={parsedId}
-                  userRole={user?.role || ""}
+                  transactionId={transaction.id}
+                  userRole={user.role}
                 />
               </TabsContent>
               <TabsContent value="chat" className="mt-6">
-                <Chat transactionId={parsedId} />
+                <Chat transactionId={transaction.id} />
               </TabsContent>
             </Tabs>
           </CardContent>
