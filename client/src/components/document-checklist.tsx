@@ -70,8 +70,14 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       }
       return response.json();
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
+    onSuccess: () => {
+      const currentDocs = [...(queryClient.getQueryData<Document[]>(["/api/documents", transactionId]) || [])];
+      currentDocs.push({
+        id: String(Date.now()),
+        name: newDocument,
+        status: 'not_applicable'
+      });
+      queryClient.setQueryData(["/api/documents", transactionId], currentDocs);
       setNewDocument("");
     },
   });
@@ -84,7 +90,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       }
     },
     onSuccess: (_, id) => {
-      const currentDocs = queryClient.getQueryData<Document[]>(["/api/documents", transactionId]) || [];
+      const currentDocs = queryClient.getQueryData<Document[]>(["/api/documents", transactionId]) || defaultDocuments;
       const updatedDocs = currentDocs.filter(doc => doc.id !== id);
       queryClient.setQueryData(["/api/documents", transactionId], updatedDocs);
     },
