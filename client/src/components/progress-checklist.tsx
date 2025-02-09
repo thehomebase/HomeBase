@@ -54,26 +54,29 @@ export function ProgressChecklist({
   checklist,
   userRole,
 }: ProgressChecklistProps) {
-  // Fetch existing checklist if not provided
+  // Get existing checklist if not provided
   const { data: fetchedChecklist } = useQuery({
     queryKey: ["/api/checklists", transactionId, userRole],
     enabled: !checklist && !!transactionId && !!userRole,
   });
 
   const currentChecklist = checklist || fetchedChecklist;
-  const items = currentChecklist?.items || DEFAULT_ITEMS[userRole as keyof typeof DEFAULT_ITEMS] || [];
+  const defaultItems = DEFAULT_ITEMS[userRole as keyof typeof DEFAULT_ITEMS] || [];
+  const items = currentChecklist?.items || defaultItems;
   const progress = Math.round((items.filter((item) => item.completed).length / items.length) * 100);
 
-  const updateChecklistMutation = useMutation({
-    mutationFn: async (items: typeof DEFAULT_ITEMS[keyof typeof DEFAULT_ITEMS]) => {
-      if (currentChecklist?.id) {
-        await apiRequest("PATCH", `/api/checklists/${currentChecklist.id}`, { items });
-      } else {
+  const createOrUpdateMutation = useMutation({
+    mutationFn: async ({ items }: { items: typeof defaultItems }) => {
+      if (!currentChecklist) {
+        // Create new checklist
         await apiRequest("POST", "/api/checklists", {
           transactionId,
           role: userRole,
           items,
         });
+      } else {
+        // Update existing checklist
+        await apiRequest("PATCH", `/api/checklists/${currentChecklist.id}`, { items });
       }
     },
     onSuccess: () => {
@@ -82,10 +85,11 @@ export function ProgressChecklist({
   });
 
   const handleCheck = (itemId: string, checked: boolean) => {
+    console.log("Handling checkbox change:", { itemId, checked });
     const updatedItems = items.map((item) =>
       item.id === itemId ? { ...item, completed: checked } : item
     );
-    updateChecklistMutation.mutate(updatedItems);
+    createOrUpdateMutation.mutate({ items: updatedItems });
   };
 
   return (
