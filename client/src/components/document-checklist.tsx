@@ -15,20 +15,19 @@ interface Document {
 }
 
 const defaultDocuments = [
-  { id: "1", name: "Purchase Agreement", status: "waiting_signatures" },
-  { id: "2", name: "Seller's Disclosure", status: "not_applicable" },
-  { id: "3", name: "Lead-Based Paint Disclosure", status: "not_applicable" },
-  { id: "4", name: "Property Survey", status: "waiting_others" },
-  { id: "5", name: "Home Inspection Report", status: "not_applicable" },
-  { id: "6", name: "Appraisal Report", status: "not_applicable" },
-  { id: "7", name: "Title Report", status: "not_applicable" },
-  { id: "8", name: "Closing Disclosure", status: "not_applicable" },
-  { id: "9", name: "Deed", status: "not_applicable" },
-  { id: "10", name: "Information About Broker Services (IABS)", status: "not_applicable" },
-  { id: "11", name: "Buyer Representation Agreement", status: "not_applicable" },
-  { id: "12", name: "Listing Agreement", status: "not_applicable" },
-  { id: "13", name: "3rd Party Financing Addendum", status: "not_applicable" },
-  { id: "14", name: "HOA Addendum", status: "not_applicable" }
+  { id: "1", name: "Information About Broker Services (IABS)", status: "not_applicable" },
+  { id: "2", name: "Buyer Representation Agreement", status: "not_applicable" },
+  { id: "3", name: "Listing Agreement", status: "not_applicable" },
+  { id: "4", name: "Seller's Disclosure", status: "not_applicable" },
+  { id: "5", name: "Property Survey", status: "waiting_others" },
+  { id: "6", name: "Lead-Based Paint Disclosure", status: "not_applicable" },
+  { id: "7", name: "Purchase Agreement", status: "waiting_signatures" },
+  { id: "8", name: "HOA Addendum", status: "not_applicable" },
+  { id: "9", name: "Home Inspection Report", status: "not_applicable" },
+  { id: "10", name: "Appraisal Report", status: "not_applicable" },
+  { id: "11", name: "Title Report", status: "not_applicable" },
+  { id: "12", name: "Closing Disclosure", status: "not_applicable" },
+  { id: "13", name: "3rd Party Financing Addendum", status: "not_applicable" }
 ];
 
 export function DocumentChecklist({ transactionId }: { transactionId: number }) {
