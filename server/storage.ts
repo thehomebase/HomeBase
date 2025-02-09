@@ -84,6 +84,7 @@ export class DatabaseStorage implements IStorage {
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
     try {
+      console.log('Database query - fetching transaction with ID:', id);
       const result = await db.execute(sql`
         SELECT 
           t.id,
@@ -97,12 +98,13 @@ export class DatabaseStorage implements IStorage {
       `);
 
       if (result.rows.length === 0) {
+        console.log('No transaction found with ID:', id);
         return undefined;
       }
 
       const transaction = result.rows[0];
       console.log('Retrieved transaction:', transaction);
-      
+
       if (!transaction.participants) {
         transaction.participants = [];
       } else if (typeof transaction.participants === 'string') {

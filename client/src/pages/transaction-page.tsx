@@ -52,6 +52,7 @@ export default function TransactionPage() {
   }
 
   if (error) {
+    console.error('Transaction loading error:', error);
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
