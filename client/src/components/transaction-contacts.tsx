@@ -4,9 +4,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Check, X } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -44,6 +43,7 @@ interface TransactionContactsProps {
 
 export function TransactionContacts({ transactionId }: TransactionContactsProps) {
   const { toast } = useToast();
+  const [isAddingContact, setIsAddingContact] = React.useState(false);
   const [newContact, setNewContact] = React.useState<Partial<Contact>>({
     role: "",
     firstName: "",
@@ -85,6 +85,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
         mobilePhone: "",
         email: "",
       });
+      setIsAddingContact(false);
       toast({
         title: "Success",
         description: "Contact added successfully",
@@ -121,9 +122,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
     },
   });
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
+  const handleSubmit = () => {
     if (!newContact.role || !newContact.firstName || !newContact.lastName || !newContact.email) {
       toast({
         title: "Error",
@@ -145,141 +144,135 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Add New Contact</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="role">Role *</Label>
-              <select
-                id="role"
-                className="w-full px-3 py-2 border rounded-md bg-background"
-                value={newContact.role}
-                onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
-                required
-              >
-                <option value="">Select a role</option>
-                {CONTACT_ROLES.map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name *</Label>
-                <Input
-                  id="firstName"
-                  value={newContact.firstName}
-                  onChange={(e) => setNewContact({ ...newContact, firstName: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name *</Label>
-                <Input
-                  id="lastName"
-                  value={newContact.lastName}
-                  onChange={(e) => setNewContact({ ...newContact, lastName: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={newContact.email}
-                onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={newContact.phone}
-                  onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mobilePhone">Mobile Phone</Label>
-                <Input
-                  id="mobilePhone"
-                  type="tel"
-                  value={newContact.mobilePhone}
-                  onChange={(e) => setNewContact({ ...newContact, mobilePhone: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <Button type="submit" disabled={addContactMutation.isPending}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Contact
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Contact List</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
+    <Card>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Role</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Mobile</TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsAddingContact(true)}
+                  disabled={isAddingContact}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Contact
+                </Button>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isAddingContact && (
               <TableRow>
-                <TableHead>Role</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Mobile</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {contacts.map((contact) => (
-                <TableRow key={contact.id}>
-                  <TableCell>{contact.role}</TableCell>
-                  <TableCell>{`${contact.firstName} ${contact.lastName}`}</TableCell>
-                  <TableCell>{contact.email}</TableCell>
-                  <TableCell>{contact.phone || "N/A"}</TableCell>
-                  <TableCell>{contact.mobilePhone || "N/A"}</TableCell>
-                  <TableCell>
+                <TableCell>
+                  <select
+                    className="w-full px-3 py-2 border rounded-md bg-background"
+                    value={newContact.role}
+                    onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
+                    required
+                  >
+                    <option value="">Select role</option>
+                    {CONTACT_ROLES.map((role) => (
+                      <option key={role} value={role}>
+                        {role}
+                      </option>
+                    ))}
+                  </select>
+                </TableCell>
+                <TableCell className="space-x-2">
+                  <Input
+                    placeholder="First Name"
+                    value={newContact.firstName}
+                    onChange={(e) => setNewContact({ ...newContact, firstName: e.target.value })}
+                    className="w-[120px] inline-block"
+                  />
+                  <Input
+                    placeholder="Last Name"
+                    value={newContact.lastName}
+                    onChange={(e) => setNewContact({ ...newContact, lastName: e.target.value })}
+                    className="w-[120px] inline-block"
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={newContact.email}
+                    onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="tel"
+                    placeholder="Phone"
+                    value={newContact.phone}
+                    onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="tel"
+                    placeholder="Mobile"
+                    value={newContact.mobilePhone}
+                    onChange={(e) => setNewContact({ ...newContact, mobilePhone: e.target.value })}
+                  />
+                </TableCell>
+                <TableCell>
+                  <div className="flex space-x-2">
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => contact.id && deleteContactMutation.mutate(contact.id)}
-                      disabled={deleteContactMutation.isPending}
+                      onClick={handleSubmit}
+                      disabled={addContactMutation.isPending}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Check className="h-4 w-4" />
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {contacts.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
-                    No contacts added yet
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsAddingContact(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+            {contacts.map((contact) => (
+              <TableRow key={contact.id}>
+                <TableCell>{contact.role}</TableCell>
+                <TableCell>{`${contact.firstName} ${contact.lastName}`}</TableCell>
+                <TableCell>{contact.email}</TableCell>
+                <TableCell>{contact.phone || "N/A"}</TableCell>
+                <TableCell>{contact.mobilePhone || "N/A"}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => contact.id && deleteContactMutation.mutate(contact.id)}
+                    disabled={deleteContactMutation.isPending}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {contacts.length === 0 && !isAddingContact && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  No contacts added yet
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
