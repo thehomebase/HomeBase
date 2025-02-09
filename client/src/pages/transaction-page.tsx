@@ -1,7 +1,6 @@
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,18 +18,7 @@ export default function TransactionPage() {
 
   const { data: transaction, isError, isLoading } = useQuery<Transaction>({
     queryKey: ["/api/transactions", parsedId],
-    queryFn: async () => {
-      if (!parsedId || isNaN(parsedId)) {
-        throw new Error("Invalid transaction ID");
-      }
-      const response = await apiRequest("GET", `/api/transactions/${parsedId}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch transaction");
-      }
-      return response.json();
-    },
     enabled: !!parsedId && !isNaN(parsedId) && !!user,
-    retry: 1
   });
 
   if (!user) {
