@@ -220,29 +220,29 @@ export default function TransactionPage() {
       <main className="container mx-auto p-6">
         <Card>
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Transaction Summary</h3>
-            <div className="space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Transaction Summary</h3>
               {user.role === 'agent' && (
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsEditing(!isEditing)}
-                  >
-                    {isEditing ? (
-                      <>
-                        <X className="h-4 w-4 mr-2" />
-                        Cancel
-                      </>
-                    ) : (
-                      <>
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Edit Details
-                      </>
-                    )}
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditing(!isEditing)}
+                >
+                  {isEditing ? (
+                    <>
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel
+                    </>
+                  ) : (
+                    <>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit Details
+                    </>
+                  )}
+                </Button>
               )}
+            </div>
+            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                     <p className="text-sm text-muted-foreground">Transaction Type</p>
