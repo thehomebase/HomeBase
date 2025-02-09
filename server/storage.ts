@@ -237,19 +237,28 @@ export class DatabaseStorage implements IStorage {
 
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
     try {
+      // Ensure transactionId is a number
+      const transactionId = Number(insertMessage.transactionId);
+
+      if (!transactionId || isNaN(transactionId)) {
+        throw new Error('Transaction ID must be a valid number');
+      }
+
       // First verify if the transaction exists
-      const transactionExists = await db.execute(sql`
+      const transactionCheck = await db.execute(sql`
         SELECT EXISTS(
           SELECT 1 FROM transactions 
-          WHERE id = ${insertMessage.transactionId}
+          WHERE id = ${transactionId}
         );
       `);
 
-      if (!transactionExists.rows[0]?.exists) {
-        throw new Error(`Transaction with ID ${insertMessage.transactionId} not found`);
+      const transactionExists = transactionCheck.rows[0]?.exists;
+
+      if (!transactionExists) {
+        throw new Error(`Transaction with ID ${transactionId} does not exist`);
       }
 
-      // Then create the message with all required fields
+      // Create the message
       const result = await db.execute(sql`
         INSERT INTO messages (
           transaction_id,
@@ -259,12 +268,12 @@ export class DatabaseStorage implements IStorage {
           content,
           timestamp
         ) VALUES (
-          ${insertMessage.transactionId},
+          ${transactionId},
           ${insertMessage.userId},
           ${insertMessage.username},
           ${insertMessage.role},
           ${insertMessage.content},
-          COALESCE(${insertMessage.timestamp}, NOW())
+          NOW()
         )
         RETURNING 
           id,
@@ -273,7 +282,7 @@ export class DatabaseStorage implements IStorage {
           username,
           role,
           content,
-          timestamp
+          timestamp::text
       `);
 
       if (!result.rows[0]) {
@@ -282,7 +291,7 @@ export class DatabaseStorage implements IStorage {
 
       const message = result.rows[0];
 
-      // Return properly typed message object
+      // Return a properly typed message object
       return {
         id: Number(message.id),
         transactionId: Number(message.transactionId),

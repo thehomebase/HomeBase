@@ -49,22 +49,16 @@ export function Chat({ transactionId }: ChatProps) {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (messageContent: string) => {
-      // Validate user and transaction
-      if (!user?.id || !user?.username || !user?.role) {
+      if (!user) {
         throw new Error("Please log in to send messages");
-      }
-
-      if (!transactionId) {
-        throw new Error("Cannot send message - invalid transaction");
       }
 
       const messageData = {
         content: messageContent,
-        transactionId: transactionId,
+        transactionId: Number(transactionId), // Ensure it's a number
         userId: user.id,
         username: user.username,
         role: user.role,
-        timestamp: new Date().toISOString()
       };
 
       const response = await apiRequest("POST", "/api/messages", messageData);
@@ -81,7 +75,6 @@ export function Chat({ transactionId }: ChatProps) {
       setMessage("");
     },
     onError: (error: Error) => {
-      console.error('Message send error:', error);
       toast({
         title: "Error sending message",
         description: error.message,
@@ -98,9 +91,10 @@ export function Chat({ transactionId }: ChatProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim()) return;
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) return;
 
-    sendMessageMutation.mutate(message.trim());
+    sendMessageMutation.mutate(trimmedMessage);
   };
 
   if (error) {
