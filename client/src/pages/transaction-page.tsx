@@ -3,28 +3,32 @@ import { useParams, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ClipboardCheck, Clock, ArrowLeft } from 'lucide-react';
+import { ClipboardCheck, Clock, ArrowLeft, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { ProgressChecklist } from '@/components/progress-checklist';
 import { Chat } from '@/components/chat';
-import type { Transaction } from '@shared/schema';
 
 export default function TransactionPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
 
-  const { data: transaction, isError, isLoading } = useQuery<Transaction>({
-    queryKey: ['/api/transactions', Number(id)],
-    enabled: !!id && !!user?.id
+  console.log("TransactionPage mounted, ID:", id);
+
+  const { data: transaction, isError, error, isLoading } = useQuery({
+    queryKey: ['/api/transactions', id],
+    enabled: !!id && !!user?.id,
+    retry: false
   });
+
+  console.log("Current transaction data:", transaction);
 
   if (isLoading) {
     return <div className="p-6">Loading...</div>;
   }
 
-  if (isError || !transaction) {
+  if (isError) {
     return (
       <div className="p-6">
         <Button onClick={() => setLocation('/')} variant="ghost">
@@ -46,7 +50,7 @@ export default function TransactionPage() {
               Back
             </Button>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold">{transaction.address}</h1>
+              <h1 className="text-2xl font-bold">{transaction?.address}</h1>
               <p className="text-sm text-muted-foreground">Transaction ID: {id}</p>
             </div>
           </div>
@@ -70,7 +74,8 @@ export default function TransactionPage() {
               <TabsContent value="progress" className="mt-6">
                 <ProgressChecklist
                   transactionId={Number(id)}
-                  userRole={user?.role || "client"}
+                  checklist={transaction?.checklist}
+                  userRole={user?.role || ""}
                 />
               </TabsContent>
               <TabsContent value="chat" className="mt-6">
