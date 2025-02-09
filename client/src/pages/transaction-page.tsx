@@ -268,18 +268,17 @@ export default function TransactionPage() {
                     )}
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Option Period</p>
+                    <p className="text-sm text-muted-foreground">Option Expiration Date</p>
                     {isEditing ? (
                       <Input
-                        type="number"
-                        {...form.register("optionPeriod")}
-                        placeholder="Enter option period"
+                        type="date"
+                        {...form.register("optionExpirationDate")}
                         className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
                       <p className="font-medium">
-                        {transaction.optionPeriod
-                          ? `${transaction.optionPeriod} days`
+                        {transaction.optionExpirationDate
+                          ? new Date(transaction.optionExpirationDate).toLocaleDateString()
                           : 'Not set'}
                       </p>
                     )}
@@ -449,7 +448,13 @@ export default function TransactionPage() {
                     <Button
                       type="button"
                       onClick={form.handleSubmit((data) => {
-                        updateTransaction.mutate(data);
+                        const formattedData = {
+                          ...data,
+                          closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : undefined,
+                          contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : undefined,
+                          optionExpirationDate: data.optionExpirationDate ? new Date(data.optionExpirationDate).toISOString() : undefined
+                        };
+                        updateTransaction.mutate(formattedData);
                         setIsEditing(false);
                       })}
                       disabled={updateTransaction.isPending}
