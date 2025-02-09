@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, json, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -9,12 +9,27 @@ export const users = pgTable("users", {
   role: text("role").notNull(),
 });
 
+export const clients = pgTable("clients", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  type: text("type").notNull(), // 'buyer' or 'seller'
+  status: text("status").notNull(), // 'active', 'inactive', 'pending'
+  notes: text("notes"),
+  agentId: integer("agent_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   address: text("address").notNull(),
   accessCode: text("access_code").notNull(),
   status: text("status").notNull(),
   agentId: integer("agent_id").notNull(),
+  clientId: integer("client_id").notNull(),
   participants: json("participants").notNull().$type<{
     userId: number;
     role: string;
@@ -47,6 +62,10 @@ const checklistItemSchema = z.object({
 });
 
 export const insertUserSchema = createInsertSchema(users);
+export const insertClientSchema = createInsertSchema(clients).omit({ 
+  createdAt: true,
+  updatedAt: true 
+});
 export const insertTransactionSchema = createInsertSchema(transactions);
 export const insertChecklistSchema = createInsertSchema(checklists).extend({
   items: z.array(checklistItemSchema)
@@ -54,11 +73,13 @@ export const insertChecklistSchema = createInsertSchema(checklists).extend({
 export const insertMessageSchema = createInsertSchema(messages);
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type InsertClient = z.infer<typeof insertClientSchema>;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type InsertChecklist = z.infer<typeof insertChecklistSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 
 export type User = typeof users.$inferSelect;
+export type Client = typeof clients.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type Checklist = typeof checklists.$inferSelect;
 export type Message = typeof messages.$inferSelect;
