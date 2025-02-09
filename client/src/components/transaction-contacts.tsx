@@ -187,10 +187,11 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
               <TableHead>Mobile</TableHead>
               <TableHead>
                 <Button
-                  variant="ghost"
+                  variant="default"
                   size="sm"
                   onClick={() => setIsAddingContact(true)}
                   disabled={isAddingContact}
+                  className="bg-black hover:bg-black/90"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Contact
