@@ -18,17 +18,13 @@ export default function TransactionPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
 
-  // Ensure ID is valid before making the query
-  const transactionId = id ? parseInt(id, 10) : null;
-  const isValidId = !isNaN(Number(transactionId)) && transactionId > 0;
-
   const { data: transaction, isLoading: isLoadingTransaction, error } = useQuery<Transaction>({
-    queryKey: ["/api/transactions", transactionId],
-    enabled: !!user && isValidId,
+    queryKey: ["/api/transactions", id],
+    enabled: !!user && !!id,
   });
 
   const { data: checklist } = useQuery<Checklist>({
-    queryKey: ["/api/checklists", transactionId, user?.role],
+    queryKey: ["/api/checklists", id, user?.role],
     enabled: !!transaction && !!user?.role,
   });
 
@@ -40,20 +36,6 @@ export default function TransactionPage() {
           <p className="text-muted-foreground mt-2">Please log in to view this transaction.</p>
           <Button className="mt-4" onClick={() => setLocation("/auth")}>
             Go to Login
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isValidId) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold">Invalid Transaction ID</h2>
-          <p className="text-muted-foreground mt-2">The transaction ID provided is invalid.</p>
-          <Button className="mt-4" onClick={() => setLocation("/")}>
-            Return Home
           </Button>
         </div>
       </div>
@@ -100,19 +82,6 @@ export default function TransactionPage() {
       </div>
     );
   }
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "active":
-        return "bg-green-500/10 text-green-500";
-      case "pending":
-        return "bg-yellow-500/10 text-yellow-500";
-      case "completed":
-        return "bg-blue-500/10 text-blue-500";
-      default:
-        return "bg-gray-500/10 text-gray-500";
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -192,14 +161,14 @@ export default function TransactionPage() {
                   </TabsList>
                   <TabsContent value="progress" className="mt-6">
                     <ProgressChecklist
-                      transactionId={transactionId!}
+                      transactionId={Number(id)}
                       checklist={checklist}
                       userRole={user?.role || ""}
                     />
                   </TabsContent>
                   <TabsContent value="chat" className="mt-6">
                     <Chat
-                      transactionId={transactionId!}
+                      transactionId={Number(id)}
                       userId={user?.id || 0}
                     />
                   </TabsContent>

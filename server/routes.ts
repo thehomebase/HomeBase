@@ -26,13 +26,8 @@ export function registerRoutes(app: Express): Server {
       return res.sendStatus(401);
     }
 
-    const id = parseInt(req.params.id, 10);
-    if (isNaN(id) || id <= 0) {
-      return res.status(400).send('Invalid transaction ID');
-    }
-
     try {
-      const transaction = await storage.getTransaction(id);
+      const transaction = await storage.getTransaction(Number(req.params.id));
 
       if (!transaction) {
         return res.status(404).send('Transaction not found');
