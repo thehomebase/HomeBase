@@ -9,7 +9,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ClipboardCheck, MessageSquare } from "lucide-react";
+import { useForm } from "react-hook-form";
 import { ProgressChecklist } from "@/components/progress-checklist";
 import { Chat } from "@/components/chat";
 
@@ -124,10 +126,7 @@ export default function TransactionPage() {
               </TabsContent>
               <TabsContent value="details" className="mt-6">
                 <div className="space-y-4">
-                  <form className="grid grid-cols-2 gap-4" onSubmit={(e) => {
-                    e.preventDefault();
-                    // Add submission logic here
-                  }}>
+                  <form className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="contractPrice">Contract Price</Label>
                       <Input
