@@ -160,13 +160,12 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const id = Number(req.params.id);
+      // Only include fields that are explicitly provided in the request
       const data = {
         ...req.body,
-        closingDate: req.body.closingDate || null,
-        contractExecutionDate: req.body.contractExecutionDate || null
       };
 
-      // Remove any undefined or invalid fields
+      // Remove any undefined fields
       Object.keys(data).forEach(key => {
         if (data[key] === undefined) {
           delete data[key];

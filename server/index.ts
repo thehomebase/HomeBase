@@ -53,46 +53,33 @@ app.use((req, res, next) => {
       res.status(status).json({ message });
     });
 
+    // Use port 3000 instead of 5000
+    const PORT = Number(process.env.PORT || 3000);
+    log(`Attempting to start server on port ${PORT}`);
+
     if (app.get("env") === "development") {
+      // Setup Vite before starting the server
       await setupVite(app, server);
     } else {
       serveStatic(app);
     }
 
-    // Try different ports if the default port is in use
-    const tryPort = async (startPort: number): Promise<number> => {
-      for (let port = startPort; port < startPort + 10; port++) {
-        try {
-          await new Promise<void>((resolve, reject) => {
-            const onError = (error: Error & { code?: string }) => {
-              if (error.code === 'EADDRINUSE') {
-                console.log(`Port ${port} in use, trying next port...`);
-                server.removeListener('error', onError);
-                reject(error);
-              } else {
-                console.error(`Failed to bind to port ${port}:`, error);
-                reject(error);
-              }
-            };
-
-            server.once('error', onError);
-            server.listen(port, '0.0.0.0', () => {
-              server.removeListener('error', onError);
-              resolve();
-            });
-          });
-          return port;
-        } catch (err: unknown) {
-          const error = err as Error & { code?: string };
-          if (error.code !== 'EADDRINUSE') throw error;
+    // Start the server on the specified port
+    await new Promise<void>((resolve, reject) => {
+      server.listen(PORT, '0.0.0.0', () => {
+        log(`Server running on port ${PORT}`);
+        resolve();
+      }).on('error', (error: Error & { code?: string }) => {
+        if (error.code === 'EADDRINUSE') {
+          console.error(`Error: Port ${PORT} is already in use.`);
+          console.error('Please ensure no other service is running on this port.');
+          process.exit(1);
+        } else {
+          console.error(`Failed to start server:`, error);
+          reject(error);
         }
-      }
-      throw new Error('No available ports found');
-    };
-
-    const PORT = Number(process.env.PORT || 5000);
-    const actualPort = await tryPort(PORT);
-    log(`Server running on port ${actualPort}`);
+      });
+    });
 
   } catch (error) {
     console.error('Failed to start server:', error);
