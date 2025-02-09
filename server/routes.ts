@@ -307,6 +307,23 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/contacts", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const contactData = {
+        ...req.body,
+        transactionId: Number(req.body.transactionId)
+      };
+
+      const contact = await storage.createContact(contactData);
+      res.json(contact);
+    } catch (error) {
+      console.error('Error creating contact:', error);
+      res.status(500).json({ error: 'Failed to create contact' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

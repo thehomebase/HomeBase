@@ -638,6 +638,44 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async createContact(data: any) {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO contacts (
+          role,
+          first_name,
+          last_name,
+          email,
+          phone,
+          mobile_phone,
+          transaction_id
+        ) VALUES (
+          ${data.role},
+          ${data.firstName},
+          ${data.lastName},
+          ${data.email},
+          ${data.phone},
+          ${data.mobilePhone},
+          ${data.transactionId}
+        ) RETURNING *
+      `);
+      
+      return {
+        id: result.rows[0].id,
+        role: result.rows[0].role,
+        firstName: result.rows[0].first_name,
+        lastName: result.rows[0].last_name,
+        email: result.rows[0].email,
+        phone: result.rows[0].phone,
+        mobilePhone: result.rows[0].mobile_phone,
+        transactionId: result.rows[0].transaction_id
+      };
+    } catch (error) {
+      console.error('Error in createContact:', error);
+      throw error;
+    }
+  }
+
   async getClientsByAgent(agentId: number): Promise<Client[]> {
     try {
       const result = await db.execute(sql`
