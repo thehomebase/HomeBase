@@ -14,11 +14,10 @@ export default function TransactionPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const transactionId = id ? parseInt(id) : undefined;
 
   const { data: transaction, isError, isLoading } = useQuery<Transaction>({
-    queryKey: ['/api/transactions', transactionId],
-    enabled: !!transactionId && !!user?.id,
+    queryKey: ['/api/transactions', Number(id)],
+    enabled: !!id && !!user?.id,
     retry: false
   });
 
@@ -26,7 +25,7 @@ export default function TransactionPage() {
     return <div className="p-6">Loading...</div>;
   }
 
-  if (isError || !transactionId) {
+  if (isError) {
     return (
       <div className="p-6">
         <Button onClick={() => setLocation('/')} variant="ghost">
@@ -49,7 +48,7 @@ export default function TransactionPage() {
             </Button>
             <div className="flex-1">
               <h1 className="text-2xl font-bold">{transaction?.address}</h1>
-              <p className="text-sm text-muted-foreground">Transaction ID: {transactionId}</p>
+              <p className="text-sm text-muted-foreground">Transaction ID: {id}</p>
             </div>
           </div>
         </div>
@@ -70,20 +69,16 @@ export default function TransactionPage() {
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="progress" className="mt-6">
-                {transactionId && (
-                  <ProgressChecklist
-                    transactionId={transactionId}
-                    userRole={user?.role || ""}
-                  />
-                )}
+                <ProgressChecklist
+                  transactionId={Number(id)}
+                  userRole={user?.role || ""}
+                />
               </TabsContent>
               <TabsContent value="chat" className="mt-6">
-                {transactionId && (
-                  <Chat
-                    transactionId={transactionId}
-                    userId={user?.id || 0}
-                  />
-                )}
+                <Chat
+                  transactionId={Number(id)}
+                  userId={user?.id || 0}
+                />
               </TabsContent>
             </Tabs>
           </CardContent>

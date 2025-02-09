@@ -48,9 +48,7 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
       try {
         if (checklist) {
           // Update existing checklist
-          const response = await apiRequest("PATCH", `/api/checklists/${checklist.id}`, {
-            items: newItems
-          });
+          const response = await apiRequest("PATCH", `/api/checklists/${checklist.id}`, { items: newItems });
           return response.json();
         } else {
           // Create new checklist
@@ -80,7 +78,7 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
   });
 
   const handleCheck = (itemId: string, checked: boolean) => {
-    console.log("Checkbox clicked:", { itemId, checked, transactionId, userRole });
+    console.log("Handling checkbox change:", { itemId, checked, transactionId, userRole });
     const updatedItems = items.map(item =>
       item.id === itemId ? { ...item, completed: checked } : item
     );
