@@ -182,6 +182,8 @@ export default function TransactionPage() {
   const completedTasks = transaction.checklist?.filter(item => item.completed)?.length ?? 0;
   const totalTasks = transaction.checklist?.length ?? 1;
   const progress = Math.round((completedTasks / totalTasks) * 100);
+  const currentPhase = transaction.checklist?.find(item => !item.completed)?.phase || 
+    (transactionType === 'buy' ? "Pre-Offer" : "Pre-Listing Preparation");
 
   return (
     <div>
@@ -206,7 +208,12 @@ export default function TransactionPage() {
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-4">Transaction Summary</h3>
             <div className="space-y-4">
-              {user.role === 'agent' && (
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-muted-foreground">Current Phase</p>
+                  <p className="font-medium">{currentPhase}</p>
+                </div>
+                {user.role === 'agent' && (
                 <div className="flex justify-end">
                   <Button
                     type="button"
@@ -226,7 +233,11 @@ export default function TransactionPage() {
                     )}
                   </Button>
                 </div>
-              )}
+              </div>
+              <div className="space-y-2">
+                <Progress value={progress} className="h-2" />
+                <p className="text-sm text-muted-foreground">{progress}% Complete</p>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
