@@ -69,7 +69,6 @@ export default function TransactionPage() {
         throw new Error("Invalid transaction ID");
       }
 
-      // Clean up the data before sending
       const cleanData = Object.fromEntries(
         Object.entries(data).filter(([_, value]) => value !== undefined && value !== '')
       );
@@ -79,20 +78,37 @@ export default function TransactionPage() {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to update transaction");
       }
-      const updatedTransaction = await response.json();
-      return updatedTransaction;
+      return response.json();
     },
     onSuccess: (updatedData) => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
       setIsEditing(false);
-      form.reset(updatedData);
+      
+      // Reset form with the updated data
+      if (updatedData) {
+        form.reset({
+          contractPrice: updatedData.contractPrice || undefined,
+          optionPeriod: updatedData.optionPeriod || undefined,
+          optionFee: updatedData.optionFee || undefined,
+          earnestMoney: updatedData.earnestMoney || undefined,
+          downPayment: updatedData.downPayment || undefined,
+          sellerConcessions: updatedData.sellerConcessions || undefined,
+          closingDate: updatedData.closingDate || undefined,
+        });
+      }
+      
       toast({
         title: "Success",
         description: "Transaction updated successfully",
       });
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update transaction",
+        variant: "destructive",
+      });
+    }
       setIsEditing(false);
       form.reset({
         contractPrice: data.contractPrice,
