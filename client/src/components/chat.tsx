@@ -21,7 +21,7 @@ interface Message {
 }
 
 interface ChatProps {
-  transactionId: number | string;
+  transactionId: number;
 }
 
 export function Chat({ transactionId }: ChatProps) {
@@ -30,33 +30,9 @@ export function Chat({ transactionId }: ChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Ensure transactionId is a valid number
-  const numericTransactionId = typeof transactionId === 'string' ? parseInt(transactionId, 10) : transactionId;
-
-  // Validate transaction ID
-  if (isNaN(numericTransactionId)) {
-    return (
-      <div className="p-4 border rounded-lg bg-destructive/10 text-destructive">
-        Invalid transaction ID provided
-      </div>
-    );
-  }
-
   const { data: messages = [], isLoading } = useQuery<Message[]>({
-    queryKey: ["/api/messages", numericTransactionId],
-    queryFn: async () => {
-      try {
-        const response = await apiRequest("GET", `/api/messages?transactionId=${numericTransactionId}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch messages");
-        }
-        return response.json();
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-        throw error;
-      }
-    },
-    enabled: !!user && !!numericTransactionId,
+    queryKey: ["/api/messages", transactionId],
+    enabled: !!user && !!transactionId,
     refetchInterval: 5000,
   });
 
@@ -68,7 +44,7 @@ export function Chat({ transactionId }: ChatProps) {
 
       const messageData = {
         content,
-        transactionId: numericTransactionId,
+        transactionId,
         userId: user.id,
         username: user.username,
         role: user.role,
@@ -81,7 +57,7 @@ export function Chat({ transactionId }: ChatProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages", numericTransactionId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages", transactionId] });
       setMessage("");
     },
     onError: (error: Error) => {

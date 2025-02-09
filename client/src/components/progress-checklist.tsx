@@ -27,16 +27,6 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
 
   const { data: checklist, isLoading } = useQuery<Checklist>({
     queryKey: ["/api/checklists", transactionId, userRole],
-    queryFn: async () => {
-      const response = await apiRequest(
-        "GET",
-        `/api/checklists/${transactionId}/${userRole}`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch checklist");
-      }
-      return response.json();
-    },
     enabled: !!transactionId && !!userRole,
   });
 
@@ -108,10 +98,10 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
   }, [isLoading, checklist]);
 
   const items = checklist?.items || DEFAULT_ITEMS;
-  const progress = Math.round((items.filter((item: ChecklistItem) => item.completed).length / items.length) * 100);
+  const progress = Math.round((items.filter((item) => item.completed).length / items.length) * 100);
 
   const handleCheck = (itemId: string, checked: boolean) => {
-    const updatedItems = items.map((item: ChecklistItem) =>
+    const updatedItems = items.map((item) =>
       item.id === itemId ? { ...item, completed: checked } : item
     );
     updateChecklistMutation.mutate(updatedItems);
@@ -135,12 +125,12 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {items.map((item: ChecklistItem) => (
+            {items.map((item) => (
               <div key={item.id} className="flex items-center space-x-2">
                 <Checkbox
                   id={item.id}
                   checked={item.completed}
-                  onCheckedChange={(checked) => handleCheck(item.id, checked as boolean)}
+                  onCheckedChange={(checked) => handleCheck(item.id, checked)}
                   disabled={updateChecklistMutation.isPending}
                 />
                 <label
