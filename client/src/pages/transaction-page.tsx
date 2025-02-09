@@ -27,7 +27,7 @@ interface Transaction {
   sellerConcessions?: number;
   closingDate?: string;
   checklist?: Array<{ id: string; text: string; completed: boolean }>;
-  type: 'buy' | 'sell'; // Added transaction type
+  type: 'buy' | 'sell';
 }
 
 interface TransactionFormData {
@@ -176,33 +176,6 @@ export default function TransactionPage() {
       <main className="container mx-auto p-6">
         <Card>
           <CardContent className="p-6">
-            <Tabs defaultValue="progress">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="progress">
-                  <ClipboardCheck className="h-4 w-4 mr-2" />
-                  Progress
-                </TabsTrigger>
-                <TabsTrigger value="chat">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Chat
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="progress" className="mt-6">
-                <ProgressChecklist 
-                  transactionId={parsedId}
-                  userRole={user.role || ""}
-                  transactionType={transaction.type as 'buy' | 'sell'}
-                />
-              </TabsContent>
-              <TabsContent value="chat" className="mt-6">
-                <Chat transactionId={parsedId} />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-
-        <Card className="mt-6">
-          <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-4">Transaction Summary</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -278,6 +251,33 @@ export default function TransactionPage() {
               <Progress value={progress} className="h-2" />
               <p className="text-sm text-muted-foreground">{progress}% Complete</p>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardContent className="p-6">
+            <Tabs defaultValue="progress">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="progress">
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  Progress
+                </TabsTrigger>
+                <TabsTrigger value="chat">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Chat
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="progress" className="mt-6">
+                <ProgressChecklist 
+                  transactionId={parsedId}
+                  userRole={user.role || ""}
+                  transactionType={transaction.type as 'buy' | 'sell'}
+                />
+              </TabsContent>
+              <TabsContent value="chat" className="mt-6">
+                <Chat transactionId={parsedId} />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
