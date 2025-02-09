@@ -96,7 +96,8 @@ export default function TransactionPage() {
           downPayment: updatedTransaction.downPayment || undefined,
           sellerConcessions: updatedTransaction.sellerConcessions || undefined,
           closingDate: updatedTransaction.closingDate || undefined,
-          contractExecutionDate: updatedTransaction.contractExecutionDate || undefined, // Added contract execution date
+          contractExecutionDate: updatedTransaction.contractExecutionDate || undefined,
+          status: updatedTransaction.status || undefined,
         });
       }
 
@@ -362,7 +363,27 @@ export default function TransactionPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
-                  <p className="font-medium capitalize">{transaction.status}</p>
+                  {isEditing ? (
+                    <select
+                      className="w-full px-3 py-2 border rounded-md"
+                      value={transaction.status}
+                      {...form.register("status")}
+                    >
+                      <option value="coming_soon">Coming Soon</option>
+                      <option value="active">Active</option>
+                      <option value="active_option">Active Option Contract</option>
+                      <option value="pending">Pending</option>
+                      <option value="closed">Closed</option>
+                      <option value="withdrawn">Withdrawn</option>
+                      <option value="canceled">Canceled</option>
+                    </select>
+                  ) : (
+                    <p className="font-medium capitalize">
+                      {transaction.status === 'active_option' 
+                        ? 'Active Option Contract'
+                        : transaction.status?.replace('_', ' ')}
+                    </p>
+                  )}
                 </div>
               </div>
 
