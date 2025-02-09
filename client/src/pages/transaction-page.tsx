@@ -1,11 +1,13 @@
 
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ArrowLeft, ClipboardCheck, MessageSquare } from "lucide-react";
 import { ProgressChecklist } from "@/components/progress-checklist";
 import { Chat } from "@/components/chat";
@@ -17,6 +19,25 @@ export default function TransactionPage() {
   const parsedId = id ? parseInt(id, 10) : null;
   const isValidId = parsedId && !isNaN(parsedId);
   
+  const queryClient = useQueryClient();
+  
+  const updateTransaction = useMutation({
+    mutationFn: async (data: Partial<Transaction>) => {
+      const response = await apiRequest(
+        "PATCH",
+        `/api/transactions/${parsedId}`,
+        data
+      );
+      if (!response.ok) {
+        throw new Error("Failed to update transaction");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
+    },
+  });
+
   const { data: transaction, isError, error } = useQuery({
     queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
@@ -88,36 +109,87 @@ export default function TransactionPage() {
               </TabsContent>
               <TabsContent value="details" className="mt-6">
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <form className="grid grid-cols-2 gap-4" onSubmit={(e) => {
+                    e.preventDefault();
+                    // Add submission logic here
+                  }}>
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Contract Price</p>
-                      <p className="text-lg">${transaction?.contractPrice?.toLocaleString() || 'Not set'}</p>
+                      <Label htmlFor="contractPrice">Contract Price</Label>
+                      <Input
+                        id="contractPrice"
+                        type="number"
+                        defaultValue={transaction?.contractPrice}
+                        placeholder="Enter contract price"
+                        disabled={user?.role !== 'agent'}
+                      />
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Option Period</p>
-                      <p className="text-lg">{transaction?.optionPeriod || 'Not set'} days</p>
+                      <Label htmlFor="optionPeriod">Option Period (days)</Label>
+                      <Input
+                        id="optionPeriod"
+                        type="number"
+                        defaultValue={transaction?.optionPeriod}
+                        placeholder="Enter option period"
+                        disabled={user?.role !== 'agent'}
+                      />
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Option Fee</p>
-                      <p className="text-lg">${transaction?.optionFee?.toLocaleString() || 'Not set'}</p>
+                      <Label htmlFor="optionFee">Option Fee</Label>
+                      <Input
+                        id="optionFee"
+                        type="number"
+                        defaultValue={transaction?.optionFee}
+                        placeholder="Enter option fee"
+                        disabled={user?.role !== 'agent'}
+                      />
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Earnest Money</p>
-                      <p className="text-lg">${transaction?.earnestMoney?.toLocaleString() || 'Not set'}</p>
+                      <Label htmlFor="earnestMoney">Earnest Money</Label>
+                      <Input
+                        id="earnestMoney"
+                        type="number"
+                        defaultValue={transaction?.earnestMoney}
+                        placeholder="Enter earnest money"
+                        disabled={user?.role !== 'agent'}
+                      />
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Down Payment</p>
-                      <p className="text-lg">${transaction?.downPayment?.toLocaleString() || 'Not set'}</p>
+                      <Label htmlFor="downPayment">Down Payment</Label>
+                      <Input
+                        id="downPayment"
+                        type="number"
+                        defaultValue={transaction?.downPayment}
+                        placeholder="Enter down payment"
+                        disabled={user?.role !== 'agent'}
+                      />
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Seller Concessions</p>
-                      <p className="text-lg">${transaction?.sellerConcessions?.toLocaleString() || 'Not set'}</p>
+                      <Label htmlFor="sellerConcessions">Seller Concessions</Label>
+                      <Input
+                        id="sellerConcessions"
+                        type="number"
+                        defaultValue={transaction?.sellerConcessions}
+                        placeholder="Enter seller concessions"
+                        disabled={user?.role !== 'agent'}
+                      />
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Closing Date</p>
-                      <p className="text-lg">{transaction?.closingDate || 'Not set'}</p>
+                      <Label htmlFor="closingDate">Closing Date</Label>
+                      <Input
+                        id="closingDate"
+                        type="date"
+                        defaultValue={transaction?.closingDate}
+                        disabled={user?.role !== 'agent'}
+                      />
                     </div>
-                  </div>
+                    {user?.role === 'agent' && (
+                      <div className="col-span-2 flex justify-end">
+                        <Button type="submit">
+                          Save Changes
+                        </Button>
+                      </div>
+                    )}
+                  </form>
                 </div>
               </TabsContent>
             </Tabs>

@@ -103,13 +103,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
-    try {
-      const [transaction] = await db.insert(transactions).values(insertTransaction).returning();
-      return transaction;
-    } catch (error) {
-      console.error('Error in createTransaction:', error);
-      throw error;
-    }
+    const result = await db.insert(transactions).values(insertTransaction).returning();
+    return result[0];
   }
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
@@ -204,8 +199,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction> {
-    const [transaction] = await db.update(transactions).set(data).where(eq(transactions.id, id)).returning();
-    return transaction;
+    const result = await db
+      .update(transactions)
+      .set(data)
+      .where(eq(transactions.id, id))
+      .returning();
+    return result[0];
   }
 
   async createChecklist(insertChecklist: InsertChecklist): Promise<Checklist> {

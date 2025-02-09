@@ -82,6 +82,21 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.patch("/api/transactions/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const id = Number(req.params.id);
+      const transaction = await storage.updateTransaction(id, req.body);
+      res.json(transaction);
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+      res.status(500).send('Error updating transaction');
+    }
+  });
+
   app.post("/api/transactions", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "agent") {
       return res.sendStatus(401);
