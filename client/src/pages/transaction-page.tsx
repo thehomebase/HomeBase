@@ -9,11 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ClipboardCheck, MessageSquare, UserPlus, Pencil, X } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import { ProgressChecklist } from "@/components/progress-checklist";
-import { Chat } from "@/components/chat";
+import { DocumentChecklist } from "@/components/document-checklist";
 import { TransactionContacts } from "@/components/transaction-contacts";
 
 interface Transaction {
@@ -476,9 +476,9 @@ export default function TransactionPage() {
                     <UserPlus className="h-4 w-4 mr-2" />
                     Contacts
                   </TabsTrigger>
-                  <TabsTrigger value="chat">
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Chat
+                  <TabsTrigger value="documents">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Documents
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="progress" className="mt-6">
@@ -491,8 +491,8 @@ export default function TransactionPage() {
                 <TabsContent value="contacts" className="mt-6">
                   <TransactionContacts transactionId={parsedId} />
                 </TabsContent>
-                <TabsContent value="chat" className="mt-6">
-                  <Chat transactionId={parsedId} />
+                <TabsContent value="documents" className="mt-6">
+                  <DocumentChecklist transactionId={parsedId} />
                 </TabsContent>
               </Tabs>
             </CardContent>
