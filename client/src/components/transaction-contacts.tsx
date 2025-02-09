@@ -64,6 +64,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
     },
   });
 
+  const queryClient = useQueryClient();
   const addContactMutation = useMutation({
     mutationFn: async (data: Partial<Contact>) => {
       const contactData = {
@@ -86,6 +87,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
         email: "",
       });
       setIsAddingContact(false);
+      queryClient.invalidateQueries(["/api/contacts", transactionId]);
       toast({
         title: "Success",
         description: "Contact added successfully",
