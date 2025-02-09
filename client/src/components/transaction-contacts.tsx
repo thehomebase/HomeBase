@@ -89,53 +89,6 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
     },
   });
 
-  const updateContactMutation = useMutation({
-    mutationFn: async (contact: Contact) => {
-      const response = await apiRequest("PATCH", `/api/contacts/${contact.id}`, contact);
-      if (!response.ok) {
-        throw new Error("Failed to update contact");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts", transactionId] });
-      toast({
-        title: "Contact updated",
-        description: "The contact has been updated successfully.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update contact",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteContactMutation = useMutation({
-    mutationFn: async (contactId: number) => {
-      const response = await apiRequest("DELETE", `/api/contacts/${contactId}`);
-      if (!response.ok) {
-        throw new Error("Failed to delete contact");
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts", transactionId] });
-      toast({
-        title: "Contact deleted",
-        description: "The contact has been deleted successfully.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete contact",
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleAddContact = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newContact.role || !newContact.firstName || !newContact.lastName || !newContact.email) {
@@ -164,7 +117,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
           <CardTitle className="text-lg">Add New Contact</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleAddContact} className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleAddContact} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="role">Role *</Label>
               <select
@@ -182,24 +135,28 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                 ))}
               </select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name *</Label>
-              <Input
-                id="firstName"
-                value={newContact.firstName}
-                onChange={(e) => setNewContact({ ...newContact, firstName: e.target.value })}
-                required
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name *</Label>
+                <Input
+                  id="firstName"
+                  value={newContact.firstName}
+                  onChange={(e) => setNewContact({ ...newContact, firstName: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name *</Label>
+                <Input
+                  id="lastName"
+                  value={newContact.lastName}
+                  onChange={(e) => setNewContact({ ...newContact, lastName: e.target.value })}
+                  required
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name *</Label>
-              <Input
-                id="lastName"
-                value={newContact.lastName}
-                onChange={(e) => setNewContact({ ...newContact, lastName: e.target.value })}
-                required
-              />
-            </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">Email *</Label>
               <Input
@@ -210,25 +167,29 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                type="tel"
-                value={newContact.phone}
-                onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={newContact.phone}
+                  onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mobilePhone">Mobile Phone</Label>
+                <Input
+                  id="mobilePhone"
+                  type="tel"
+                  value={newContact.mobilePhone}
+                  onChange={(e) => setNewContact({ ...newContact, mobilePhone: e.target.value })}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="mobilePhone">Mobile Phone</Label>
-              <Input
-                id="mobilePhone"
-                type="tel"
-                value={newContact.mobilePhone}
-                onChange={(e) => setNewContact({ ...newContact, mobilePhone: e.target.value })}
-              />
-            </div>
-            <div className="col-span-2 flex justify-end">
+
+            <div className="flex justify-end">
               <Button type="submit" disabled={addContactMutation.isPending}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Contact
