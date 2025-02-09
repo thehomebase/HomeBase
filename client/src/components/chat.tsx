@@ -49,32 +49,31 @@ export function Chat({ transactionId }: ChatProps) {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (messageContent: string) => {
+      // Validate user and transaction
       if (!user?.id || !user?.username || !user?.role) {
-        throw new Error("User information is incomplete");
+        throw new Error("Please log in to send messages");
       }
 
-      // Ensure transactionId is a number and valid
-      const tid = Number(transactionId);
-      if (!tid || isNaN(tid)) {
-        throw new Error("Invalid transaction ID");
+      if (!transactionId) {
+        throw new Error("Cannot send message - invalid transaction");
       }
 
       const messageData = {
-        content: messageContent.trim(),
-        transactionId: tid,
+        content: messageContent,
+        transactionId: transactionId,
         userId: user.id,
         username: user.username,
         role: user.role,
         timestamp: new Date().toISOString()
       };
 
-      console.log('Sending message data:', messageData); // Debug log
-
       const response = await apiRequest("POST", "/api/messages", messageData);
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || "Failed to send message");
       }
+
       return response.json();
     },
     onSuccess: () => {
@@ -99,16 +98,9 @@ export function Chat({ transactionId }: ChatProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim()) {
-      toast({
-        title: "Error",
-        description: "Message cannot be empty",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!message.trim()) return;
 
-    sendMessageMutation.mutate(message);
+    sendMessageMutation.mutate(message.trim());
   };
 
   if (error) {
@@ -180,7 +172,6 @@ export function Chat({ transactionId }: ChatProps) {
           type="submit"
           size="icon"
           disabled={sendMessageMutation.isPending || !message.trim()}
-          aria-label="Send message"
         >
           <Send className="h-4 w-4" />
         </Button>

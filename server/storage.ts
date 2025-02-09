@@ -237,24 +237,43 @@ export class DatabaseStorage implements IStorage {
 
   async createMessage(insertMessage: InsertMessage): Promise<Message> {
     try {
-      // First create the message with basic fields
+      // First verify if the transaction exists
+      const transactionExists = await db.execute(sql`
+        SELECT EXISTS(
+          SELECT 1 FROM transactions 
+          WHERE id = ${insertMessage.transactionId}
+        );
+      `);
+
+      if (!transactionExists.rows[0]?.exists) {
+        throw new Error(`Transaction with ID ${insertMessage.transactionId} not found`);
+      }
+
+      // Then create the message with all required fields
       const result = await db.execute(sql`
         INSERT INTO messages (
+          transaction_id,
           user_id,
           username,
           role,
           content,
-          timestamp,
-          transaction_id
+          timestamp
         ) VALUES (
+          ${insertMessage.transactionId},
           ${insertMessage.userId},
           ${insertMessage.username},
           ${insertMessage.role},
           ${insertMessage.content},
-          ${insertMessage.timestamp},
-          ${insertMessage.transactionId}
+          COALESCE(${insertMessage.timestamp}, NOW())
         )
-        RETURNING *
+        RETURNING 
+          id,
+          transaction_id as "transactionId",
+          user_id as "userId",
+          username,
+          role,
+          content,
+          timestamp
       `);
 
       if (!result.rows[0]) {
@@ -263,16 +282,17 @@ export class DatabaseStorage implements IStorage {
 
       const message = result.rows[0];
 
-      // Return the complete message with proper typing
+      // Return properly typed message object
       return {
         id: Number(message.id),
-        transactionId: Number(message.transaction_id),
-        userId: Number(message.user_id),
+        transactionId: Number(message.transactionId),
+        userId: Number(message.userId),
         username: String(message.username),
         role: String(message.role),
         content: String(message.content),
         timestamp: String(message.timestamp)
       };
+
     } catch (error) {
       console.error('Error in createMessage:', error);
       throw error;
