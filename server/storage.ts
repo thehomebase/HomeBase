@@ -640,6 +640,20 @@ export class DatabaseStorage implements IStorage {
 
   async createContact(data: any) {
     try {
+      // Validate required fields
+      if (!data.role || !data.firstName || !data.lastName || !data.email || !data.transactionId) {
+        throw new Error('Missing required fields');
+      }
+
+      // Validate transaction exists
+      const transactionExists = await db.execute(sql`
+        SELECT EXISTS(SELECT 1 FROM transactions WHERE id = ${data.transactionId})
+      `);
+
+      if (!transactionExists.rows[0].exists) {
+        throw new Error('Transaction not found');
+      }
+
       const result = await db.execute(sql`
         INSERT INTO contacts (
           role,
@@ -654,11 +668,15 @@ export class DatabaseStorage implements IStorage {
           ${data.firstName},
           ${data.lastName},
           ${data.email},
-          ${data.phone},
-          ${data.mobilePhone},
+          ${data.phone || null},
+          ${data.mobilePhone || null},
           ${data.transactionId}
         ) RETURNING *
       `);
+
+      if (!result.rows[0]) {
+        throw new Error('Failed to create contact');
+      }
       
       return {
         id: result.rows[0].id,
