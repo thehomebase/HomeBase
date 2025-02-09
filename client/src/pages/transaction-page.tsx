@@ -178,74 +178,145 @@ export default function TransactionPage() {
         <Card>
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-4">Transaction Summary</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Transaction Type</p>
-                <p className="font-medium capitalize">
-                  {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
-                </p>
+            <form onSubmit={form.handleSubmit((data) => updateTransaction.mutate(data))} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Transaction Type</p>
+                  <p className="font-medium capitalize">
+                    {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="contractPrice">Contract Price</Label>
+                  {user.role === 'agent' ? (
+                    <Input
+                      id="contractPrice"
+                      type="number"
+                      {...form.register("contractPrice")}
+                      placeholder="Enter contract price"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.contractPrice 
+                        ? `$${transaction.contractPrice.toLocaleString()}` 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="optionPeriod">Option Period (days)</Label>
+                  {user.role === 'agent' ? (
+                    <Input
+                      id="optionPeriod"
+                      type="number"
+                      {...form.register("optionPeriod")}
+                      placeholder="Enter option period"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.optionPeriod 
+                        ? `${transaction.optionPeriod} days` 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="optionFee">Option Fee</Label>
+                  {user.role === 'agent' ? (
+                    <Input
+                      id="optionFee"
+                      type="number"
+                      {...form.register("optionFee")}
+                      placeholder="Enter option fee"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.optionFee 
+                        ? `$${transaction.optionFee.toLocaleString()}` 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="earnestMoney">Earnest Money</Label>
+                  {user.role === 'agent' ? (
+                    <Input
+                      id="earnestMoney"
+                      type="number"
+                      {...form.register("earnestMoney")}
+                      placeholder="Enter earnest money"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.earnestMoney 
+                        ? `$${transaction.earnestMoney.toLocaleString()}` 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="downPayment">Down Payment</Label>
+                  {user.role === 'agent' ? (
+                    <Input
+                      id="downPayment"
+                      type="number"
+                      {...form.register("downPayment")}
+                      placeholder="Enter down payment"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.downPayment 
+                        ? `$${transaction.downPayment.toLocaleString()}` 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="sellerConcessions">Seller Concessions</Label>
+                  {user.role === 'agent' ? (
+                    <Input
+                      id="sellerConcessions"
+                      type="number"
+                      {...form.register("sellerConcessions")}
+                      placeholder="Enter seller concessions"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.sellerConcessions 
+                        ? `$${transaction.sellerConcessions.toLocaleString()}` 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="closingDate">Closing Date</Label>
+                  {user.role === 'agent' ? (
+                    <Input
+                      id="closingDate"
+                      type="date"
+                      {...form.register("closingDate")}
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.closingDate 
+                        ? new Date(transaction.closingDate).toLocaleDateString() 
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <p className="font-medium capitalize">{transaction.status}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Contract Price</p>
-                <p className="font-medium">
-                  {transaction.contractPrice 
-                    ? `$${transaction.contractPrice.toLocaleString()}` 
-                    : 'Not set'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Option Period</p>
-                <p className="font-medium">
-                  {transaction.optionPeriod 
-                    ? `${transaction.optionPeriod} days` 
-                    : 'Not set'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Option Fee</p>
-                <p className="font-medium">
-                  {transaction.optionFee 
-                    ? `$${transaction.optionFee.toLocaleString()}` 
-                    : 'Not set'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Earnest Money</p>
-                <p className="font-medium">
-                  {transaction.earnestMoney 
-                    ? `$${transaction.earnestMoney.toLocaleString()}` 
-                    : 'Not set'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Down Payment</p>
-                <p className="font-medium">
-                  {transaction.downPayment 
-                    ? `$${transaction.downPayment.toLocaleString()}` 
-                    : 'Not set'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Seller Concessions</p>
-                <p className="font-medium">
-                  {transaction.sellerConcessions 
-                    ? `$${transaction.sellerConcessions.toLocaleString()}` 
-                    : 'Not set'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Closing Date</p>
-                <p className="font-medium">
-                  {transaction.closingDate 
-                    ? new Date(transaction.closingDate).toLocaleDateString() 
-                    : 'Not set'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Status</p>
-                <p className="font-medium capitalize">{transaction.status}</p>
-              </div>
-            </div>
+              {user.role === 'agent' && (
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={updateTransaction.isPending}>
+                    Save Changes
+                  </Button>
+                </div>
+              )}
+            </form>
 
             <div className="mt-6 space-y-2">
               <h4 className="text-sm font-medium">Progress</h4>
