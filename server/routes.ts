@@ -242,12 +242,14 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
+      const { items, role, transactionId } = req.body;
+      
       const parsed = z.array(z.object({
         id: z.string(),
         text: z.string(),
         completed: z.boolean(),
         phase: z.string(),
-      })).safeParse(req.body.items);
+      })).safeParse(items);
 
       if (!parsed.success) {
         console.error('Validation error:', parsed.error);
