@@ -2,12 +2,11 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { Checklist } from "@shared/schema";
 import { Progress } from "@/components/ui/progress";
+import type { Checklist } from "@shared/schema";
 
 interface ProgressChecklistProps {
   transactionId: number;
-  checklist?: Checklist;
   userRole: string;
 }
 
@@ -19,77 +18,55 @@ const DEFAULT_ITEMS = {
     { id: "a4", text: "List property on MLS", completed: false },
     { id: "a5", text: "Schedule open houses", completed: false },
   ],
-  lender: [
-    { id: "l1", text: "Pre-approval letter issued", completed: false },
-    { id: "l2", text: "Review borrower documentation", completed: false },
-    { id: "l3", text: "Order property appraisal", completed: false },
-    { id: "l4", text: "Clear underwriting conditions", completed: false },
-    { id: "l5", text: "Issue final loan approval", completed: false },
-  ],
-  title: [
-    { id: "t1", text: "Title search completed", completed: false },
-    { id: "t2", text: "Review title report", completed: false },
-    { id: "t3", text: "Clear title issues", completed: false },
-    { id: "t4", text: "Prepare closing documents", completed: false },
-    { id: "t5", text: "Schedule closing", completed: false },
-  ],
-  inspector: [
-    { id: "i1", text: "Schedule inspection", completed: false },
-    { id: "i2", text: "Complete property inspection", completed: false },
-    { id: "i3", text: "Generate inspection report", completed: false },
-    { id: "i4", text: "Review findings with client", completed: false },
-    { id: "i5", text: "Follow-up inspection if needed", completed: false },
-  ],
   client: [
     { id: "c1", text: "Sign purchase agreement", completed: false },
     { id: "c2", text: "Submit earnest money", completed: false },
     { id: "c3", text: "Schedule property inspection", completed: false },
     { id: "c4", text: "Review closing documents", completed: false },
     { id: "c5", text: "Final walk-through", completed: false },
-  ],
+  ]
 } as const;
 
-export function ProgressChecklist({
-  transactionId,
-  checklist,
-  userRole,
-}: ProgressChecklistProps) {
-  // Get existing checklist if not provided
-  const { data: fetchedChecklist } = useQuery({
+export function ProgressChecklist({ transactionId, userRole }: ProgressChecklistProps) {
+  // Get existing checklist
+  const { data: checklist } = useQuery<Checklist>({
     queryKey: ["/api/checklists", transactionId, userRole],
-    enabled: !checklist && !!transactionId && !!userRole,
+    enabled: !!transactionId && !!userRole,
   });
 
-  const currentChecklist = checklist || fetchedChecklist;
   const defaultItems = DEFAULT_ITEMS[userRole as keyof typeof DEFAULT_ITEMS] || [];
-  const items = currentChecklist?.items || defaultItems;
-  const progress = Math.round((items.filter((item) => item.completed).length / items.length) * 100);
+  const items = checklist?.items || defaultItems;
+  const progress = Math.round((items.filter(item => item.completed).length / items.length) * 100);
 
-  const createOrUpdateMutation = useMutation({
-    mutationFn: async ({ items }: { items: typeof defaultItems }) => {
-      if (!currentChecklist) {
+  // Single mutation to handle both create and update
+  const updateChecklistMutation = useMutation({
+    mutationFn: async (newItems: typeof defaultItems) => {
+      if (checklist) {
+        // Update existing checklist
+        await apiRequest("PATCH", `/api/checklists/${checklist.id}`, { items: newItems });
+      } else {
         // Create new checklist
         await apiRequest("POST", "/api/checklists", {
           transactionId,
           role: userRole,
-          items,
+          items: newItems
         });
-      } else {
-        // Update existing checklist
-        await apiRequest("PATCH", `/api/checklists/${currentChecklist.id}`, { items });
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/checklists", transactionId, userRole] });
     },
+    onError: (error) => {
+      console.error("Failed to update checklist:", error);
+    }
   });
 
   const handleCheck = (itemId: string, checked: boolean) => {
     console.log("Handling checkbox change:", { itemId, checked });
-    const updatedItems = items.map((item) =>
+    const updatedItems = items.map(item =>
       item.id === itemId ? { ...item, completed: checked } : item
     );
-    createOrUpdateMutation.mutate({ items: updatedItems });
+    updateChecklistMutation.mutate(updatedItems);
   };
 
   return (
@@ -108,10 +85,13 @@ export function ProgressChecklist({
                   id={item.id}
                   checked={item.completed}
                   onCheckedChange={(checked) => handleCheck(item.id, checked as boolean)}
+                  className="cursor-pointer"
                 />
                 <label
                   htmlFor={item.id}
-                  className={`text-sm ${item.completed ? "line-through text-muted-foreground" : ""}`}
+                  className={`text-sm cursor-pointer ${
+                    item.completed ? "line-through text-muted-foreground" : ""
+                  }`}
                 >
                   {item.text}
                 </label>
