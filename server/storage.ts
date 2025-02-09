@@ -643,7 +643,7 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(sql`
         SELECT * FROM contacts WHERE transaction_id = ${transactionId}
       `);
-      
+
       return result.rows.map(row => ({
         id: row.id,
         role: row.role,
@@ -712,7 +712,7 @@ export class DatabaseStorage implements IStorage {
       if (!result.rows[0]) {
         throw new Error('Failed to create contact');
       }
-      
+
       return {
         id: result.rows[0].id,
         role: result.rows[0].role,
