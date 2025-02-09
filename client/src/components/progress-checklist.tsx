@@ -24,9 +24,27 @@ interface Checklist {
 
 export function ProgressChecklist({ transactionId, userRole }: ProgressChecklistProps) {
   const { toast } = useToast();
+  const DEFAULT_ITEMS: ChecklistItem[] = [
+    { id: "1", text: "Initial consultation with client", completed: false },
+    { id: "2", text: "Property listing agreement signed", completed: false },
+    { id: "3", text: "Schedule professional photography", completed: false },
+    { id: "4", text: "List property on MLS", completed: false },
+    { id: "5", text: "Schedule open houses", completed: false },
+  ];
 
   const { data: checklist, isLoading } = useQuery<Checklist>({
     queryKey: ["/api/checklists", transactionId, userRole],
+    queryFn: async () => {
+      const response = await apiRequest(
+        "GET",
+        `/api/checklists/${transactionId}/${userRole}`
+      );
+      if (!response.ok) {
+        console.error("Failed to fetch checklist:", await response.text());
+        throw new Error("Failed to fetch checklist");
+      }
+      return response.json();
+    },
     enabled: !!transactionId && !!userRole,
   });
 
@@ -82,14 +100,6 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
     },
   });
 
-  const DEFAULT_ITEMS: ChecklistItem[] = [
-    { id: "1", text: "Initial consultation with client", completed: false },
-    { id: "2", text: "Property listing agreement signed", completed: false },
-    { id: "3", text: "Schedule professional photography", completed: false },
-    { id: "4", text: "List property on MLS", completed: false },
-    { id: "5", text: "Schedule open houses", completed: false },
-  ];
-
   // Create a new checklist if one doesn't exist
   useEffect(() => {
     if (!isLoading && !checklist) {
@@ -98,10 +108,10 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
   }, [isLoading, checklist]);
 
   const items = checklist?.items || DEFAULT_ITEMS;
-  const progress = Math.round((items.filter((item) => item.completed).length / items.length) * 100);
+  const progress = Math.round((items.filter(item => item.completed).length / items.length) * 100);
 
   const handleCheck = (itemId: string, checked: boolean) => {
-    const updatedItems = items.map((item) =>
+    const updatedItems = items.map(item =>
       item.id === itemId ? { ...item, completed: checked } : item
     );
     updateChecklistMutation.mutate(updatedItems);
@@ -130,7 +140,7 @@ export function ProgressChecklist({ transactionId, userRole }: ProgressChecklist
                 <Checkbox
                   id={item.id}
                   checked={item.completed}
-                  onCheckedChange={(checked) => handleCheck(item.id, checked)}
+                  onCheckedChange={(checked) => handleCheck(item.id, !!checked)}
                   disabled={updateChecklistMutation.isPending}
                 />
                 <label
