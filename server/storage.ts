@@ -4,13 +4,11 @@ import {
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient 
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or } from "drizzle-orm";
-import session from "express-session";
-import connectPg from "connect-pg-simple";
-import { pool } from "./db";
 import { sql } from 'drizzle-orm/sql';
+import session from 'express-session';
+import MemoryStore from 'memorystore';
 
-const PostgresSessionStore = connectPg(session);
+const MemoryStoreSession = MemoryStore(session);
 
 // Define ChecklistItem type to match the frontend
 interface ChecklistItem {
@@ -18,6 +16,13 @@ interface ChecklistItem {
   text: string;
   completed: boolean;
   phase: string;
+}
+
+interface Document {
+  id: string;
+  name: string;
+  status: 'not_applicable' | 'waiting_signatures' | 'signed' | 'waiting_others' | 'complete';
+  transactionId: number;
 }
 
 export interface IStorage {
@@ -45,6 +50,12 @@ export interface IStorage {
   sessionStore: session.Store;
   getClientsByAgent(agentId: number):Promise<Client[]>;
   createClient(insertClient:InsertClient):Promise<Client>;
+
+  // Document operations
+  getDocumentsByTransaction(transactionId: number): Promise<Document[]>;
+  createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document>;
+  updateDocument(id: string, data: Partial<Document>): Promise<Document>;
+  deleteDocument(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -53,9 +64,8 @@ export class DatabaseStorage implements IStorage {
   private SELLER_CHECKLIST_ITEMS: ChecklistItem[];
 
   constructor() {
-    this.sessionStore = new PostgresSessionStore({
-      pool,
-      createTableIfMissing: true,
+    this.sessionStore = new MemoryStoreSession({
+      checkPeriod: 86400000 // prune expired entries every 24h
     });
 
     // Initialize checklist items
@@ -821,6 +831,83 @@ export class DatabaseStorage implements IStorage {
       return client;
     } catch (error) {
       console.error('Error in createClient:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM documents 
+        WHERE transaction_id = ${transactionId}
+        ORDER BY id ASC
+      `);
+
+      return result.rows.map(row => ({
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      }));
+    } catch (error) {
+      console.error('Error in getDocumentsByTransaction:', error);
+      return [];
+    }
+  }
+
+  async createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO documents (name, status, transaction_id)
+        VALUES (${document.name}, ${document.status}, ${document.transactionId})
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in createDocument:', error);
+      throw error;
+    }
+  }
+
+  async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE documents 
+        SET 
+          status = COALESCE(${data.status}, status),
+          name = COALESCE(${data.name}, name)
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in updateDocument:', error);
+      throw error;
+    }
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM documents 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteDocument:', error);
       throw error;
     }
   }

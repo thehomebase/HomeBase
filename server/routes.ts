@@ -373,6 +373,54 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Documents
+  app.get("/api/documents/:transactionId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const documents = await storage.getDocumentsByTransaction(Number(req.params.transactionId));
+      res.json(documents);
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      res.status(500).json({ error: 'Failed to fetch documents' });
+    }
+  });
+
+  app.post("/api/documents/:transactionId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const document = await storage.createDocument({
+        ...req.body,
+        transactionId: Number(req.params.transactionId)
+      });
+      res.status(201).json(document);
+    } catch (error) {
+      console.error('Error creating document:', error);
+      res.status(500).json({ error: 'Failed to create document' });
+    }
+  });
+
+  app.patch("/api/documents/:transactionId/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const document = await storage.updateDocument(req.params.id, req.body);
+      res.json(document);
+    } catch (error) {
+      console.error('Error updating document:', error);
+      res.status(500).json({ error: 'Failed to update document' });
+    }
+  });
+
+  app.delete("/api/documents/:transactionId/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      await storage.deleteDocument(req.params.id);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      res.status(500).json({ error: 'Failed to delete document' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

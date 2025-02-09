@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -6,7 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 import { Input } from "./ui/input";
-import { Select } from "./ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 interface Document {
   id: string;
@@ -14,33 +13,18 @@ interface Document {
   status: 'not_applicable' | 'waiting_signatures' | 'signed' | 'waiting_others' | 'complete';
 }
 
-const defaultDocuments = [
-  { id: "1", name: "Information About Broker Services (IABS)", status: "not_applicable" },
-  { id: "2", name: "Buyer Representation Agreement", status: "not_applicable" },
-  { id: "3", name: "Listing Agreement", status: "not_applicable" },
-  { id: "4", name: "Seller's Disclosure", status: "not_applicable" },
-  { id: "5", name: "Property Survey", status: "waiting_others" },
-  { id: "6", name: "Lead-Based Paint Disclosure", status: "not_applicable" },
-  { id: "7", name: "Purchase Agreement", status: "waiting_signatures" },
-  { id: "8", name: "HOA Addendum", status: "not_applicable" },
-  { id: "9", name: "Home Inspection Report", status: "not_applicable" },
-  { id: "10", name: "Appraisal Report", status: "not_applicable" },
-  { id: "11", name: "Title Report", status: "not_applicable" },
-  { id: "12", name: "Closing Disclosure", status: "not_applicable" },
-  { id: "13", name: "3rd Party Financing Addendum", status: "not_applicable" }
-];
-
 export function DocumentChecklist({ transactionId }: { transactionId: number }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [newDocument, setNewDocument] = useState("");
 
-  const { data: documents = defaultDocuments, isLoading } = useQuery({
+  const { data: documents = [], isLoading } = useQuery({
     queryKey: ["/api/documents", transactionId],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/documents/${transactionId}`);
       if (!response.ok) {
-        return defaultDocuments;
+        throw new Error("Failed to fetch documents");
       }
       return response.json();
     },
@@ -71,14 +55,19 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       return response.json();
     },
     onSuccess: () => {
-      const currentDocs = queryClient.getQueryData<Document[]>(["/api/documents", transactionId]) || [];
-      const newDoc = {
-        id: `custom-${Date.now()}`,
-        name: newDocument,
-        status: 'not_applicable'
-      };
-      queryClient.setQueryData(["/api/documents", transactionId], [...currentDocs, newDoc]);
+      queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
       setNewDocument("");
+      toast({
+        title: "Success",
+        description: "Document added successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add document",
+        variant: "destructive",
+      });
     },
   });
 
@@ -89,16 +78,24 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         throw new Error("Failed to remove document");
       }
     },
-    onSuccess: (_, id) => {
-      const currentDocs = queryClient.getQueryData<Document[]>(["/api/documents", transactionId]) || defaultDocuments;
-      const updatedDocs = currentDocs.filter(doc => doc.id !== id);
-      queryClient.setQueryData(["/api/documents", transactionId], updatedDocs);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
+      toast({
+        title: "Success",
+        description: "Document removed successfully",
+      });
     },
   });
 
   if (isLoading) {
     return <div>Loading...</div>;
   }
+
+  const handleAddDocument = () => {
+    if (newDocument.trim()) {
+      addDocumentMutation.mutate(newDocument.trim());
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -107,7 +104,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         <div>Status</div>
         <div></div>
       </div>
-      
+
       {documents.map((doc) => (
         <div key={doc.id} className="grid grid-cols-[1fr,200px,40px] gap-4 items-center">
           <div>{doc.name}</div>
@@ -141,10 +138,15 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
             placeholder="New document name..."
             value={newDocument}
             onChange={(e) => setNewDocument(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleAddDocument();
+              }
+            }}
           />
           <Button
-            onClick={() => newDocument && addDocumentMutation.mutate(newDocument)}
-            disabled={!newDocument}
+            onClick={handleAddDocument}
+            disabled={!newDocument.trim() || addDocumentMutation.isPending}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Document
