@@ -84,34 +84,12 @@ export class DatabaseStorage implements IStorage {
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
     try {
-      console.log('Fetching transaction with raw SQL, ID:', id);
-      const result = await db.execute(sql`
-        SELECT 
-          t.id,
-          t.address,
-          t.access_code as "accessCode",
-          t.status,
-          t.agent_id as "agentId",
-          COALESCE(t.participants, '[]'::jsonb) as participants
-        FROM transactions t
-        WHERE t.id = ${id}
-      `);
-
-      console.log('Raw database result:', result.rows);
-
-      if (result.rows.length === 0) {
-        console.log('No transaction found with ID:', id);
-        return undefined;
-      }
-
-      // Parse participants if it's a string
-      const transaction = result.rows[0];
-      if (typeof transaction.participants === 'string') {
-        transaction.participants = JSON.parse(transaction.participants);
-      }
-
-      console.log('Returning formatted transaction:', transaction);
-      return transaction;
+      const result = await db.query(transactions)
+        .select()
+        .where(eq(transactions.id, id))
+        .limit(1);
+      
+      return result[0];
     } catch (error) {
       console.error('Database error in getTransaction:', error);
       throw error;
