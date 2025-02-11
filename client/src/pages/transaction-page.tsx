@@ -95,7 +95,7 @@ const updateTransaction = useMutation({
       ...data,
       closingDate: formatDate(data.closingDate),
       contractExecutionDate: formatDate(data.contractExecutionDate),
-      optionPeriodExpiration: formatDate(data.OptionExpirationDate)
+      optionPeriodExpiration: formatDate(data.optionPeriodExpiration)
     };
 
     const cleanData = Object.fromEntries(
@@ -474,7 +474,7 @@ const updateTransaction = useMutation({
                         ...data,
                         closingDate: formatDate(data.closingDate),
                         contractExecutionDate: formatDate(data.contractExecutionDate),
-                        optionPeriodExpiration: formatDate(data.OptionExpirationDate)
+                        optionPeriodExpiration: formatDate(data.optionPeriodExpiration)
                       };
                       updateTransaction.mutate(formattedData);
                       setIsEditing(false);
