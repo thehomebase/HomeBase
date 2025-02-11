@@ -83,12 +83,17 @@ const updateTransaction = useMutation({
       throw new Error("Invalid transaction ID");
     }
 
-    // Format dates with Central Time handling
+    const formatDate = (date: string | null | undefined) => {
+      if (!date) return null;
+      const d = new Date(date);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    };
+
     const formattedData = {
       ...data,
-      closingDate: data.closingDate ? new Date(data.closingDate).toISOString().split('T')[0] : null,
-      contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString().split('T')[0] : null,
-      optionPeriodExpiration: data.OptionExpirationDate ? new Date(data.OptionExpirationDate).toISOString().split('T')[0] : null
+      closingDate: formatDate(data.closingDate),
+      contractExecutionDate: formatDate(data.contractExecutionDate),
+      optionPeriodExpiration: formatDate(data.OptionExpirationDate)
     };
 
     const cleanData = Object.fromEntries(
@@ -458,11 +463,16 @@ const updateTransaction = useMutation({
                   <Button
                     type="button"
                     onClick={form.handleSubmit((data) => {
+                      const formatDate = (date: string | null | undefined) => {
+                        if (!date) return null;
+                        const d = new Date(date);
+                        return isNaN(d.getTime()) ? null : d.toISOString();
+                      };
                       const formattedData = {
                         ...data,
-                        closingDate: data.closingDate ? new Date(data.closingDate).toISOString().split('T')[0] : null,
-                        contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString().split('T')[0] : null,
-                        optionPeriodExpiration: data.OptionExpirationDate ? new Date(data.OptionExpirationDate).toISOString().split('T')[0] : null
+                        closingDate: formatDate(data.closingDate),
+                        contractExecutionDate: formatDate(data.contractExecutionDate),
+                        optionPeriodExpiration: formatDate(data.OptionExpirationDate)
                       };
                       updateTransaction.mutate(formattedData);
                       setIsEditing(false);

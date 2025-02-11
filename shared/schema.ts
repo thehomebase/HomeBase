@@ -25,7 +25,6 @@ export const clients = pgTable("clients", {
 });
 
 export const transactions = pgTable("transactions", {
-  option_period_expiration: timestamp("option_period_expiration"),
   id: serial("id").primaryKey(),
   address: text("address").notNull(),
   accessCode: text("access_code").notNull(),
@@ -38,7 +37,7 @@ export const transactions = pgTable("transactions", {
     role: string;
   }[]>(),
   contractPrice: integer("contract_price"),
-  optionPeriodExpiration: text("option_period_expiration"),
+  optionPeriodExpiration: timestamp("option_period_expiration"),
   optionFee: integer("option_fee"),
   earnestMoney: integer("earnest_money"),
   downPayment: integer("down_payment"),
