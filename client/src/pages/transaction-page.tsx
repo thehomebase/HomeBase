@@ -43,7 +43,7 @@ interface Transaction {
 
 interface TransactionFormData {
   contractPrice?: number;
-  option_period_expiration?: string;
+  optionPeriodExpiration?: string;
   optionFee?: number;
   earnestMoney?: number;
   downPayment?: number;
@@ -127,7 +127,7 @@ const updateTransaction = useMutation({
     if (transaction) {
       form.reset({
         contractPrice: transaction.contractPrice,
-        optionPeriodExpiration: transaction.option_period_expiration,
+        optionPeriodExpiration: transaction.optionPeriodExpiration,
         optionFee: transaction.optionFee,
         earnestMoney: transaction.earnestMoney,
         downPayment: transaction.downPayment,
@@ -462,7 +462,7 @@ const updateTransaction = useMutation({
                         ...data,
                         closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : null,
                         contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : null,
-                        option_period_expiration: data.option_period_expiration ? new Date(data.option_period_expiration).toISOString() : null
+                        option_period_expiration: data.optionPeriodExpiration ? new Date(data.optionPeriodExpiration).toISOString() : null
                       };
                       updateTransaction.mutate(formattedData);
                       setIsEditing(false);
