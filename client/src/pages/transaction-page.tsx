@@ -88,7 +88,7 @@ const updateTransaction = useMutation({
       ...data,
       closingDate: data.closingDate ? new Date(data.closingDate).toISOString().split('T')[0] : null,
       contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString().split('T')[0] : null,
-      option_period_expiration: data.option_period_expiration ? new Date(data.option_period_expiration).toISOString().split('T')[0] : null
+      optionPeriodExpiration: data.option_period_expiration ? new Date(data.option_period_expiration).toISOString().split('T')[0] : null
     };
 
     const cleanData = Object.fromEntries(
@@ -282,7 +282,7 @@ const updateTransaction = useMutation({
                     {isEditing ? (
                       <Input
                         type="date"
-                        {...form.register("option_period_expiration")}
+                        {...form.register("optionPeriodExpiration")}
                         className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
