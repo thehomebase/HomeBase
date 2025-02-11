@@ -86,7 +86,9 @@ const updateTransaction = useMutation({
     const formatDate = (date: string | null | undefined) => {
       if (!date) return null;
       const d = new Date(date);
-      return isNaN(d.getTime()) ? null : d.toISOString();
+      if (isNaN(d.getTime())) return null;
+      d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+      return d.toISOString();
     };
 
     const formattedData = {
