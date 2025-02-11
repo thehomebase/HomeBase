@@ -88,7 +88,7 @@ const updateTransaction = useMutation({
       ...data,
       closingDate: data.closingDate ? new Date(data.closingDate).toISOString().split('T')[0] : null,
       contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString().split('T')[0] : null,
-      optionPeriodExpiration: data.option_period_expiration ? new Date(data.option_period_expiration).toISOString().split('T')[0] : null
+      option_period_expiration: data.optionPeriodExpiration ? new Date(data.optionPeriodExpiration).toISOString().split('T')[0] : null
     };
 
     const cleanData = Object.fromEntries(
@@ -127,7 +127,7 @@ const updateTransaction = useMutation({
     if (transaction) {
       form.reset({
         contractPrice: transaction.contractPrice,
-        option_period_expiration: transaction.optionPeriodExpiration,
+        optionPeriodExpiration: transaction.option_period_expiration,
         optionFee: transaction.optionFee,
         earnestMoney: transaction.earnestMoney,
         downPayment: transaction.downPayment,
