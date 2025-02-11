@@ -289,7 +289,7 @@ const updateTransaction = useMutation({
                     {isEditing ? (
                       <Input
                         type="date"
-                        {...form.register("OptionExpirationDate")}
+                        {...form.register("optionPeriodExpiration")}
                         className="w-full h-9 px-3 rounded-md border"
                       />
                     ) : (
@@ -465,21 +465,19 @@ const updateTransaction = useMutation({
                   <Button
                     type="button"
                     onClick={form.handleSubmit((data) => {
-                      const formatDate = (date: string | null | undefined) => {
-                        if (!date) return null;
-                        // Ensure consistent date handling by creating date at noon UTC
-                        const d = new Date(date);
-                        d.setUTCHours(12, 0, 0, 0);
-                        return d.toISOString();
-                      };
-                      
                       const formattedData = {
                         ...data,
-                        closingDate: formatDate(data.closingDate),
-                        contractExecutionDate: formatDate(data.contractExecutionDate),
-                        optionPeriodExpiration: formatDate(data.OptionExpirationDate)
+                        closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : null,
+                        contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : null,
+                        optionPeriodExpiration: data.optionPeriodExpiration ? new Date(data.optionPeriodExpiration).toISOString() : null
                       };
-                      updateTransaction.mutate(formattedData);
+                      
+                      // Filter out any undefined or empty values
+                      const cleanData = Object.fromEntries(
+                        Object.entries(formattedData).filter(([_, v]) => v != null && v !== '')
+                      );
+                      
+                      updateTransaction.mutate(cleanData);
                       setIsEditing(false);
                     })}
                     disabled={updateTransaction.isPending}
