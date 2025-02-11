@@ -127,13 +127,13 @@ const updateTransaction = useMutation({
     if (transaction) {
       form.reset({
         contractPrice: transaction.contractPrice,
-        optionPeriodExpiration: transaction.optionPeriodExpiration,
+        optionPeriodExpiration: transaction.option_period_expiration?.split('T')[0],
         optionFee: transaction.optionFee,
         earnestMoney: transaction.earnestMoney,
         downPayment: transaction.downPayment,
         sellerConcessions: transaction.sellerConcessions,
-        closingDate: transaction.closingDate,
-        contractExecutionDate: transaction.contractExecutionDate,
+        closingDate: transaction.closingDate?.split('T')[0],
+        contractExecutionDate: transaction.contractExecutionDate?.split('T')[0],
         mlsNumber: transaction.mlsNumber,
         financing: transaction.financing,
         status: transaction.status
@@ -287,8 +287,8 @@ const updateTransaction = useMutation({
                       />
                     ) : (
                       <p className="font-medium">
-                        {transaction.optionPeriodExpiration
-                          ? new Date(transaction.optionPeriodExpiration + 'T12:00:00').toLocaleDateString('en-US')
+                        {transaction.option_period_expiration
+                          ? new Date(transaction.option_period_expiration).toLocaleDateString('en-US')
                           : 'Not set'}
                       </p>
                     )}
