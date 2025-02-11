@@ -467,14 +467,17 @@ const updateTransaction = useMutation({
                     onClick={form.handleSubmit((data) => {
                       const formatDate = (date: string | null | undefined) => {
                         if (!date) return null;
+                        // Ensure consistent date handling by creating date at noon UTC
                         const d = new Date(date);
-                        return isNaN(d.getTime()) ? null : d.toISOString();
+                        d.setUTCHours(12, 0, 0, 0);
+                        return d.toISOString();
                       };
+                      
                       const formattedData = {
                         ...data,
                         closingDate: formatDate(data.closingDate),
                         contractExecutionDate: formatDate(data.contractExecutionDate),
-                        optionPeriodExpiration: formatDate(data.optionPeriodExpiration)
+                        optionPeriodExpiration: formatDate(data.OptionExpirationDate)
                       };
                       updateTransaction.mutate(formattedData);
                       setIsEditing(false);
