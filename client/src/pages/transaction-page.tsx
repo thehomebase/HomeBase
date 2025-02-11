@@ -377,7 +377,7 @@ const updateTransaction = useMutation({
                     ) : (
                       <p className="font-medium">
                         {transaction.closingDate
-                          ? new Date(transaction.closingDate + 'T12:00:00').toLocaleDateString('en-US')
+                          ? new Date(transaction.closingDate).toLocaleDateString('en-US')
                           : 'Not set'}
                       </p>
                     )}
