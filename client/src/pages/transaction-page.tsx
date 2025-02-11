@@ -388,7 +388,7 @@ const updateTransaction = useMutation({
                     ) : (
                       <p className="font-medium">
                         {transaction.contractExecutionDate
-                          ? new Date(transaction.contractExecutionDate + 'T12:00:00').toLocaleDateString('en-US')
+                          ? new Date(transaction.contractExecutionDate).toLocaleDateString('en-US')
                           : 'Not set'}
                       </p>
                     )}
@@ -460,9 +460,9 @@ const updateTransaction = useMutation({
                     onClick={form.handleSubmit((data) => {
                       const formattedData = {
                         ...data,
-                        closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : null,
-                        contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : null,
-                        option_period_expiration: data.optionPeriodExpiration ? new Date(data.optionPeriodExpiration).toISOString() : null
+                        closingDate: data.closingDate ? new Date(data.closingDate).toISOString().split('T')[0] : null,
+                        contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString().split('T')[0] : null,
+                        option_period_expiration: data.optionPeriodExpiration ? new Date(data.optionPeriodExpiration).toISOString().split('T')[0] : null
                       };
                       updateTransaction.mutate(formattedData);
                       setIsEditing(false);
