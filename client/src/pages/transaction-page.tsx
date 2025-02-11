@@ -288,7 +288,7 @@ const updateTransaction = useMutation({
                     ) : (
                       <p className="font-medium">
                         {transaction.optionPeriodExpiration
-                          ? new Date(transaction.optionPeriodExpiration).toLocaleDateString('en-US', { timeZone: 'America/Chicago' })
+                          ? new Date(transaction.optionPeriodExpiration + 'T12:00:00').toLocaleDateString('en-US')
                           : 'Not set'}
                       </p>
                     )}
@@ -388,7 +388,7 @@ const updateTransaction = useMutation({
                     ) : (
                       <p className="font-medium">
                         {transaction.contractExecutionDate
-                          ? new Date(transaction.contractExecutionDate).toLocaleDateString('en-US', { timeZone: 'America/Chicago' })
+                          ? new Date(transaction.contractExecutionDate + 'T12:00:00').toLocaleDateString('en-US')
                           : 'Not set'}
                       </p>
                     )}
