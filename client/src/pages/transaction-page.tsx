@@ -465,18 +465,9 @@ const updateTransaction = useMutation({
                   <Button
                     type="button"
                     onClick={form.handleSubmit((data) => {
-                      const formattedData = {
-                        ...data,
-                        closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : null,
-                        contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : null,
-                        optionPeriodExpiration: data.optionPeriodExpiration ? new Date(data.optionPeriodExpiration).toISOString() : null
-                      };
-                      
-                      // Filter out any undefined or empty values
                       const cleanData = Object.fromEntries(
-                        Object.entries(formattedData).filter(([_, v]) => v != null && v !== '')
+                        Object.entries(data).filter(([_, v]) => v != null && v !== '')
                       );
-                      
                       updateTransaction.mutate(cleanData);
                       setIsEditing(false);
                     })}

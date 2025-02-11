@@ -160,10 +160,17 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const id = Number(req.params.id);
-      // Only include fields that are explicitly provided in the request
-      const data = {
-        ...req.body,
-      };
+      const data = { ...req.body };
+
+      // Handle date fields specifically
+      const dateFields = ['closingDate', 'contractExecutionDate', 'optionPeriodExpiration'];
+      dateFields.forEach(field => {
+        if (data[field]) {
+          const date = new Date(data[field]);
+          date.setUTCHours(12, 0, 0, 0);
+          data[field] = date.toISOString();
+        }
+      });
 
       // Remove any undefined fields
       Object.keys(data).forEach(key => {
