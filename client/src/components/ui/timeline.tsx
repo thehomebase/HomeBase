@@ -96,7 +96,7 @@ export function Timeline({ transactions }: TimelineProps) {
                   }}
                 />
               </TooltipTrigger>
-              <TooltipContent>
+              <TooltipContent side="top" align="center" sideOffset={5}>
                 <div className="space-y-2">
                   {events.map((event, idx) => (
                     <div key={idx} className="text-sm">
