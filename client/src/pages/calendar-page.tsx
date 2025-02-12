@@ -22,6 +22,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+// Add styles for the today circle
+const todayStyles = `
+  .rs__cell--today::after {
+    background-color: transparent !important;
+    border: 2px solid black !important;
+  }
+`;
+
 export default function CalendarPage() {
   const { user } = useAuth();
   const [showTable, setShowTable] = useState(false);
@@ -88,6 +96,9 @@ export default function CalendarPage() {
 
   return (
     <main className="container mx-auto px-4 py-8">
+      {/* Add the styles to the DOM */}
+      <style>{todayStyles}</style>
+
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-2xl font-bold">Calendar</h2>
         <div className="flex items-center gap-2">
