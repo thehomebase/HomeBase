@@ -22,44 +22,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// Updated styles for the today circle
-const todayStyles = `
-  .rs__cell--today::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 1.8em;
-    height: 1.8em;
-    background-color: transparent !important;
-    border: 2px solid black !important;
-    border-radius: 50%;
-  }
-
-  .rs__cell--today > button {
-    background: transparent !important;
-    color: inherit !important;
-  }
-
-  /* Hide Today and Agenda buttons */
-  button[data-toggle="today"],
-  button[data-toggle="agenda"] {
-    display: none !important;
-  }
-`;
-
 export default function CalendarPage() {
   const { user } = useAuth();
   const [showTable, setShowTable] = useState(false);
 
-  // Fetch transactions to display in calendar
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     enabled: !!user,
   });
 
-  // Convert transactions to calendar events
   const events = transactions.map((transaction) => {
     const events = [];
 
@@ -72,7 +43,7 @@ export default function CalendarPage() {
         draggable: false,
         editable: false,
         deletable: false,
-        color: "#fbbf24", // amber-400
+        color: "#fbbf24",
       });
     }
 
@@ -85,14 +56,13 @@ export default function CalendarPage() {
         draggable: false,
         editable: false,
         deletable: false,
-        color: "#22c55e", // green-500
+        color: "#22c55e",
       });
     }
 
     return events;
   }).flat();
 
-  // Sort events by date for the table view
   const sortedEvents = [...events].sort((a, b) =>
     new Date(a.start).getTime() - new Date(b.start).getTime()
   );
@@ -105,7 +75,6 @@ export default function CalendarPage() {
 
   const handleSubscribeToCalendar = () => {
     if (user) {
-      // Use webcal:// protocol for better calendar app integration
       const baseUrl = window.location.origin.replace(/^https?:/, 'webcal:');
       window.location.href = `${baseUrl}/api/calendar/${user.id}/subscribe`;
     }
@@ -113,8 +82,6 @@ export default function CalendarPage() {
 
   return (
     <main className="container mx-auto px-4 py-8">
-      <style>{todayStyles}</style>
-
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-2xl font-bold">Calendar</h2>
         <div className="flex items-center gap-2">
@@ -171,10 +138,13 @@ export default function CalendarPage() {
             deletable={false}
             draggable={false}
             views={["month"]}
-            navigation={{
-              component: () => null // Remove the view selector buttons
-            }}
-            viewerExtraComponent={() => null}
+            customViewer={false}
+            navigation={false}
+            selectedDate={new Date()}
+            day={null}
+            fields={[]}
+            dialogMaxWidth="lg"
+            resources={[]}
           />
         ) : (
           <div>
