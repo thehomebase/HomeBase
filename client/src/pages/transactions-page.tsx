@@ -121,17 +121,17 @@ export default function TransactionsPage() {
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <img 
-            src={theme === 'dark' ? '/attached_assets/homebaselogowhite.png' : '/homebaselogo.png'} 
+            src={theme === 'dark' ? '/attached_assets/homebaselogowhite.png' : '/attached_assets/homebaselogo.png'} 
             alt="Homebase Logo" 
             className="h-8"
           />
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
-          <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+          <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1 dark:bg-gray-800/50">
             <Toggle
               pressed={view === 'list'}
               onPressedChange={() => setView('list')}
               aria-label="List view"
-              className="data-[state=on]:bg-background text-foreground dark:text-white"
+              className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
             >
               <List className="h-4 w-4" />
             </Toggle>
@@ -139,7 +139,7 @@ export default function TransactionsPage() {
               pressed={view === 'board'}
               onPressedChange={() => setView('board')}
               aria-label="Board view"
-              className="data-[state=on]:bg-background text-foreground dark:text-white"
+              className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
             >
               <LayoutGrid className="h-4 w-4" />
             </Toggle>
@@ -148,7 +148,7 @@ export default function TransactionsPage() {
             pressed={theme === 'dark'}
             onPressedChange={toggleTheme}
             aria-label="Toggle theme"
-            className="ml-2 text-foreground dark:text-white"
+            className="ml-2 hover:text-foreground dark:text-white dark:hover:text-white"
           >
             {theme === 'light' ? (
               <Moon className="h-4 w-4" />
@@ -160,7 +160,7 @@ export default function TransactionsPage() {
         {user?.role === "agent" && (
           <Dialog>
             <DialogTrigger asChild>
-              <Button className="text-foreground dark:text-white">
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 dark:text-white">
                 <Plus className="h-4 w-4 mr-2" />
                 New Transaction
               </Button>
@@ -210,6 +210,7 @@ export default function TransactionsPage() {
                             </Button>
                           </div>
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
