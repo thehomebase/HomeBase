@@ -43,7 +43,7 @@ interface Transaction {
 
 interface TransactionFormData {
   contractPrice?: number;
-  OptionExpirationDate?: string;
+  optionPeriodExpiration?: string;
   optionFee?: number;
   earnestMoney?: number;
   downPayment?: number;
@@ -77,64 +77,64 @@ export default function TransactionPage() {
     enabled: !!parsedId && !!user,
   });
 
-const updateTransaction = useMutation({
-  mutationFn: async (data: TransactionFormData) => {
-    if (!parsedId || isNaN(parsedId)) {
-      throw new Error("Invalid transaction ID");
+  const updateTransaction = useMutation({
+    mutationFn: async (data: TransactionFormData) => {
+      if (!parsedId || isNaN(parsedId)) {
+        throw new Error("Invalid transaction ID");
+      }
+
+      const formatDate = (date: string | null | undefined) => {
+        if (!date) return null;
+        const d = new Date(date);
+        if (isNaN(d.getTime())) return null;
+        d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+        return d.toISOString();
+      };
+
+      const formattedData = {
+        ...data,
+        closingDate: formatDate(data.closingDate),
+        contractExecutionDate: formatDate(data.contractExecutionDate),
+        optionPeriodExpiration: formatDate(data.optionPeriodExpiration)
+      };
+
+      const cleanData = Object.fromEntries(
+        Object.entries(formattedData).filter(([_, value]) => value !== undefined && value !== '')
+      );
+
+      const response = await apiRequest("PATCH", `/api/transactions/${parsedId}`, cleanData);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to update transaction");
+      }
+      return response.json();
+    },
+    onSuccess: async (updatedData) => {
+      queryClient.setQueryData(["/api/transactions", parsedId], updatedData);
+      await queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
+      setIsEditing(false);
+
+      form.reset(updatedData);
+
+      toast({
+        title: "Success",
+        description: "Transaction updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update transaction",
+        variant: "destructive",
+      });
     }
-
-    const formatDate = (date: string | null | undefined) => {
-      if (!date) return null;
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return null;
-      d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
-      return d.toISOString();
-    };
-
-    const formattedData = {
-      ...data,
-      closingDate: formatDate(data.closingDate),
-      contractExecutionDate: formatDate(data.contractExecutionDate),
-      optionPeriodExpiration: formatDate(data.optionPeriodExpiration)
-    };
-
-    const cleanData = Object.fromEntries(
-      Object.entries(formattedData).filter(([_, value]) => value !== undefined && value !== '')
-    );
-
-    const response = await apiRequest("PATCH", `/api/transactions/${parsedId}`, cleanData);
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || "Failed to update transaction");
-    }
-    return response.json();
-  },
-  onSuccess: async (updatedData) => {
-    queryClient.setQueryData(["/api/transactions", parsedId], updatedData);
-    await queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
-    setIsEditing(false);
-
-    form.reset(updatedData);
-
-    toast({
-      title: "Success",
-      description: "Transaction updated successfully",
-    });
-  },
-  onError: (error) => {
-    toast({
-      title: "Error",
-      description: error instanceof Error ? error.message : "Failed to update transaction",
-      variant: "destructive",
-    });
-  }
-});
+  });
 
   React.useEffect(() => {
     if (transaction) {
       form.reset({
         contractPrice: transaction.contractPrice,
-        OptionExpirationDate: transaction.optionPeriodExpiration?.split('T')[0],
+        optionPeriodExpiration: transaction.optionPeriodExpiration?.split('T')[0],
         optionFee: transaction.optionFee,
         earnestMoney: transaction.earnestMoney,
         downPayment: transaction.downPayment,
@@ -204,7 +204,7 @@ const updateTransaction = useMutation({
   const phases = Array.from(new Set(checklist.map(item => item.phase)));
 
   // Find current phase (first phase with incomplete items)
-  const currentPhase = phases.find(phase => 
+  const currentPhase = phases.find(phase =>
     checklist.some(item => item.phase === phase && !item.completed)
   ) || phases[phases.length - 1];
 
@@ -262,202 +262,202 @@ const updateTransaction = useMutation({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <p className="text-sm text-muted-foreground">Transaction Type</p>
-                    <p className="font-medium capitalize">
-                      {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
+                  <p className="text-sm text-muted-foreground">Transaction Type</p>
+                  <p className="font-medium capitalize">
+                    {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Contract Price</p>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      {...form.register("contractPrice")}
+                      placeholder="Enter contract price"
+                      className="w-full h-9 px-3 rounded-md border"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.contractPrice
+                        ? `$${transaction.contractPrice.toLocaleString()}`
+                        : 'Not set'}
                     </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Contract Price</p>
-                    {isEditing ? (
-                      <Input
-                        type="number"
-                        {...form.register("contractPrice")}
-                        placeholder="Enter contract price"
-                        className="w-full h-9 px-3 rounded-md border"
-                      />
-                    ) : (
-                      <p className="font-medium">
-                        {transaction.contractPrice
-                          ? `$${transaction.contractPrice.toLocaleString()}`
-                          : 'Not set'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Option Expiration Date</p>
-                    {isEditing ? (
-                      <Input
-                        type="date"
-                        {...form.register("optionPeriodExpiration")}
-                        className="w-full h-9 px-3 rounded-md border"
-                      />
-                    ) : (
-                      <p className="font-medium">
-                        {transaction.optionPeriodExpiration
-                          ? new Date(transaction.optionPeriodExpiration).toLocaleDateString('en-US')
-                          : 'Not set'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Option Fee</p>
-                    {isEditing ? (
-                      <Input
-                        type="number"
-                        {...form.register("optionFee")}
-                        placeholder="Enter option fee"
-                        className="w-full h-9 px-3 rounded-md border"
-                      />
-                    ) : (
-                      <p className="font-medium">
-                        {transaction.optionFee
-                          ? `$${transaction.optionFee.toLocaleString()}`
-                          : 'Not set'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Earnest Money</p>
-                    {isEditing ? (
-                      <Input
-                        type="number"
-                        {...form.register("earnestMoney")}
-                        placeholder="Enter earnest money"
-                        className="w-full h-9 px-3 rounded-md border"
-                      />
-                    ) : (
-                      <p className="font-medium">
-                        {transaction.earnestMoney
-                          ? `$${transaction.earnestMoney.toLocaleString()}`
-                          : 'Not set'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Down Payment</p>
-                    {isEditing ? (
-                      <Input
-                        type="number"
-                        {...form.register("downPayment")}
-                        placeholder="Enter down payment"
-                        className="w-full h-9 px-3 rounded-md border"
-                      />
-                    ) : (
-                      <p className="font-medium">
-                        {transaction.downPayment
-                          ? `$${transaction.downPayment.toLocaleString()}`
-                          : 'Not set'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Seller Concessions</p>
-                    {isEditing ? (
-                      <Input
-                        type="number"
-                        {...form.register("sellerConcessions")}
-                        placeholder="Enter seller concessions"
-                        className="w-full h-9 px-3 rounded-md border"
-                      />
-                    ) : (
-                      <p className="font-medium">
-                        {transaction.sellerConcessions
-                          ? `$${transaction.sellerConcessions.toLocaleString()}`
-                          : 'Not set'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Closing Date</p>
-                    {isEditing ? (
-                      <Input
-                        type="date"
-                        {...form.register("closingDate")}
-                        className="w-full h-9 px-3 rounded-md border"
-                      />
-                    ) : (
-                      <p className="font-medium">
-                        {transaction.closingDate
-                          ? new Date(transaction.closingDate).toLocaleDateString('en-US')
-                          : 'Not set'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Contract Execution Date</p> 
-                    {isEditing ? (
-                      <Input
-                        type="date"
-                        {...form.register("contractExecutionDate")}
-                        className="w-full h-9 px-3 rounded-md border"
-                      />
-                    ) : (
-                      <p className="font-medium">
-                        {transaction.contractExecutionDate
-                          ? new Date(transaction.contractExecutionDate).toLocaleDateString('en-US')
-                          : 'Not set'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">MLS No.</p>
-                    {isEditing ? (
-                      <Input
-                        type="text"
-                        {...form.register("mlsNumber")}
-                        placeholder="Enter MLS number"
-                        className="w-full h-9 px-3 rounded-md border"
-                      />
-                    ) : (
-                      <p className="font-medium">
-                        {transaction.mlsNumber || 'Not set'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Financing</p>
-                    {isEditing ? (
-                      <select
-                        className="w-full h-9 px-3 rounded-md border"
-                        {...form.register("financing")}
-                      >
-                        <option value="">Select financing type</option>
-                        <option value="FHA">FHA</option>
-                        <option value="VA">VA</option>
-                        <option value="Conventional">Conventional</option>
-                        <option value="Cash">Cash</option>
-                      </select>
-                    ) : (
-                      <p className="font-medium">
-                        {transaction.financing || 'Not set'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    {isEditing ? (
-                      <select
-                        className="w-full h-9 px-3 rounded-md border"
-                        value={transaction.status}
-                        {...form.register("status")}
-                      >
-                        <option value="coming_soon">Coming Soon</option>
-                        <option value="active">Active</option>
-                        <option value="active_option">Active Option Contract</option>
-                        <option value="pending">Pending</option>
-                        <option value="closed">Closed</option>
-                        <option value="withdrawn">Withdrawn</option>
-                        <option value="canceled">Canceled</option>
-                      </select>
-                    ) : (
-                      <p className="font-medium capitalize">
-                        {transaction.status === 'active_option'
-                          ? 'Active Option Contract'
-                          : transaction.status?.replace('_', ' ')}
-                      </p>
-                    )}
-                  </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Option Expiration Date</p>
+                  {isEditing ? (
+                    <Input
+                      type="date"
+                      {...form.register("optionPeriodExpiration")}
+                      className="w-full h-9 px-3 rounded-md border"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.optionPeriodExpiration
+                        ? new Date(transaction.optionPeriodExpiration).toLocaleDateString('en-US')
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Option Fee</p>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      {...form.register("optionFee")}
+                      placeholder="Enter option fee"
+                      className="w-full h-9 px-3 rounded-md border"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.optionFee
+                        ? `$${transaction.optionFee.toLocaleString()}`
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Earnest Money</p>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      {...form.register("earnestMoney")}
+                      placeholder="Enter earnest money"
+                      className="w-full h-9 px-3 rounded-md border"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.earnestMoney
+                        ? `$${transaction.earnestMoney.toLocaleString()}`
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Down Payment</p>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      {...form.register("downPayment")}
+                      placeholder="Enter down payment"
+                      className="w-full h-9 px-3 rounded-md border"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.downPayment
+                        ? `$${transaction.downPayment.toLocaleString()}`
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Seller Concessions</p>
+                  {isEditing ? (
+                    <Input
+                      type="number"
+                      {...form.register("sellerConcessions")}
+                      placeholder="Enter seller concessions"
+                      className="w-full h-9 px-3 rounded-md border"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.sellerConcessions
+                        ? `$${transaction.sellerConcessions.toLocaleString()}`
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Closing Date</p>
+                  {isEditing ? (
+                    <Input
+                      type="date"
+                      {...form.register("closingDate")}
+                      className="w-full h-9 px-3 rounded-md border"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.closingDate
+                        ? new Date(transaction.closingDate).toLocaleDateString('en-US')
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Contract Execution Date</p>
+                  {isEditing ? (
+                    <Input
+                      type="date"
+                      {...form.register("contractExecutionDate")}
+                      className="w-full h-9 px-3 rounded-md border"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.contractExecutionDate
+                        ? new Date(transaction.contractExecutionDate).toLocaleDateString('en-US')
+                        : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">MLS No.</p>
+                  {isEditing ? (
+                    <Input
+                      type="text"
+                      {...form.register("mlsNumber")}
+                      placeholder="Enter MLS number"
+                      className="w-full h-9 px-3 rounded-md border"
+                    />
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.mlsNumber || 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Financing</p>
+                  {isEditing ? (
+                    <select
+                      className="w-full h-9 px-3 rounded-md border"
+                      {...form.register("financing")}
+                    >
+                      <option value="">Select financing type</option>
+                      <option value="FHA">FHA</option>
+                      <option value="VA">VA</option>
+                      <option value="Conventional">Conventional</option>
+                      <option value="Cash">Cash</option>
+                    </select>
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.financing || 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  {isEditing ? (
+                    <select
+                      className="w-full h-9 px-3 rounded-md border"
+                      value={transaction.status}
+                      {...form.register("status")}
+                    >
+                      <option value="coming_soon">Coming Soon</option>
+                      <option value="active">Active</option>
+                      <option value="active_option">Active Option Contract</option>
+                      <option value="pending">Pending</option>
+                      <option value="closed">Closed</option>
+                      <option value="withdrawn">Withdrawn</option>
+                      <option value="canceled">Canceled</option>
+                    </select>
+                  ) : (
+                    <p className="font-medium capitalize">
+                      {transaction.status === 'active_option'
+                        ? 'Active Option Contract'
+                        : transaction.status?.replace('_', ' ')}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {isEditing && (

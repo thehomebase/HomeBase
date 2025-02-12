@@ -25,5 +25,5 @@ export const transactions = pgTable('transactions', {
   updatedAt: timestamp('updated_at').defaultNow(),
   closingDate: timestamp('closing_date'),
   contractExecutionDate: timestamp('contract_execution_date'),
-  option_period_expiration: timestamp('option_period_expiration'),
+  optionPeriodExpiration: timestamp('option_period_expiration'),
 });
