@@ -1,13 +1,6 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { format, getDaysInMonth, isSameDay } from "date-fns";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "./tooltip";
-import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
 interface TimelineProps {
   transactions: Array<{
@@ -22,6 +15,7 @@ export function Timeline({ transactions }: TimelineProps) {
   const today = new Date();
   const daysInMonth = getDaysInMonth(today);
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
   
   // Group events by day
   const eventsByDay = new Map<number, Array<{ type: string; transaction: any }>>();
@@ -48,7 +42,7 @@ export function Timeline({ transactions }: TimelineProps) {
   });
 
   return (
-    <div className="mb-8">
+    <div className="mb-8 space-y-4">
       <div className="relative h-16">
         {/* Timeline bar */}
         <div className="absolute w-full h-2 bg-muted rounded-full"></div>
@@ -97,47 +91,49 @@ export function Timeline({ transactions }: TimelineProps) {
 
         {/* Event markers */}
         {Array.from(eventsByDay.entries()).map(([day, events]) => (
-          <TooltipProvider key={day}>
-            <Tooltip>
-              <TooltipTrigger>
-                <div
-                  className="absolute w-4 h-4 bg-primary rounded-full cursor-pointer"
-                  style={{
-                    left: `${(day / (daysInMonth - 1)) * 100}%`,
-                    top: '-5px',
-                    transform: 'translateX(-50%)'
-                  }}
-                />
-              </TooltipTrigger>
-              <TooltipPrimitive.Portal>
-                <TooltipContent 
-                  side="bottom" 
-                  align="center" 
-                  sideOffset={5}
-                  className="z-50 relative"
-                  avoidCollisions={true}
-                >
-                <div className="space-y-2">
-                  {events.map((event, idx) => (
-                    <div key={idx} className="text-sm">
-                      <p className="font-medium">{event.transaction.address}</p>
-                      <p className="text-muted-foreground">
-                        {event.type === 'closing' ? 'Closing' : 'Option Expiration'}:
-                        {' '}
-                        {format(new Date(event.type === 'closing' 
-                          ? event.transaction.closingDate 
-                          : event.transaction.optionPeriodExpiration
-                        ), 'MMM d, yyyy')}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </TooltipContent>
-              </TooltipPrimitive.Portal>
-            </Tooltip>
-          </TooltipProvider>
+          <div
+            key={day}
+            onClick={() => setSelectedDay(selectedDay === day ? null : day)}
+            className="absolute w-4 h-4 bg-primary rounded-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+            style={{
+              left: `${(day / (daysInMonth - 1)) * 100}%`,
+              top: '-5px',
+              transform: 'translateX(-50%)'
+            }}
+          />
         ))}
       </div>
+
+      {/* Event Cards */}
+      {selectedDay !== null && eventsByDay.has(selectedDay) && (
+        <div className="bg-card rounded-lg p-4 space-y-2 border">
+          <h3 className="font-medium">Events for Day {selectedDay + 1}</h3>
+          <div className="grid gap-2">
+            {eventsByDay.get(selectedDay)?.map((event, idx) => (
+              <div 
+                key={idx} 
+                className="p-3 rounded-md bg-muted flex items-center justify-between"
+              >
+                <div>
+                  <p className="font-medium">{event.transaction.address}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {event.type === 'closing' ? 'Closing' : 'Option Expiration'}:{' '}
+                    {format(new Date(event.type === 'closing' 
+                      ? event.transaction.closingDate 
+                      : event.transaction.optionPeriodExpiration
+                    ), 'MMM d, yyyy')}
+                  </p>
+                </div>
+                <div 
+                  className={`w-2 h-2 rounded-full ${
+                    event.type === 'closing' ? 'bg-green-500' : 'bg-yellow-400'
+                  }`}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
