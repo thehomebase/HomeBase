@@ -113,6 +113,10 @@ export default function TransactionPage() {
     onSuccess: (updatedData) => {
       // Update the cache immediately with the new data
       queryClient.setQueryData(["/api/transactions", parsedId], updatedData);
+      // Invalidate both the individual transaction and the transactions list
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
+      console.log("Transaction updated, invalidating queries", updatedData);
       setIsEditing(false);
       toast({
         title: "Success",

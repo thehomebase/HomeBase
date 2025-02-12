@@ -23,9 +23,18 @@ interface MonthlyData {
 export default function DataPage() {
   const { user } = useAuth();
 
-  const { data: transactions = [] } = useQuery<Transaction[]>({
+  const { data: transactions = [], isLoading, error } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     enabled: !!user,
+    refetchInterval: 5000, // Refetch every 5 seconds
+    staleTime: 1000, // Consider data stale after 1 second
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    onSuccess: (data) => {
+      console.log("Data page received updated transactions:", 
+        data.filter(t => t.status === "closed" && t.closingDate && t.contractPrice).length,
+        "closed transactions"
+      );
+    }
   });
 
   // Get all months in current year
@@ -85,6 +94,28 @@ export default function DataPage() {
       maximumFractionDigits: 1,
     }).format(value);
   };
+
+  if (isLoading) {
+    return (
+      <main className="container mx-auto px-4 py-8">
+        <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
+        <Card className="p-6">
+          <p className="text-center text-muted-foreground">Loading transaction data...</p>
+        </Card>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="container mx-auto px-4 py-8">
+        <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
+        <Card className="p-6">
+          <p className="text-center text-destructive">Error loading transaction data</p>
+        </Card>
+      </main>
+    );
+  }
 
   if (!user || !transactions.length) {
     return (

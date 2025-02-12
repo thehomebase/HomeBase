@@ -53,9 +53,32 @@ app.use((req, res, next) => {
       res.status(status).json({ message });
     });
 
-    // Change port to 5000 to match .replit configuration
-    const PORT = Number(process.env.PORT || 5000);
-    log(`Attempting to start server on port ${PORT}`);
+    // Try ports in sequence until one works
+    const ports = [5000, 5001, 3000];
+    let currentPortIndex = 0;
+
+    const tryPort = async (port: number): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        server.once('error', (error: Error & { code?: string }) => {
+          if (error.code === 'EADDRINUSE') {
+            if (currentPortIndex < ports.length - 1) {
+              currentPortIndex++;
+              log(`Port ${port} is in use, trying next port ${ports[currentPortIndex]}`);
+              tryPort(ports[currentPortIndex]).then(resolve).catch(reject);
+            } else {
+              reject(new Error('All ports are in use. Please free up one of the required ports.'));
+            }
+          } else {
+            reject(error);
+          }
+        });
+
+        server.listen(port, '0.0.0.0', () => {
+          log(`Server running on port ${port}`);
+          resolve();
+        });
+      });
+    };
 
     if (app.get("env") === "development") {
       await setupVite(app, server);
@@ -63,21 +86,7 @@ app.use((req, res, next) => {
       serveStatic(app);
     }
 
-    await new Promise<void>((resolve, reject) => {
-      server.listen(PORT, '0.0.0.0', () => {
-        log(`Server running on port ${PORT}`);
-        resolve();
-      }).on('error', (error: Error & { code?: string }) => {
-        if (error.code === 'EADDRINUSE') {
-          console.error(`Error: Port ${PORT} is already in use.`);
-          console.error('Please ensure no other service is running on this port.');
-          process.exit(1);
-        } else {
-          console.error(`Failed to start server:`, error);
-          reject(error);
-        }
-      });
-    });
+    await tryPort(ports[currentPortIndex]);
 
   } catch (error) {
     console.error('Failed to start server:', error);
