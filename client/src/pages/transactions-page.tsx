@@ -11,10 +11,12 @@ import { Toggle } from "@/components/ui/toggle";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
-import { Plus, List, LayoutGrid } from "lucide-react";
+import { Plus, List, LayoutGrid, Trash2, Moon, Sun } from "lucide-react";
 import { NavTabs } from "@/components/ui/nav-tabs";
 import { KanbanBoard } from "@/components/kanban-board";
 import { useState } from "react";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface Transaction {
   id: number;
@@ -40,6 +42,11 @@ export default function TransactionsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const [view, setView] = useState<'list' | 'board'>('board');
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const { toast } = useToast();
+  const [theme, setTheme] = useState<'light' | 'dark'>(
+    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  );
 
   const form = useForm({
     resolver: zodResolver(createTransactionSchema),
@@ -81,6 +88,35 @@ export default function TransactionsPage() {
     },
   });
 
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/transactions/${id}`);
+      if (!response.ok) {
+        throw new Error('Failed to delete transaction');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      toast({
+        title: "Transaction deleted",
+        description: "The transaction has been successfully deleted.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    document.documentElement.classList.toggle('dark');
+  };
+
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
@@ -104,6 +140,18 @@ export default function TransactionsPage() {
               <LayoutGrid className="h-4 w-4" />
             </Toggle>
           </div>
+          <Toggle
+            pressed={theme === 'dark'}
+            onPressedChange={toggleTheme}
+            aria-label="Toggle theme"
+            className="ml-2"
+          >
+            {theme === 'light' ? (
+              <Moon className="h-4 w-4" />
+            ) : (
+              <Sun className="h-4 w-4" />
+            )}
+          </Toggle>
         </div>
         {user?.role === "agent" && (
           <Dialog>
@@ -191,11 +239,28 @@ export default function TransactionsPage() {
           {transactions.map((transaction) => (
             <Card 
               key={transaction.id} 
-              className="cursor-pointer hover:bg-accent/50 transition-colors" 
-              onClick={() => setLocation(`/transactions/${transaction.id}`)}
+              className="cursor-pointer hover:bg-accent/50 transition-colors relative" 
             >
-              <CardHeader>
-                <CardTitle className="text-lg">{transaction.address}</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle 
+                  className="text-lg hover:underline"
+                  onClick={() => setLocation(`/transactions/${transaction.id}`)}
+                >
+                  {transaction.address}
+                </CardTitle>
+                {user?.role === "agent" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteId(transaction.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">Status: {transaction.status}</p>
@@ -218,6 +283,31 @@ export default function TransactionsPage() {
           )}
         </div>
       )}
+
+      <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this transaction? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteId) {
+                  deleteTransactionMutation.mutate(deleteId);
+                  setDeleteId(null);
+                }
+              }}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }

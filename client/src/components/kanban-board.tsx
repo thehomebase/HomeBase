@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -19,6 +19,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+
 
 interface Transaction {
   id: number;
@@ -76,11 +80,26 @@ const KanbanColumn = ({ title, transactions, status }: KanbanColumnProps) => {
         {transactions.map((transaction) => (
           <Card 
             key={transaction.id} 
-            className="p-3 cursor-pointer hover:shadow-md transition-shadow"
-            onClick={(e) => handleCardClick(e, transaction.id)}
+            className="p-3 cursor-pointer hover:shadow-md transition-shadow relative group"
           >
-            <div className="flex flex-col gap-1">
-              <div className="font-medium text-sm truncate">{transaction.address}</div>
+            <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-destructive hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteId(transaction.id);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+            <div 
+              className="flex flex-col gap-1"
+              onClick={(e) => handleCardClick(e, transaction.id)}
+            >
+              <div className="font-medium text-sm truncate pr-6">{transaction.address}</div>
               <div className="text-xs text-muted-foreground space-y-0.5">
                 <div className="capitalize">{transaction.type === 'buy' ? 'Purchase' : 'Sale'}</div>
                 <div>Price: {formatPrice(transaction.contractPrice)}</div>
@@ -101,12 +120,36 @@ const KanbanColumn = ({ title, transactions, status }: KanbanColumnProps) => {
 export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [deleteId, setDeleteId] = useState<number | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/transactions/${id}`);
+      if (!response.ok) {
+        throw new Error("Failed to delete transaction");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      toast({
+        title: "Transaction deleted",
+        description: "The transaction has been successfully deleted.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const updateTransactionStatus = useMutation({
     mutationFn: async ({ id, newStatus }: { id: number; newStatus: string }) => {
@@ -150,26 +193,53 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
   };
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex gap-2 overflow-x-auto pb-4">
-        {statusColumns.map((column) => {
-          const columnTransactions = transactions.filter(
-            (t) => t.status === column.id
-          );
-          return (
-            <KanbanColumn
-              key={column.id}
-              title={column.title}
-              transactions={columnTransactions}
-              status={column.id}
-            />
-          );
-        })}
-      </div>
-    </DndContext>
+    <>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex gap-2 overflow-x-auto pb-4">
+          {statusColumns.map((column) => {
+            const columnTransactions = transactions.filter(
+              (t) => t.status === column.id
+            );
+            return (
+              <KanbanColumn
+                key={column.id}
+                title={column.title}
+                transactions={columnTransactions}
+                status={column.id}
+              />
+            );
+          })}
+        </div>
+      </DndContext>
+
+      <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this transaction? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteId) {
+                  deleteTransactionMutation.mutate(deleteId);
+                  setDeleteId(null);
+                }
+              }}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

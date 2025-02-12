@@ -36,6 +36,7 @@ export interface IStorage {
   getTransaction(id: number): Promise<Transaction | undefined>;
   getTransactionsByUser(userId: number): Promise<Transaction[]>;
   updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction>;
+  deleteTransaction(id: number): Promise<void>;
 
   // Checklist operations
   createChecklist(checklist: InsertChecklist): Promise<Checklist>;
@@ -923,6 +924,17 @@ export class DatabaseStorage implements IStorage {
       `);
     } catch (error) {
       console.error('Error in deleteDocument:', error);
+      throw error;
+    }
+  }
+  async deleteTransaction(id: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM transactions 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteTransaction:', error);
       throw error;
     }
   }
