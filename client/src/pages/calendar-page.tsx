@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type Transaction } from "@shared/schema";
 import { format } from "date-fns";
 import { List, Calendar as CalendarIcon } from "lucide-react";
+import { Timeline } from "@/components/ui/timeline";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Scheduler } from "@aldabil/react-scheduler";
@@ -109,6 +110,7 @@ export default function CalendarPage() {
       </div>
 
       <Card className="p-6">
+        <Timeline transactions={transactions} />
         {!showTable ? (
           <Scheduler
             events={events}
