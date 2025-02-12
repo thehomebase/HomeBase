@@ -53,18 +53,16 @@ app.use((req, res, next) => {
       res.status(status).json({ message });
     });
 
-    // Use port 3000 instead of 5000
-    const PORT = Number(process.env.PORT || 3000);
+    // Change port to 5000
+    const PORT = Number(process.env.PORT || 5000);
     log(`Attempting to start server on port ${PORT}`);
 
     if (app.get("env") === "development") {
-      // Setup Vite before starting the server
       await setupVite(app, server);
     } else {
       serveStatic(app);
     }
 
-    // Start the server on the specified port
     await new Promise<void>((resolve, reject) => {
       server.listen(PORT, '0.0.0.0', () => {
         log(`Server running on port ${PORT}`);
