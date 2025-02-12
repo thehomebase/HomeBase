@@ -22,6 +22,12 @@ interface Transaction {
   status: string;
   type: 'buy' | 'sell';
   participants: any[];
+  contractPrice: number | null;
+  clientId: number | null;
+  client?: {
+    firstName: string;
+    lastName: string;
+  } | null;
 }
 
 const createTransactionSchema = z.object({
@@ -46,6 +52,14 @@ export default function TransactionsPage() {
 
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/transactions");
+      if (!response.ok) {
+        throw new Error('Failed to fetch transactions');
+      }
+      const data = await response.json();
+      return data;
+    },
     enabled: !!user,
   });
 
@@ -188,6 +202,11 @@ export default function TransactionsPage() {
                 <p className="text-sm text-muted-foreground">
                   Participants: {transaction.participants.length}
                 </p>
+                {transaction.client && (
+                  <p className="text-sm text-muted-foreground">
+                    Client: {transaction.client.firstName} {transaction.client.lastName}
+                  </p>
+                )}
               </CardContent>
             </Card>
           ))}

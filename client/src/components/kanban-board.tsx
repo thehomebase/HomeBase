@@ -24,6 +24,9 @@ interface Transaction {
   address: string;
   status: string;
   type: 'buy' | 'sell';
+  contractPrice: number | null;
+  clientId: number | null;
+  client?: { firstName: string; lastName: string; } | null;
 }
 
 interface KanbanColumnProps {
@@ -40,22 +43,38 @@ const statusColumns = [
   { id: "closed", title: "Closed" },
 ];
 
+const formatPrice = (price: number | null) => {
+  if (!price) return 'N/A';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(price);
+};
+
 const KanbanColumn = ({ title, transactions, status }: KanbanColumnProps) => {
   return (
-    <div className="flex flex-col min-w-[300px] bg-muted/50 rounded-lg p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-semibold">{title}</h3>
-        <span className="bg-primary/10 text-primary px-2 py-1 rounded-full text-sm">
+    <div className="flex flex-col min-w-[240px] bg-muted/50 rounded-lg p-2">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="font-semibold text-sm">{title}</h3>
+        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs">
           {transactions.length}
         </span>
       </div>
       <div className="flex flex-col gap-2">
         {transactions.map((transaction) => (
-          <Card key={transaction.id} className="p-4 cursor-move hover:shadow-md transition-shadow">
+          <Card key={transaction.id} className="p-3 cursor-move hover:shadow-md transition-shadow">
             <div className="flex flex-col gap-1">
-              <div className="font-medium">{transaction.address}</div>
-              <div className="text-sm text-muted-foreground capitalize">
-                {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
+              <div className="font-medium text-sm truncate">{transaction.address}</div>
+              <div className="text-xs text-muted-foreground space-y-0.5">
+                <div className="capitalize">{transaction.type === 'buy' ? 'Purchase' : 'Sale'}</div>
+                <div>Price: {formatPrice(transaction.contractPrice)}</div>
+                {transaction.client && (
+                  <div className="truncate">
+                    Client: {transaction.client.firstName} {transaction.client.lastName}
+                  </div>
+                )}
               </div>
             </div>
           </Card>
@@ -122,7 +141,7 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
       collisionDetection={closestCorners}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto p-4">
+      <div className="flex gap-2 overflow-x-auto pb-4">
         {statusColumns.map((column) => {
           const columnTransactions = transactions.filter(
             (t) => t.status === column.id
