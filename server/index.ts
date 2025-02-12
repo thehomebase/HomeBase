@@ -42,10 +42,26 @@ app.use((req, res, next) => {
   next();
 });
 
+// Health check endpoint
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// Create a clean shutdown function
+function shutdown(server: any) {
+  return new Promise((resolve) => {
+    server.close(() => {
+      console.log('Server shutdown complete');
+      resolve(true);
+    });
+  });
+}
+
 (async () => {
   try {
     const server = registerRoutes(app);
 
+    // Add error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       console.error('Error in request:', err);
       const status = err.status || err.statusCode || 500;
@@ -53,40 +69,40 @@ app.use((req, res, next) => {
       res.status(status).json({ message });
     });
 
-    // Try ports in sequence until one works
-    const ports = [5000, 5001, 3000];
-    let currentPortIndex = 0;
+    const port = parseInt(process.env.PORT || '3000', 10);
 
-    const tryPort = async (port: number): Promise<void> => {
-      return new Promise((resolve, reject) => {
-        server.once('error', (error: Error & { code?: string }) => {
-          if (error.code === 'EADDRINUSE') {
-            if (currentPortIndex < ports.length - 1) {
-              currentPortIndex++;
-              log(`Port ${port} is in use, trying next port ${ports[currentPortIndex]}`);
-              tryPort(ports[currentPortIndex]).then(resolve).catch(reject);
-            } else {
-              reject(new Error('All ports are in use. Please free up one of the required ports.'));
-            }
-          } else {
-            reject(error);
-          }
-        });
-
-        server.listen(port, '0.0.0.0', () => {
-          log(`Server running on port ${port}`);
-          resolve();
-        });
-      });
-    };
-
+    // Setup development environment first if needed
     if (app.get("env") === "development") {
       await setupVite(app, server);
     } else {
       serveStatic(app);
     }
 
-    await tryPort(ports[currentPortIndex]);
+    // Attempt to start the server
+    server.listen(port, '0.0.0.0', () => {
+      log(`Server running on port ${port}`);
+    }).on('error', async (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`Port ${port} is already in use. Please check for other running processes.`);
+        process.exit(1);
+      } else {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+      }
+    });
+
+    // Handle graceful shutdown
+    process.on('SIGTERM', async () => {
+      console.log('SIGTERM received. Starting graceful shutdown...');
+      await shutdown(server);
+      process.exit(0);
+    });
+
+    process.on('SIGINT', async () => {
+      console.log('SIGINT received. Starting graceful shutdown...');
+      await shutdown(server);
+      process.exit(0);
+    });
 
   } catch (error) {
     console.error('Failed to start server:', error);
