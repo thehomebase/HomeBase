@@ -453,8 +453,11 @@ export default function TransactionPage() {
                   {isEditing ? (
                     <select
                       className="w-full h-9 px-3 rounded-md border"
-                      value={transaction.status}
                       {...form.register("status")}
+                      onChange={(e) => {
+                        form.setValue("status", e.target.value);
+                        updateTransaction.mutate({ status: e.target.value });
+                      }}
                     >
                       <option value="coming_soon">Coming Soon</option>
                       <option value="active">Active</option>
