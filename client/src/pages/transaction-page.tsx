@@ -42,6 +42,7 @@ interface Transaction {
 }
 
 interface TransactionFormData {
+  address?: string;
   contractPrice?: number;
   optionPeriodExpiration?: string;
   optionFee?: number;
@@ -231,7 +232,16 @@ export default function TransactionPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold">{transaction.address}</h1>
+              {isEditing ? (
+                <Input
+                  type="text"
+                  {...form.register("address")}
+                  defaultValue={transaction.address}
+                  className="text-2xl font-bold mb-1 w-full"
+                />
+              ) : (
+                <h1 className="text-2xl font-bold">{transaction.address}</h1>
+              )}
               <p className="text-muted-foreground">Transaction ID: {parsedId}</p>
             </div>
           </div>
