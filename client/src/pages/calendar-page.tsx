@@ -1,5 +1,4 @@
 import { useAuth } from "@/hooks/use-auth";
-import { Scheduler } from "@aldabil/react-scheduler";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { type Transaction } from "@shared/schema";
@@ -7,6 +6,7 @@ import { format } from "date-fns";
 import { List, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { Calendar } from "@/components/ui/calendar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +25,7 @@ import {
 export default function CalendarPage() {
   const { user } = useAuth();
   const [showTable, setShowTable] = useState(false);
+  const [date, setDate] = useState<Date>(new Date());
 
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -36,27 +37,19 @@ export default function CalendarPage() {
 
     if (transaction.optionPeriodExpiration) {
       events.push({
-        event_id: `option-${transaction.id}`,
+        id: `option-${transaction.id}`,
         title: `Option Expiration - ${transaction.address}`,
-        start: new Date(transaction.optionPeriodExpiration),
-        end: new Date(transaction.optionPeriodExpiration),
-        draggable: false,
-        editable: false,
-        deletable: false,
-        color: "#fbbf24",
+        date: new Date(transaction.optionPeriodExpiration),
+        type: 'option'
       });
     }
 
     if (transaction.closingDate) {
       events.push({
-        event_id: `closing-${transaction.id}`,
+        id: `closing-${transaction.id}`,
         title: `Closing - ${transaction.address}`,
-        start: new Date(transaction.closingDate),
-        end: new Date(transaction.closingDate),
-        draggable: false,
-        editable: false,
-        deletable: false,
-        color: "#22c55e",
+        date: new Date(transaction.closingDate),
+        type: 'closing'
       });
     }
 
@@ -64,7 +57,7 @@ export default function CalendarPage() {
   }).flat();
 
   const sortedEvents = [...events].sort((a, b) =>
-    new Date(a.start).getTime() - new Date(b.start).getTime()
+    a.date.getTime() - b.date.getTime()
   );
 
   const handleExportToIcal = () => {
@@ -115,42 +108,20 @@ export default function CalendarPage() {
 
       <Card className="p-6">
         {!showTable ? (
-          <Scheduler
-            view="month"
-            events={events}
-            week={{
-              weekDays: [0, 1, 2, 3, 4, 5, 6],
-              weekStartOn: 0,
-              startHour: 9,
-              endHour: 17,
-              step: 60,
+          <Calendar
+            mode="single"
+            selected={date}
+            onSelect={(date) => date && setDate(date)}
+            className="rounded-md border w-full"
+            modifiers={{
+              event: (date) => events.some(
+                event => event.date.toDateString() === date.toDateString()
+              )
             }}
-            month={{
-              weekDays: [0, 1, 2, 3, 4, 5, 6],
-              weekStartOn: 0,
-              startHour: 9,
-              endHour: 17,
-            }}
-            height={600}
-            hourFormat="12"
-            loading={false}
-            editable={false}
-            deletable={false}
-            draggable={false}
-            views={["month"]}
-            navigation={{
-              component: () => null
-            }}
-            viewerExtraComponent={() => null}
-            selectedDate={new Date()}
-            fields={[]}
-            dialogMaxWidth="lg"
-            customStyles={{
-              todayCell: {
-                borderRadius: "50%",
-                border: "2px solid black",
-                background: "transparent",
-                color: "inherit"
+            modifiersStyles={{
+              event: {
+                fontWeight: 'bold',
+                textDecoration: 'underline'
               }
             }}
           />
@@ -167,15 +138,16 @@ export default function CalendarPage() {
               </TableHeader>
               <TableBody>
                 {sortedEvents.map((event) => (
-                  <TableRow key={event.event_id}>
-                    <TableCell>{format(new Date(event.start), 'MMM d, yyyy')}</TableCell>
+                  <TableRow key={event.id}>
+                    <TableCell>{format(event.date, 'MMM d, yyyy')}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: event.color }}
+                          className={`w-3 h-3 rounded-full ${
+                            event.type === 'option' ? 'bg-yellow-400' : 'bg-green-500'
+                          }`}
                         />
-                        {event.event_id.startsWith('option') ? 'Option Expiration' : 'Closing'}
+                        {event.type === 'option' ? 'Option Expiration' : 'Closing'}
                       </div>
                     </TableCell>
                     <TableCell>{event.title.split(' - ')[1]}</TableCell>
