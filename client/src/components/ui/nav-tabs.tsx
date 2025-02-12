@@ -4,10 +4,12 @@ import { cn } from "@/lib/utils";
 export function NavTabs() {
   const [location] = useLocation();
 
+  const { user } = useAuth();
   const tabs = [
     { name: "Transactions", href: "/" },
     { name: "Clients", href: "/clients" },
     { name: "Calendar", href: "/calendar" },
+    ...(user?.role === 'agent' ? [{ name: "Data", href: "/data" }] : []),
   ];
 
   return (
