@@ -360,8 +360,12 @@ export class DatabaseStorage implements IStorage {
           if (['address', 'access_code', 'status', 'type', 'agent_id', 'client_id', 
                'participants', 'contract_price', 'option_period', 'option_fee', 
                'earnest_money', 'down_payment', 'seller_concessions', 'closing_date',
-               'contract_execution_date'].includes(snakeKey)) {
-            if (key === 'participants' && Array.isArray(value)) {
+               'contract_execution_date', 'option_period_expiration'].includes(snakeKey)) {
+
+            // Handle date fields
+            if (['closing_date', 'contract_execution_date', 'option_period_expiration'].includes(snakeKey)) {
+              cleanData[snakeKey] = value ? new Date(value).toISOString() : null;
+            } else if (key === 'participants' && Array.isArray(value)) {
               cleanData[snakeKey] = JSON.stringify(value);
             } else if (value === null) {
               cleanData[snakeKey] = null;
@@ -385,6 +389,9 @@ export class DatabaseStorage implements IStorage {
         if (key === 'participants') {
           return sql`${sql.identifier([key])} = ${value}::jsonb`;
         }
+        if (['closing_date', 'contract_execution_date', 'option_period_expiration'].includes(key)) {
+          return sql`${sql.identifier([key])} = ${value}::timestamp`;
+        }
         return sql`${sql.identifier([key])} = ${value}`;
       });
 
@@ -405,6 +412,7 @@ export class DatabaseStorage implements IStorage {
         address: String(row.address),
         accessCode: String(row.access_code),
         status: String(row.status),
+        type: String(row.type),
         agentId: Number(row.agent_id),
         clientId: row.client_id ? Number(row.client_id) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
@@ -414,9 +422,9 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
         downPayment: row.down_payment ? Number(row.down_payment) : null,
         sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
-        closingDate: row.closing_date || null,
-        type: row.type,
-        contractExecutionDate: row.contract_execution_date || null
+        closingDate: row.closing_date ? new Date(row.closing_date).toISOString() : null,
+        contractExecutionDate: row.contract_execution_date ? new Date(row.contract_execution_date).toISOString() : null,
+        optionPeriodExpiration: row.option_period_expiration ? new Date(row.option_period_expiration).toISOString() : null
       };
     } catch (error) {
       console.error('Error in updateTransaction:', error);
