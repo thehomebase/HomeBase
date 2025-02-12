@@ -1,3 +1,4 @@
+
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -6,7 +7,7 @@ import { format } from "date-fns";
 import { List, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { Calendar } from "@/components/ui/calendar";
+import { Scheduler } from "@aldabil/react-scheduler";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +26,6 @@ import {
 export default function CalendarPage() {
   const { user } = useAuth();
   const [showTable, setShowTable] = useState(false);
-  const [date, setDate] = useState<Date>(new Date());
 
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -37,19 +37,21 @@ export default function CalendarPage() {
 
     if (transaction.optionPeriodExpiration) {
       events.push({
-        id: `option-${transaction.id}`,
+        event_id: `option-${transaction.id}`,
         title: `Option Expiration - ${transaction.address}`,
-        date: new Date(transaction.optionPeriodExpiration),
-        type: 'option'
+        start: new Date(transaction.optionPeriodExpiration),
+        end: new Date(transaction.optionPeriodExpiration),
+        color: "#EAB308"
       });
     }
 
     if (transaction.closingDate) {
       events.push({
-        id: `closing-${transaction.id}`,
+        event_id: `closing-${transaction.id}`,
         title: `Closing - ${transaction.address}`,
-        date: new Date(transaction.closingDate),
-        type: 'closing'
+        start: new Date(transaction.closingDate),
+        end: new Date(transaction.closingDate),
+        color: "#22C55E"
       });
     }
 
@@ -57,7 +59,7 @@ export default function CalendarPage() {
   }).flat();
 
   const sortedEvents = [...events].sort((a, b) =>
-    a.date.getTime() - b.date.getTime()
+    a.start.getTime() - b.start.getTime()
   );
 
   const handleExportToIcal = () => {
@@ -108,22 +110,21 @@ export default function CalendarPage() {
 
       <Card className="p-6">
         {!showTable ? (
-          <Calendar
-            mode="single"
-            selected={date}
-            onSelect={(date) => date && setDate(date)}
-            className="rounded-md border w-full"
-            modifiers={{
-              event: (date) => events.some(
-                event => event.date.toDateString() === date.toDateString()
-              )
+          <Scheduler
+            events={events}
+            month={{
+              weekDays: [0, 1, 2, 3, 4, 5, 6],
+              weekStartOn: 0,
+              startHour: 0,
+              endHour: 23,
             }}
-            modifiersStyles={{
-              event: {
-                fontWeight: 'bold',
-                textDecoration: 'underline'
-              }
-            }}
+            deletable={false}
+            draggable={false}
+            views={["month"]}
+            navigation={false}
+            selectedDate={new Date()}
+            fields={[]}
+            dialogMaxWidth="lg"
           />
         ) : (
           <div>
@@ -138,16 +139,16 @@ export default function CalendarPage() {
               </TableHeader>
               <TableBody>
                 {sortedEvents.map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell>{format(event.date, 'MMM d, yyyy')}</TableCell>
+                  <TableRow key={event.event_id}>
+                    <TableCell>{format(event.start, 'MMM d, yyyy')}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span
                           className={`w-3 h-3 rounded-full ${
-                            event.type === 'option' ? 'bg-yellow-400' : 'bg-green-500'
+                            event.event_id.startsWith('option') ? 'bg-yellow-400' : 'bg-green-500'
                           }`}
                         />
-                        {event.type === 'option' ? 'Option Expiration' : 'Closing'}
+                        {event.event_id.startsWith('option') ? 'Option Expiration' : 'Closing'}
                       </div>
                     </TableCell>
                     <TableCell>{event.title.split(' - ')[1]}</TableCell>
