@@ -4,6 +4,9 @@ import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { type Transaction } from "@shared/schema";
 import { format } from "date-fns";
+import { List } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -15,6 +18,7 @@ import {
 
 export default function CalendarPage() {
   const { user } = useAuth();
+  const [showTable, setShowTable] = useState(false);
 
   // Fetch transactions to display in calendar
   const { data: transactions = [] } = useQuery<Transaction[]>({
@@ -66,6 +70,15 @@ export default function CalendarPage() {
     <main className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-2xl font-bold">Calendar</h2>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowTable(!showTable)}
+          className="gap-2"
+        >
+          <List className="h-4 w-4" />
+          {showTable ? "Hide List" : "Show List"}
+        </Button>
       </div>
 
       <Card className="p-6">
@@ -92,7 +105,7 @@ export default function CalendarPage() {
           deletable={false}
           draggable={false}
           navigation={{
-            component: (props) => {
+            component: (props: { onChange: (view: string) => void; selectedView: string }) => {
               const views = [
                 { id: "month", label: "Month" },
                 { id: "week", label: "Week" },
@@ -119,42 +132,44 @@ export default function CalendarPage() {
           }}
         />
 
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold mb-4">Upcoming Events</h3>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Event</TableHead>
-                <TableHead>Property</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedEvents.map((event) => (
-                <TableRow key={event.event_id}>
-                  <TableCell>{format(new Date(event.start), 'MMM d, yyyy')}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: event.color }}
-                      />
-                      {event.event_id.startsWith('option') ? 'Option Expiration' : 'Closing'}
-                    </div>
-                  </TableCell>
-                  <TableCell>{event.title.split(' - ')[1]}</TableCell>
-                </TableRow>
-              ))}
-              {sortedEvents.length === 0 && (
+        {showTable && (
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold mb-4">Upcoming Events</h3>
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground">
-                    No upcoming events
-                  </TableCell>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Event</TableHead>
+                  <TableHead>Property</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {sortedEvents.map((event) => (
+                  <TableRow key={event.event_id}>
+                    <TableCell>{format(new Date(event.start), 'MMM d, yyyy')}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: event.color }}
+                        />
+                        {event.event_id.startsWith('option') ? 'Option Expiration' : 'Closing'}
+                      </div>
+                    </TableCell>
+                    <TableCell>{event.title.split(' - ')[1]}</TableCell>
+                  </TableRow>
+                ))}
+                {sortedEvents.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground">
+                      No upcoming events
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </Card>
     </main>
   );
