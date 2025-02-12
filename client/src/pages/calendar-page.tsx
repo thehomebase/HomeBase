@@ -105,6 +105,7 @@ export default function CalendarPage() {
             editable={false}
             deletable={false}
             draggable={false}
+            views={["month", "week", "day"]}
             navigation={{
               component: (props: { onChange: (view: string) => void; selectedView: string }) => {
                 const views = [
