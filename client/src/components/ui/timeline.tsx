@@ -1,12 +1,13 @@
 
 import React from "react";
-import { format, getDaysInMonth } from "date-fns";
+import { format, getDaysInMonth, isSameDay } from "date-fns";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "./tooltip";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
 interface TimelineProps {
   transactions: Array<{
@@ -83,6 +84,17 @@ export function Timeline({ transactions }: TimelineProps) {
           ))}
         </div>
 
+        {/* Current date marker */}
+        <div
+          className="absolute w-4 h-4 bg-destructive rounded-full cursor-pointer"
+          style={{
+            left: `${((today.getDate() - 1) / (daysInMonth - 1)) * 100}%`,
+            top: '-5px',
+            transform: 'translateX(-50%)',
+            zIndex: 10
+          }}
+        />
+
         {/* Event markers */}
         {Array.from(eventsByDay.entries()).map(([day, events]) => (
           <TooltipProvider key={day}>
@@ -97,7 +109,14 @@ export function Timeline({ transactions }: TimelineProps) {
                   }}
                 />
               </TooltipTrigger>
-              <TooltipContent side="bottom" align="center" sideOffset={5}>
+              <TooltipPrimitive.Portal>
+                <TooltipContent 
+                  side="bottom" 
+                  align="center" 
+                  sideOffset={5}
+                  className="z-50 relative"
+                  avoidCollisions={true}
+                >
                 <div className="space-y-2">
                   {events.map((event, idx) => (
                     <div key={idx} className="text-sm">
@@ -114,6 +133,7 @@ export function Timeline({ transactions }: TimelineProps) {
                   ))}
                 </div>
               </TooltipContent>
+              </TooltipPrimitive.Portal>
             </Tooltip>
           </TooltipProvider>
         ))}
