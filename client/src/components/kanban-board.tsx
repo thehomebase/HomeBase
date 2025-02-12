@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 interface Transaction {
   id: number;
@@ -54,6 +55,15 @@ const formatPrice = (price: number | null) => {
 };
 
 const KanbanColumn = ({ title, transactions, status }: KanbanColumnProps) => {
+  const [, setLocation] = useLocation();
+
+  const handleCardClick = (e: React.MouseEvent, transactionId: number) => {
+    // Only navigate if we're not dragging
+    if (!e.defaultPrevented) {
+      setLocation(`/transactions/${transactionId}`);
+    }
+  };
+
   return (
     <div className="flex flex-col min-w-[240px] bg-muted/50 rounded-lg p-2">
       <div className="flex justify-between items-center mb-2">
@@ -64,7 +74,11 @@ const KanbanColumn = ({ title, transactions, status }: KanbanColumnProps) => {
       </div>
       <div className="flex flex-col gap-2">
         {transactions.map((transaction) => (
-          <Card key={transaction.id} className="p-3 cursor-move hover:shadow-md transition-shadow">
+          <Card 
+            key={transaction.id} 
+            className="p-3 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={(e) => handleCardClick(e, transaction.id)}
+          >
             <div className="flex flex-col gap-1">
               <div className="font-medium text-sm truncate">{transaction.address}</div>
               <div className="text-xs text-muted-foreground space-y-0.5">
