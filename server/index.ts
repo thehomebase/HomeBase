@@ -53,8 +53,8 @@ app.use((req, res, next) => {
       res.status(status).json({ message });
     });
 
-    // Change port to 3000
-    const PORT = Number(process.env.PORT || 3000);
+    // Change port to 5000 to match .replit configuration
+    const PORT = Number(process.env.PORT || 5000);
     log(`Attempting to start server on port ${PORT}`);
 
     if (app.get("env") === "development") {

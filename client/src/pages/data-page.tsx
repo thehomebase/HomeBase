@@ -2,7 +2,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { type Transaction } from "@shared/schema";
-import { ChartContainer } from "@/components/ui/chart";
 import { 
   BarChart, 
   Bar, 
@@ -55,11 +54,13 @@ export default function DataPage() {
       if (date.getFullYear() !== currentYear) return acc;
 
       const monthKey = format(date, 'MMM');
-      acc[monthKey].totalVolume += transaction.contractPrice!;
+      if (acc[monthKey]) {
+        acc[monthKey].totalVolume += transaction.contractPrice!;
+      }
       return acc;
     }, initialMonthlyData);
 
-  // Calculate cumulative totals
+  // Calculate cumulative totals and create sorted chart data
   let runningTotal = 0;
   const chartData = Object.entries(monthlyData)
     .sort((a, b) => {
