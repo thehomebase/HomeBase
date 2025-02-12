@@ -87,7 +87,7 @@ export default function TransactionPage() {
         if (!date) return null;
         const d = new Date(date);
         if (isNaN(d.getTime())) return null;
-        d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+        // Don't adjust timezone offset as we want to preserve the user's selected date
         return d.toISOString();
       };
 
@@ -109,13 +109,10 @@ export default function TransactionPage() {
       }
       return response.json();
     },
-    onSuccess: async (updatedData) => {
+    onSuccess: (updatedData) => {
+      // Update the cache immediately with the new data
       queryClient.setQueryData(["/api/transactions", parsedId], updatedData);
-      await queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
       setIsEditing(false);
-
-      form.reset(updatedData);
-
       toast({
         title: "Success",
         description: "Transaction updated successfully",
@@ -132,15 +129,22 @@ export default function TransactionPage() {
 
   React.useEffect(() => {
     if (transaction) {
+      // Format dates to local date string for form display
+      const formatDateForInput = (dateString: string | null | undefined) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toISOString().split('T')[0];
+      };
+
       form.reset({
         contractPrice: transaction.contractPrice,
-        optionPeriodExpiration: transaction.optionPeriodExpiration?.split('T')[0],
+        optionPeriodExpiration: formatDateForInput(transaction.optionPeriodExpiration),
         optionFee: transaction.optionFee,
         earnestMoney: transaction.earnestMoney,
         downPayment: transaction.downPayment,
         sellerConcessions: transaction.sellerConcessions,
-        closingDate: transaction.closingDate?.split('T')[0],
-        contractExecutionDate: transaction.contractExecutionDate?.split('T')[0],
+        closingDate: formatDateForInput(transaction.closingDate),
+        contractExecutionDate: formatDateForInput(transaction.contractExecutionDate),
         mlsNumber: transaction.mlsNumber,
         financing: transaction.financing,
         status: transaction.status
