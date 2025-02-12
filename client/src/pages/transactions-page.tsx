@@ -11,13 +11,16 @@ import { Toggle } from "@/components/ui/toggle";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
-import { Plus } from "lucide-react";
+import { Plus, List, LayoutGrid } from "lucide-react";
 import { NavTabs } from "@/components/ui/nav-tabs";
+import { KanbanBoard } from "@/components/kanban-board";
+import { useState } from "react";
 
 interface Transaction {
   id: number;
   address: string;
   status: string;
+  type: 'buy' | 'sell';
   participants: any[];
 }
 
@@ -30,9 +33,15 @@ const createTransactionSchema = z.object({
 export default function TransactionsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const [view, setView] = useState<'list' | 'board'>('board');
+
   const form = useForm({
     resolver: zodResolver(createTransactionSchema),
-    defaultValues: { address: "", accessCode: "", type: "buy" },
+    defaultValues: { 
+      address: "", 
+      accessCode: "", 
+      type: "buy" as const 
+    },
   });
 
   const { data: transactions = [] } = useQuery<Transaction[]>({
@@ -45,7 +54,7 @@ export default function TransactionsPage() {
       const response = await apiRequest("POST", "/api/transactions", {
         ...data,
         agentId: user?.id,
-        status: "active",
+        status: "prospect",
         participants: [],
       });
       if (!response.ok) {
@@ -61,7 +70,27 @@ export default function TransactionsPage() {
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-bold">Your Transactions</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-bold">Your Transactions</h2>
+          <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+            <Toggle
+              pressed={view === 'list'}
+              onPressedChange={() => setView('list')}
+              aria-label="List view"
+              className="data-[state=on]:bg-background"
+            >
+              <List className="h-4 w-4" />
+            </Toggle>
+            <Toggle
+              pressed={view === 'board'}
+              onPressedChange={() => setView('board')}
+              aria-label="Board view"
+              className="data-[state=on]:bg-background"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Toggle>
+          </div>
+        </div>
         {user?.role === "agent" && (
           <Dialog>
             <DialogTrigger asChild>
@@ -141,31 +170,35 @@ export default function TransactionsPage() {
         )}
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {transactions.map((transaction) => (
-          <Card 
-            key={transaction.id} 
-            className="cursor-pointer hover:bg-accent/50 transition-colors" 
-            onClick={() => setLocation(`/transactions/${transaction.id}`)}
-          >
-            <CardHeader>
-              <CardTitle className="text-lg">{transaction.address}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Status: {transaction.status}</p>
-              <p className="text-sm text-muted-foreground">
-                Participants: {transaction.participants.length}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+      {view === 'board' ? (
+        <KanbanBoard transactions={transactions} />
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {transactions.map((transaction) => (
+            <Card 
+              key={transaction.id} 
+              className="cursor-pointer hover:bg-accent/50 transition-colors" 
+              onClick={() => setLocation(`/transactions/${transaction.id}`)}
+            >
+              <CardHeader>
+                <CardTitle className="text-lg">{transaction.address}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">Status: {transaction.status}</p>
+                <p className="text-sm text-muted-foreground">
+                  Participants: {transaction.participants.length}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
 
-        {transactions.length === 0 && (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            No transactions found. {user?.role === "agent" ? "Create one to get started!" : "Ask your agent for an access code to join a transaction."}
-          </div>
-        )}
-      </div>
+          {transactions.length === 0 && (
+            <div className="col-span-full text-center py-12 text-muted-foreground">
+              No transactions found. {user?.role === "agent" ? "Create one to get started!" : "Ask your agent for an access code to join a transaction."}
+            </div>
+          )}
+        </div>
+      )}
     </main>
   );
 }

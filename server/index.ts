@@ -57,6 +57,36 @@ function shutdown(server: any) {
   });
 }
 
+// Function to try starting the server on different ports
+async function startServer(server: any, initialPort: number = 5000, maxAttempts: number = 3) {
+  for (let port = initialPort; port < initialPort + maxAttempts; port++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.listen(port, '0.0.0.0')
+          .once('listening', () => {
+            log(`Server running on port ${port}`);
+            resolve();
+          })
+          .once('error', (err: any) => {
+            if (err.code === 'EADDRINUSE') {
+              log(`Port ${port} is in use, trying next port...`);
+              server.close();
+              reject(err);
+            } else {
+              reject(err);
+            }
+          });
+      });
+      return port; // Successfully started
+    } catch (err) {
+      if (port === initialPort + maxAttempts - 1) {
+        throw new Error(`Failed to find an available port after ${maxAttempts} attempts`);
+      }
+    }
+  }
+  throw new Error('Failed to start server');
+}
+
 (async () => {
   try {
     const server = registerRoutes(app);
@@ -69,27 +99,16 @@ function shutdown(server: any) {
       res.status(status).json({ message });
     });
 
-    const port = parseInt(process.env.PORT || '3000', 10);
-
-    // Setup development environment first if needed
+    // Setup development environment first
     if (app.get("env") === "development") {
       await setupVite(app, server);
     } else {
       serveStatic(app);
     }
 
-    // Attempt to start the server
-    server.listen(port, '0.0.0.0', () => {
-      log(`Server running on port ${port}`);
-    }).on('error', async (error: any) => {
-      if (error.code === 'EADDRINUSE') {
-        console.error(`Port ${port} is already in use. Please check for other running processes.`);
-        process.exit(1);
-      } else {
-        console.error('Failed to start server:', error);
-        process.exit(1);
-      }
-    });
+    // Try to start the server with port fallback
+    const initialPort = parseInt(process.env.PORT || '5000', 10);
+    await startServer(server, initialPort);
 
     // Handle graceful shutdown
     process.on('SIGTERM', async () => {
