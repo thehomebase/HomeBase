@@ -64,8 +64,7 @@ export default function TransactionsPage() {
       if (!response.ok) {
         throw new Error('Failed to fetch transactions');
       }
-      const data = await response.json();
-      return data;
+      return response.json();
     },
     enabled: !!user,
   });
@@ -121,13 +120,18 @@ export default function TransactionsPage() {
     <main className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
+          <img 
+            src={theme === 'dark' ? '/attached_assets/homebaselogowhite.png' : '/homebaselogo.png'} 
+            alt="Homebase Logo" 
+            className="h-8"
+          />
           <h2 className="text-2xl font-bold">Your Transactions</h2>
           <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
             <Toggle
               pressed={view === 'list'}
               onPressedChange={() => setView('list')}
               aria-label="List view"
-              className="data-[state=on]:bg-background"
+              className="data-[state=on]:bg-background dark:text-white"
             >
               <List className="h-4 w-4" />
             </Toggle>
@@ -135,7 +139,7 @@ export default function TransactionsPage() {
               pressed={view === 'board'}
               onPressedChange={() => setView('board')}
               aria-label="Board view"
-              className="data-[state=on]:bg-background"
+              className="data-[state=on]:bg-background dark:text-white"
             >
               <LayoutGrid className="h-4 w-4" />
             </Toggle>
@@ -144,7 +148,7 @@ export default function TransactionsPage() {
             pressed={theme === 'dark'}
             onPressedChange={toggleTheme}
             aria-label="Toggle theme"
-            className="ml-2"
+            className="ml-2 dark:text-white"
           >
             {theme === 'light' ? (
               <Moon className="h-4 w-4" />
@@ -156,7 +160,7 @@ export default function TransactionsPage() {
         {user?.role === "agent" && (
           <Dialog>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="dark:text-white">
                 <Plus className="h-4 w-4 mr-2" />
                 New Transaction
               </Button>
@@ -191,7 +195,7 @@ export default function TransactionsPage() {
                             <Button
                               type="button"
                               variant={field.value === 'buy' ? 'default' : 'outline'}
-                              className={field.value === 'buy' ? 'bg-green-500 hover:bg-green-600' : ''}
+                              className={`${field.value === 'buy' ? 'bg-green-500 hover:bg-green-600' : ''} dark:text-white`}
                               onClick={() => field.onChange('buy')}
                             >
                               Buy
@@ -199,7 +203,7 @@ export default function TransactionsPage() {
                             <Button
                               type="button"
                               variant={field.value === 'sell' ? 'default' : 'outline'}
-                              className={field.value === 'sell' ? 'bg-red-500 hover:bg-red-600' : ''}
+                              className={`${field.value === 'sell' ? 'bg-red-500 hover:bg-red-600' : ''} dark:text-white`}
                               onClick={() => field.onChange('sell')}
                             >
                               Sell
@@ -222,7 +226,7 @@ export default function TransactionsPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full" disabled={createTransactionMutation.isPending}>
+                  <Button type="submit" className="w-full dark:text-white" disabled={createTransactionMutation.isPending}>
                     Create Transaction
                   </Button>
                 </form>
@@ -239,11 +243,11 @@ export default function TransactionsPage() {
           {transactions.map((transaction) => (
             <Card 
               key={transaction.id} 
-              className="cursor-pointer hover:bg-accent/50 transition-colors relative" 
+              className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800" 
             >
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle 
-                  className="text-lg hover:underline"
+                  className="text-lg hover:underline dark:text-white"
                   onClick={() => setLocation(`/transactions/${transaction.id}`)}
                 >
                   {transaction.address}
@@ -263,12 +267,12 @@ export default function TransactionsPage() {
                 )}
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">Status: {transaction.status}</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground dark:text-gray-300">Status: {transaction.status}</p>
+                <p className="text-sm text-muted-foreground dark:text-gray-300">
                   Participants: {transaction.participants.length}
                 </p>
                 {transaction.client && (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground dark:text-gray-300">
                     Client: {transaction.client.firstName} {transaction.client.lastName}
                   </p>
                 )}
@@ -277,7 +281,7 @@ export default function TransactionsPage() {
           ))}
 
           {transactions.length === 0 && (
-            <div className="col-span-full text-center py-12 text-muted-foreground">
+            <div className="col-span-full text-center py-12 text-muted-foreground dark:text-gray-400">
               No transactions found. {user?.role === "agent" ? "Create one to get started!" : "Ask your agent for an access code to join a transaction."}
             </div>
           )}

@@ -23,7 +23,6 @@ import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
-
 interface Transaction {
   id: number;
   address: string;
@@ -69,10 +68,10 @@ const KanbanColumn = ({ title, transactions, status }: KanbanColumnProps) => {
   };
 
   return (
-    <div className="flex flex-col min-w-[240px] bg-muted/50 rounded-lg p-2">
+    <div className="flex flex-col min-w-[240px] bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50">
       <div className="flex justify-between items-center mb-2">
-        <h3 className="font-semibold text-sm">{title}</h3>
-        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs">
+        <h3 className="font-semibold text-sm dark:text-white">{title}</h3>
+        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
           {transactions.length}
         </span>
       </div>
@@ -80,7 +79,7 @@ const KanbanColumn = ({ title, transactions, status }: KanbanColumnProps) => {
         {transactions.map((transaction) => (
           <Card 
             key={transaction.id} 
-            className="p-3 cursor-pointer hover:shadow-md transition-shadow relative group"
+            className="p-3 cursor-pointer hover:shadow-md transition-shadow relative group dark:bg-gray-700"
           >
             <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button
@@ -99,8 +98,8 @@ const KanbanColumn = ({ title, transactions, status }: KanbanColumnProps) => {
               className="flex flex-col gap-1"
               onClick={(e) => handleCardClick(e, transaction.id)}
             >
-              <div className="font-medium text-sm truncate pr-6">{transaction.address}</div>
-              <div className="text-xs text-muted-foreground space-y-0.5">
+              <div className="font-medium text-sm truncate pr-6 dark:text-white">{transaction.address}</div>
+              <div className="text-xs text-muted-foreground space-y-0.5 dark:text-gray-300">
                 <div className="capitalize">{transaction.type === 'buy' ? 'Purchase' : 'Sale'}</div>
                 <div>Price: {formatPrice(transaction.contractPrice)}</div>
                 {transaction.client && (
