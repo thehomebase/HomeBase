@@ -270,10 +270,15 @@ export function registerRoutes(app: Express): Server {
 
       let checklist = await storage.getChecklist(transactionId, transaction.type);
       if (!checklist) {
+        const defaultItems = transaction.type === 'sell' ?
+          SELLER_CHECKLIST_ITEMS.map(item => ({ ...item, completed: false })) :
+          BUYER_CHECKLIST_ITEMS.map(item => ({ ...item, completed: false }));
+
         try {
           checklist = await storage.createChecklist({
             transactionId,
             role: transaction.type,
+            items: defaultItems
           });
         } catch (createError) {
           // If creation fails due to duplicate, try fetching again

@@ -3,8 +3,23 @@ import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { type Transaction } from "@shared/schema";
 import { ChartContainer } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { format } from "date-fns";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  ResponsiveContainer,
+  Line,
+  ComposedChart
+} from "recharts";
+import { format, parse, startOfYear, eachMonthOfInterval, endOfYear } from "date-fns";
+
+interface MonthlyData {
+  month: string;
+  totalVolume: number;
+  cumulativeVolume: number;
+}
 
 export default function DataPage() {
   const { user } = useAuth();
@@ -14,33 +29,61 @@ export default function DataPage() {
     enabled: !!user,
   });
 
-  // Filter closed transactions and group by month
+  // Get all months in current year
+  const currentYear = new Date().getFullYear();
+  const yearStart = startOfYear(new Date(currentYear, 0));
+  const yearEnd = endOfYear(new Date(currentYear, 0));
+  const allMonths = eachMonthOfInterval({ start: yearStart, end: yearEnd });
+
+  // Initialize data for all months
+  const initialMonthlyData = allMonths.reduce<Record<string, MonthlyData>>((acc, date) => {
+    const monthKey = format(date, 'MMM');
+    acc[monthKey] = {
+      month: monthKey,
+      totalVolume: 0,
+      cumulativeVolume: 0
+    };
+    return acc;
+  }, {});
+
+  // Process transactions to get monthly totals
   const monthlyData = transactions
     .filter(t => t.status === "closed" && t.closingDate && t.contractPrice)
     .reduce((acc, transaction) => {
       const date = new Date(transaction.closingDate!);
-      const monthKey = format(date, 'MMM yyyy');
+      // Only include transactions from current year
+      if (date.getFullYear() !== currentYear) return acc;
 
-      if (!acc[monthKey]) {
-        acc[monthKey] = {
-          month: monthKey,
-          prices: [],
-          averagePrice: 0
-        };
-      }
-
-      acc[monthKey].prices.push(transaction.contractPrice!);
-      acc[monthKey].averagePrice = acc[monthKey].prices.reduce((a, b) => a + b, 0) / acc[monthKey].prices.length;
-
+      const monthKey = format(date, 'MMM');
+      acc[monthKey].totalVolume += transaction.contractPrice!;
       return acc;
-    }, {} as Record<string, { month: string; prices: number[]; averagePrice: number }>);
+    }, initialMonthlyData);
 
-  const chartData = Object.values(monthlyData)
-    .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime())
-    .map(data => ({
-      month: data.month,
-      averagePrice: data.averagePrice
-    }));
+  // Calculate cumulative totals
+  let runningTotal = 0;
+  const chartData = Object.entries(monthlyData)
+    .sort((a, b) => {
+      const monthA = parse(a[0], 'MMM', new Date());
+      const monthB = parse(b[0], 'MMM', new Date());
+      return monthA.getMonth() - monthB.getMonth();
+    })
+    .map(([month, data]) => {
+      runningTotal += data.totalVolume;
+      return {
+        month,
+        totalVolume: data.totalVolume,
+        cumulativeVolume: runningTotal
+      };
+    });
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    }).format(value);
+  };
 
   if (!user || !transactions.length) {
     return (
@@ -57,10 +100,10 @@ export default function DataPage() {
     <main className="container mx-auto px-4 py-8">
       <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Monthly Closed Transaction Prices</h3>
+        <h3 className="text-lg font-semibold mb-4">Monthly Sales Volume & Cumulative Total</h3>
         <div className="h-[400px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 20, right: 30, bottom: 60, left: 70 }}>
+            <ComposedChart data={chartData} margin={{ top: 20, right: 30, bottom: 60, left: 70 }}>
               <XAxis 
                 dataKey="month" 
                 angle={-45} 
@@ -68,35 +111,46 @@ export default function DataPage() {
                 height={60}
               />
               <YAxis 
-                tickFormatter={(value) => 
-                  new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                    notation: 'compact',
-                    maximumFractionDigits: 1,
-                  }).format(value)
-                }
+                yAxisId="left"
+                tickFormatter={formatCurrency}
                 label={{ 
-                  value: 'Price', 
+                  value: 'Monthly Volume', 
                   angle: -90, 
                   position: 'insideLeft',
                   offset: -60
                 }}
               />
+              <YAxis 
+                yAxisId="right"
+                orientation="right"
+                tickFormatter={formatCurrency}
+                label={{ 
+                  value: 'Cumulative Volume', 
+                  angle: 90, 
+                  position: 'insideRight',
+                  offset: -70
+                }}
+              />
               <Tooltip 
-                formatter={(value) => 
-                  new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                  }).format(value)
-                }
+                formatter={(value: number) => formatCurrency(value)}
+                labelFormatter={(label) => `Month: ${label}`}
               />
               <Bar 
-                dataKey="averagePrice" 
+                yAxisId="left"
+                dataKey="totalVolume" 
                 fill="#2563eb" 
-                name="Transaction Price" 
+                name="Monthly Volume"
               />
-            </BarChart>
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="cumulativeVolume"
+                stroke="#16a34a"
+                strokeWidth={2}
+                dot={false}
+                name="Cumulative Volume"
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </Card>
