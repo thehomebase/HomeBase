@@ -36,6 +36,12 @@ const todayStyles = `
     border: 2px solid black !important;
     border-radius: 50%;
   }
+
+  /* Hide Today and Agenda buttons */
+  button[data-toggle="today"],
+  button[data-toggle="agenda"] {
+    display: none !important;
+  }
 `;
 
 export default function CalendarPage() {
