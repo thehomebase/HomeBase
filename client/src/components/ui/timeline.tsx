@@ -81,8 +81,8 @@ export function Timeline({ transactions }: TimelineProps) {
                             transform: 'translateX(-50%)'
                           }}
                         >
-                          <div className="bg-green-500 w-3 h-3 rounded-full mb-1 hover:ring-2 hover:ring-green-300 transition-all" />
-                          <Card className="p-2 text-xs w-32 text-center">
+                          <div className="bg-green-500 w-3 h-3 rounded-full mb-3 hover:ring-2 hover:ring-green-300 transition-all" />
+                          <Card className="p-2 text-xs w-32 text-center absolute -translate-y-full" style={{ marginBottom: '20px' }}>
                             <p className="font-medium truncate">{transaction.address}</p>
                             <p className="text-muted-foreground">Closing: {format(closing, 'MMM d')}</p>
                           </Card>
@@ -106,8 +106,8 @@ export function Timeline({ transactions }: TimelineProps) {
                             transform: 'translateX(-50%)'
                           }}
                         >
-                          <div className="bg-purple-500 w-3 h-3 rounded-full mb-1 hover:ring-2 hover:ring-purple-300 transition-all" />
-                          <Card className="p-2 text-xs w-32 text-center border-purple-200">
+                          <div className="bg-purple-500 w-3 h-3 rounded-full mb-3 hover:ring-2 hover:ring-purple-300 transition-all" />
+                          <Card className="p-2 text-xs w-32 text-center border-purple-200 absolute translate-y-1">
                             <p className="font-medium truncate">{transaction.address}</p>
                             <p className="text-muted-foreground">Option: {format(option, 'MMM d')}</p>
                           </Card>
