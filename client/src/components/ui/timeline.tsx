@@ -1,6 +1,6 @@
 
 import React from "react";
-import { format } from "date-fns";
+import { format, getDaysInMonth } from "date-fns";
 import {
   Tooltip,
   TooltipContent,
@@ -18,8 +18,9 @@ interface TimelineProps {
 }
 
 export function Timeline({ transactions }: TimelineProps) {
-  const days = Array.from({ length: 30 }, (_, i) => i + 1);
   const today = new Date();
+  const daysInMonth = getDaysInMonth(today);
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   
   // Group events by day
   const eventsByDay = new Map<number, Array<{ type: string; transaction: any }>>();
@@ -27,20 +28,20 @@ export function Timeline({ transactions }: TimelineProps) {
   transactions.forEach(transaction => {
     if (transaction.closingDate) {
       const date = new Date(transaction.closingDate);
-      const daysDiff = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysDiff >= 0 && daysDiff < 30) {
-        const events = eventsByDay.get(daysDiff) || [];
+      if (date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()) {
+        const day = date.getDate();
+        const events = eventsByDay.get(day - 1) || [];
         events.push({ type: 'closing', transaction });
-        eventsByDay.set(daysDiff, events);
+        eventsByDay.set(day - 1, events);
       }
     }
     if (transaction.optionPeriodExpiration) {
       const date = new Date(transaction.optionPeriodExpiration);
-      const daysDiff = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysDiff >= 0 && daysDiff < 30) {
-        const events = eventsByDay.get(daysDiff) || [];
+      if (date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()) {
+        const day = date.getDate();
+        const events = eventsByDay.get(day - 1) || [];
         events.push({ type: 'option', transaction });
-        eventsByDay.set(daysDiff, events);
+        eventsByDay.set(day - 1, events);
       }
     }
   });
@@ -58,7 +59,7 @@ export function Timeline({ transactions }: TimelineProps) {
               key={day}
               className="absolute h-3 w-0.5 bg-muted-foreground/30"
               style={{ 
-                left: `${((day - 1) / 29) * 100}%`,
+                left: `${((day - 1) / (daysInMonth - 1)) * 100}%`,
                 transform: 'translateX(-50%)',
                 top: '-4px'
               }}
@@ -68,12 +69,12 @@ export function Timeline({ transactions }: TimelineProps) {
         
         {/* Day labels */}
         <div className="absolute w-full top-4">
-          {[1, 10, 20, 30].map(day => (
+          {[1, 10, 20, daysInMonth].map(day => (
             <span
               key={day}
               className="absolute text-xs text-muted-foreground"
               style={{
-                left: `${((day - 1) / 29) * 100}%`,
+                left: `${((day - 1) / (daysInMonth - 1)) * 100}%`,
                 transform: 'translateX(-50%)'
               }}
             >
@@ -90,13 +91,13 @@ export function Timeline({ transactions }: TimelineProps) {
                 <div
                   className="absolute w-4 h-4 bg-primary rounded-full cursor-pointer"
                   style={{
-                    left: `${(day / 29) * 100}%`,
+                    left: `${(day / (daysInMonth - 1)) * 100}%`,
                     top: '-5px',
                     transform: 'translateX(-50%)'
                   }}
                 />
               </TooltipTrigger>
-              <TooltipContent side="top" align="center" sideOffset={5}>
+              <TooltipContent side="bottom" align="center" sideOffset={5}>
                 <div className="space-y-2">
                   {events.map((event, idx) => (
                     <div key={idx} className="text-sm">
