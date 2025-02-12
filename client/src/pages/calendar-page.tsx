@@ -138,13 +138,13 @@ export default function CalendarPage() {
             deletable={false}
             draggable={false}
             views={["month"]}
-            customViewer={false}
-            navigation={false}
+            navigation={{
+              component: () => null
+            }}
+            viewerExtraComponent={() => null}
             selectedDate={new Date()}
-            day={null}
             fields={[]}
             dialogMaxWidth="lg"
-            resources={[]}
           />
         ) : (
           <div>
