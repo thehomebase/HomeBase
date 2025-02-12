@@ -37,6 +37,11 @@ const todayStyles = `
     border-radius: 50%;
   }
 
+  .rs__cell--today > button {
+    background: transparent !important;
+    color: inherit !important;
+  }
+
   /* Hide Today and Agenda buttons */
   button[data-toggle="today"],
   button[data-toggle="agenda"] {
