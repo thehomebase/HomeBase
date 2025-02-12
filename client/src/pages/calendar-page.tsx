@@ -22,11 +22,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// Add styles for the today circle
+// Updated styles for the today circle
 const todayStyles = `
   .rs__cell--today::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 1.8em;
+    height: 1.8em;
     background-color: transparent !important;
     border: 2px solid black !important;
+    border-radius: 50%;
   }
 `;
 
@@ -44,7 +52,6 @@ export default function CalendarPage() {
   const events = transactions.map((transaction) => {
     const events = [];
 
-    // Add option expiration date event
     if (transaction.optionPeriodExpiration) {
       events.push({
         event_id: `option-${transaction.id}`,
@@ -58,7 +65,6 @@ export default function CalendarPage() {
       });
     }
 
-    // Add closing date event
     if (transaction.closingDate) {
       events.push({
         event_id: `closing-${transaction.id}`,
@@ -96,7 +102,6 @@ export default function CalendarPage() {
 
   return (
     <main className="container mx-auto px-4 py-8">
-      {/* Add the styles to the DOM */}
       <style>{todayStyles}</style>
 
       <div className="flex items-center justify-between mb-8">
@@ -154,36 +159,11 @@ export default function CalendarPage() {
             editable={false}
             deletable={false}
             draggable={false}
-            views={["month", "week", "day"]}
+            views={["month"]}
             navigation={{
-              component: (props: { onChange: (view: string) => void; selectedView: string }) => {
-                const views = [
-                  { id: "month", label: "Month" },
-                  { id: "week", label: "Week" },
-                  { id: "day", label: "Day" },
-                ];
-                return (
-                  <div className="flex items-center gap-2">
-                    {views.map((view) => (
-                      <button
-                        key={view.id}
-                        onClick={() => props.onChange(view.id)}
-                        className={`px-3 py-1 rounded-md text-sm ${
-                          props.selectedView === view.id
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                        }`}
-                      >
-                        {view.label}
-                      </button>
-                    ))}
-                  </div>
-                );
-              },
+              component: () => null // Remove the view selector buttons
             }}
-            viewerExtraComponent={(fields) => {
-              return null;
-            }}
+            viewerExtraComponent={() => null}
           />
         ) : (
           <div>
