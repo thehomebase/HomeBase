@@ -131,6 +131,9 @@ export default function CalendarPage() {
                 );
               },
             }}
+            viewerExtraComponent={(fields) => {
+              return null;
+            }}
           />
         ) : (
           <div>
