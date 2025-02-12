@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
 import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema } from "@shared/schema";
+import ical from "ical-generator";
 
 // Seller checklist items
 const SELLER_CHECKLIST_ITEMS = [
@@ -437,6 +438,46 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error deleting document:', error);
       res.status(500).json({ error: 'Failed to delete document' });
+    }
+  });
+
+  // Calendar Integration
+  app.get("/api/calendar/export/ical/:userId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const transactions = await storage.getTransactionsByUser(Number(req.params.userId));
+
+      const calendar = ical({ name: "Real Estate Calendar" });
+
+      transactions.forEach(transaction => {
+        if (transaction.closingDate) {
+          calendar.createEvent({
+            start: new Date(transaction.closingDate),
+            end: new Date(transaction.closingDate),
+            summary: `Closing - ${transaction.address}`,
+            description: `Closing for property at ${transaction.address}`,
+            location: transaction.address
+          });
+        }
+
+        if (transaction.optionPeriodExpiration) {
+          calendar.createEvent({
+            start: new Date(transaction.optionPeriodExpiration),
+            end: new Date(transaction.optionPeriodExpiration),
+            summary: `Option Expiration - ${transaction.address}`,
+            description: `Option period expiration for property at ${transaction.address}`,
+            location: transaction.address
+          });
+        }
+      });
+
+      res.set("Content-Type", "text/calendar");
+      res.set("Content-Disposition", "attachment; filename=real-estate-calendar.ics");
+      res.send(calendar.toString());
+    } catch (error) {
+      console.error('Error generating iCal feed:', error);
+      res.status(500).json({ error: 'Failed to generate calendar feed' });
     }
   });
 

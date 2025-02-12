@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { type Transaction } from "@shared/schema";
 import { format } from "date-fns";
-import { List } from "lucide-react";
+import { List, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import {
@@ -62,23 +62,40 @@ export default function CalendarPage() {
   }).flat();
 
   // Sort events by date for the table view
-  const sortedEvents = [...events].sort((a, b) => 
+  const sortedEvents = [...events].sort((a, b) =>
     new Date(a.start).getTime() - new Date(b.start).getTime()
   );
+
+  const handleExportToIcal = () => {
+    if (user) {
+      window.location.href = `/api/calendar/export/ical/${user.id}`;
+    }
+  };
 
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-2xl font-bold">Calendar</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowTable(!showTable)}
-          className="gap-2"
-        >
-          <List className="h-4 w-4" />
-          {showTable ? "Show Calendar" : "Show List"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportToIcal}
+            className="gap-2"
+          >
+            <CalendarIcon className="h-4 w-4" />
+            Export to Calendar (iOS/Outlook)
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowTable(!showTable)}
+            className="gap-2"
+          >
+            <List className="h-4 w-4" />
+            {showTable ? "Show Calendar" : "Show List"}
+          </Button>
+        </div>
       </div>
 
       <Card className="p-6">
