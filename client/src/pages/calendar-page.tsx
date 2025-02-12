@@ -77,63 +77,63 @@ export default function CalendarPage() {
           className="gap-2"
         >
           <List className="h-4 w-4" />
-          {showTable ? "Hide List" : "Show List"}
+          {showTable ? "Show Calendar" : "Show List"}
         </Button>
       </div>
 
       <Card className="p-6">
-        <Scheduler
-          view="month"
-          events={events}
-          week={{
-            weekDays: [0, 1, 2, 3, 4, 5, 6],
-            weekStartOn: 0,
-            startHour: 9,
-            endHour: 17,
-            step: 60,
-          }}
-          month={{
-            weekDays: [0, 1, 2, 3, 4, 5, 6],
-            weekStartOn: 0,
-            startHour: 9,
-            endHour: 17,
-          }}
-          height={600}
-          hourFormat="12"
-          loading={false}
-          editable={false}
-          deletable={false}
-          draggable={false}
-          navigation={{
-            component: (props: { onChange: (view: string) => void; selectedView: string }) => {
-              const views = [
-                { id: "month", label: "Month" },
-                { id: "week", label: "Week" },
-                { id: "day", label: "Day" },
-              ];
-              return (
-                <div className="flex items-center gap-2">
-                  {views.map((view) => (
-                    <button
-                      key={view.id}
-                      onClick={() => props.onChange(view.id)}
-                      className={`px-3 py-1 rounded-md text-sm ${
-                        props.selectedView === view.id
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                      }`}
-                    >
-                      {view.label}
-                    </button>
-                  ))}
-                </div>
-              );
-            },
-          }}
-        />
-
-        {showTable && (
-          <div className="mt-8">
+        {!showTable ? (
+          <Scheduler
+            view="month"
+            events={events}
+            week={{
+              weekDays: [0, 1, 2, 3, 4, 5, 6],
+              weekStartOn: 0,
+              startHour: 9,
+              endHour: 17,
+              step: 60,
+            }}
+            month={{
+              weekDays: [0, 1, 2, 3, 4, 5, 6],
+              weekStartOn: 0,
+              startHour: 9,
+              endHour: 17,
+            }}
+            height={600}
+            hourFormat="12"
+            loading={false}
+            editable={false}
+            deletable={false}
+            draggable={false}
+            navigation={{
+              component: (props: { onChange: (view: string) => void; selectedView: string }) => {
+                const views = [
+                  { id: "month", label: "Month" },
+                  { id: "week", label: "Week" },
+                  { id: "day", label: "Day" },
+                ];
+                return (
+                  <div className="flex items-center gap-2">
+                    {views.map((view) => (
+                      <button
+                        key={view.id}
+                        onClick={() => props.onChange(view.id)}
+                        className={`px-3 py-1 rounded-md text-sm ${
+                          props.selectedView === view.id
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                        }`}
+                      >
+                        {view.label}
+                      </button>
+                    ))}
+                  </div>
+                );
+              },
+            }}
+          />
+        ) : (
+          <div>
             <h3 className="text-lg font-semibold mb-4">Upcoming Events</h3>
             <Table>
               <TableHeader>
