@@ -145,6 +145,14 @@ export default function CalendarPage() {
             selectedDate={new Date()}
             fields={[]}
             dialogMaxWidth="lg"
+            customStyles={{
+              todayCell: {
+                borderRadius: "50%",
+                border: "2px solid black",
+                background: "transparent",
+                color: "inherit"
+              }
+            }}
           />
         ) : (
           <div>
