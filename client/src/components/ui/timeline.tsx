@@ -2,8 +2,8 @@
 import React from "react";
 import { format } from "date-fns";
 import { Card } from "./card";
-import { Tooltip } from "./tooltip";
 import {
+  Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
@@ -22,9 +22,15 @@ export function Timeline({ transactions }: TimelineProps) {
   const days = Array.from({ length: 30 }, (_, i) => i + 1);
   const today = new Date();
   
+  // Group transactions by date to handle overlaps
+  const getDatePosition = (date: Date) => {
+    const daysDiff = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(0, Math.min(100, (daysDiff / 30) * 100));
+  };
+
   return (
     <div className="mb-8">
-      <div className="relative">
+      <div className="relative h-32">
         {/* Timeline bar */}
         <div className="h-2 bg-muted rounded-full mb-6"></div>
         
@@ -56,17 +62,14 @@ export function Timeline({ transactions }: TimelineProps) {
         </div>
 
         {/* Transaction markers */}
-        <div className="relative" style={{ marginTop: '-8px' }}>
-          {transactions.map(transaction => {
+        <div className="absolute w-full" style={{ top: '40px' }}>
+          {transactions.map((transaction, index) => {
             const closing = transaction.closingDate ? new Date(transaction.closingDate) : null;
             const option = transaction.optionPeriodExpiration ? new Date(transaction.optionPeriodExpiration) : null;
             
             if (!closing && !option) return null;
 
-            const getPosition = (date: Date) => {
-              const daysDiff = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-              return Math.max(0, Math.min(100, (daysDiff / 30) * 100));
-            };
+            const verticalOffset = (index % 2) * 60;
 
             return (
               <div key={transaction.id}>
@@ -77,20 +80,20 @@ export function Timeline({ transactions }: TimelineProps) {
                         <div 
                           className="absolute"
                           style={{ 
-                            left: `${getPosition(closing)}%`,
-                            transform: 'translateX(-50%)'
+                            left: `${getDatePosition(closing)}%`,
+                            top: verticalOffset,
+                            transform: 'translate(-50%, -50%)'
                           }}
                         >
-                          <div className="bg-green-500 w-3 h-3 rounded-full mb-3 hover:ring-2 hover:ring-green-300 transition-all" />
-                          <Card className="p-2 text-xs w-32 text-center absolute -translate-y-full" style={{ marginBottom: '20px' }}>
-                            <p className="font-medium truncate">{transaction.address}</p>
-                            <p className="text-muted-foreground">Closing: {format(closing, 'MMM d')}</p>
-                          </Card>
+                          <div className="bg-green-500 w-3 h-3 rounded-full mb-1" />
+                          <div className="text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
+                            {transaction.address}
+                          </div>
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Closing Date: {format(closing, 'MMM d, yyyy')}</p>
-                        <p>Property: {transaction.address}</p>
+                        <p className="font-medium">{transaction.address}</p>
+                        <p className="text-muted-foreground">Closing: {format(closing, 'MMM d, yyyy')}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -102,20 +105,20 @@ export function Timeline({ transactions }: TimelineProps) {
                         <div 
                           className="absolute"
                           style={{ 
-                            left: `${getPosition(option)}%`,
-                            transform: 'translateX(-50%)'
+                            left: `${getDatePosition(option)}%`,
+                            top: verticalOffset + 20,
+                            transform: 'translate(-50%, -50%)'
                           }}
                         >
-                          <div className="bg-purple-500 w-3 h-3 rounded-full mb-3 hover:ring-2 hover:ring-purple-300 transition-all" />
-                          <Card className="p-2 text-xs w-32 text-center border-purple-200 absolute translate-y-1">
-                            <p className="font-medium truncate">{transaction.address}</p>
-                            <p className="text-muted-foreground">Option: {format(option, 'MMM d')}</p>
-                          </Card>
+                          <div className="bg-purple-500 w-3 h-3 rounded-full mb-1" />
+                          <div className="text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
+                            Option
+                          </div>
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Option Expiration: {format(option, 'MMM d, yyyy')}</p>
-                        <p>Property: {transaction.address}</p>
+                        <p className="font-medium">{transaction.address}</p>
+                        <p className="text-muted-foreground">Option Expiration: {format(option, 'MMM d, yyyy')}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
