@@ -8,6 +8,12 @@ import { List, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Table,
   TableBody,
   TableCell,
@@ -68,7 +74,15 @@ export default function CalendarPage() {
 
   const handleExportToIcal = () => {
     if (user) {
-      window.location.href = `/api/calendar/export/ical/${user.id}`;
+      window.location.href = `/api/calendar/${user.id}/export`;
+    }
+  };
+
+  const handleSubscribeToCalendar = () => {
+    if (user) {
+      // Use webcal:// protocol for better calendar app integration
+      const baseUrl = window.location.origin.replace(/^https?:/, 'webcal:');
+      window.location.href = `${baseUrl}/api/calendar/${user.id}/subscribe`;
     }
   };
 
@@ -77,15 +91,22 @@ export default function CalendarPage() {
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-2xl font-bold">Calendar</h2>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportToIcal}
-            className="gap-2"
-          >
-            <CalendarIcon className="h-4 w-4" />
-            Export to Calendar (iOS/Outlook)
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                Add to Calendar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleSubscribeToCalendar}>
+                Subscribe (Auto-updating)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportToIcal}>
+                Export as File
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="outline"
             size="sm"

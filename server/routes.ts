@@ -442,13 +442,17 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Calendar Integration
-  app.get("/api/calendar/export/ical/:userId", async (req, res) => {
+  app.get("/api/calendar/:userId/:type", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
       const transactions = await storage.getTransactionsByUser(Number(req.params.userId));
+      const isSubscription = req.params.type === 'subscribe';
 
-      const calendar = ical({ name: "Real Estate Calendar" });
+      const calendar = ical({ 
+        name: "Real Estate Calendar",
+        timezone: 'America/Chicago'
+      });
 
       transactions.forEach(transaction => {
         if (transaction.closingDate) {
@@ -472,11 +476,27 @@ export function registerRoutes(app: Express): Server {
         }
       });
 
-      res.set("Content-Type", "text/calendar");
-      res.set("Content-Disposition", "attachment; filename=real-estate-calendar.ics");
+      // Set headers based on request type
+      if (isSubscription) {
+        // Headers for calendar subscription
+        res.set({
+          'Content-Type': 'text/calendar; charset=utf-8',
+          'Content-Disposition': 'inline; filename=calendar.ics',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Refresh': '3600' // Suggest refresh every hour
+        });
+      } else {
+        // Headers for calendar download
+        res.set({
+          'Content-Type': 'text/calendar; charset=utf-8',
+          'Content-Disposition': 'attachment; filename=calendar.ics'
+        });
+      }
+
       res.send(calendar.toString());
     } catch (error) {
-      console.error('Error generating iCal feed:', error);
+      console.error('Error generating calendar feed:', error);
       res.status(500).json({ error: 'Failed to generate calendar feed' });
     }
   });
