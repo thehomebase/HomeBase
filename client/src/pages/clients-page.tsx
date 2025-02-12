@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Mail, Phone, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -20,6 +20,46 @@ type SortConfig = {
   key: keyof Client;
   direction: 'asc' | 'desc';
 } | null;
+
+const ClientCard = ({ client }: { client: Client }) => (
+  <Card className="mb-4">
+    <CardHeader>
+      <CardTitle className="text-lg">
+        {client.firstName} {client.lastName}
+      </CardTitle>
+      <div className="text-sm text-muted-foreground">
+        Added {format(new Date(client.createdAt), 'MMM d, yyyy')}
+      </div>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Mail className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm">{client.email || 'No email'}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Phone className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm">{client.phone || 'No phone'}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm">{client.address || 'No address'}</span>
+        </div>
+        <div className="pt-2">
+          <span className={`px-2 py-1 rounded-full text-xs ${
+            client.status === 'active'
+              ? 'bg-green-100 text-green-800'
+              : client.status === 'pending'
+              ? 'bg-yellow-100 text-yellow-800'
+              : 'bg-gray-100 text-gray-800'
+          }`}>
+            {client.status}
+          </span>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+);
 
 export default function ClientsPage() {
   const { user } = useAuth();
@@ -119,74 +159,92 @@ export default function ClientsPage() {
   const buyers = sortData(clients.filter(client => client.type === 'buyer'), sortConfig);
 
   const ClientTable = ({ clients }: { clients: Client[] }) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="cursor-pointer" onClick={() => requestSort('firstName')}>
-            <div className="flex items-center gap-1">
-              First Name {getSortIcon('firstName')}
-            </div>
-          </TableHead>
-          <TableHead className="cursor-pointer" onClick={() => requestSort('lastName')}>
-            <div className="flex items-center gap-1">
-              Last Name {getSortIcon('lastName')}
-            </div>
-          </TableHead>
-          <TableHead>Contact</TableHead>
-          <TableHead>Address</TableHead>
-          <TableHead className="cursor-pointer" onClick={() => requestSort('status')}>
-            <div className="flex items-center gap-1">
-              Status {getSortIcon('status')}
-            </div>
-          </TableHead>
-          <TableHead className="cursor-pointer" onClick={() => requestSort('createdAt')}>
-            <div className="flex items-center gap-1">
-              Added {getSortIcon('createdAt')}
-            </div>
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {clients.map((client) => (
-          <TableRow key={client.id}>
-            <TableCell className="font-medium">{client.firstName}</TableCell>
-            <TableCell className="font-medium">{client.lastName}</TableCell>
-            <TableCell>
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  {client.email}
+    <>
+      {/* Desktop view - Table */}
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="cursor-pointer" onClick={() => requestSort('firstName')}>
+                <div className="flex items-center gap-1">
+                  First Name {getSortIcon('firstName')}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  {client.phone}
+              </TableHead>
+              <TableHead className="cursor-pointer" onClick={() => requestSort('lastName')}>
+                <div className="flex items-center gap-1">
+                  Last Name {getSortIcon('lastName')}
                 </div>
-              </div>
-            </TableCell>
-            <TableCell>{client.address}</TableCell>
-            <TableCell>
-              <span className={`px-2 py-1 rounded-full text-xs ${
-                client.status === 'active'
-                  ? 'bg-green-100 text-green-800'
-                  : client.status === 'pending'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {client.status}
-              </span>
-            </TableCell>
-            <TableCell>{format(new Date(client.createdAt), 'MMM d, yyyy')}</TableCell>
-          </TableRow>
-        ))}
-        {clients.length === 0 && (
-          <TableRow>
-            <TableCell colSpan={6} className="text-center text-muted-foreground">
-              No clients found. Add your first client to get started!
-            </TableCell>
-          </TableRow>
+              </TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead>Address</TableHead>
+              <TableHead className="cursor-pointer" onClick={() => requestSort('status')}>
+                <div className="flex items-center gap-1">
+                  Status {getSortIcon('status')}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer" onClick={() => requestSort('createdAt')}>
+                <div className="flex items-center gap-1">
+                  Added {getSortIcon('createdAt')}
+                </div>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {clients.map((client) => (
+              <TableRow key={client.id}>
+                <TableCell className="font-medium">{client.firstName}</TableCell>
+                <TableCell className="font-medium">{client.lastName}</TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      {client.email}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      {client.phone}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>{client.address}</TableCell>
+                <TableCell>
+                  <span className={`px-2 py-1 rounded-full text-xs ${
+                    client.status === 'active'
+                      ? 'bg-green-100 text-green-800'
+                      : client.status === 'pending'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {client.status}
+                  </span>
+                </TableCell>
+                <TableCell>{format(new Date(client.createdAt), 'MMM d, yyyy')}</TableCell>
+              </TableRow>
+            ))}
+            {clients.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  No clients found. Add your first client to get started!
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Mobile view - Cards */}
+      <div className="md:hidden space-y-4">
+        {clients.length === 0 ? (
+          <div className="text-center text-muted-foreground py-8">
+            No clients found. Add your first client to get started!
+          </div>
+        ) : (
+          clients.map((client) => (
+            <ClientCard key={client.id} client={client} />
+          ))
         )}
-      </TableBody>
-    </Table>
+      </div>
+    </>
   );
 
   return (
@@ -311,9 +369,9 @@ export default function ClientsPage() {
                     </FormItem>
                   )}
                 />
-                <Button 
-                  type="submit" 
-                  className="w-full" 
+                <Button
+                  type="submit"
+                  className="w-full"
                   disabled={createClientMutation.isPending}
                 >
                   {createClientMutation.isPending ? 'Adding...' : 'Add Client'}
