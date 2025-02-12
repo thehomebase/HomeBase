@@ -120,8 +120,37 @@ export default function CalendarPage() {
             }}
             deletable={false}
             draggable={false}
-            views={["month"]}
-            navigation={false}
+            views={["month", "week", "day"]}
+            month={{
+              weekDays: [0, 1, 2, 3, 4, 5, 6],
+              weekStartOn: 0,
+              startHour: 0,
+              endHour: 23,
+            }}
+            week={{
+              weekDays: [0, 1, 2, 3, 4, 5, 6],
+              weekStartOn: 0,
+              startHour: 0,
+              endHour: 23,
+            }}
+            day={{
+              startHour: 0,
+              endHour: 23,
+            }}
+            navigation={{
+              toolbar: (toolbar) => {
+                const { onNavigate, date } = toolbar;
+                return (
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="flex gap-2">
+                      <button onClick={() => onNavigate('PREV')} className="p-1">←</button>
+                      <span>{format(date, 'MMMM yyyy')}</span>
+                      <button onClick={() => onNavigate('NEXT')} className="p-1">→</button>
+                    </div>
+                  </div>
+                );
+              }
+            }}
             selectedDate={new Date()}
             fields={[]}
             dialogMaxWidth="lg"
