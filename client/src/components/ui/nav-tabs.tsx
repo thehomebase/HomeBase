@@ -7,6 +7,7 @@ export function NavTabs() {
   const tabs = [
     { name: "Transactions", href: "/" },
     { name: "Clients", href: "/clients" },
+    { name: "Calendar", href: "/calendar" },
   ];
 
   return (

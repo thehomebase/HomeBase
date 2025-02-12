@@ -6,6 +6,7 @@ import AuthPage from "@/pages/auth-page";
 import TransactionsPage from "@/pages/transactions-page";
 import ClientsPage from "@/pages/clients-page";
 import TransactionPage from "@/pages/transaction-page";
+import CalendarPage from "@/pages/calendar-page";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "./hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
@@ -58,6 +59,7 @@ function Router() {
       <ProtectedRoute path="/" component={TransactionsPage} />
       <ProtectedRoute path="/transactions" component={TransactionsPage} />
       <ProtectedRoute path="/clients" component={ClientsPage} />
+      <ProtectedRoute path="/calendar" component={CalendarPage} />
       <Route component={NotFound} />
     </Switch>
   );
