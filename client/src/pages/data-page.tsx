@@ -25,16 +25,17 @@ export default function DataPage() {
 
   const { data: transactions = [], isLoading, error } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
+    queryFn: async () => {
+      const response = await fetch("/api/transactions");
+      if (!response.ok) {
+        throw new Error("Failed to fetch transactions");
+      }
+      return response.json();
+    },
     enabled: !!user,
     refetchInterval: 5000, // Refetch every 5 seconds
     staleTime: 1000, // Consider data stale after 1 second
     refetchOnWindowFocus: true, // Refetch when window regains focus
-    onSuccess: (data) => {
-      console.log("Data page received updated transactions:", 
-        data.filter(t => t.status === "closed" && t.closingDate && t.contractPrice).length,
-        "closed transactions"
-      );
-    }
   });
 
   // Get all months in current year
@@ -58,13 +59,12 @@ export default function DataPage() {
   const monthlyData = transactions
     .filter(t => t.status === "closed" && t.closingDate && t.contractPrice)
     .reduce((acc, transaction) => {
-      const date = new Date(transaction.closingDate!);
-      // Only include transactions from current year
-      if (date.getFullYear() !== currentYear) return acc;
+      const date = transaction.closingDate ? new Date(transaction.closingDate) : null;
+      if (!date || date.getFullYear() !== currentYear) return acc;
 
       const monthKey = format(date, 'MMM');
-      if (acc[monthKey]) {
-        acc[monthKey].totalVolume += transaction.contractPrice!;
+      if (acc[monthKey] && transaction.contractPrice) {
+        acc[monthKey].totalVolume += transaction.contractPrice;
       }
       return acc;
     }, initialMonthlyData);
@@ -117,12 +117,20 @@ export default function DataPage() {
     );
   }
 
-  if (!user || !transactions.length) {
+  const closedTransactions = transactions.filter(t => 
+    t.status === "closed" && t.closingDate && t.contractPrice
+  );
+
+  if (!user || !closedTransactions.length) {
     return (
       <main className="container mx-auto px-4 py-8">
         <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
         <Card className="p-6">
-          <p className="text-center text-muted-foreground">No closed transactions available.</p>
+          <p className="text-center text-muted-foreground">
+            {closedTransactions.length === 0 
+              ? "No closed transactions available."
+              : "Loading transaction data..."}
+          </p>
         </Card>
       </main>
     );
