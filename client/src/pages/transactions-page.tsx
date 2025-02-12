@@ -125,13 +125,13 @@ export default function TransactionsPage() {
             alt="Homebase Logo" 
             className="h-8"
           />
-          <h2 className="text-2xl font-bold">Your Transactions</h2>
+          <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
           <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
             <Toggle
               pressed={view === 'list'}
               onPressedChange={() => setView('list')}
               aria-label="List view"
-              className="data-[state=on]:bg-background dark:text-white"
+              className="data-[state=on]:bg-background text-foreground dark:text-white"
             >
               <List className="h-4 w-4" />
             </Toggle>
@@ -139,7 +139,7 @@ export default function TransactionsPage() {
               pressed={view === 'board'}
               onPressedChange={() => setView('board')}
               aria-label="Board view"
-              className="data-[state=on]:bg-background dark:text-white"
+              className="data-[state=on]:bg-background text-foreground dark:text-white"
             >
               <LayoutGrid className="h-4 w-4" />
             </Toggle>
@@ -148,7 +148,7 @@ export default function TransactionsPage() {
             pressed={theme === 'dark'}
             onPressedChange={toggleTheme}
             aria-label="Toggle theme"
-            className="ml-2 dark:text-white"
+            className="ml-2 text-foreground dark:text-white"
           >
             {theme === 'light' ? (
               <Moon className="h-4 w-4" />
@@ -160,7 +160,7 @@ export default function TransactionsPage() {
         {user?.role === "agent" && (
           <Dialog>
             <DialogTrigger asChild>
-              <Button className="dark:text-white">
+              <Button className="text-foreground dark:text-white">
                 <Plus className="h-4 w-4 mr-2" />
                 New Transaction
               </Button>
@@ -226,7 +226,7 @@ export default function TransactionsPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full dark:text-white" disabled={createTransactionMutation.isPending}>
+                  <Button type="submit" className="w-full text-foreground dark:text-white" disabled={createTransactionMutation.isPending}>
                     Create Transaction
                   </Button>
                 </form>
