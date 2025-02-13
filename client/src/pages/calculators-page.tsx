@@ -1,25 +1,9 @@
+
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
-
-// Placeholder components and function - Replace with actual Recharts implementation
-const RechartsPrimitive = { ComposedChart: ({ children, data }) => <div>{children} Data: {JSON.stringify(data)}</div>, CartesianGrid: () => null, XAxis: ({ children }) => <div>{children}</div>, YAxis: ({ children }) => <div>{children}</div>, Tooltip: ({ content }) => <div>{content}</div>, Legend: ({ content }) => <div>{content}</div>, Bar: () => null, Line: () => null };
-const ChartContainer = ({ children, config }) => <div style={{ border: "1px solid #ccc" }}>{children}</div>;
-const ChartTooltipContent = () => <div>Tooltip</div>;
-const ChartLegendContent = () => <div>Legend</div>;
-
-const generateAmortizationData = () => {
-  // Placeholder data - Replace with actual amortization calculation
-  return [
-    { year: 1, principal: 10000, interest: 5000, balance: 100000 },
-    { year: 2, principal: 12000, interest: 4000, balance: 88000 },
-    { year: 3, principal: 14000, interest: 3000, balance: 74000 },
-    { year: 4, principal: 16000, interest: 2000, balance: 58000 },
-    { year: 5, principal: 18000, interest: 1000, balance: 40000 },
-  ];
-};
 
 export default function CalculatorsPage() {
   const [refinanceInputs, setRefinanceInputs] = useState({
@@ -76,7 +60,7 @@ export default function CalculatorsPage() {
     const principal = mortgageInputs.purchasePrice - mortgageInputs.downPayment;
     const monthlyRate = mortgageInputs.interestRate / 100 / 12;
     const numberOfPayments = Number(mortgageInputs.loanTerm) * 12;
-
+    
     const monthlyPrincipal = 
       (principal * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) / 
       (Math.pow(1 + monthlyRate, numberOfPayments) - 1);
@@ -96,7 +80,7 @@ export default function CalculatorsPage() {
   return (
     <main className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-8">Financial Calculators</h1>
-
+      
       <Tabs defaultValue="mortgage" className="space-y-4">
         <TabsList>
           <TabsTrigger value="mortgage">Mortgage Calculator</TabsTrigger>
@@ -105,74 +89,251 @@ export default function CalculatorsPage() {
         </TabsList>
 
         <TabsContent value="mortgage">
-          {/* Mortgage Calculator Content */}
-        </TabsContent>
-
-        <TabsContent value="refinance">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Refinancing Inputs */}
             <div className="space-y-6">
-              <Card className="p-6">
-                {/* Current Loan Inputs */}
-              </Card>
-
-              <Card className="p-6">
-                {/* New Loan Inputs */}
-              </Card>
-            </div>
-
-            <div className="space-y-6">
-              <div className="bg-white p-6 rounded-lg border">
-                {/* Refinancing Summary */}
+              <div className="space-y-4">
+                <label className="text-sm font-medium">Purchase Price</label>
+                <Input
+                  type="number"
+                  value={mortgageInputs.purchasePrice}
+                  onChange={(e) => setMortgageInputs({...mortgageInputs, purchasePrice: Number(e.target.value)})}
+                  placeholder="Enter purchase price"
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                {/* Current vs Refinanced Loan Summary */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Down Payment (${mortgageInputs.downPayment})</label>
+                <Slider
+                  value={[mortgageInputs.downPayment / mortgageInputs.purchasePrice * 100]}
+                  onValueChange={(value) => setMortgageInputs({
+                    ...mortgageInputs,
+                    downPayment: Math.round(mortgageInputs.purchasePrice * value[0] / 100)
+                  })}
+                  max={100}
+                  step={1}
+                />
+                <div className="text-sm text-muted-foreground">{(mortgageInputs.downPayment / mortgageInputs.purchasePrice * 100).toFixed(1)}%</div>
               </div>
 
-              <div className="space-y-6">
-                <div className="bg-black text-white p-6 rounded-lg">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span>Monthly Savings</span>
-                      <span className="text-2xl font-bold text-emerald-400">${calculateMonthlySavings().toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Break-even Period</span>
-                      <span>{calculateBreakEven()} months</span>
-                    </div>
-                  </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Interest Rate ({mortgageInputs.interestRate}%)</label>
+                <Slider
+                  value={[mortgageInputs.interestRate]}
+                  onValueChange={(value) => setMortgageInputs({...mortgageInputs, interestRate: value[0]})}
+                  max={10}
+                  step={0.1}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Loan Term</label>
+                  <select 
+                    className="w-full h-9 px-3 rounded-md border mt-2"
+                    value={mortgageInputs.loanTerm}
+                    onChange={(e) => setMortgageInputs({...mortgageInputs, loanTerm: e.target.value})}
+                  >
+                    <option value="30">30 Years</option>
+                    <option value="15">15 Years</option>
+                  </select>
                 </div>
 
-                <div className="bg-white p-6 rounded-lg border">
-                  <h4 className="text-lg font-semibold mb-4">Amortization Schedule</h4>
-                  <ChartContainer
-                    className="h-[300px]"
-                    config={{
-                      balance: { color: "#000000" },
-                      principal: { color: "#4f46e5" },
-                      interest: { color: "#fbbf24" }
-                    }}
-                  >
-                    <RechartsPrimitive.ComposedChart data={generateAmortizationData()}>
-                      <RechartsPrimitive.CartesianGrid strokeDasharray="3 3" />
-                      <RechartsPrimitive.XAxis dataKey="year" />
-                      <RechartsPrimitive.YAxis width={80} tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
-                      <RechartsPrimitive.Tooltip content={<ChartTooltipContent />} />
-                      <RechartsPrimitive.Legend content={<ChartLegendContent />} />
-                      <RechartsPrimitive.Bar dataKey="principal" stackId="a" fill="var(--color-principal)" />
-                      <RechartsPrimitive.Bar dataKey="interest" stackId="a" fill="var(--color-interest)" />
-                      <RechartsPrimitive.Line type="monotone" dataKey="balance" stroke="var(--color-balance)" />
-                    </RechartsPrimitive.ComposedChart>
-                  </ChartContainer>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Annual Tax Rate ({mortgageInputs.taxRate}%)</label>
+                  <Slider
+                    value={[mortgageInputs.taxRate]}
+                    onValueChange={(value) => setMortgageInputs({
+                      ...mortgageInputs,
+                      taxRate: value[0],
+                      annualTaxes: Math.round(mortgageInputs.purchasePrice * value[0] / 100)
+                    })}
+                    max={3}
+                    step={0.1}
+                  />
+                  <div className="text-sm text-muted-foreground">Annual Tax: ${mortgageInputs.annualTaxes.toLocaleString()}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Annual Insurance ($)</label>
+                  <Input
+                    type="number"
+                    value={mortgageInputs.annualInsurance}
+                    onChange={(e) => setMortgageInputs({...mortgageInputs, annualInsurance: Number(e.target.value)})}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Monthly HOA ($)</label>
+                <Input
+                  type="number"
+                  value={mortgageInputs.monthlyHOA}
+                  onChange={(e) => setMortgageInputs({...mortgageInputs, monthlyHOA: Number(e.target.value)})}
+                />
+              </div>
+            </div>
+
+            <div className="bg-black text-white p-8 rounded-lg">
+              <div className="text-center mb-8">
+                <div className="text-5xl font-bold">${monthlyPayment.total.toFixed(2)}</div>
+                <div className="text-sm opacity-80 mt-2">MONTHLY PAYMENT</div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-between">
+                  <div>Principal & Interest</div>
+                  <div>${monthlyPayment.principal.toFixed(2)}</div>
+                </div>
+                <div className="flex justify-between">
+                  <div>Monthly Taxes</div>
+                  <div>${monthlyPayment.taxes.toFixed(2)}</div>
+                </div>
+                <div className="flex justify-between">
+                  <div>Monthly HOA</div>
+                  <div>${monthlyPayment.hoa.toFixed(2)}</div>
+                </div>
+                <div className="flex justify-between">
+                  <div>Monthly Insurance</div>
+                  <div>${monthlyPayment.insurance.toFixed(2)}</div>
                 </div>
               </div>
             </div>
           </div>
         </TabsContent>
 
+        <TabsContent value="refinance">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Current Loan</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Loan Balance ($)</label>
+                    <Input
+                      type="number"
+                      value={refinanceInputs.currentBalance}
+                      onChange={(e) => setRefinanceInputs({...refinanceInputs, currentBalance: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Monthly Payment ($)</label>
+                    <Input
+                      type="number"
+                      value={refinanceInputs.currentPayment}
+                      onChange={(e) => setRefinanceInputs({...refinanceInputs, currentPayment: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Interest Rate (%)</label>
+                    <Input
+                      type="number"
+                      value={refinanceInputs.currentRate}
+                      onChange={(e) => setRefinanceInputs({...refinanceInputs, currentRate: Number(e.target.value)})}
+                    />
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-4">New Loan</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Term (Years)</label>
+                    <select 
+                      className="w-full h-9 px-3 rounded-md border mt-2"
+                      value={refinanceInputs.newTerm}
+                      onChange={(e) => setRefinanceInputs({...refinanceInputs, newTerm: Number(e.target.value)})}
+                    >
+                      <option value="30">30 Years</option>
+                      <option value="20">20 Years</option>
+                      <option value="15">15 Years</option>
+                      <option value="10">10 Years</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Interest Rate (%)</label>
+                    <Input
+                      type="number"
+                      value={refinanceInputs.newRate}
+                      onChange={(e) => setRefinanceInputs({...refinanceInputs, newRate: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Closing Costs ($)</label>
+                    <Input
+                      type="number"
+                      value={refinanceInputs.closingCosts}
+                      onChange={(e) => setRefinanceInputs({...refinanceInputs, closingCosts: Number(e.target.value)})}
+                    />
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-lg border">
+                <p className="text-sm leading-relaxed">
+                  By refinancing your current loan balance of ${refinanceInputs.currentBalance.toLocaleString()} at {refinanceInputs.newRate}% over {refinanceInputs.newTerm} years, 
+                  you will {calculateMonthlySavings() > 0 ? 'decrease' : 'increase'} your monthly payments by ${Math.abs(calculateMonthlySavings()).toFixed(2)}.
+                  The total interest paid over the life of the loan will {calculateInterestSavings() > 0 ? 'decrease' : 'increase'} by ${Math.abs(calculateInterestSavings()).toFixed(2)}.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-6 rounded-lg">
+                  <h4 className="text-lg font-semibold mb-4">Current Loan</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Monthly Payment</span>
+                      <span>${refinanceInputs.currentPayment.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Interest Rate</span>
+                      <span>{refinanceInputs.currentRate}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total Interest</span>
+                      <span>${(refinanceInputs.currentPayment * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-6 rounded-lg">
+                  <h4 className="text-lg font-semibold mb-4">Refinanced Loan</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Monthly Payment</span>
+                      <span className="text-emerald-600">${calculateNewPayment().toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Interest Rate</span>
+                      <span className="text-emerald-600">{refinanceInputs.newRate}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total Interest</span>
+                      <span className="text-emerald-600">${(calculateNewPayment() * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-black text-white p-6 rounded-lg">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span>Monthly Savings</span>
+                    <span className="text-2xl font-bold text-emerald-400">${calculateMonthlySavings().toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Break-even Period</span>
+                    <span>{calculateBreakEven()} months</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+        
         <TabsContent value="rent">
-          {/* Rent vs Buy Calculator Content */}
+          {/* Existing rent vs buy calculator content */}
         </TabsContent>
       </Tabs>
     </main>
