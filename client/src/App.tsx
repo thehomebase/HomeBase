@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import React from "react";
 import CalculatorsPage from "@/pages/calculators-page"; //Import CalculatorsPage
+import GlossaryPage from "./pages/glossary-page"; // Added import for GlossaryPage
+
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -82,6 +84,7 @@ function Router() {
           </Route>
         </>
       )}
+      <Route path="/glossary" component={GlossaryPage} /> {/* Added glossary route */}
       <Route component={NotFound} />
     </Switch>
   );
