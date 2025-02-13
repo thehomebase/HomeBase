@@ -75,11 +75,41 @@ const KanbanColumn = ({ title, transactions, status }: KanbanColumnProps) => {
           {transactions.length}
         </span>
       </div>
-      <div className="flex flex-col gap-2">
+      <div 
+        className="flex flex-col gap-2" 
+        data-status={status}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.currentTarget.classList.add('bg-primary/10');
+        }}
+        onDragLeave={(e) => {
+          e.currentTarget.classList.remove('bg-primary/10');
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.currentTarget.classList.remove('bg-primary/10');
+          const data = e.dataTransfer.getData('text/plain');
+          const [transactionId, sourceStatus] = data.split('-');
+          if (sourceStatus !== status) {
+            updateTransactionStatus.mutate({
+              id: parseInt(transactionId),
+              newStatus: status
+            });
+          }
+        }}
+      >
         {transactions.map((transaction) => (
           <Card 
-            key={transaction.id} 
-            className="p-3 cursor-pointer hover:shadow-md transition-shadow relative group dark:bg-gray-700"
+            key={transaction.id}
+            draggable="true"
+            onDragStart={(e) => {
+              e.dataTransfer.setData('text/plain', `${transaction.id}-${status}`);
+              e.currentTarget.classList.add('opacity-50');
+            }}
+            onDragEnd={(e) => {
+              e.currentTarget.classList.remove('opacity-50');
+            }}
+            className="p-3 cursor-move hover:shadow-md transition-shadow relative group dark:bg-gray-700"
           >
             <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button
