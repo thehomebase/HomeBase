@@ -121,7 +121,8 @@ export default function TransactionPage() {
         contractExecutionDate: formatDateForAPI(data.contractExecutionDate),
         mlsNumber: data.mlsNumber?.trim() || null,
         financing: data.financing || null,
-        status: data.status || transaction?.status || 'prospect'
+        status: data.status || transaction?.status || 'prospect',
+        clientId: data.clientId || null
       };
 
       // Remove undefined values but keep null values
