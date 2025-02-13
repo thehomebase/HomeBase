@@ -142,7 +142,7 @@ export default function TransactionPage() {
         return date.toISOString().split('T')[0];
       };
 
-      const formData = {
+      form.reset({
         address: transaction.address,
         contractPrice: transaction.contractPrice,
         optionPeriodExpiration: formatDateForInput(transaction.optionPeriodExpiration),
@@ -155,13 +155,7 @@ export default function TransactionPage() {
         mlsNumber: transaction.mlsNumber,
         financing: transaction.financing,
         status: transaction.status
-      };
-
-      // Reset the form with all fields
-      form.reset(formData);
-        earnestMoney: transaction.earnestMoney,
-        downPayment: transaction.downPayment,
-        sellerConcessions: transaction.sellerConcessions,
+      });
         closingDate: formatDateForInput(transaction.closingDate),
         contractExecutionDate: formatDateForInput(transaction.contractExecutionDate),
         mlsNumber: transaction.mlsNumber,
