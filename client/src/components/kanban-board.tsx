@@ -95,6 +95,11 @@ function DraggableCard({
           {transaction.address}
         </div>
         <div className="text-xs text-muted-foreground space-y-0.5 dark:text-gray-300">
+          {transaction.client && (
+            <div className="font-medium">
+              {transaction.client.firstName} {transaction.client.lastName}
+            </div>
+          )}
           <div className="capitalize">
             {transaction.type === "buy" ? "Purchase" : "Sale"}
           </div>
