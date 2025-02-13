@@ -91,7 +91,7 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     setActiveId(Number(event.active.id));
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
 
@@ -103,14 +103,43 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     // Update local state immediately for visual feedback
     const updatedTransactions = localTransactions.map(t => 
       t.id === draggedId 
-        ? { ...t, status: newStatus }
+        ? { ...t, status: newStatus.toLowerCase() }
         : t
     );
     
     setLocalTransactions(updatedTransactions);
     
-    // Force a re-render of the board
-    queryClient.setQueryData(["/api/transactions"], updatedTransactions);
+    // Update the transaction status in the backend
+    try {
+      const transaction = localTransactions.find(t => t.id === draggedId);
+      if (transaction) {
+        const response = await apiRequest(
+          "PATCH",
+          `/api/transactions/${draggedId}`,
+          { status: newStatus.toLowerCase() }
+        );
+        
+        if (!response.ok) {
+          throw new Error("Failed to update transaction");
+        }
+        
+        // Update the cache with the new data
+        queryClient.setQueryData(["/api/transactions"], updatedTransactions);
+        
+        toast({
+          title: "Success",
+          description: "Transaction status updated",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update transaction status",
+        variant: "destructive",
+      });
+      // Revert the local state on error
+      setLocalTransactions(localTransactions);
+    }
   };
 
   // Update local transactions when props change
