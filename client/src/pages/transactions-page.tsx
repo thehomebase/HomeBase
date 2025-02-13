@@ -26,7 +26,12 @@ interface Transaction {
   participants: any[];
   contractPrice: number | null;
   clientId: number | null;
+  secondaryClientId: number | null;
   client?: {
+    firstName: string;
+    lastName: string;
+  } | null;
+  secondaryClient?: {
     firstName: string;
     lastName: string;
   } | null;
@@ -35,7 +40,9 @@ interface Transaction {
 const createTransactionSchema = z.object({
   address: z.string().min(1),
   accessCode: z.string().min(6),
-  type: z.enum(['buy', 'sell'])
+  type: z.enum(['buy', 'sell']),
+  clientId: z.number().nullable(),
+  secondaryClientId: z.number().nullable()
 });
 
 export default function TransactionsPage() {
@@ -64,7 +71,8 @@ export default function TransactionsPage() {
       address: "", 
       accessCode: "", 
       type: "buy" as const,
-      clientId: null as number | null
+      clientId: null as number | null,
+      secondaryClientId: null as number | null
     },
   });
 
@@ -85,8 +93,10 @@ export default function TransactionsPage() {
       const response = await apiRequest("POST", "/api/transactions", {
         ...data,
         agentId: user?.id,
-        status: "prospect",
+        status: 'prospect',
         participants: [],
+        clientId: data.clientId || null,
+        secondaryClientId: data.secondaryClientId || null
       });
       if (!response.ok) {
         throw new Error('Failed to create transaction');
