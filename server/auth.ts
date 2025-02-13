@@ -74,10 +74,10 @@ export function setupAuth(app: Express) {
       const user = await storage.createUser({
         email: req.body.email,
         password: await hashPassword(req.body.password),
-        firstName: req.body.firstName,
-        lastName: req.body.lastName,
-        role: 'user',
-        agentId: null
+        first_name: req.body.firstName,
+        last_name: req.body.lastName,
+        role: req.body.role || 'client',
+        agent_id: req.body.agentId ? parseInt(req.body.agentId) : null
       });
 
       req.login(user, (err) => {
