@@ -55,6 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      // Initialize empty clients data to prevent undefined error
+      queryClient.setQueryData(["/api/clients"], []);
     },
     onError: (error: Error) => {
       toast({
