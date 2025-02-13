@@ -864,7 +864,7 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error in createClient:', error);
       throw error;
-    }
+        }
   }
 
   async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
