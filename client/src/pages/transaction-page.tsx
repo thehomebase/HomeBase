@@ -72,6 +72,10 @@ export default function TransactionPage() {
   const parsedId = id ? parseInt(id, 10) : null;
 
   const [isEditing, setIsEditing] = React.useState(false);
+  const { data: clients = [] } = useQuery({
+    queryKey: ["/api/clients"],
+    enabled: !!user,
+  });
   const form = useForm<TransactionFormData>();
 
   const { data: transaction, isError, isLoading } = useQuery({
@@ -515,6 +519,26 @@ export default function TransactionPage() {
                   ) : (
                     <p className="font-medium">
                       {transaction.financing || 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Primary Client</p>
+                  {isEditing ? (
+                    <select
+                      className="w-full h-9 px-3 rounded-md border"
+                      {...form.register("clientId")}
+                    >
+                      <option value="">Select client</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.firstName} {client.lastName}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="font-medium">
+                      {transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : 'Not set'}
                     </p>
                   )}
                 </div>
