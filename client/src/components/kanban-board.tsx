@@ -279,6 +279,11 @@ export function KanbanBoard({ transactions, onDeleteTransaction }: KanbanBoardPr
             <div className="font-medium text-sm truncate dark:text-white">
               {activeTransaction.address}
             </div>
+            {activeTransaction.client && (
+              <div className="text-sm text-primary dark:text-primary-foreground">
+                {activeTransaction.client.firstName} {activeTransaction.client.lastName}
+              </div>
+            )}
             <div className="text-xs text-muted-foreground dark:text-gray-300">
               {activeTransaction.type === "buy" ? "Purchase" : "Sale"}
             </div>

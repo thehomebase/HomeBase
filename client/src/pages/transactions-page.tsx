@@ -252,7 +252,7 @@ export default function TransactionsPage() {
                             <FormLabel>Primary Client</FormLabel>
                             <FormControl>
                               <select 
-                                className="w-full h-9 px-3 rounded-md border"
+                                className="w-full h-9 px-3 rounded-md border text-base bg-background"
                                 value={field.value || ""}
                                 onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                               >
@@ -275,7 +275,7 @@ export default function TransactionsPage() {
                             <FormLabel>Secondary Client</FormLabel>
                             <FormControl>
                               <select 
-                                className="w-full h-9 px-3 rounded-md border"
+                                className="w-full h-9 px-3 rounded-md border text-base bg-background"
                                 value={field.value || ""}
                                 onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                               >
@@ -343,7 +343,7 @@ export default function TransactionsPage() {
                 </p>
                 {transaction.client && (
                   <p className="text-sm text-muted-foreground dark:text-gray-300">
-                    Primary Client: {transaction.client.firstName} {transaction.client.lastName}
+                    Primary Contact: {transaction.client.firstName} {transaction.client.lastName}
                   </p>
                 )}
                 {transaction.secondaryClient && (
