@@ -246,32 +246,10 @@ export default function TransactionPage() {
   const displayProgress = `${progress}% Complete`;
 
   // Form submission handler
+
   const handleSubmit = async (data: TransactionFormData) => {
     try {
-      const formValues = form.getValues();
-      console.log('Form values before submission:', formValues);
-
-      const cleanData = {
-        address: data.address,
-        contractPrice: data.contractPrice ? Number(data.contractPrice) : null,
-        optionPeriodExpiration: data.optionPeriodExpiration || null,
-        optionFee: data.optionFee ? Number(data.optionFee) : null,
-        earnestMoney: data.earnestMoney ? Number(data.earnestMoney) : null,
-        downPayment: data.downPayment ? Number(data.downPayment) : null,
-        sellerConcessions: data.sellerConcessions ? Number(data.sellerConcessions) : null,
-        closingDate: data.closingDate || null,
-        contractExecutionDate: data.contractExecutionDate || null,
-        mlsNumber: formValues.mlsNumber || null,
-        financing: formValues.financing || null,
-        status: formValues.status || null
-      };
-
-      console.log('Cleaned data for submission:', cleanData);
-      const updated = await updateTransaction.mutateAsync(cleanData);
-      queryClient.setQueryData(["/api/transactions", parsedId], updated);
-      await queryClient.invalidateQueries({
-        queryKey: ["/api/transactions", parsedId]
-      });
+      await updateTransaction.mutateAsync(data);
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating transaction:', error);
