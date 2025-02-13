@@ -138,14 +138,27 @@ export default function TransactionPage() {
       const formatDateForInput = (dateString: string | null | undefined) => {
         if (!dateString) return '';
         const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '';
         return date.toISOString().split('T')[0];
       };
 
-      form.reset({
+      const formData = {
         address: transaction.address,
         contractPrice: transaction.contractPrice,
         optionPeriodExpiration: formatDateForInput(transaction.optionPeriodExpiration),
         optionFee: transaction.optionFee,
+        earnestMoney: transaction.earnestMoney,
+        downPayment: transaction.downPayment,
+        sellerConcessions: transaction.sellerConcessions,
+        closingDate: formatDateForInput(transaction.closingDate),
+        contractExecutionDate: formatDateForInput(transaction.contractExecutionDate),
+        mlsNumber: transaction.mlsNumber,
+        financing: transaction.financing,
+        status: transaction.status
+      };
+
+      // Reset the form with all fields
+      form.reset(formData);
         earnestMoney: transaction.earnestMoney,
         downPayment: transaction.downPayment,
         sellerConcessions: transaction.sellerConcessions,
