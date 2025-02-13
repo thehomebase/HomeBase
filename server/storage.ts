@@ -871,7 +871,7 @@ export class DatabaseStorage implements IStorage {
         ORDER BY id ASC
       `);
 
-      return result.rows.map(row => ({
+      return result.rows.map(row =>` => ({
         id: String(row.id),
         name: String(row.name),
         status: String(row.status),
