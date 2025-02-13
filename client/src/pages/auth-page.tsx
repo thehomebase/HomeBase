@@ -19,7 +19,8 @@ const registerSchema = z.object({
   password: z.string(),
   firstName: z.string(),
   lastName: z.string(),
-  agentId: z.string().optional(), // Assuming agentId is a string
+  role: z.string().min(1, "Role is required"),
+  agentId: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -39,7 +40,7 @@ export default function AuthPage() {
 
   const registerForm = useForm({
     resolver: zodResolver(registerSchema),
-    defaultValues: { email: "", password: "", firstName: "", lastName: "", agentId: "" },
+    defaultValues: { email: "", password: "", firstName: "", lastName: "", role: "", agentId: "" },
   });
 
   useEffect(() => {
@@ -162,6 +163,28 @@ export default function AuthPage() {
                             <FormControl>
                               <Input {...field} />
                             </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="role"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Label>Role</Label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select your role" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="agent">Agent</SelectItem>
+                                <SelectItem value="client">Client</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
