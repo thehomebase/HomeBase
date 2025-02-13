@@ -94,16 +94,16 @@ function DraggableCard({
         <div className="font-medium text-sm truncate pr-8 dark:text-white">
           {transaction.address}
         </div>
-        <div className="text-xs text-muted-foreground space-y-1 dark:text-gray-300">
-          <div className="capitalize font-medium">
-            {transaction.type === "buy" ? "Purchase" : "Sale"}
-          </div>
-          <div>
-            Price: {formatPrice(transaction.contractPrice)}
+        <div className="text-xs space-y-1.5">
+          <div className="flex justify-between items-center">
+            <span className="capitalize font-medium text-primary">
+              {transaction.type === "buy" ? "Purchase" : "Sale"}
+            </span>
+            <span>{formatPrice(transaction.contractPrice)}</span>
           </div>
           {transaction.client && (
-            <div className="truncate">
-              Client: {transaction.client.firstName} {transaction.client.lastName}
+            <div className="truncate font-medium">
+              {transaction.client.firstName} {transaction.client.lastName}
             </div>
           )}
         </div>
