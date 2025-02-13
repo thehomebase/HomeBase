@@ -292,7 +292,7 @@ export default function TransactionsPage() {
                       />
                     </div>
                   )}
-                  <Button type="submit" className="w-full text-foreground dark:text-white" disabled={createTransactionMutation.isPending}>
+                  <Button type="submit" className="w-full bg-primary text-white hover:bg-primary/90" disabled={createTransactionMutation.isPending}>
                     Create Transaction
                   </Button>
                 </form>
