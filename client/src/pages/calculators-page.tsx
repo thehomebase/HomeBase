@@ -269,29 +269,62 @@ export default function CalculatorsPage() {
               </Card>
             </div>
 
-            <div className="bg-black text-white p-8 rounded-lg">
-              <div className="space-y-6">
-                <div className="text-center">
-                  <div className="text-4xl font-bold">${calculateMonthlySavings()}</div>
-                  <div className="text-sm opacity-80 mt-2">MONTHLY SAVINGS</div>
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-lg border">
+                <p className="text-sm leading-relaxed">
+                  By refinancing your current loan balance of ${refinanceInputs.currentBalance.toLocaleString()} at {refinanceInputs.newRate}% over {refinanceInputs.newTerm} years, 
+                  you will {calculateMonthlySavings() > 0 ? 'decrease' : 'increase'} your monthly payments by ${Math.abs(calculateMonthlySavings()).toFixed(2)}.
+                  The total interest paid over the life of the loan will {calculateInterestSavings() > 0 ? 'decrease' : 'increase'} by ${Math.abs(calculateInterestSavings()).toFixed(2)}.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-6 rounded-lg">
+                  <h4 className="text-lg font-semibold mb-4">Current Loan</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Monthly Payment</span>
+                      <span>${refinanceInputs.currentPayment.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Interest Rate</span>
+                      <span>{refinanceInputs.currentRate}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total Interest</span>
+                      <span>${(refinanceInputs.currentPayment * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance).toFixed(2)}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="border-t border-white/20 pt-6 space-y-4">
-                  <div className="flex justify-between">
-                    <div>Current Payment</div>
-                    <div>${refinanceInputs.currentPayment.toFixed(2)}</div>
+                <div className="bg-slate-50 p-6 rounded-lg">
+                  <h4 className="text-lg font-semibold mb-4">Refinanced Loan</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Monthly Payment</span>
+                      <span className="text-emerald-600">${calculateNewPayment().toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Interest Rate</span>
+                      <span className="text-emerald-600">{refinanceInputs.newRate}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total Interest</span>
+                      <span className="text-emerald-600">${(calculateNewPayment() * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-black text-white p-6 rounded-lg">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span>Monthly Savings</span>
+                    <span className="text-2xl font-bold text-emerald-400">${calculateMonthlySavings().toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <div>New Payment</div>
-                    <div className="text-emerald-400">${calculateNewPayment().toFixed(2)}</div>
-                  </div>
-                  <div className="flex justify-between">
-                    <div>Total Interest Savings</div>
-                    <div className="text-emerald-400">${calculateInterestSavings().toFixed(2)}</div>
-                  </div>
-                  <div className="flex justify-between">
-                    <div>Break-even Period</div>
-                    <div>{calculateBreakEven()} months</div>
+                    <span>Break-even Period</span>
+                    <span>{calculateBreakEven()} months</span>
                   </div>
                 </div>
               </div>
