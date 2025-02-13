@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React from "react";
 import {
   DndContext,
   DragOverlay,
@@ -18,7 +18,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { 
+  AlertDialog, 
+  AlertDialogContent, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogCancel, 
+  AlertDialogAction 
+} from "@/components/ui/alert-dialog";
 
 interface Transaction {
   id: number;
@@ -49,11 +58,11 @@ const formatPrice = (price: number | null) => {
 };
 
 export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [activeId, setActiveId] = useState<number | null>(null);
-  const [, setLocation] = useLocation();
+  const [activeId, setActiveId] = React.useState<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -101,8 +110,9 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       toast({
         title: "Transaction deleted",
-        description: "The transaction has been successfully deleted.",
+        description: "Transaction has been deleted successfully.",
       });
+      setDeleteId(null);
     },
     onError: () => {
       toast({
@@ -124,13 +134,13 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     if (!over) return;
 
     const draggedId = Number(active.id);
-    const newStatus = over.id.toString();
+    const [, targetStatus] = over.id.toString().split("-");
     
     const transaction = transactions.find(t => t.id === draggedId);
-    if (transaction && transaction.status !== newStatus) {
+    if (transaction && transaction.status !== targetStatus) {
       updateTransactionStatus.mutate({
         id: draggedId,
-        newStatus: newStatus,
+        newStatus: targetStatus,
       });
     }
   };
@@ -156,7 +166,7 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
                 </span>
               </div>
               <div 
-                id={column.id}
+                id={`droppable-${column.id}`}
                 data-droppable="true"
                 className="flex flex-col gap-2 min-h-[100px]"
               >
@@ -221,7 +231,6 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
               onClick={() => {
                 if (deleteId) {
                   deleteTransactionMutation.mutate(deleteId);
-                  setDeleteId(null);
                 }
               }}
               className="bg-destructive hover:bg-destructive/90"
