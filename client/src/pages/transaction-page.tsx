@@ -249,11 +249,11 @@ export default function TransactionPage() {
                 <h1 className="text-2xl font-bold">{transaction.address}</h1>
               )}
               <p className="text-muted-foreground">Transaction ID: {parsedId}</p>
-      {transaction.client && (
-        <p className="text-muted-foreground">
-          Client: {transaction.client.firstName} {transaction.client.lastName}
-        </p>
-      )}
+              {transaction.client && (
+                <p className="text-muted-foreground">
+                  Client: {transaction.client.firstName} {transaction.client.lastName}
+                </p>
+              )}
               {transaction.client && (
                 <p className="text-muted-foreground">
                   Primary Client: {transaction.client.firstName} {transaction.client.lastName}
@@ -499,16 +499,16 @@ export default function TransactionPage() {
                         const cleanData = {
                           address: data.address,
                           contractPrice: data.contractPrice ? Number(data.contractPrice) : null,
-                          optionPeriodExpiration: data.optionPeriodExpiration ? new Date(data.optionPeriodExpiration).toISOString() : null,
+                          optionPeriodExpiration: data.optionPeriodExpiration || null,
                           optionFee: data.optionFee ? Number(data.optionFee) : null,
                           earnestMoney: data.earnestMoney ? Number(data.earnestMoney) : null,
                           downPayment: data.downPayment ? Number(data.downPayment) : null,
                           sellerConcessions: data.sellerConcessions ? Number(data.sellerConcessions) : null,
-                          closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : null,
-                          contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : null,
+                          closingDate: data.closingDate || null,
+                          contractExecutionDate: data.contractExecutionDate || null,
                           mlsNumber: data.mlsNumber || null,
                           financing: formValues.financing || null,
-                          status: formValues.status || 'prospect'
+                          status: formValues.status || null
                         };
 
                         const updated = await updateTransaction.mutateAsync(cleanData);
