@@ -348,11 +348,9 @@ export default function TransactionsPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize">Status: {transaction.status.replace('_', ' ')}</p>
-              {transaction.client && (
                 <p className="text-sm text-muted-foreground dark:text-gray-300">
-                  Client: {transaction.client.firstName} {transaction.client.lastName}
+                  Client: {transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : 'Not set'}
                 </p>
-              )}
                 {transaction.client && (
                   <p className="text-sm text-muted-foreground dark:text-gray-300">
                     Primary Contact: {transaction.client.firstName} {transaction.client.lastName}

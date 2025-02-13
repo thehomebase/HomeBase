@@ -101,12 +101,8 @@ function DraggableCard({
             </span>
             <span>{formatPrice(transaction.contractPrice)}</span>
           </div>
-          <div className="flex flex-col gap-0.5">
-            {transaction.client && (
-              <div className="truncate text-sm text-muted-foreground">
-                Client: {transaction.client.firstName} {transaction.client.lastName}
-              </div>
-            )}
+          <div className="text-muted-foreground">
+            Client: {transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : 'Not set'}
           </div>
         </div>
       </div>
