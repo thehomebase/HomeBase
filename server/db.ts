@@ -29,10 +29,11 @@ export const transactions = pgTable('transactions', {
 });
 
 export const users = pgTable('users', {
-    id: serial('id').primaryKey(),
-    email: text('email').notNull(),
-    password: text('password').notNull(),
-    role: text('role').notNull(),
-    firstName: text('first_name').notNull(),
-    lastName: text('last_name').notNull()
-})
+  id: serial('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  password: text('password').notNull(),
+  firstName: text('first_name').notNull(),
+  lastName: text('last_name').notNull(),
+  role: text('role').notNull(),
+  agentId: integer('agent_id'),
+});
