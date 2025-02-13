@@ -102,7 +102,9 @@ function DraggableCard({
             <span>{formatPrice(transaction.contractPrice)}</span>
           </div>
           <div className="text-muted-foreground">
-            Client: {transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : 'Not set'}
+            Client: {clients.find(c => c.id === transaction.clientId) 
+              ? `${clients.find(c => c.id === transaction.clientId)?.firstName} ${clients.find(c => c.id === transaction.clientId)?.lastName}` 
+              : 'Not set'}
           </div>
         </div>
       </div>

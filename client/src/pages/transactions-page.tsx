@@ -349,13 +349,10 @@ export default function TransactionsPage() {
               <CardContent>
                 <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize">Status: {transaction.status.replace('_', ' ')}</p>
                 <p className="text-sm text-muted-foreground dark:text-gray-300">
-                  Client: {transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : 'Not set'}
+                  Client: {clients.find(c => c.id === transaction.clientId) 
+                    ? `${clients.find(c => c.id === transaction.clientId)?.firstName} ${clients.find(c => c.id === transaction.clientId)?.lastName}` 
+                    : 'Not set'}
                 </p>
-                {transaction.client && (
-                  <p className="text-sm text-muted-foreground dark:text-gray-300">
-                    Primary Contact: {transaction.client.firstName} {transaction.client.lastName}
-                  </p>
-                )}
                 {transaction.secondaryClient && (
                   <p className="text-sm text-muted-foreground dark:text-gray-300">
                     Secondary Client: {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}
