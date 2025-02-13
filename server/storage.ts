@@ -143,6 +143,31 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, email, password, role 
+        FROM users 
+        WHERE email = ${email}
+      `);
+
+      if (result.rows.length === 0) {
+        return undefined;
+      }
+
+      const user = result.rows[0];
+      return {
+        id: Number(user.id),
+        email: String(user.email),
+        password: String(user.password),
+        role: String(user.role)
+      };
+    } catch (error) {
+      console.error('Error in getUserByEmail:', error);
+      return undefined;
+    }
+  }
+
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
       const result = await db.execute(sql`
