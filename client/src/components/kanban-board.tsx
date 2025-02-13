@@ -123,13 +123,13 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
 
     if (!over) return;
 
-    const draggedId = active.id;
-    const newStatus = over.id as string;
+    const draggedId = Number(active.id);
+    const newStatus = over.id.toString();
     
-    const transaction = transactions.find(t => t.id === Number(draggedId));
+    const transaction = transactions.find(t => t.id === draggedId);
     if (transaction && transaction.status !== newStatus) {
       updateTransactionStatus.mutate({
-        id: Number(draggedId),
+        id: draggedId,
         newStatus: newStatus,
       });
     }
@@ -147,7 +147,6 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
           {statusColumns.map((column) => (
             <div
               key={column.id}
-              id={column.id}
               className="flex flex-col min-w-[240px] bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50"
             >
               <div className="flex justify-between items-center mb-2">
@@ -156,15 +155,19 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
                   {transactions.filter(t => t.status === column.id).length}
                 </span>
               </div>
-              <div className="flex flex-col gap-2" data-droppable id={column.id}>
+              <div 
+                id={column.id}
+                data-droppable="true"
+                className="flex flex-col gap-2 min-h-[100px]"
+              >
                 {transactions
                   .filter((t) => t.status === column.id)
                   .map((transaction) => (
                     <Card
                       key={transaction.id}
+                      data-draggable="true"
                       id={transaction.id.toString()}
                       className="p-3 cursor-move hover:shadow-md transition-shadow relative group dark:bg-gray-700"
-                      draggable="true"
                     >
                       <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
