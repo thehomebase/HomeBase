@@ -13,7 +13,7 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
-  todayColor = "bg-blue-500",
+  todayColor = "bg-black",
   ...props
 }: CalendarProps) {
   return (
