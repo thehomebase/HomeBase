@@ -28,7 +28,7 @@ interface Document {
 export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
   // Transaction operations
@@ -143,12 +143,12 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
+  async getUserByEmail(email: string): Promise<User | undefined> {
     try {
       const result = await db.execute(sql`
-        SELECT id, username, password, role 
+        SELECT id, email, password, role, first_name, last_name 
         FROM users 
-        WHERE username = ${username}
+        WHERE email = ${email}
       `);
 
       if (result.rows.length === 0) {
@@ -158,12 +158,14 @@ export class DatabaseStorage implements IStorage {
       const user = result.rows[0];
       return {
         id: Number(user.id),
-        username: String(user.username),
+        email: String(user.email),
         password: String(user.password),
+        firstName: String(user.first_name),
+        lastName: String(user.last_name),
         role: String(user.role)
       };
     } catch (error) {
-      console.error('Error in getUserByUsername:', error);
+      console.error('Error in getUserByEmail:', error);
       return undefined;
     }
   }
@@ -171,14 +173,20 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     try {
       // Validate required fields
-      if (!insertUser.username || !insertUser.password) {
-        throw new Error('Username and password are required');
+      if (!insertUser.email || !insertUser.password) {
+        throw new Error('Email and password are required');
       }
 
       const result = await db.execute(sql`
-        INSERT INTO users (username, password, role)
-        VALUES (${insertUser.username}, ${insertUser.password}, ${insertUser.role || 'user'})
-        RETURNING id, username, role
+        INSERT INTO users (email, password, first_name, last_name, role)
+        VALUES (
+          ${insertUser.email}, 
+          ${insertUser.password}, 
+          ${insertUser.firstName},
+          ${insertUser.lastName},
+          ${insertUser.role || 'user'}
+        )
+        RETURNING id, email, first_name, last_name, role
       `);
 
       if (!result.rows[0]) {
@@ -187,8 +195,10 @@ export class DatabaseStorage implements IStorage {
 
       return {
         id: Number(result.rows[0].id),
-        username: String(result.rows[0].username),
+        email: String(result.rows[0].email),
         password: String(result.rows[0].password),
+        firstName: String(result.rows[0].first_name),
+        lastName: String(result.rows[0].last_name),
         role: String(result.rows[0].role)
       };
     } catch (error) {

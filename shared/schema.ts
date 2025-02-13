@@ -1,3 +1,7 @@
+import { pgTable, serial, text, timestamp, integer, boolean, json, numeric } from 'drizzle-orm/pg-core';
+import { createInsertSchema } from 'drizzle-zod';
+import { z } from "zod";
+
 export const privateMessages = pgTable("private_messages", {
   id: serial("id").primaryKey(),
   senderId: integer("sender_id").notNull(),
@@ -7,13 +11,8 @@ export const privateMessages = pgTable("private_messages", {
   read: boolean("read").notNull().default(false),
 });
 
-import { pgTable, serial, text, timestamp, integer, boolean, json, numeric } from 'drizzle-orm/pg-core';
-import { createInsertSchema } from 'drizzle-zod';
-import { z } from "zod";
-
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username"),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   firstName: text("first_name").notNull(),
@@ -106,7 +105,13 @@ const checklistItemSchema = z.object({
   phase: z.string()
 });
 
-export const insertUserSchema = createInsertSchema(users);
+export const insertUserSchema = createInsertSchema(users).extend({
+  email: z.string().email("Invalid email format"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+});
+
 export const insertClientSchema = createInsertSchema(clients).omit({ 
   createdAt: true,
   updatedAt: true 

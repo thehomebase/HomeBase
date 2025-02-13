@@ -45,17 +45,21 @@ export function setupAuth(app: Express) {
   app.use(passport.session());
 
   passport.use(
-    new LocalStrategy(async (username, password, done) => {
-      try {
-        const user = await storage.getUserByUsername(username);
-        if (!user || !(await comparePasswords(password, user.password))) {
-          return done(null, false);
+    new LocalStrategy(
+      { usernameField: 'email' },
+      async (email, password, done) => {
+        try {
+          const user = await storage.getUserByEmail(email);
+          if (!user || !(await comparePasswords(password, user.password))) {
+            return done(null, false);
+          }
+          return done(null, user);
+        } catch (error) {
+          console.error('Error in LocalStrategy:', error);
+          return done(error);
         }
-        return done(null, user);
-      } catch (error) {
-        return done(error);
       }
-    }),
+    )
   );
 
   passport.serializeUser((user, done) => done(null, user.id));
@@ -70,24 +74,48 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res, next) => {
     try {
-      const existingUser = await storage.getUserByUsername(req.body.username);
+      console.log('Registration request body:', req.body);
+
+      // Validate required fields
+      if (!req.body.email || !req.body.password || !req.body.firstName || !req.body.lastName) {
+        console.error('Missing required fields');
+        return res.status(400).json({
+          error: 'Missing required fields',
+          required: ['email', 'password', 'firstName', 'lastName'],
+          received: Object.keys(req.body)
+        });
+      }
+
+      const existingUser = await storage.getUserByEmail(req.body.email);
       if (existingUser) {
-        return res.status(400).send("Username already exists");
+        console.log('Email already exists:', req.body.email);
+        return res.status(400).json({ error: "Email already exists" });
       }
 
       const user = await storage.createUser({
-        username: req.body.username,
+        email: req.body.email,
         password: await hashPassword(req.body.password),
+        firstName: req.body.firstName,
+        lastName: req.body.lastName,
         role: req.body.role || 'client'
       });
 
+      console.log('User created successfully:', { id: user.id, email: user.email });
+
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          console.error('Login error after registration:', err);
+          return next(err);
+        }
         res.status(201).json(user);
       });
     } catch (error) {
       console.error('Registration error:', error);
-      res.status(500).send('Error during registration');
+      if (error instanceof Error) {
+        res.status(500).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'Error during registration' });
+      }
     }
   });
 
