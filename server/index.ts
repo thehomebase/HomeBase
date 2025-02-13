@@ -57,7 +57,7 @@ function shutdown(server: HttpServer) {
 }
 
 // Improved server startup function
-async function startServer(server: HttpServer, initialPort: number = 5000, maxAttempts: number = 3) {
+async function startServer(server: HttpServer, initialPort: number = 3000, maxAttempts: number = 3) {
   let currentServer: HttpServer | null = null;
 
   for (let port = initialPort; port < initialPort + maxAttempts; port++) {
@@ -68,7 +68,9 @@ async function startServer(server: HttpServer, initialPort: number = 5000, maxAt
           currentServer.close();
         }
 
-        currentServer = server.listen(port, '0.0.0.0')
+        currentServer = server.listen(port, '0.0.0.0', () => {
+          console.log(`Server API endpoints running on port ${port}`);
+        })
           .once('listening', () => {
             log(`Server running on port ${port}`);
             resolve();
