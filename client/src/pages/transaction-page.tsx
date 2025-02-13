@@ -142,6 +142,7 @@ export default function TransactionPage() {
       };
 
       form.reset({
+        address: transaction.address,
         contractPrice: transaction.contractPrice,
         optionPeriodExpiration: formatDateForInput(transaction.optionPeriodExpiration),
         optionFee: transaction.optionFee,
