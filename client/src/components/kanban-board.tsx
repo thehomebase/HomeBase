@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -100,14 +100,17 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     const draggedId = Number(active.id);
     const newStatus = over.id.toString();
     
-    // Update local state for immediate visual feedback
-    setLocalTransactions(prev => 
-      prev.map(t => 
-        t.id === draggedId 
-          ? { ...t, status: newStatus }
-          : t
-      )
+    // Update local state immediately for visual feedback
+    const updatedTransactions = localTransactions.map(t => 
+      t.id === draggedId 
+        ? { ...t, status: newStatus }
+        : t
     );
+    
+    setLocalTransactions(updatedTransactions);
+    
+    // Force a re-render of the board
+    queryClient.setQueryData(["/api/transactions"], updatedTransactions);
   };
 
   // Update local transactions when props change
