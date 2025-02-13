@@ -13,9 +13,12 @@ import { z } from "zod";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
   role: text("role").notNull(),
+  agentId: integer("agent_id"),
 });
 
 export const clients = pgTable("clients", {

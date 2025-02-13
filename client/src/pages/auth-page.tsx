@@ -9,13 +9,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Logo } from "@/components/ui/logo";
 
-const loginSchema = insertUserSchema.pick({ username: true, password: true });
-const registerSchema = insertUserSchema;
+// Updated schema to include email, first name, last name, and agent association
+const registerSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  agentId: z.string().optional(), // Assuming agentId is a string
+});
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+});
+
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
@@ -23,12 +34,12 @@ export default function AuthPage() {
 
   const loginForm = useForm({
     resolver: zodResolver(loginSchema),
-    defaultValues: { username: "", password: "" },
+    defaultValues: { email: "", password: "" },
   });
 
   const registerForm = useForm({
     resolver: zodResolver(registerSchema),
-    defaultValues: { username: "", password: "", role: "" },
+    defaultValues: { email: "", password: "", firstName: "", lastName: "", agentId: "" },
   });
 
   useEffect(() => {
@@ -62,12 +73,12 @@ export default function AuthPage() {
                     <form onSubmit={loginForm.handleSubmit((data) => loginMutation.mutate(data))} className="space-y-4">
                       <FormField
                         control={loginForm.control}
-                        name="username"
+                        name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <Label>Username</Label>
+                            <Label>Email</Label>
                             <FormControl>
-                              <Input {...field} />
+                              <Input type="email" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -105,12 +116,12 @@ export default function AuthPage() {
                     <form onSubmit={registerForm.handleSubmit((data) => registerMutation.mutate(data))} className="space-y-4">
                       <FormField
                         control={registerForm.control}
-                        name="username"
+                        name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <Label>Username</Label>
+                            <Label>Email</Label>
                             <FormControl>
-                              <Input {...field} />
+                              <Input type="email" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -131,22 +142,46 @@ export default function AuthPage() {
                       />
                       <FormField
                         control={registerForm.control}
-                        name="role"
+                        name="firstName"
                         render={({ field }) => (
                           <FormItem>
-                            <Label>Role</Label>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Label>First Name</Label>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Label>Last Name</Label>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="agentId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Label>Associated Agent</Label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}> {/* Requires backend integration for agent options */}
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select your role" />
+                                  <SelectValue placeholder="Select an agent" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="agent">Real Estate Agent</SelectItem>
-                                <SelectItem value="client">Client</SelectItem>
-                                <SelectItem value="lender">Lender</SelectItem>
-                                <SelectItem value="title">Title Company</SelectItem>
-                                <SelectItem value="inspector">Inspector</SelectItem>
+                                {/* Placeholder -  Replace with actual agent data fetched from backend */}
+                                <SelectItem value="agent1">Agent 1</SelectItem>
+                                <SelectItem value="agent2">Agent 2</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />
