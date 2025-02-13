@@ -283,12 +283,12 @@ export default function TransactionPage() {
               <p className="text-muted-foreground">Transaction ID: {parsedId}</p>
               {transaction.client && (
                 <p className="text-muted-foreground">
-                  Client: {transaction.client.firstName} {transaction.client.lastName}
+                  Primary Client: {transaction.client.firstName} {transaction.client.lastName}
                 </p>
               )}
-              {transaction.client && (
+              {transaction.secondaryClient && (
                 <p className="text-muted-foreground">
-                  Primary Client: {transaction.client.firstName} {transaction.client.lastName}
+                  Secondary Client: {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}
                 </p>
               )}
             </div>
