@@ -1,4 +1,3 @@
-
 export const privateMessages = pgTable("private_messages", {
   id: serial("id").primaryKey(),
   senderId: integer("sender_id").notNull(),
@@ -79,7 +78,8 @@ export const messages = pgTable("messages", {
   username: text("username").notNull(),
   role: text("role").notNull(),
   content: text("content").notNull(),
-  timestamp: text("timestamp").notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  isRead: boolean("is_read").default(false).notNull()
 });
 
 export const contacts = pgTable('contacts', {
