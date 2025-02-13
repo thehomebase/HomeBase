@@ -122,7 +122,7 @@ export default function TransactionsPage() {
         <div className="flex items-center gap-4">
           <img 
             src={theme === 'dark' ? '/attached_assets/homebaselogowhite.png' : '/attached_assets/homebaselogo.png'} 
-            alt="Homebase Logo" 
+            alt="Homebase" 
             className="h-8"
           />
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
