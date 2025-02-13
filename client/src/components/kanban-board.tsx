@@ -1,12 +1,15 @@
+
 import React, { useState } from "react";
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  closestCenter,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
+  DragEndEvent,
+  DragStartEvent,
 } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -49,6 +52,7 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [localTransactions, setLocalTransactions] = useState<Transaction[]>(transactions);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -58,32 +62,6 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     }),
     useSensor(KeyboardSensor)
   );
-
-  const updateTransactionStatus = useMutation({
-    mutationFn: async ({ id, newStatus }: { id: number; newStatus: string }) => {
-      const response = await apiRequest("PATCH", `/api/transactions/${id}`, {
-        status: newStatus,
-      });
-      if (!response.ok) {
-        throw new Error("Failed to update transaction status");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      toast({
-        title: "Status updated",
-        description: "Transaction status has been updated successfully.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update transaction status.",
-        variant: "destructive",
-      });
-    },
-  });
 
   const deleteTransaction = useMutation({
     mutationFn: async (id: number) => {
@@ -95,42 +73,51 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       toast({
-        title: "Transaction deleted",
-        description: "Transaction has been deleted successfully.",
+        title: "Success",
+        description: "Transaction deleted successfully",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to delete transaction.",
+        description: "Failed to delete transaction",
         variant: "destructive",
       });
     },
   });
 
-  const handleDragStart = (event: any) => {
+  const handleDragStart = (event: DragStartEvent) => {
     setActiveId(Number(event.active.id));
   };
 
-  const handleDragEnd = (event: any) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
-    
+
     if (!over) return;
+
+    const draggedId = Number(active.id);
+    const newStatus = over.id.toString();
     
-    // Keep track of drag and drop visually without updating the backend
-    const draggedTransaction = transactions.find(t => t.id === Number(active.id));
-    if (draggedTransaction) {
-      draggedTransaction.status = over.id.toString();
-      // Force a re-render
-      queryClient.setQueryData(["/api/transactions"], [...transactions]);
-    }
+    // Update local state for immediate visual feedback
+    setLocalTransactions(prev => 
+      prev.map(t => 
+        t.id === draggedId 
+          ? { ...t, status: newStatus }
+          : t
+      )
+    );
   };
+
+  // Update local transactions when props change
+  React.useEffect(() => {
+    setLocalTransactions(transactions);
+  }, [transactions]);
 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
@@ -146,11 +133,11 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
                 {column.title}
               </h3>
               <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
-                {transactions.filter((t) => t.status === column.id).length}
+                {localTransactions.filter((t) => t.status === column.id).length}
               </span>
             </div>
             <div className="flex flex-col gap-2 min-h-[100px]">
-              {transactions
+              {localTransactions
                 .filter((t) => t.status === column.id)
                 .map((transaction) => (
                   <Card
@@ -200,7 +187,7 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
         {activeId ? (
           <Card className="p-3 w-[240px] shadow-lg cursor-grabbing dark:bg-gray-700">
             <div className="font-medium text-sm truncate dark:text-white">
-              {transactions.find((t) => t.id === activeId)?.address}
+              {localTransactions.find((t) => t.id === activeId)?.address}
             </div>
           </Card>
         ) : null}
