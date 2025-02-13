@@ -57,7 +57,7 @@ export default function TransactionsPage() {
     },
   });
 
-  const { data: transactions = [] } = useQuery<Transaction[]>({
+  const { data: transactions = [], refetch } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/transactions");
@@ -84,6 +84,7 @@ export default function TransactionsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      refetch();
     },
   });
 
@@ -96,15 +97,17 @@ export default function TransactionsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      refetch();
       toast({
-        title: "Transaction deleted",
-        description: "The transaction has been successfully deleted.",
+        title: "Success",
+        description: "Transaction deleted successfully",
       });
+      setDeleteId(null);
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to delete transaction.",
+        description: "Failed to delete transaction",
         variant: "destructive",
       });
     },
@@ -114,6 +117,10 @@ export default function TransactionsPage() {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
     document.documentElement.classList.toggle('dark');
+  };
+
+  const handleDeleteTransaction = (id: number) => {
+    setDeleteId(id);
   };
 
   return (
@@ -234,13 +241,16 @@ export default function TransactionsPage() {
       </div>
 
       {view === 'board' ? (
-        <KanbanBoard transactions={transactions} />
+        <KanbanBoard 
+          transactions={transactions} 
+          onDeleteTransaction={handleDeleteTransaction}
+        />
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {transactions.map((transaction) => (
             <Card 
               key={transaction.id} 
-              className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800" 
+              className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800"
             >
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle 
@@ -256,7 +266,7 @@ export default function TransactionsPage() {
                     className="h-8 w-8 text-destructive hover:text-destructive"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setDeleteId(transaction.id);
+                      handleDeleteTransaction(transaction.id);
                     }}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -299,7 +309,6 @@ export default function TransactionsPage() {
               onClick={() => {
                 if (deleteId) {
                   deleteTransactionMutation.mutate(deleteId);
-                  setDeleteId(null);
                 }
               }}
               className="bg-destructive hover:bg-destructive/90"

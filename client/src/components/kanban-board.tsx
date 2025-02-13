@@ -101,8 +101,7 @@ function DraggableCard({
           <div>Price: {formatPrice(transaction.contractPrice)}</div>
           {transaction.client && (
             <div className="truncate">
-              Client: {transaction.client.firstName}{" "}
-              {transaction.client.lastName}
+              Client: {transaction.client.firstName} {transaction.client.lastName}
             </div>
           )}
         </div>
@@ -129,7 +128,7 @@ function KanbanColumn({
   });
 
   return (
-    <div ref={setNodeRef} className="flex flex-col min-w-[240px] bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50">
+    <div ref={setNodeRef} className="flex flex-col min-w-[200px] bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50">
       <div className="flex justify-between items-center mb-2">
         <h3 className="font-semibold text-sm dark:text-white">{title}</h3>
         <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
@@ -150,7 +149,12 @@ function KanbanColumn({
   );
 }
 
-export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
+interface KanbanBoardProps {
+  transactions: Transaction[];
+  onDeleteTransaction: (id: number) => void;
+}
+
+export function KanbanBoard({ transactions, onDeleteTransaction }: KanbanBoardProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -166,27 +170,31 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     useSensor(KeyboardSensor)
   );
 
-  const deleteTransactionMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `/api/transactions/${id}`);
+  const updateTransactionStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const response = await apiRequest(
+        "PATCH",
+        `/api/transactions/${id}`,
+        { status: status.toLowerCase() }
+      );
       if (!response.ok) {
-        throw new Error("Failed to delete transaction");
+        throw new Error("Failed to update transaction");
       }
     },
-    onSuccess: (_, deletedId) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      setLocalTransactions(prev => prev.filter(t => t.id !== deletedId));
       toast({
         title: "Success",
-        description: "Transaction deleted successfully",
+        description: "Transaction status updated",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to delete transaction",
+        description: "Failed to update transaction status",
         variant: "destructive",
       });
+      setLocalTransactions(transactions);
     },
   });
 
@@ -205,7 +213,6 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
 
     if (newStatus === active.id.toString()) return;
 
-    // Update local state immediately for visual feedback
     const updatedTransactions = localTransactions.map(t => 
       t.id === draggedId 
         ? { ...t, status: newStatus.toLowerCase() }
@@ -213,38 +220,7 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     );
 
     setLocalTransactions(updatedTransactions);
-
-    // Update the transaction status in the backend
-    try {
-      const transaction = localTransactions.find(t => t.id === draggedId);
-      if (transaction) {
-        const response = await apiRequest(
-          "PATCH",
-          `/api/transactions/${draggedId}`,
-          { status: newStatus.toLowerCase() }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to update transaction");
-        }
-
-        // Update the cache with the new data
-        queryClient.setQueryData(["/api/transactions"], updatedTransactions);
-
-        toast({
-          title: "Success",
-          description: "Transaction status updated",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update transaction status",
-        variant: "destructive",
-      });
-      // Revert the local state on error
-      setLocalTransactions(transactions);
-    }
+    updateTransactionStatusMutation.mutate({ id: draggedId, status: newStatus });
   };
 
   // Update local transactions when props change
@@ -261,14 +237,14 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="block md:flex md:flex-row gap-4">
         {statusColumns.map((column) => (
           <KanbanColumn 
             key={column.id} 
             status={column.id} 
             title={column.title} 
             transactions={localTransactions.filter((t) => t.status === column.id)}
-            onDelete={(id) => deleteTransactionMutation.mutate(id)}
+            onDelete={onDeleteTransaction}
             onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
           />
         ))}
@@ -276,7 +252,7 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
 
       <DragOverlay>
         {activeId && activeTransaction ? (
-          <Card className="p-3 w-[240px] shadow-lg cursor-grabbing dark:bg-gray-700">
+          <Card className="p-3 w-[200px] shadow-lg cursor-grabbing dark:bg-gray-700">
             <div className="font-medium text-sm truncate dark:text-white">
               {activeTransaction.address}
             </div>
