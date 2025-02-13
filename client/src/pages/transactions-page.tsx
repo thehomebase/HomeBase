@@ -120,11 +120,6 @@ export default function TransactionsPage() {
     <main className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <img 
-            src={theme === 'dark' ? '/homebaselogowhite.png' : '/homebaselogo.png'} 
-            alt="Homebase" 
-            className="h-8"
-          />
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
           <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1 dark:bg-gray-800/50">
             <Toggle
