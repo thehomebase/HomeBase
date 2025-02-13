@@ -84,24 +84,41 @@ export default function TransactionPage() {
         throw new Error("Invalid transaction ID");
       }
 
-      const formatDate = (date: string | null | undefined) => {
-        if (!date) return null;
-        const d = new Date(date);
-        if (isNaN(d.getTime())) return null;
-        // Don't adjust timezone offset as we want to preserve the user's selected date
-        return d.toISOString();
+      // Format dates properly for API submission
+      const formatDate = (dateStr: string | null | undefined) => {
+        if (!dateStr) return null;
+        try {
+          // Ensure date is in YYYY-MM-DD format for consistency
+          const [year, month, day] = dateStr.split('-').map(Number);
+          const date = new Date(year, month - 1, day);
+          return date.toISOString();
+        } catch (error) {
+          console.error('Date formatting error:', error);
+          return null;
+        }
       };
 
       const formattedData = {
         ...data,
         closingDate: formatDate(data.closingDate),
         contractExecutionDate: formatDate(data.contractExecutionDate),
-        optionPeriodExpiration: formatDate(data.optionPeriodExpiration)
+        optionPeriodExpiration: formatDate(data.optionPeriodExpiration),
+        contractPrice: data.contractPrice ? Number(data.contractPrice) : null,
+        optionFee: data.optionFee ? Number(data.optionFee) : null,
+        earnestMoney: data.earnestMoney ? Number(data.earnestMoney) : null,
+        downPayment: data.downPayment ? Number(data.downPayment) : null,
+        sellerConcessions: data.sellerConcessions ? Number(data.sellerConcessions) : null,
+        mlsNumber: data.mlsNumber || null,
+        financing: data.financing || null,
+        status: data.status || null
       };
 
+      // Remove undefined values and empty strings
       const cleanData = Object.fromEntries(
         Object.entries(formattedData).filter(([_, value]) => value !== undefined && value !== '')
       );
+
+      console.log('Submitting transaction update:', cleanData);
 
       const response = await apiRequest("PATCH", `/api/transactions/${parsedId}`, cleanData);
       if (!response.ok) {
@@ -116,7 +133,7 @@ export default function TransactionPage() {
       // Invalidate both the individual transaction and the transactions list
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
-      console.log("Transaction updated, invalidating queries", updatedData);
+      console.log("Transaction updated successfully:", updatedData);
       setIsEditing(false);
       toast({
         title: "Success",
@@ -124,6 +141,7 @@ export default function TransactionPage() {
       });
     },
     onError: (error) => {
+      console.error('Transaction update error:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update transaction",
@@ -226,6 +244,45 @@ export default function TransactionPage() {
 
   // Ensure consistent progress display
   const displayProgress = `${progress}% Complete`;
+
+  // Form submission handler
+  const handleSubmit = async (data: TransactionFormData) => {
+    try {
+      const formValues = form.getValues();
+      console.log('Form values before submission:', formValues);
+
+      const cleanData = {
+        address: data.address,
+        contractPrice: data.contractPrice ? Number(data.contractPrice) : null,
+        optionPeriodExpiration: data.optionPeriodExpiration || null,
+        optionFee: data.optionFee ? Number(data.optionFee) : null,
+        earnestMoney: data.earnestMoney ? Number(data.earnestMoney) : null,
+        downPayment: data.downPayment ? Number(data.downPayment) : null,
+        sellerConcessions: data.sellerConcessions ? Number(data.sellerConcessions) : null,
+        closingDate: data.closingDate || null,
+        contractExecutionDate: data.contractExecutionDate || null,
+        mlsNumber: formValues.mlsNumber || null,
+        financing: formValues.financing || null,
+        status: formValues.status || null
+      };
+
+      console.log('Cleaned data for submission:', cleanData);
+      const updated = await updateTransaction.mutateAsync(cleanData);
+      queryClient.setQueryData(["/api/transactions", parsedId], updated);
+      await queryClient.invalidateQueries({
+        queryKey: ["/api/transactions", parsedId]
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update transaction. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
 
   return (
     <div>
@@ -493,39 +550,7 @@ export default function TransactionPage() {
                 <div className="flex justify-end mt-4">
                   <Button
                     type="button"
-                    onClick={form.handleSubmit(async (data) => {
-                      try {
-                        const formValues = form.getValues();
-                        const cleanData = {
-                          address: data.address,
-                          contractPrice: data.contractPrice ? Number(data.contractPrice) : null,
-                          optionPeriodExpiration: data.optionPeriodExpiration || null,
-                          optionFee: data.optionFee ? Number(data.optionFee) : null,
-                          earnestMoney: data.earnestMoney ? Number(data.earnestMoney) : null,
-                          downPayment: data.downPayment ? Number(data.downPayment) : null,
-                          sellerConcessions: data.sellerConcessions ? Number(data.sellerConcessions) : null,
-                          closingDate: data.closingDate || null,
-                          contractExecutionDate: data.contractExecutionDate || null,
-                          mlsNumber: data.mlsNumber || null,
-                          financing: formValues.financing || null,
-                          status: formValues.status || null
-                        };
-
-                        const updated = await updateTransaction.mutateAsync(cleanData);
-                        queryClient.setQueryData(["/api/transactions", parsedId], updated);
-                        await queryClient.invalidateQueries({
-                          queryKey: ["/api/transactions", parsedId]
-                        });
-                        setIsEditing(false);
-                      } catch (error) {
-                        console.error('Error updating transaction:', error);
-                        toast({
-                          title: "Error",
-                          description: "Failed to update transaction. Please try again.",
-                          variant: "destructive"
-                        });
-                      }
-                    })}
+                    onClick={form.handleSubmit(handleSubmit)}
                     disabled={updateTransaction.isPending}
                   >
                     Save Changes
