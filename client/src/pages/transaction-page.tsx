@@ -451,10 +451,6 @@ export default function TransactionPage() {
                     <select
                       className="w-full h-9 px-3 rounded-md border"
                       {...form.register("financing")}
-                      onChange={(e) => {
-                        form.setValue("financing", e.target.value);
-                        updateTransaction.mutate({ financing: e.target.value });
-                      }}
                     >
                       <option value="">Select financing type</option>
                       <option value="FHA">FHA</option>
