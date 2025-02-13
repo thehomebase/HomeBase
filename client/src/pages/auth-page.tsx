@@ -49,7 +49,7 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl grid md:grid-cols-2 gap-8">
+      <div className="w-full max-w-4xl mx-auto grid md:grid-cols-2 gap-8 items-start">
         <div className="space-y-6">
           <div className="space-y-2">
             <Logo className="mb-4" />

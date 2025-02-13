@@ -70,11 +70,12 @@ export function setupAuth(app: Express) {
     done(null, user.id);
   });
   
-  passport.deserializeUser(async (id: string, done) => {
+  passport.deserializeUser(async (id: string | number, done) => {
     try {
-      const user = await storage.getUser(parseInt(id));
+      const userId = typeof id === 'string' ? parseInt(id) : id;
+      const user = await storage.getUser(userId);
       if (!user) {
-        return done(new Error('User not found'), null);
+        return done(null, false);
       }
       done(null, user);
     } catch (error) {
