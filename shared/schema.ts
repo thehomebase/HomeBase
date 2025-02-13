@@ -47,7 +47,7 @@ export const transactions = pgTable("transactions", {
   contractExecutionDate: timestamp("contract_execution_date"),
   mlsNumber: text("mls_number"),
   financing: text("financing"),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow()
+  updatedAt: timestamp("updated_at").defaultNow()
 });
 
 export const checklists = pgTable("checklists", {
