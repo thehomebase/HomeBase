@@ -115,16 +115,16 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
   const handleDragEnd = (event: any) => {
     const { active, over } = event;
     setActiveId(null);
-
+    
     if (!over) return;
-
-    const transactionId = Number(active.id);
-    const newStatus = over.id.toString();
-
-    updateTransactionStatus.mutate({
-      id: transactionId,
-      newStatus: newStatus,
-    });
+    
+    // Keep track of drag and drop visually without updating the backend
+    const draggedTransaction = transactions.find(t => t.id === Number(active.id));
+    if (draggedTransaction) {
+      draggedTransaction.status = over.id.toString();
+      // Force a re-render
+      queryClient.setQueryData(["/api/transactions"], [...transactions]);
+    }
   };
 
   return (
