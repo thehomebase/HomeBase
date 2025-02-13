@@ -152,6 +152,7 @@ export default function TransactionsPage() {
             )}
           </Toggle>
         </div>
+
         {user?.role === "agent" && (
           <Dialog>
             <DialogTrigger asChild>
