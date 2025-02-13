@@ -44,9 +44,9 @@ export const transactions = pgTable("transactions", {
   downPayment: integer("down_payment"),
   sellerConcessions: integer("seller_concessions"),
   closingDate: timestamp("closing_date"),
-  contractExecutionDate: timestamp("contract_execution_date").onUpdateNow(),
-  mlsNumber: text("mls_number").onUpdateNow(),
-  financing: text("financing").onUpdateNow(),
+  contractExecutionDate: timestamp("contract_execution_date"),
+  mlsNumber: text("mls_number"),
+  financing: text("financing"),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow()
 });
 
