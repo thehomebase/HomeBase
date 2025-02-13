@@ -70,8 +70,9 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
         throw new Error("Failed to delete transaction");
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      setLocalTransactions(prev => prev.filter(t => t.id !== deletedId));
       toast({
         title: "Success",
         description: "Transaction deleted successfully",
