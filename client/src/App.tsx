@@ -15,7 +15,7 @@ import { Logo } from "@/components/ui/logo";
 import { NavTabs } from "@/components/ui/nav-tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Mail } from "lucide-react";
 import React from "react";
 import CalculatorsPage from "@/pages/calculators-page"; //Import CalculatorsPage
 import GlossaryPage from "./pages/glossary-page"; // Added import for GlossaryPage
