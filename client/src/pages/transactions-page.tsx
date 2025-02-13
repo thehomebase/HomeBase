@@ -48,12 +48,23 @@ export default function TransactionsPage() {
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   );
 
+  const { data: clients = [] } = useQuery({
+    queryKey: ["/api/clients"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/clients");
+      if (!response.ok) throw new Error('Failed to fetch clients');
+      return response.json();
+    },
+    enabled: user?.role === "agent"
+  });
+
   const form = useForm({
     resolver: zodResolver(createTransactionSchema),
     defaultValues: { 
       address: "", 
       accessCode: "", 
-      type: "buy" as const 
+      type: "buy" as const,
+      clientId: null as number | null
     },
   });
 
@@ -231,6 +242,31 @@ export default function TransactionsPage() {
                       </FormItem>
                     )}
                   />
+                  {user?.role === "agent" && (
+                    <FormField
+                      control={form.control}
+                      name="clientId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Assign Client</FormLabel>
+                          <FormControl>
+                            <select 
+                              className="w-full h-9 px-3 rounded-md border"
+                              value={field.value || ""}
+                              onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                            >
+                              <option value="">Select a client</option>
+                              {clients.map((client) => (
+                                <option key={client.id} value={client.id}>
+                                  {client.firstName} {client.lastName}
+                                </option>
+                              ))}
+                            </select>
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <Button type="submit" className="w-full text-foreground dark:text-white" disabled={createTransactionMutation.isPending}>
                     Create Transaction
                   </Button>
