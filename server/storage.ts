@@ -253,7 +253,7 @@ export class DatabaseStorage implements IStorage {
           client_id as "clientId",
           participants,
           contract_price as "contractPrice",
-          option_period as "optionPeriod",
+          option_period_expiration as "optionPeriodExpiration",
           option_fee as "optionFee",
           earnest_money as "earnestMoney",
           down_payment as "downPayment",
