@@ -228,7 +228,7 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
         collisionDetection={closestCorners}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-2 overflow-x-auto pb-4">
+        <div className="flex gap-4 overflow-x-auto pb-4">
           {statusColumns.map((column) => {
             const columnTransactions = transactions.filter(
               (t) => t.status === column.id
