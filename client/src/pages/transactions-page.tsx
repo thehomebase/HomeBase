@@ -337,10 +337,12 @@ export default function TransactionsPage() {
                 )}
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground dark:text-gray-300">Status: {transaction.status}</p>
+                <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize">Status: {transaction.status.replace('_', ' ')}</p>
+              {transaction.client && (
                 <p className="text-sm text-muted-foreground dark:text-gray-300">
-                  Participants: {transaction.participants.length}
+                  Client: {transaction.client.firstName} {transaction.client.lastName}
                 </p>
+              )}
                 {transaction.client && (
                   <p className="text-sm text-muted-foreground dark:text-gray-300">
                     Primary Contact: {transaction.client.firstName} {transaction.client.lastName}
