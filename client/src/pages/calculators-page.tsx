@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -60,7 +59,7 @@ export default function CalculatorsPage() {
     const principal = mortgageInputs.purchasePrice - mortgageInputs.downPayment;
     const monthlyRate = mortgageInputs.interestRate / 100 / 12;
     const numberOfPayments = Number(mortgageInputs.loanTerm) * 12;
-    
+
     const monthlyPrincipal = 
       (principal * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) / 
       (Math.pow(1 + monthlyRate, numberOfPayments) - 1);
@@ -80,7 +79,7 @@ export default function CalculatorsPage() {
   return (
     <main className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-8">Financial Calculators</h1>
-      
+
       <Tabs defaultValue="mortgage" className="space-y-4">
         <TabsList>
           <TabsTrigger value="mortgage">Mortgage Calculator</TabsTrigger>
@@ -129,7 +128,7 @@ export default function CalculatorsPage() {
                 <div>
                   <label className="text-sm font-medium">Loan Term</label>
                   <select 
-                    className="w-full h-9 px-3 rounded-md border mt-2"
+                    className="w-full h-9 px-3 rounded-md border mt-2 dark:text-white bg-background"
                     value={mortgageInputs.loanTerm}
                     onChange={(e) => setMortgageInputs({...mortgageInputs, loanTerm: e.target.value})}
                   >
@@ -239,7 +238,7 @@ export default function CalculatorsPage() {
                   <div>
                     <label className="text-sm font-medium">Term (Years)</label>
                     <select 
-                      className="w-full h-9 px-3 rounded-md border mt-2"
+                      className="w-full h-9 px-3 rounded-md border mt-2 dark:text-white bg-background"
                       value={refinanceInputs.newTerm}
                       onChange={(e) => setRefinanceInputs({...refinanceInputs, newTerm: Number(e.target.value)})}
                     >
@@ -331,7 +330,7 @@ export default function CalculatorsPage() {
             </div>
           </div>
         </TabsContent>
-        
+
         <TabsContent value="rent">
           {/* Existing rent vs buy calculator content */}
         </TabsContent>
