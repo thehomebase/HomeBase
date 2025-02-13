@@ -38,7 +38,7 @@ export const transactions = pgTable("transactions", {
     role: string;
   }[]>(),
   contractPrice: integer("contract_price"),
-  optionPeriodExpiration: timestamp("option_period_expiration").onUpdateNow(),
+  optionPeriodExpiration: timestamp("option_period_expiration"),
   optionFee: integer("option_fee"),
   earnestMoney: integer("earnest_money"),
   downPayment: integer("down_payment"),
