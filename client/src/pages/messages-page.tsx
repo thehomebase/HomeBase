@@ -14,6 +14,15 @@ export default function MessagesPage() {
   const [message, setMessage] = useState("");
   const [selectedUser, setSelectedUser] = useState<number | null>(null);
 
+  const { data: users = [] } = useQuery({
+    queryKey: ["/api/users"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/users");
+      return response.json();
+    },
+    enabled: !!user,
+  });
+
   const { data: messages = [] } = useQuery({
     queryKey: ["/api/messages"],
     queryFn: async () => {
@@ -47,6 +56,22 @@ export default function MessagesPage() {
   return (
     <main className="container mx-auto px-4 py-8">
       <h2 className="text-2xl font-bold mb-8">Messages</h2>
+      <div className="flex gap-4">
+        <select 
+          className="mb-4 p-2 rounded border"
+          value={selectedUser || ""}
+          onChange={(e) => setSelectedUser(Number(e.target.value))}
+        >
+          <option value="">Select recipient...</option>
+          {users.map((u: any) => (
+            u.id !== user?.id && (
+              <option key={u.id} value={u.id}>
+                {u.username} ({u.role})
+              </option>
+            )
+          ))}
+        </select>
+      </div>
       <Card className="flex flex-col h-[600px]">
         <ScrollArea className="flex-grow p-4">
           <div className="space-y-4">

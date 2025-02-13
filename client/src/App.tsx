@@ -19,6 +19,7 @@ import { LogOut, Mail } from "lucide-react";
 import React from "react";
 import CalculatorsPage from "@/pages/calculators-page"; //Import CalculatorsPage
 import GlossaryPage from "./pages/glossary-page"; // Added import for GlossaryPage
+import MessagesPage from "./pages/messages-page"; // Added import for MessagesPage
 
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -74,6 +75,8 @@ function Router() {
           <ProtectedRoute path="/clients" component={ClientsPage} />
           <ProtectedRoute path="/calendar" component={CalendarPage} />
           <Route path="/data" component={DataPage} />
+          <Route path="/messages" component={MessagesPage} /> {/* Added messages route */}
+
         </>
       ) : (
         <>
@@ -87,6 +90,7 @@ function Router() {
               />
             )}
           </Route>
+          <Route path="/messages" component={MessagesPage} /> {/* Added messages route */}
         </>
       )}
       <Route path="/glossary" component={GlossaryPage} /> {/* Added glossary route */}
