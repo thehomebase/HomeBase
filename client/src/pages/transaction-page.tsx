@@ -470,10 +470,6 @@ export default function TransactionPage() {
                     <select
                       className="w-full h-9 px-3 rounded-md border"
                       {...form.register("status")}
-                      onChange={(e) => {
-                        form.setValue("status", e.target.value);
-                        updateTransaction.mutate({ status: e.target.value });
-                      }}
                     >
                       <option value="coming_soon">Coming Soon</option>
                       <option value="active">Active</option>
@@ -499,6 +495,7 @@ export default function TransactionPage() {
                     type="button"
                     onClick={form.handleSubmit(async (data) => {
                       try {
+                        const formValues = form.getValues();
                         const cleanData = {
                           address: data.address,
                           contractPrice: data.contractPrice ? Number(data.contractPrice) : null,
@@ -510,8 +507,8 @@ export default function TransactionPage() {
                           closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : null,
                           contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : null,
                           mlsNumber: data.mlsNumber || null,
-                          financing: data.financing || null,
-                          status: data.status || 'prospect'
+                          financing: formValues.financing || null,
+                          status: formValues.status || 'prospect'
                         };
 
                         const updated = await updateTransaction.mutateAsync(cleanData);
