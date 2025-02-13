@@ -288,6 +288,7 @@ export default function TransactionsPage() {
             <Card 
               key={transaction.id} 
               className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800"
+              onClick={() => setLocation(`/transactions/${transaction.id}`)}
             >
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle 
