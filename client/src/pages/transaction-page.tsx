@@ -529,7 +529,11 @@ export default function TransactionPage() {
                     <select
                       className="w-full h-9 px-3 rounded-md border"
                       {...form.register("clientId")}
-                      defaultValue={transaction.clientId || ""}
+                      value={form.getValues("clientId") || ""}
+                      onChange={(e) => {
+                        const value = e.target.value ? Number(e.target.value) : null;
+                        form.setValue("clientId", value);
+                      }}
                     >
                       <option value="">Select client</option>
                       {clients.map((client) => (
@@ -540,7 +544,9 @@ export default function TransactionPage() {
                     </select>
                   ) : (
                     <p className="font-medium">
-                      {transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : 'Not set'}
+                      {clients?.find(c => c.id === transaction.clientId)
+                        ? `${clients.find(c => c.id === transaction.clientId)?.firstName} ${clients.find(c => c.id === transaction.clientId)?.lastName}`
+                        : 'Not set'}
                     </p>
                   )}
                 </div>
