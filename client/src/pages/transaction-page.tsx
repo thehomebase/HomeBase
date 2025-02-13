@@ -501,13 +501,17 @@ export default function TransactionPage() {
                 <div className="flex justify-end mt-4">
                   <Button
                     type="button"
-                    onClick={form.handleSubmit((data) => {
+                    onClick={async () => {
+                      const formData = form.getValues();
                       const cleanData = Object.fromEntries(
-                        Object.entries(data).filter(([_, v]) => v != null && v !== '')
+                        Object.entries(formData)
+                          .filter(([_, v]) => v != null && v !== '')
+                          .map(([k, v]) => [k, k.includes('Date') ? new Date(v).toISOString() : v])
                       );
-                      updateTransaction.mutate(cleanData);
+                      await updateTransaction.mutateAsync(cleanData);
+                      await queryClient.invalidateQueries(["/api/transactions", parsedId]);
                       setIsEditing(false);
-                    })}
+                    }}
                     disabled={updateTransaction.isPending}
                   >
                     Save Changes
