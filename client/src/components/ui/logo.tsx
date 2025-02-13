@@ -1,3 +1,4 @@
+
 import { type HTMLAttributes } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -8,7 +9,7 @@ export function Logo({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   const logoContent = (
     <div className={`flex items-center ${className}`} {...props}>
       <img
-        src="/homebaselogo.png"
+        src="/homebaselogowhite.png"
         alt="Homebase Logo"
         className="h-8 md:h-10 w-auto object-contain transition-all" 
         style={{ 
@@ -19,7 +20,6 @@ export function Logo({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
     </div>
   );
 
-  // Don't wrap in Link if we're already on the home page
   if (isHomePage) {
     return logoContent;
   }
