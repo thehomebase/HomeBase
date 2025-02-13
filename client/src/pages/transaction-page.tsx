@@ -85,10 +85,11 @@ export default function TransactionPage() {
       }
 
       // Format dates properly for API submission
-      const formatDate = (dateStr: string | null | undefined) => {
+      const formatDateForAPI = (dateStr: string | undefined) => {
         if (!dateStr) return null;
         try {
           const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return null;
           return date.toISOString();
         } catch (error) {
           console.error('Date formatting error:', error);
@@ -97,18 +98,18 @@ export default function TransactionPage() {
       };
 
       const formattedData = {
-        ...data,
-        closingDate: formatDate(data.closingDate),
-        contractExecutionDate: formatDate(data.contractExecutionDate),
-        optionPeriodExpiration: formatDate(data.optionPeriodExpiration),
+        address: data.address?.trim(),
         contractPrice: data.contractPrice ? Number(data.contractPrice) : null,
+        optionPeriodExpiration: formatDateForAPI(data.optionPeriodExpiration),
         optionFee: data.optionFee ? Number(data.optionFee) : null,
         earnestMoney: data.earnestMoney ? Number(data.earnestMoney) : null,
         downPayment: data.downPayment ? Number(data.downPayment) : null,
         sellerConcessions: data.sellerConcessions ? Number(data.sellerConcessions) : null,
-        mlsNumber: data.mlsNumber || null,
+        closingDate: formatDateForAPI(data.closingDate),
+        contractExecutionDate: formatDateForAPI(data.contractExecutionDate),
+        mlsNumber: data.mlsNumber?.trim() || null,
         financing: data.financing || null,
-        status: data.status || transaction?.status || null
+        status: data.status || transaction?.status || 'prospect'
       };
 
       // Remove undefined values but keep null values
@@ -244,33 +245,9 @@ export default function TransactionPage() {
   const displayProgress = `${progress}% Complete`;
 
   // Form submission handler
-
   const handleSubmit = async (data: TransactionFormData) => {
     try {
-      // Convert date strings to ISO format for the API
-      const formatDateForAPI = (dateStr: string | null | undefined) => {
-        if (!dateStr) return null;
-        const date = new Date(dateStr);
-        return date.toISOString();
-      };
-
-      const formData = {
-        address: data.address,
-        contractPrice: data.contractPrice ? Number(data.contractPrice) : null,
-        optionPeriodExpiration: formatDateForAPI(data.optionPeriodExpiration),
-        optionFee: data.optionFee ? Number(data.optionFee) : null,
-        earnestMoney: data.earnestMoney ? Number(data.earnestMoney) : null,
-        downPayment: data.downPayment ? Number(data.downPayment) : null,
-        sellerConcessions: data.sellerConcessions ? Number(data.sellerConcessions) : null,
-        closingDate: formatDateForAPI(data.closingDate),
-        contractExecutionDate: formatDateForAPI(data.contractExecutionDate),
-        mlsNumber: data.mlsNumber || null,
-        financing: data.financing || null,
-        status: data.status || transaction?.status || 'prospect'
-      };
-
-      console.log('Submitting transaction update:', formData);
-      await updateTransaction.mutateAsync(formData);
+      await updateTransaction.mutateAsync(data);
     } catch (error) {
       console.error('Error updating transaction:', error);
       toast({

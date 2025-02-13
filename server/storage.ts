@@ -359,7 +359,7 @@ export class DatabaseStorage implements IStorage {
 
           // Handle date fields
           if (['closing_date', 'contract_execution_date', 'option_period_expiration'].includes(snakeKey)) {
-            cleanData[snakeKey] = value ? new Date(value).toISOString() : null;
+            cleanData[snakeKey] = value ? new Date(value) : null;
           } else if (key === 'participants' && Array.isArray(value)) {
             cleanData[snakeKey] = JSON.stringify(value);
           } else if (value === null) {
@@ -859,8 +859,7 @@ export class DatabaseStorage implements IStorage {
       const [client] = await db.insert(clients).values({
                 ...insertClient,
         createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
+        updatedAt: new Date(),      }).returning();
       return client;
     } catch (error) {
       console.error('Error in createClient:', error);
