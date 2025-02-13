@@ -1,6 +1,16 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
-import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarGroup, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "./components/ui/sidebar";
+import { 
+  SidebarRoot as SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton
+} from "./components/ui/sidebar";
 import { Switch, Route } from "wouter";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
