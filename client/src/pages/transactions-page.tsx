@@ -243,29 +243,54 @@ export default function TransactionsPage() {
                     )}
                   />
                   {user?.role === "agent" && (
-                    <FormField
-                      control={form.control}
-                      name="clientId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Assign Client</FormLabel>
-                          <FormControl>
-                            <select 
-                              className="w-full h-9 px-3 rounded-md border"
-                              value={field.value || ""}
-                              onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                            >
-                              <option value="">Select a client</option>
-                              {clients.map((client) => (
-                                <option key={client.id} value={client.id}>
-                                  {client.firstName} {client.lastName}
-                                </option>
-                              ))}
-                            </select>
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
+                    <div className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="clientId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Primary Client</FormLabel>
+                            <FormControl>
+                              <select 
+                                className="w-full h-9 px-3 rounded-md border"
+                                value={field.value || ""}
+                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                              >
+                                <option value="">Select primary client</option>
+                                {clients.map((client) => (
+                                  <option key={client.id} value={client.id}>
+                                    {client.firstName} {client.lastName}
+                                  </option>
+                                ))}
+                              </select>
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="secondaryClientId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Secondary Client</FormLabel>
+                            <FormControl>
+                              <select 
+                                className="w-full h-9 px-3 rounded-md border"
+                                value={field.value || ""}
+                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                              >
+                                <option value="">Select secondary client</option>
+                                {clients.map((client) => (
+                                  <option key={client.id} value={client.id}>
+                                    {client.firstName} {client.lastName}
+                                  </option>
+                                ))}
+                              </select>
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   )}
                   <Button type="submit" className="w-full text-foreground dark:text-white" disabled={createTransactionMutation.isPending}>
                     Create Transaction
@@ -318,7 +343,12 @@ export default function TransactionsPage() {
                 </p>
                 {transaction.client && (
                   <p className="text-sm text-muted-foreground dark:text-gray-300">
-                    Client: {transaction.client.firstName} {transaction.client.lastName}
+                    Primary Client: {transaction.client.firstName} {transaction.client.lastName}
+                  </p>
+                )}
+                {transaction.secondaryClient && (
+                  <p className="text-sm text-muted-foreground dark:text-gray-300">
+                    Secondary Client: {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}
                   </p>
                 )}
               </CardContent>
