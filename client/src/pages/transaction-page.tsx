@@ -502,15 +502,36 @@ export default function TransactionPage() {
                   <Button
                     type="button"
                     onClick={async () => {
-                      const formData = form.getValues();
-                      const cleanData = Object.fromEntries(
-                        Object.entries(formData)
-                          .filter(([_, v]) => v != null && v !== '')
-                          .map(([k, v]) => [k, k.includes('Date') ? new Date(v).toISOString() : v])
-                      );
-                      await updateTransaction.mutateAsync(cleanData);
-                      await queryClient.invalidateQueries(["/api/transactions", parsedId]);
-                      setIsEditing(false);
+                      try {
+                        const formData = form.getValues();
+                        const cleanData = Object.fromEntries(
+                          Object.entries(formData)
+                            .filter(([_, v]) => v != null && v !== '')
+                            .map(([k, v]) => {
+                              if (k.includes('Date') && v) {
+                                const date = new Date(v);
+                                date.setUTCHours(12, 0, 0, 0);
+                                return [k, date.toISOString()];
+                              }
+                              return [k, v];
+                            })
+                        );
+                        
+                        await updateTransaction.mutateAsync(cleanData);
+                        await queryClient.invalidateQueries({
+                          queryKey: ["/api/transactions", parsedId],
+                          exact: true
+                        });
+                        form.reset(cleanData);
+                        setIsEditing(false);
+                      } catch (error) {
+                        console.error('Error updating transaction:', error);
+                        toast({
+                          title: "Error",
+                          description: "Failed to update transaction. Please try again.",
+                          variant: "destructive"
+                        });
+                      }
                     }}
                     disabled={updateTransaction.isPending}
                   >
