@@ -13,7 +13,7 @@ import {
   useDraggable
 } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -28,6 +28,12 @@ interface Transaction {
   contractPrice: number | null;
   clientId: number | null;
   client?: { firstName: string; lastName: string; } | null;
+}
+
+interface Client {
+  id: number;
+  firstName: string;
+  lastName: string;
 }
 
 const statusColumns = [
@@ -57,7 +63,7 @@ function DraggableCard({
   transaction: Transaction; 
   onDelete: (id: number) => Promise<void>;
   onClick: () => void;
-  clients: any[];
+  clients: Client[];
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: transaction.id,
@@ -66,6 +72,8 @@ function DraggableCard({
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : undefined;
+
+  const client = clients.find((c) => c.id === transaction.clientId);
 
   return (
     <Card
@@ -104,8 +112,8 @@ function DraggableCard({
             <span>{formatPrice(transaction.contractPrice)}</span>
           </div>
           <div className="text-muted-foreground">
-            Client: {clients.find(c => c.id === transaction.clientId) 
-              ? `${clients.find(c => c.id === transaction.clientId)?.firstName} ${clients.find(c => c.id === transaction.clientId)?.lastName}` 
+            Client: {client 
+              ? `${client.firstName} ${client.lastName}` 
               : 'Not set'}
           </div>
         </div>
@@ -127,7 +135,7 @@ function KanbanColumn({
   transactions: Transaction[];
   onDelete: (id: number) => void;
   onTransactionClick: (id: number) => void;
-  clients: any[];
+  clients: Client[];
 }) {
   const { setNodeRef } = useDroppable({
     id: status,
@@ -182,15 +190,18 @@ function KanbanColumn({
 interface KanbanBoardProps {
   transactions: Transaction[];
   onDeleteTransaction: (id: number) => void;
-  clients: any[];
 }
 
-export function KanbanBoard({ transactions, onDeleteTransaction, clients }: KanbanBoardProps) {
+export function KanbanBoard({ transactions, onDeleteTransaction }: KanbanBoardProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<number | null>(null);
   const [localTransactions, setLocalTransactions] = useState<Transaction[]>(transactions);
+
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -283,16 +294,14 @@ export function KanbanBoard({ transactions, onDeleteTransaction, clients }: Kanb
       </div>
 
       <DragOverlay>
-        {activeId && activeTransaction ? (
+        {activeId && activeTransaction && activeTransaction.client ? (
           <Card className="p-3 w-[200px] shadow-lg cursor-grabbing dark:bg-gray-700">
             <div className="font-medium text-sm truncate dark:text-white">
               {activeTransaction.address}
             </div>
-            {activeTransaction.client && (
-              <div className="text-sm text-primary dark:text-primary-foreground">
-                {activeTransaction.client.firstName} {activeTransaction.client.lastName}
-              </div>
-            )}
+            <div className="text-sm text-primary dark:text-primary-foreground">
+              {activeTransaction.client.firstName} {activeTransaction.client.lastName}
+            </div>
             <div className="text-xs text-muted-foreground dark:text-gray-300">
               {activeTransaction.type === "buy" ? "Purchase" : "Sale"}
             </div>
