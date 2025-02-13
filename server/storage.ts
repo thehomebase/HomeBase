@@ -281,7 +281,7 @@ export class DatabaseStorage implements IStorage {
         clientId: row.clientId ? Number(row.clientId) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
         contractPrice: row.contractPrice ? Number(row.contractPrice) : null,
-        optionPeriod: row.optionPeriod ? Number(row.optionPeriod) : null,
+        optionPeriodExpiration: row.optionPeriodExpiration || null,
         optionFee: row.optionFee ? Number(row.optionFee) : null,
         earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
         downPayment: row.downPayment ? Number(row.downPayment) : null,
@@ -871,7 +871,7 @@ export class DatabaseStorage implements IStorage {
         ORDER BY id ASC
       `);
 
-      return result.rows.map(row =>` => ({
+      return result.rows.map(row => ({
         id: String(row.id),
         name: String(row.name),
         status: String(row.status),
