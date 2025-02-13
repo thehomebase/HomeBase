@@ -4,13 +4,15 @@ import { useAuth } from "@/hooks/use-auth";
 
 export function NavTabs() {
   const [location] = useLocation();
-
   const { user } = useAuth();
+  const isClient = user?.role === 'client';
+
   const tabs = [
     { name: "Transactions", href: "/" },
-    { name: "Clients", href: "/clients" },
+    ...(isClient ? [] : [{ name: "Clients", href: "/clients" }]),
     { name: "Calendar", href: "/calendar" },
     ...(user?.role === 'agent' ? [{ name: "Data", href: "/data" }] : []),
+    ...(isClient ? [{ name: "Glossary", href: "/glossary" }] : []),
   ];
 
   return (
