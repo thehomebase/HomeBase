@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { Server as HttpServer } from "http";
 
 const app = express();
 app.use(express.json());
@@ -12,6 +13,7 @@ app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
   next(err);
 });
 
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -30,15 +32,12 @@ app.use((req, res, next) => {
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
       if (logLine.length > 80) {
         logLine = logLine.slice(0, 79) + "…";
       }
-
       log(logLine);
     }
   });
-
   next();
 });
 
@@ -47,30 +46,36 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Create a clean shutdown function
-function shutdown(server: any) {
-  return new Promise((resolve) => {
+// Clean shutdown function
+function shutdown(server: HttpServer) {
+  return new Promise<void>((resolve) => {
     server.close(() => {
       console.log('Server shutdown complete');
-      resolve(true);
+      resolve();
     });
   });
 }
 
-// Function to try starting the server on different ports
-async function startServer(server: any, initialPort: number = 5000, maxAttempts: number = 3) {
+// Improved server startup function
+async function startServer(server: HttpServer, initialPort: number = 5000, maxAttempts: number = 3) {
+  let currentServer: HttpServer | null = null;
+
   for (let port = initialPort; port < initialPort + maxAttempts; port++) {
     try {
       await new Promise<void>((resolve, reject) => {
-        server.listen(port, '0.0.0.0')
+        // Close any existing server before attempting to start a new one
+        if (currentServer) {
+          currentServer.close();
+        }
+
+        currentServer = server.listen(port, '0.0.0.0')
           .once('listening', () => {
             log(`Server running on port ${port}`);
             resolve();
           })
-          .once('error', (err: any) => {
+          .once('error', (err: NodeJS.ErrnoException) => {
             if (err.code === 'EADDRINUSE') {
               log(`Port ${port} is in use, trying next port...`);
-              server.close();
               reject(err);
             } else {
               reject(err);
@@ -87,11 +92,12 @@ async function startServer(server: any, initialPort: number = 5000, maxAttempts:
   throw new Error('Failed to start server');
 }
 
+// Main application startup
 (async () => {
   try {
     const server = registerRoutes(app);
 
-    // Add error handling middleware
+    // Error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       console.error('Error in request:', err);
       const status = err.status || err.statusCode || 500;
@@ -99,18 +105,18 @@ async function startServer(server: any, initialPort: number = 5000, maxAttempts:
       res.status(status).json({ message });
     });
 
-    // Setup development environment first
+    // Setup development environment
     if (app.get("env") === "development") {
       await setupVite(app, server);
     } else {
       serveStatic(app);
     }
 
-    // Try to start the server with port fallback
+    // Start server with port fallback
     const initialPort = parseInt(process.env.PORT || '5000', 10);
     await startServer(server, initialPort);
 
-    // Handle graceful shutdown
+    // Graceful shutdown handlers
     process.on('SIGTERM', async () => {
       console.log('SIGTERM received. Starting graceful shutdown...');
       await shutdown(server);

@@ -584,10 +584,8 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/register", async (req, res, next) => {
-    //Existing register code here.  This remains unchanged as per instructions.
+    //Existing register code here.
   });
 
-
-  const httpServer = createServer(app);
-  return httpServer;
+  return createServer(app);
 }
