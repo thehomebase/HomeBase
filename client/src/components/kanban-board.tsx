@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import {
   DndContext,
@@ -63,29 +64,6 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     useSensor(KeyboardSensor)
   );
 
-  const deleteTransactionMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `/api/transactions/${id}`);
-      if (!response.ok) {
-        throw new Error("Failed to delete transaction");
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      toast({
-        title: "Transaction deleted",
-        description: "The transaction has been successfully deleted.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete transaction.",
-        variant: "destructive",
-      });
-    },
-  });
-
   const updateTransactionStatus = useMutation({
     mutationFn: async ({ id, newStatus }: { id: number; newStatus: string }) => {
       const response = await apiRequest("PATCH", `/api/transactions/${id}`, {
@@ -112,29 +90,49 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     },
   });
 
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/transactions/${id}`);
+      if (!response.ok) {
+        throw new Error("Failed to delete transaction");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      toast({
+        title: "Transaction deleted",
+        description: "The transaction has been successfully deleted.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(Number(event.active.id));
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveId(null);
 
-    if (!over) {
-      setActiveId(null);
-      return;
-    }
+    if (!over) return;
 
-    const draggedTransaction = transactions.find(t => t.id === Number(active.id));
-    const targetStatus = over.id.toString();
-
-    if (draggedTransaction && draggedTransaction.status !== targetStatus) {
+    const draggedId = active.id;
+    const newStatus = over.id as string;
+    
+    const transaction = transactions.find(t => t.id === Number(draggedId));
+    if (transaction && transaction.status !== newStatus) {
       updateTransactionStatus.mutate({
-        id: Number(active.id),
-        newStatus: targetStatus,
+        id: Number(draggedId),
+        newStatus: newStatus,
       });
     }
-
-    setActiveId(null);
   };
 
   return (
@@ -146,28 +144,27 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
         onDragEnd={handleDragEnd}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-          {statusColumns.map((column) => {
-            const columnTransactions = transactions.filter(
-              (t) => t.status === column.id
-            );
-            return (
-              <div
-                key={column.id}
-                id={column.id}
-                className="flex flex-col min-w-[240px] bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50"
-              >
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-semibold text-sm dark:text-white">{column.title}</h3>
-                  <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
-                    {columnTransactions.length}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {columnTransactions.map((transaction) => (
+          {statusColumns.map((column) => (
+            <div
+              key={column.id}
+              id={column.id}
+              className="flex flex-col min-w-[240px] bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50"
+            >
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="font-semibold text-sm dark:text-white">{column.title}</h3>
+                <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
+                  {transactions.filter(t => t.status === column.id).length}
+                </span>
+              </div>
+              <div className="flex flex-col gap-2" data-droppable id={column.id}>
+                {transactions
+                  .filter((t) => t.status === column.id)
+                  .map((transaction) => (
                     <Card
                       key={transaction.id}
                       id={transaction.id.toString()}
                       className="p-3 cursor-move hover:shadow-md transition-shadow relative group dark:bg-gray-700"
+                      draggable="true"
                     >
                       <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
@@ -201,10 +198,9 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
                       </div>
                     </Card>
                   ))}
-                </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </DndContext>
 
