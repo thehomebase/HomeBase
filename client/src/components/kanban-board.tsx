@@ -177,9 +177,10 @@ function KanbanColumn({
 interface KanbanBoardProps {
   transactions: Transaction[];
   onDeleteTransaction: (id: number) => void;
+  clients: any[];
 }
 
-export function KanbanBoard({ transactions, onDeleteTransaction }: KanbanBoardProps) {
+export function KanbanBoard({ transactions, onDeleteTransaction, clients }: KanbanBoardProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
