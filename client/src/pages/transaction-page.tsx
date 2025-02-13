@@ -156,12 +156,6 @@ export default function TransactionPage() {
         financing: transaction.financing,
         status: transaction.status
       });
-        closingDate: formatDateForInput(transaction.closingDate),
-        contractExecutionDate: formatDateForInput(transaction.contractExecutionDate),
-        mlsNumber: transaction.mlsNumber,
-        financing: transaction.financing,
-        status: transaction.status
-      });
     }
   }, [transaction, form]);
 
