@@ -7,13 +7,9 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  DragStartEvent,
+  DragEndEvent,
 } from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
 import { Card } from "@/components/ui/card";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -31,12 +27,6 @@ interface Transaction {
   contractPrice: number | null;
   clientId: number | null;
   client?: { firstName: string; lastName: string; } | null;
-}
-
-interface KanbanColumnProps {
-  title: string;
-  transactions: Transaction[];
-  status: string;
 }
 
 const statusColumns = [
@@ -57,104 +47,20 @@ const formatPrice = (price: number | null) => {
   }).format(price);
 };
 
-const KanbanColumn = ({ title, transactions, status }: KanbanColumnProps) => {
-  const [, setLocation] = useLocation();
-
-  const handleCardClick = (e: React.MouseEvent, transactionId: number) => {
-    // Only navigate if we're not dragging
-    if (!e.defaultPrevented) {
-      setLocation(`/transactions/${transactionId}`);
-    }
-  };
-
-  return (
-    <div className="flex flex-col min-w-[240px] bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="font-semibold text-sm dark:text-white">{title}</h3>
-        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
-          {transactions.length}
-        </span>
-      </div>
-      <div 
-        className="flex flex-col gap-2" 
-        data-status={status}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.currentTarget.classList.add('bg-primary/10');
-        }}
-        onDragLeave={(e) => {
-          e.currentTarget.classList.remove('bg-primary/10');
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          e.currentTarget.classList.remove('bg-primary/10');
-          const data = e.dataTransfer.getData('text/plain');
-          const [transactionId, sourceStatus] = data.split('-');
-          if (sourceStatus !== status) {
-            updateTransactionStatus.mutate({
-              id: parseInt(transactionId),
-              newStatus: status
-            });
-          }
-        }}
-      >
-        {transactions.map((transaction) => (
-          <Card 
-            key={transaction.id}
-            draggable="true"
-            onDragStart={(e) => {
-              e.dataTransfer.setData('text/plain', `${transaction.id}-${status}`);
-              e.currentTarget.classList.add('opacity-50');
-            }}
-            onDragEnd={(e) => {
-              e.currentTarget.classList.remove('opacity-50');
-            }}
-            className="p-3 cursor-move hover:shadow-md transition-shadow relative group dark:bg-gray-700"
-          >
-            <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-destructive hover:text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteId(transaction.id);
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-            <div 
-              className="flex flex-col gap-1"
-              onClick={(e) => handleCardClick(e, transaction.id)}
-            >
-              <div className="font-medium text-sm truncate pr-6 dark:text-white">{transaction.address}</div>
-              <div className="text-xs text-muted-foreground space-y-0.5 dark:text-gray-300">
-                <div className="capitalize">{transaction.type === 'buy' ? 'Purchase' : 'Sale'}</div>
-                <div>Price: {formatPrice(transaction.contractPrice)}</div>
-                {transaction.client && (
-                  <div className="truncate">
-                    Client: {transaction.client.firstName} {transaction.client.lastName}
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [, setLocation] = useLocation();
+
   const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor)
   );
 
   const deleteTransactionMutation = useMutation({
@@ -206,19 +112,29 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     },
   });
 
-  const handleDragEnd = (event: any) => {
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(Number(event.active.id));
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over) return;
 
-    const draggedId = active.id;
-    const newStatus = over.data?.current?.status;
+    if (!over) {
+      setActiveId(null);
+      return;
+    }
 
-    if (newStatus) {
+    const draggedTransaction = transactions.find(t => t.id === Number(active.id));
+    const targetStatus = over.id.toString();
+
+    if (draggedTransaction && draggedTransaction.status !== targetStatus) {
       updateTransactionStatus.mutate({
-        id: parseInt(draggedId),
-        newStatus: newStatus,
+        id: Number(active.id),
+        newStatus: targetStatus,
       });
     }
+
+    setActiveId(null);
   };
 
   return (
@@ -226,20 +142,67 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="grid grid-cols-5 gap-4 w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           {statusColumns.map((column) => {
             const columnTransactions = transactions.filter(
               (t) => t.status === column.id
             );
             return (
-              <KanbanColumn
+              <div
                 key={column.id}
-                title={column.title}
-                transactions={columnTransactions}
-                status={column.id}
-              />
+                id={column.id}
+                className="flex flex-col min-w-[240px] bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50"
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-semibold text-sm dark:text-white">{column.title}</h3>
+                  <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
+                    {columnTransactions.length}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {columnTransactions.map((transaction) => (
+                    <Card
+                      key={transaction.id}
+                      id={transaction.id.toString()}
+                      className="p-3 cursor-move hover:shadow-md transition-shadow relative group dark:bg-gray-700"
+                    >
+                      <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteId(transaction.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div 
+                        className="flex flex-col gap-1"
+                        onClick={() => setLocation(`/transactions/${transaction.id}`)}
+                      >
+                        <div className="font-medium text-sm truncate pr-6 dark:text-white">
+                          {transaction.address}
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-0.5 dark:text-gray-300">
+                          <div className="capitalize">{transaction.type === 'buy' ? 'Purchase' : 'Sale'}</div>
+                          <div>Price: {formatPrice(transaction.contractPrice)}</div>
+                          {transaction.client && (
+                            <div className="truncate">
+                              Client: {transaction.client.firstName} {transaction.client.lastName}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             );
           })}
         </div>
