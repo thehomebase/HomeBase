@@ -38,15 +38,16 @@ export const transactions = pgTable("transactions", {
     role: string;
   }[]>(),
   contractPrice: integer("contract_price"),
-  optionPeriodExpiration: timestamp("option_period_expiration"),
+  optionPeriodExpiration: timestamp("option_period_expiration").onUpdateNow(),
   optionFee: integer("option_fee"),
   earnestMoney: integer("earnest_money"),
   downPayment: integer("down_payment"),
   sellerConcessions: integer("seller_concessions"),
-  closingDate: timestamp("closing_date"),
-  contractExecutionDate: timestamp("contract_execution_date"),
-  mlsNumber: text("mls_number"),
-  financing: text("financing")
+  closingDate: timestamp("closing_date").onUpdateNow(),
+  contractExecutionDate: timestamp("contract_execution_date").onUpdateNow(),
+  mlsNumber: text("mls_number").onUpdateNow(),
+  financing: text("financing").onUpdateNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow()
 });
 
 export const checklists = pgTable("checklists", {

@@ -258,7 +258,10 @@ export class DatabaseStorage implements IStorage {
           earnest_money as "earnestMoney",
           down_payment as "downPayment",
           seller_concessions as "sellerConcessions",
-          closing_date as "closingDate"
+          closing_date as "closingDate",
+          contract_execution_date as "contractExecutionDate",
+          mls_number as "mlsNumber",
+          financing
         FROM transactions 
         WHERE id = ${id}
       `);
@@ -286,7 +289,10 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
         downPayment: row.downPayment ? Number(row.downPayment) : null,
         sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
-        closingDate: row.closingDate || null
+        closingDate: row.closingDate || null,
+        contractExecutionDate: row.contractExecutionDate || null,
+        mlsNumber: row.mlsNumber || null,
+        financing: row.financing || null
       };
 
       console.log('Processed transaction:', transaction);
@@ -319,7 +325,10 @@ export class DatabaseStorage implements IStorage {
           t.down_payment::numeric as "downPayment",
           t.seller_concessions::numeric as "sellerConcessions",
           t.closing_date::text as "closingDate",
-          t.type::text as "type"
+          t.type::text as "type",
+          t.contract_execution_date as "contractExecutionDate",
+          t.mls_number as "mlsNumber",
+          t.financing
         FROM transactions t
         WHERE t.agent_id = ${userId}
         ORDER BY t.id DESC
@@ -340,7 +349,10 @@ export class DatabaseStorage implements IStorage {
         downPayment: row.downPayment ? Number(row.downPayment) : null,
         sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
         closingDate: row.closingDate || null,
-        type: row.type
+        type: row.type,
+        contractExecutionDate: row.contractExecutionDate || null,
+        mlsNumber: row.mlsNumber || null,
+        financing: row.financing || null
       }));
     } catch (error) {
       console.error('Error in getTransactionsByUser:', error);
