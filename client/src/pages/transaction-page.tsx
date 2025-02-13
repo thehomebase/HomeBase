@@ -247,10 +247,30 @@ export default function TransactionPage() {
 
   const handleSubmit = async (data: TransactionFormData) => {
     try {
-      await updateTransaction.mutateAsync({
-        ...data,
+      // Convert date strings to ISO format for the API
+      const formatDateForAPI = (dateStr: string | null | undefined) => {
+        if (!dateStr) return null;
+        const date = new Date(dateStr);
+        return date.toISOString();
+      };
+
+      const formData = {
+        address: data.address,
+        contractPrice: data.contractPrice ? Number(data.contractPrice) : null,
+        optionPeriodExpiration: formatDateForAPI(data.optionPeriodExpiration),
+        optionFee: data.optionFee ? Number(data.optionFee) : null,
+        earnestMoney: data.earnestMoney ? Number(data.earnestMoney) : null,
+        downPayment: data.downPayment ? Number(data.downPayment) : null,
+        sellerConcessions: data.sellerConcessions ? Number(data.sellerConcessions) : null,
+        closingDate: formatDateForAPI(data.closingDate),
+        contractExecutionDate: formatDateForAPI(data.contractExecutionDate),
+        mlsNumber: data.mlsNumber || null,
+        financing: data.financing || null,
         status: data.status || transaction?.status || 'prospect'
-      });
+      };
+
+      console.log('Submitting transaction update:', formData);
+      await updateTransaction.mutateAsync(formData);
     } catch (error) {
       console.error('Error updating transaction:', error);
       toast({

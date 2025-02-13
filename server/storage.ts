@@ -359,7 +359,7 @@ export class DatabaseStorage implements IStorage {
 
           // Handle date fields
           if (['closing_date', 'contract_execution_date', 'option_period_expiration'].includes(snakeKey)) {
-            cleanData[snakeKey] = value ? value : null;
+            cleanData[snakeKey] = value ? new Date(value).toISOString() : null;
           } else if (key === 'participants' && Array.isArray(value)) {
             cleanData[snakeKey] = JSON.stringify(value);
           } else if (value === null) {
@@ -378,6 +378,7 @@ export class DatabaseStorage implements IStorage {
 
       console.log('Clean data for SQL update:', cleanData);
 
+      // Create SET clause for SQL update
       const setColumns = Object.entries(cleanData).map(([key, value]) => {
         if (value === null) {
           return sql`${sql.identifier([key])} = NULL`;
@@ -395,7 +396,26 @@ export class DatabaseStorage implements IStorage {
         UPDATE transactions
         SET ${sql.join(setColumns, sql`, `)}
         WHERE id = ${id}
-        RETURNING *;
+        RETURNING 
+          id,
+          address,
+          access_code as "accessCode",
+          status,
+          type,
+          agent_id as "agentId",
+          client_id as "clientId",
+          participants,
+          contract_price as "contractPrice",
+          option_period as "optionPeriod",
+          option_fee as "optionFee",
+          earnest_money as "earnestMoney",
+          down_payment as "downPayment",
+          seller_concessions as "sellerConcessions",
+          closing_date as "closingDate",
+          contract_execution_date as "contractExecutionDate",
+          option_period_expiration as "optionPeriodExpiration",
+          mls_number as "mlsNumber",
+          financing
       `);
 
       if (!result.rows[0]) {
@@ -406,22 +426,22 @@ export class DatabaseStorage implements IStorage {
       return {
         id: Number(row.id),
         address: String(row.address),
-        accessCode: String(row.access_code),
+        accessCode: String(row.accessCode),
         status: String(row.status),
         type: String(row.type),
-        agentId: Number(row.agent_id),
-        clientId: row.client_id ? Number(row.client_id) : null,
+        agentId: Number(row.agentId),
+        clientId: row.clientId ? Number(row.clientId) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
-        contractPrice: row.contract_price ? Number(row.contract_price) : null,
-        optionPeriod: row.option_period ? Number(row.option_period) : null,
-        optionFee: row.option_fee ? Number(row.option_fee) : null,
-        earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
-        downPayment: row.down_payment ? Number(row.down_payment) : null,
-        sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
-        closingDate: row.closing_date ? row.closing_date : null,
-        contractExecutionDate: row.contract_execution_date ? row.contract_execution_date : null,
-        optionPeriodExpiration: row.option_period_expiration ? row.option_period_expiration : null,
-        mlsNumber: row.mls_number || null,
+        contractPrice: row.contractPrice ? Number(row.contractPrice) : null,
+        optionPeriod: row.optionPeriod ? Number(row.optionPeriod) : null,
+        optionFee: row.optionFee ? Number(row.optionFee) : null,
+        earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
+        downPayment: row.downPayment ? Number(row.downPayment) : null,
+        sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
+        closingDate: row.closingDate ? String(row.closingDate) : null,
+        contractExecutionDate: row.contractExecutionDate ? String(row.contractExecutionDate) : null,
+        optionPeriodExpiration: row.optionPeriodExpiration ? String(row.optionPeriodExpiration) : null,
+        mlsNumber: row.mlsNumber || null,
         financing: row.financing || null
       };
     } catch (error) {
@@ -837,7 +857,7 @@ export class DatabaseStorage implements IStorage {
   async createClient(insertClient: InsertClient): Promise<Client> {
     try {
       const [client] = await db.insert(clients).values({
-        ...insertClient,
+                ...insertClient,
         createdAt: new Date(),
         updatedAt: new Date(),
       }).returning();
