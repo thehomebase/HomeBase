@@ -178,7 +178,7 @@ export default function DataPage() {
               <Bar 
                 yAxisId="left"
                 dataKey="totalVolume" 
-                fill="#000000" 
+                fill="hsl(var(--foreground))" 
                 name="Monthly Volume"
               />
               <Line
