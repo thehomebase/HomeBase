@@ -39,6 +39,14 @@ interface Transaction {
   financing?: string;
   checklist?: Array<ChecklistItem>;
   type: 'buy' | 'sell';
+  client?: {
+    firstName: string;
+    lastName: string;
+  };
+  secondaryClient?: {
+    firstName: string;
+    lastName: string;
+  };
 }
 
 interface TransactionFormData {
@@ -281,16 +289,14 @@ export default function TransactionPage() {
                 <h1 className="text-2xl font-bold">{transaction.address}</h1>
               )}
               <p className="text-muted-foreground">Transaction ID: {parsedId}</p>
-              {transaction.client && (
-                <p className="text-muted-foreground">
-                  Primary Client: {transaction.client.firstName} {transaction.client.lastName}
-                </p>
-              )}
-              {transaction.secondaryClient && (
-                <p className="text-muted-foreground">
-                  Secondary Client: {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}
-                </p>
-              )}
+              <div className="text-muted-foreground">
+                {transaction.client ? (
+                  <p>Primary Client: {transaction.client.firstName} {transaction.client.lastName}</p>
+                ) : null}
+                {transaction.secondaryClient ? (
+                  <p>Secondary Client: {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}</p>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
