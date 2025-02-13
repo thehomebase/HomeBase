@@ -154,6 +154,21 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.delete("/api/transactions/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const id = Number(req.params.id);
+      await storage.deleteTransaction(id);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      res.status(500).json({ error: 'Failed to delete transaction' });
+    }
+  });
+
   app.patch("/api/transactions/:id", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "agent") {
       return res.sendStatus(401);

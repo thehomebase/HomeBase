@@ -54,7 +54,7 @@ function DraggableCard({
   onClick 
 }: { 
   transaction: Transaction; 
-  onDelete: (id: number) => void;
+  onDelete: (id: number) => Promise<void>;
   onClick: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -77,9 +77,14 @@ function DraggableCard({
         variant="ghost"
         size="icon"
         className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 text-destructive hover:text-destructive"
-        onClick={(e) => {
+        onClick={async (e) => {
           e.stopPropagation();
-          onDelete(transaction.id);
+          try {
+            await deleteTransactionMutation.mutateAsync(transaction.id);
+            onDelete(transaction.id);
+          } catch (error) {
+            console.error('Failed to delete transaction:', error);
+          }
         }}
       >
         <Trash2 className="h-4 w-4" />
@@ -125,6 +130,29 @@ function KanbanColumn({
 }) {
   const { setNodeRef } = useDroppable({
     id: status,
+  });
+
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/transactions/${id}`);
+      if (!response.ok) {
+        throw new Error('Failed to delete transaction');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      toast({
+        title: "Success",
+        description: "Transaction deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction",
+        variant: "destructive",
+      });
+    },
   });
 
   return (
