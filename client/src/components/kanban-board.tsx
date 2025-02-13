@@ -51,11 +51,13 @@ const formatPrice = (price: number | null) => {
 function DraggableCard({ 
   transaction, 
   onDelete,
-  onClick 
+  onClick,
+  clients
 }: { 
   transaction: Transaction; 
   onDelete: (id: number) => Promise<void>;
   onClick: () => void;
+  clients: any[];
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: transaction.id,
@@ -117,13 +119,15 @@ function KanbanColumn({
   title, 
   transactions,
   onDelete,
-  onTransactionClick 
+  onTransactionClick,
+  clients
 }: { 
   status: string; 
   title: string; 
   transactions: Transaction[];
   onDelete: (id: number) => void;
   onTransactionClick: (id: number) => void;
+  clients: any[];
 }) {
   const { setNodeRef } = useDroppable({
     id: status,
@@ -167,6 +171,7 @@ function KanbanColumn({
             transaction={transaction}
             onDelete={onDelete}
             onClick={() => onTransactionClick(transaction.id)}
+            clients={clients}
           />
         ))}
       </div>
@@ -272,6 +277,7 @@ export function KanbanBoard({ transactions, onDeleteTransaction, clients }: Kanb
             transactions={localTransactions.filter((t) => t.status === column.id)}
             onDelete={onDeleteTransaction}
             onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
+            clients={clients}
           />
         ))}
       </div>
