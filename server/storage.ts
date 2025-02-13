@@ -449,7 +449,7 @@ export class DatabaseStorage implements IStorage {
         closingDate: row.closing_date ? String(row.closing_date) : null,
         contractExecutionDate: row.contract_execution_date ? String(row.contract_execution_date) : null,
         optionPeriodExpiration: row.option_period_expiration ? String(row.option_period_expiration) : null,
-        mlsNumber: row.mls_number || null,
+        mlsNumber: row.mls_number ? String(row.mls_number) : null,
         financing: row.financing || null
       };
     } catch (error) {
