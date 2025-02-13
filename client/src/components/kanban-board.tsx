@@ -210,13 +210,13 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     const { active, over } = event;
     if (!over) return;
 
-    const [draggedId, draggedStatus] = active.id.split("-");
-    const [targetId, targetStatus] = over.id.split("-");
+    const draggedId = active.id;
+    const newStatus = over.data?.current?.status;
 
-    if (draggedStatus !== targetStatus) {
+    if (newStatus) {
       updateTransactionStatus.mutate({
         id: parseInt(draggedId),
-        newStatus: targetStatus,
+        newStatus: newStatus,
       });
     }
   };
@@ -228,7 +228,7 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
         collisionDetection={closestCorners}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="grid grid-cols-5 gap-4 w-full">
           {statusColumns.map((column) => {
             const columnTransactions = transactions.filter(
               (t) => t.status === column.id
