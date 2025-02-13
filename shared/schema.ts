@@ -20,6 +20,8 @@ export const users = pgTable("users", {
   lastName: text("last_name").notNull(),
   role: text("role").notNull(),
   agentId: integer("agent_id"),
+  claimedTransactionId: integer("claimed_transaction_id"),
+  claimedAccessCode: text("claimed_access_code")
 });
 
 export const clients = pgTable("clients", {

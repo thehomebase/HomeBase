@@ -318,12 +318,12 @@ export function registerRoutes(app: Express): Server {
     try {
       // Get all transactions for the user
       const transactions = await storage.getTransactionsByUser(req.user.id);
-      
+
       // Get all unique contacts from these transactions
       const contacts = await Promise.all(
         transactions.map(t => storage.getContactsByTransaction(t.id))
       );
-      
+
       // Flatten and remove duplicates
       const uniqueContacts = Array.from(new Set(
         contacts.flat().map(c => ({
@@ -333,7 +333,7 @@ export function registerRoutes(app: Express): Server {
           email: c.email
         }))
       ));
-      
+
       res.json(uniqueContacts);
     } catch (error) {
       console.error('Error fetching recipients:', error);
@@ -341,7 +341,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-app.get("/api/messages", async (req, res) => {
+  app.get("/api/messages", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const transactionId = req.query.transactionId ? Number(req.query.transactionId) : undefined;
@@ -548,6 +548,45 @@ app.get("/api/messages", async (req, res) => {
       res.status(500).json({ error: 'Failed to generate calendar feed' });
     }
   });
+
+  app.post("/api/claim-transaction", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    const { accessCode } = req.body;
+
+    try {
+      const transaction = await storage.getTransactionByAccessCode(accessCode);
+      if (!transaction) {
+        return res.status(404).json({ error: "Transaction not found" });
+      }
+
+      // Update user with claimed transaction
+      await storage.updateUser(req.user.id, {
+        claimedTransactionId: transaction.id,
+        claimedAccessCode: accessCode
+      });
+
+      // Add user to transaction participants
+      const updatedParticipants = [...transaction.participants, {
+        userId: req.user.id,
+        role: 'client'
+      }];
+
+      await storage.updateTransaction(transaction.id, {
+        participants: updatedParticipants
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error claiming transaction:', error);
+      res.status(500).json({ error: "Failed to claim transaction" });
+    }
+  });
+
+  app.post("/api/register", async (req, res, next) => {
+    //Existing register code here.  This remains unchanged as per instructions.
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;

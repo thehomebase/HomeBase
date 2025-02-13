@@ -198,6 +198,19 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getTransactionByAccessCode(accessCode: string): Promise<Transaction | null> {
+    try {
+      const [transaction] = await db
+        .select()
+        .from(transactions)
+        .where(sql`access_code = ${accessCode}`);
+      return transaction || null;
+    } catch (error) {
+      console.error('Error in getTransactionByAccessCode:', error);
+      return null;
+    }
+  }
+
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     try {
       const result = await db.execute(sql`
