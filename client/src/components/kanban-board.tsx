@@ -101,11 +101,13 @@ function DraggableCard({
             </span>
             <span>{formatPrice(transaction.contractPrice)}</span>
           </div>
-          {transaction.client && (
-            <div className="truncate font-medium">
-              {transaction.client.firstName} {transaction.client.lastName}
-            </div>
-          )}
+          <div className="flex flex-col gap-0.5">
+            {transaction.client && (
+              <div className="truncate text-sm text-muted-foreground">
+                Client: {transaction.client.firstName} {transaction.client.lastName}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </Card>
