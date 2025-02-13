@@ -329,6 +329,22 @@ export default function TransactionPage() {
                     {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
                   </p>
                 </div>
+                {transaction.client && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Primary Client</p>
+                    <p className="font-medium">
+                      {transaction.client.firstName} {transaction.client.lastName}
+                    </p>
+                  </div>
+                )}
+                {transaction.secondaryClient && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Secondary Client</p>
+                    <p className="font-medium">
+                      {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}
+                    </p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-muted-foreground">Contract Price</p>
                   {isEditing ? (
