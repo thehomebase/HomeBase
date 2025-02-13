@@ -27,3 +27,12 @@ export const transactions = pgTable('transactions', {
   contractExecutionDate: timestamp('contract_execution_date'),
   optionPeriodExpiration: timestamp('option_period_expiration'),
 });
+
+export const users = pgTable('users', {
+    id: serial('id').primaryKey(),
+    email: text('email').notNull(),
+    password: text('password').notNull(),
+    role: text('role').notNull(),
+    firstName: text('first_name').notNull(),
+    lastName: text('last_name').notNull()
+})
