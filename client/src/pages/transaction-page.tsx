@@ -88,9 +88,7 @@ export default function TransactionPage() {
       const formatDate = (dateStr: string | null | undefined) => {
         if (!dateStr) return null;
         try {
-          // Ensure date is in YYYY-MM-DD format for consistency
-          const [year, month, day] = dateStr.split('-').map(Number);
-          const date = new Date(year, month - 1, day);
+          const date = new Date(dateStr);
           return date.toISOString();
         } catch (error) {
           console.error('Date formatting error:', error);
@@ -110,12 +108,12 @@ export default function TransactionPage() {
         sellerConcessions: data.sellerConcessions ? Number(data.sellerConcessions) : null,
         mlsNumber: data.mlsNumber || null,
         financing: data.financing || null,
-        status: data.status || null
+        status: data.status || transaction?.status || null
       };
 
-      // Remove undefined values and empty strings
+      // Remove undefined values but keep null values
       const cleanData = Object.fromEntries(
-        Object.entries(formattedData).filter(([_, value]) => value !== undefined && value !== '')
+        Object.entries(formattedData).filter(([_, value]) => value !== undefined)
       );
 
       console.log('Submitting transaction update:', cleanData);
@@ -249,8 +247,10 @@ export default function TransactionPage() {
 
   const handleSubmit = async (data: TransactionFormData) => {
     try {
-      await updateTransaction.mutateAsync(data);
-      setIsEditing(false);
+      await updateTransaction.mutateAsync({
+        ...data,
+        status: data.status || transaction?.status || 'prospect'
+      });
     } catch (error) {
       console.error('Error updating transaction:', error);
       toast({

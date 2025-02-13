@@ -357,25 +357,17 @@ export class DatabaseStorage implements IStorage {
           // Convert camelCase to snake_case for SQL
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
-          // Only include fields that exist in our schema
-          if (['address', 'access_code', 'status', 'type', 'agent_id', 'client_id', 
-               'participants', 'contract_price', 'option_period', 'option_fee', 
-               'earnest_money', 'down_payment', 'seller_concessions', 'closing_date',
-               'contract_execution_date', 'option_period_expiration', 'mls_number',
-               'financing'].includes(snakeKey)) {
-
-            // Handle date fields
-            if (['closing_date', 'contract_execution_date', 'option_period_expiration'].includes(snakeKey)) {
-              cleanData[snakeKey] = value ? value : null;
-            } else if (key === 'participants' && Array.isArray(value)) {
-              cleanData[snakeKey] = JSON.stringify(value);
-            } else if (value === null) {
-              cleanData[snakeKey] = null;
-            } else if (typeof value === 'number') {
-              cleanData[snakeKey] = value;
-            } else {
-              cleanData[snakeKey] = String(value);
-            }
+          // Handle date fields
+          if (['closing_date', 'contract_execution_date', 'option_period_expiration'].includes(snakeKey)) {
+            cleanData[snakeKey] = value ? value : null;
+          } else if (key === 'participants' && Array.isArray(value)) {
+            cleanData[snakeKey] = JSON.stringify(value);
+          } else if (value === null) {
+            cleanData[snakeKey] = null;
+          } else if (typeof value === 'number') {
+            cleanData[snakeKey] = value;
+          } else {
+            cleanData[snakeKey] = String(value);
           }
         }
       });
@@ -426,9 +418,9 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
         downPayment: row.down_payment ? Number(row.down_payment) : null,
         sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
-        closingDate: row.closing_date,
-        contractExecutionDate: row.contract_execution_date,
-        optionPeriodExpiration: row.option_period_expiration,
+        closingDate: row.closing_date ? row.closing_date : null,
+        contractExecutionDate: row.contract_execution_date ? row.contract_execution_date : null,
+        optionPeriodExpiration: row.option_period_expiration ? row.option_period_expiration : null,
         mlsNumber: row.mls_number || null,
         financing: row.financing || null
       };
