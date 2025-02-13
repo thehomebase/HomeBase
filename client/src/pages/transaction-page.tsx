@@ -501,28 +501,28 @@ export default function TransactionPage() {
                 <div className="flex justify-end mt-4">
                   <Button
                     type="button"
-                    onClick={async () => {
+                    onClick={form.handleSubmit(async (data) => {
                       try {
-                        const formData = form.getValues();
-                        const cleanData = Object.fromEntries(
-                          Object.entries(formData)
-                            .filter(([_, v]) => v != null && v !== '')
-                            .map(([k, v]) => {
-                              if (k.includes('Date') && v) {
-                                const date = new Date(v);
-                                date.setUTCHours(12, 0, 0, 0);
-                                return [k, date.toISOString()];
-                              }
-                              return [k, v];
-                            })
-                        );
-                        
-                        await updateTransaction.mutateAsync(cleanData);
+                        const cleanData = {
+                          address: data.address,
+                          contractPrice: data.contractPrice ? Number(data.contractPrice) : null,
+                          optionPeriodExpiration: data.optionPeriodExpiration ? new Date(data.optionPeriodExpiration).toISOString() : null,
+                          optionFee: data.optionFee ? Number(data.optionFee) : null,
+                          earnestMoney: data.earnestMoney ? Number(data.earnestMoney) : null,
+                          downPayment: data.downPayment ? Number(data.downPayment) : null,
+                          sellerConcessions: data.sellerConcessions ? Number(data.sellerConcessions) : null,
+                          closingDate: data.closingDate ? new Date(data.closingDate).toISOString() : null,
+                          contractExecutionDate: data.contractExecutionDate ? new Date(data.contractExecutionDate).toISOString() : null,
+                          mlsNumber: data.mlsNumber || null,
+                          financing: data.financing || null,
+                          status: data.status || 'prospect'
+                        };
+
+                        const updated = await updateTransaction.mutateAsync(cleanData);
+                        queryClient.setQueryData(["/api/transactions", parsedId], updated);
                         await queryClient.invalidateQueries({
-                          queryKey: ["/api/transactions", parsedId],
-                          exact: true
+                          queryKey: ["/api/transactions", parsedId]
                         });
-                        form.reset(cleanData);
                         setIsEditing(false);
                       } catch (error) {
                         console.error('Error updating transaction:', error);
@@ -532,7 +532,7 @@ export default function TransactionPage() {
                           variant: "destructive"
                         });
                       }
-                    }}
+                    })}
                     disabled={updateTransaction.isPending}
                   >
                     Save Changes
