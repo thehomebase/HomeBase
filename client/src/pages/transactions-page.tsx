@@ -120,7 +120,9 @@ export default function TransactionsPage() {
   };
 
   const handleDeleteTransaction = (id: number) => {
-    setDeleteId(id);
+    if (user?.role === "agent") {
+      deleteTransactionMutation.mutate(id);
+    }
   };
 
   return (
