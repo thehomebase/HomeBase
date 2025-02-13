@@ -10,12 +10,14 @@ export default function GlossaryPage() {
     { term: 'Home value', definition: 'Home value is the estimated amount your home is worth in the current market.' },
     { term: 'Monthly mortgage payment', definition: 'Your monthly mortgage payment has four components: principal, interest, taxes, and insurance.' },
     { term: 'Homeowners insurance', definition: 'Homeowners insurance is a type of property insurance. It protects you from damage to your home or possessions. Homeowners insurance also provides liability insurance if there are accidents in your home or on the property.' },
-    { term: 'Rent increase', definition: 'A rent increase is when your landlord raises the rent you pay each month.' },
-    { term: 'Housing costs', definition: 'Housing costs include your mortgage payments, homeowners insurance, property taxes, and HOA fees if you have an HOA.' },
-    { term: 'Rent payment', definition: 'Your rent payment is the money you pay to your landlord each month.' },
     { term: 'Loan amount', definition: 'The loan amount is the amount of money you plan to borrow from a lender.' },
     { term: 'Security deposit', definition: 'A security deposit is the amount of money you give to your landlord at the beginning of a lease. This deposit is usually equal to one month\'s rent and covers any damage the tenant causes to the property.' },
-    { term: 'Upfront costs', definition: 'Upfront costs are the costs you\'ll need to pay before moving into your new home, including your down payment, closing costs, and other fees.' }
+    { term: 'Earnest Money', definition: 'A deposit made to the seller showing the buyer\'s good faith in a real estate transaction. This money is typically held in escrow and goes toward the down payment at closing.' },
+    { term: 'Option Fee', definition: 'A payment made to a seller in exchange for the right to terminate a contract during the option period. This fee is typically non-refundable.' },
+    { term: 'Option Period', definition: 'A specified time period during which a buyer can terminate the contract for any reason and receive their earnest money back (though the option fee is typically non-refundable).' },
+    { term: 'FHA', definition: 'Federal Housing Administration loans are government-backed mortgages designed for low-to-moderate income borrowers. They require lower minimum down payments and credit scores than conventional loans.' },
+    { term: 'Conventional', definition: 'A conventional loan is a mortgage that is not backed by a government agency. These loans typically require higher credit scores and down payments than government-backed loans.' },
+    { term: 'VA', definition: 'Veterans Affairs loans are government-backed mortgages for military service members, veterans, and eligible spouses. They often require no down payment and offer competitive rates.' }
   ];
 
   return (
