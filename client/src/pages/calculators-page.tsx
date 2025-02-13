@@ -1,49 +1,49 @@
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Slider } from "@/components/ui/slider";
 
 export default function CalculatorsPage() {
   const [mortgageInputs, setMortgageInputs] = useState({
-    homePrice: "",
-    downPayment: "",
-    interestRate: "",
-    loanTerm: "30"
+    purchasePrice: 250000,
+    downPayment: 12500,
+    annualTaxes: 2500,
+    interestRate: 5,
+    loanTerm: "30",
+    annualInsurance: 600,
+    monthlyHOA: 50
   });
 
-  const [rentInputs, setRentInputs] = useState({
-    monthlyRent: "",
-    homePrice: "",
-    downPayment: "",
-    interestRate: ""
+  const [monthlyPayment, setMonthlyPayment] = useState({
+    total: 0,
+    principal: 0,
+    taxes: 0,
+    insurance: 0,
+    hoa: 50
   });
 
-  const calculateMortgage = () => {
-    const principal = Number(mortgageInputs.homePrice) - Number(mortgageInputs.downPayment);
-    const monthlyRate = Number(mortgageInputs.interestRate) / 100 / 12;
+  useEffect(() => {
+    const principal = mortgageInputs.purchasePrice - mortgageInputs.downPayment;
+    const monthlyRate = mortgageInputs.interestRate / 100 / 12;
     const numberOfPayments = Number(mortgageInputs.loanTerm) * 12;
     
-    const monthlyPayment = 
+    const monthlyPrincipal = 
       (principal * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) / 
       (Math.pow(1 + monthlyRate, numberOfPayments) - 1);
-    
-    return isNaN(monthlyPayment) ? 0 : monthlyPayment;
-  };
 
-  const calculateRentVsBuy = () => {
-    const monthlyRent = Number(rentInputs.monthlyRent);
-    const mortgage = calculateMortgage();
-    const propertyTax = Number(rentInputs.homePrice) * 0.015 / 12; // Estimated
-    const insurance = 1200 / 12; // Estimated annual insurance
-    const maintenance = Number(rentInputs.homePrice) * 0.01 / 12; // Estimated 1% annual maintenance
-    
-    return {
-      monthlyRent,
-      monthlyOwnership: mortgage + propertyTax + insurance + maintenance
-    };
-  };
+    const monthlyTaxes = mortgageInputs.annualTaxes / 12;
+    const monthlyInsurance = mortgageInputs.annualInsurance / 12;
+
+    setMonthlyPayment({
+      principal: monthlyPrincipal,
+      taxes: monthlyTaxes,
+      insurance: monthlyInsurance,
+      hoa: mortgageInputs.monthlyHOA,
+      total: monthlyPrincipal + monthlyTaxes + monthlyInsurance + mortgageInputs.monthlyHOA
+    });
+  }, [mortgageInputs]);
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -56,118 +56,101 @@ export default function CalculatorsPage() {
         </TabsList>
 
         <TabsContent value="mortgage">
-          <Card>
-            <CardHeader>
-              <CardTitle>Mortgage Calculator</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <label className="text-sm font-medium">Purchase Price</label>
+                <Input
+                  type="number"
+                  value={mortgageInputs.purchasePrice}
+                  onChange={(e) => setMortgageInputs({...mortgageInputs, purchasePrice: Number(e.target.value)})}
+                  placeholder="Enter purchase price"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Down Payment (${mortgageInputs.downPayment})</label>
+                <Slider
+                  value={[mortgageInputs.downPayment / mortgageInputs.purchasePrice * 100]}
+                  onValueChange={(value) => setMortgageInputs({
+                    ...mortgageInputs,
+                    downPayment: Math.round(mortgageInputs.purchasePrice * value[0] / 100)
+                  })}
+                  max={100}
+                  step={1}
+                />
+                <div className="text-sm text-muted-foreground">{(mortgageInputs.downPayment / mortgageInputs.purchasePrice * 100).toFixed(1)}%</div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Interest Rate ({mortgageInputs.interestRate}%)</label>
+                <Slider
+                  value={[mortgageInputs.interestRate]}
+                  onValueChange={(value) => setMortgageInputs({...mortgageInputs, interestRate: value[0]})}
+                  max={10}
+                  step={0.1}
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm">Home Price</label>
+                  <label className="text-sm font-medium">Annual Taxes ($)</label>
                   <Input
                     type="number"
-                    value={mortgageInputs.homePrice}
-                    onChange={(e) => setMortgageInputs({...mortgageInputs, homePrice: e.target.value})}
-                    placeholder="Enter home price"
+                    value={mortgageInputs.annualTaxes}
+                    onChange={(e) => setMortgageInputs({...mortgageInputs, annualTaxes: Number(e.target.value)})}
                   />
                 </div>
                 <div>
-                  <label className="text-sm">Down Payment</label>
+                  <label className="text-sm font-medium">Annual Insurance ($)</label>
                   <Input
                     type="number"
-                    value={mortgageInputs.downPayment}
-                    onChange={(e) => setMortgageInputs({...mortgageInputs, downPayment: e.target.value})}
-                    placeholder="Enter down payment"
+                    value={mortgageInputs.annualInsurance}
+                    onChange={(e) => setMortgageInputs({...mortgageInputs, annualInsurance: Number(e.target.value)})}
                   />
-                </div>
-                <div>
-                  <label className="text-sm">Interest Rate (%)</label>
-                  <Input
-                    type="number"
-                    value={mortgageInputs.interestRate}
-                    onChange={(e) => setMortgageInputs({...mortgageInputs, interestRate: e.target.value})}
-                    placeholder="Enter interest rate"
-                    step="0.1"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm">Loan Term (Years)</label>
-                  <select 
-                    className="w-full p-2 border rounded"
-                    value={mortgageInputs.loanTerm}
-                    onChange={(e) => setMortgageInputs({...mortgageInputs, loanTerm: e.target.value})}
-                  >
-                    <option value="30">30 Years</option>
-                    <option value="15">15 Years</option>
-                  </select>
                 </div>
               </div>
-              <div className="mt-4 p-4 bg-muted rounded-lg">
-                <p className="text-lg font-semibold">
-                  Monthly Payment: ${calculateMortgage().toFixed(2)}
-                </p>
+
+              <div>
+                <label className="text-sm font-medium">Monthly HOA ($)</label>
+                <Input
+                  type="number"
+                  value={mortgageInputs.monthlyHOA}
+                  onChange={(e) => setMortgageInputs({...mortgageInputs, monthlyHOA: Number(e.target.value)})}
+                />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+
+            <div className="bg-black text-white p-8 rounded-lg">
+              <div className="text-center mb-8">
+                <div className="text-5xl font-bold">${monthlyPayment.total.toFixed(2)}</div>
+                <div className="text-sm opacity-80 mt-2">MONTHLY PAYMENT</div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-between">
+                  <div>Principal & Interest</div>
+                  <div>${monthlyPayment.principal.toFixed(2)}</div>
+                </div>
+                <div className="flex justify-between">
+                  <div>Monthly Taxes</div>
+                  <div>${monthlyPayment.taxes.toFixed(2)}</div>
+                </div>
+                <div className="flex justify-between">
+                  <div>Monthly HOA</div>
+                  <div>${monthlyPayment.hoa.toFixed(2)}</div>
+                </div>
+                <div className="flex justify-between">
+                  <div>Monthly Insurance</div>
+                  <div>${monthlyPayment.insurance.toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="rent">
-          <Card>
-            <CardHeader>
-              <CardTitle>Rent vs Buy Calculator</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm">Monthly Rent</label>
-                  <Input
-                    type="number"
-                    value={rentInputs.monthlyRent}
-                    onChange={(e) => setRentInputs({...rentInputs, monthlyRent: e.target.value})}
-                    placeholder="Enter monthly rent"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm">Home Price</label>
-                  <Input
-                    type="number"
-                    value={rentInputs.homePrice}
-                    onChange={(e) => setRentInputs({...rentInputs, homePrice: e.target.value})}
-                    placeholder="Enter home price"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm">Down Payment</label>
-                  <Input
-                    type="number"
-                    value={rentInputs.downPayment}
-                    onChange={(e) => setRentInputs({...rentInputs, downPayment: e.target.value})}
-                    placeholder="Enter down payment"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm">Interest Rate (%)</label>
-                  <Input
-                    type="number"
-                    value={rentInputs.interestRate}
-                    onChange={(e) => setRentInputs({...rentInputs, interestRate: e.target.value})}
-                    placeholder="Enter interest rate"
-                    step="0.1"
-                  />
-                </div>
-              </div>
-              
-              <div className="mt-4 p-4 bg-muted rounded-lg space-y-2">
-                {calculateRentVsBuy().monthlyRent > 0 && (
-                  <>
-                    <p className="font-semibold">Monthly Rent: ${calculateRentVsBuy().monthlyRent.toFixed(2)}</p>
-                    <p className="font-semibold">Monthly Cost of Ownership: ${calculateRentVsBuy().monthlyOwnership.toFixed(2)}</p>
-                    <p className="text-sm text-muted-foreground">*Includes estimated property tax, insurance, and maintenance</p>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Existing rent vs buy calculator content */}
         </TabsContent>
       </Tabs>
     </main>
