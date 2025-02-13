@@ -359,15 +359,13 @@ export class DatabaseStorage implements IStorage {
 
           // Handle date fields
           if (['closing_date', 'contract_execution_date', 'option_period_expiration'].includes(snakeKey)) {
-            cleanData[snakeKey] = value ? new Date(value) : null;
+            cleanData[snakeKey] = value || null;
           } else if (key === 'participants' && Array.isArray(value)) {
             cleanData[snakeKey] = JSON.stringify(value);
           } else if (value === null) {
             cleanData[snakeKey] = null;
-          } else if (typeof value === 'number') {
-            cleanData[snakeKey] = value;
           } else {
-            cleanData[snakeKey] = String(value);
+            cleanData[snakeKey] = value;
           }
         }
       });
@@ -396,25 +394,24 @@ export class DatabaseStorage implements IStorage {
         UPDATE transactions
         SET ${sql.join(setColumns, sql`, `)}
         WHERE id = ${id}
-        RETURNING 
-          id,
+        RETURNING id, 
           address,
-          access_code as "accessCode",
+          access_code,
           status,
           type,
-          agent_id as "agentId",
-          client_id as "clientId",
+          agent_id,
+          client_id,
           participants,
-          contract_price as "contractPrice",
-          option_period as "optionPeriod",
-          option_fee as "optionFee",
-          earnest_money as "earnestMoney",
-          down_payment as "downPayment",
-          seller_concessions as "sellerConcessions",
-          closing_date as "closingDate",
-          contract_execution_date as "contractExecutionDate",
-          option_period_expiration as "optionPeriodExpiration",
-          mls_number as "mlsNumber",
+          contract_price,
+          option_period,
+          option_fee,
+          earnest_money,
+          down_payment,
+          seller_concessions,
+          closing_date,
+          contract_execution_date,
+          option_period_expiration,
+          mls_number,
           financing
       `);
 
@@ -426,22 +423,22 @@ export class DatabaseStorage implements IStorage {
       return {
         id: Number(row.id),
         address: String(row.address),
-        accessCode: String(row.accessCode),
+        accessCode: String(row.access_code),
         status: String(row.status),
         type: String(row.type),
-        agentId: Number(row.agentId),
-        clientId: row.clientId ? Number(row.clientId) : null,
+        agentId: Number(row.agent_id),
+        clientId: row.client_id ? Number(row.client_id) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
-        contractPrice: row.contractPrice ? Number(row.contractPrice) : null,
-        optionPeriod: row.optionPeriod ? Number(row.optionPeriod) : null,
-        optionFee: row.optionFee ? Number(row.optionFee) : null,
-        earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
-        downPayment: row.downPayment ? Number(row.downPayment) : null,
-        sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
-        closingDate: row.closingDate ? String(row.closingDate) : null,
-        contractExecutionDate: row.contractExecutionDate ? String(row.contractExecutionDate) : null,
-        optionPeriodExpiration: row.optionPeriodExpiration ? String(row.optionPeriodExpiration) : null,
-        mlsNumber: row.mlsNumber || null,
+        contractPrice: row.contract_price ? Number(row.contract_price) : null,
+        optionPeriod: row.option_period ? Number(row.option_period) : null,
+        optionFee: row.option_fee ? Number(row.option_fee) : null,
+        earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
+        downPayment: row.down_payment ? Number(row.down_payment) : null,
+        sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
+        closingDate: row.closing_date ? String(row.closing_date) : null,
+        contractExecutionDate: row.contract_execution_date ? String(row.contract_execution_date) : null,
+        optionPeriodExpiration: row.option_period_expiration ? String(row.option_period_expiration) : null,
+        mlsNumber: row.mls_number || null,
         financing: row.financing || null
       };
     } catch (error) {
