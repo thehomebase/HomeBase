@@ -6,6 +6,37 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 
 export default function CalculatorsPage() {
+  const [refinanceInputs, setRefinanceInputs] = useState({
+    currentBalance: 200000,
+    currentPayment: 1200,
+    currentRate: 5,
+    newTerm: 30,
+    newRate: 4,
+    closingCosts: 3000
+  });
+
+  const calculateNewPayment = () => {
+    const p = refinanceInputs.currentBalance;
+    const r = refinanceInputs.newRate / 100 / 12;
+    const n = refinanceInputs.newTerm * 12;
+    return p * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+  };
+
+  const calculateMonthlySavings = () => {
+    return Math.max(0, refinanceInputs.currentPayment - calculateNewPayment());
+  };
+
+  const calculateInterestSavings = () => {
+    const currentTotalCost = refinanceInputs.currentPayment * (refinanceInputs.newTerm * 12);
+    const newTotalCost = calculateNewPayment() * (refinanceInputs.newTerm * 12);
+    return currentTotalCost - newTotalCost - refinanceInputs.closingCosts;
+  };
+
+  const calculateBreakEven = () => {
+    const monthlySavings = calculateMonthlySavings();
+    return monthlySavings > 0 ? Math.ceil(refinanceInputs.closingCosts / monthlySavings) : 0;
+  };
+
   const [mortgageInputs, setMortgageInputs] = useState({
     purchasePrice: 250000,
     downPayment: 12500,
@@ -53,6 +84,7 @@ export default function CalculatorsPage() {
       <Tabs defaultValue="mortgage" className="space-y-4">
         <TabsList>
           <TabsTrigger value="mortgage">Mortgage Calculator</TabsTrigger>
+          <TabsTrigger value="refinance">Refinance Calculator</TabsTrigger>
           <TabsTrigger value="rent">Rent vs Buy</TabsTrigger>
         </TabsList>
 
@@ -168,6 +200,105 @@ export default function CalculatorsPage() {
           </div>
         </TabsContent>
 
+        <TabsContent value="refinance">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Current Loan</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Loan Balance ($)</label>
+                    <Input
+                      type="number"
+                      value={refinanceInputs.currentBalance}
+                      onChange={(e) => setRefinanceInputs({...refinanceInputs, currentBalance: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Monthly Payment ($)</label>
+                    <Input
+                      type="number"
+                      value={refinanceInputs.currentPayment}
+                      onChange={(e) => setRefinanceInputs({...refinanceInputs, currentPayment: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Interest Rate (%)</label>
+                    <Input
+                      type="number"
+                      value={refinanceInputs.currentRate}
+                      onChange={(e) => setRefinanceInputs({...refinanceInputs, currentRate: Number(e.target.value)})}
+                    />
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-4">New Loan</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Term (Years)</label>
+                    <select 
+                      className="w-full h-9 px-3 rounded-md border mt-2"
+                      value={refinanceInputs.newTerm}
+                      onChange={(e) => setRefinanceInputs({...refinanceInputs, newTerm: Number(e.target.value)})}
+                    >
+                      <option value="30">30 Years</option>
+                      <option value="20">20 Years</option>
+                      <option value="15">15 Years</option>
+                      <option value="10">10 Years</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Interest Rate (%)</label>
+                    <Input
+                      type="number"
+                      value={refinanceInputs.newRate}
+                      onChange={(e) => setRefinanceInputs({...refinanceInputs, newRate: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Closing Costs ($)</label>
+                    <Input
+                      type="number"
+                      value={refinanceInputs.closingCosts}
+                      onChange={(e) => setRefinanceInputs({...refinanceInputs, closingCosts: Number(e.target.value)})}
+                    />
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            <div className="bg-black text-white p-8 rounded-lg">
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="text-4xl font-bold">${calculateMonthlySavings()}</div>
+                  <div className="text-sm opacity-80 mt-2">MONTHLY SAVINGS</div>
+                </div>
+
+                <div className="border-t border-white/20 pt-6 space-y-4">
+                  <div className="flex justify-between">
+                    <div>Current Payment</div>
+                    <div>${refinanceInputs.currentPayment.toFixed(2)}</div>
+                  </div>
+                  <div className="flex justify-between">
+                    <div>New Payment</div>
+                    <div className="text-emerald-400">${calculateNewPayment().toFixed(2)}</div>
+                  </div>
+                  <div className="flex justify-between">
+                    <div>Total Interest Savings</div>
+                    <div className="text-emerald-400">${calculateInterestSavings().toFixed(2)}</div>
+                  </div>
+                  <div className="flex justify-between">
+                    <div>Break-even Period</div>
+                    <div>{calculateBreakEven()} months</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+        
         <TabsContent value="rent">
           {/* Existing rent vs buy calculator content */}
         </TabsContent>
