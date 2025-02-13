@@ -80,7 +80,7 @@ export function Timeline({ transactions }: TimelineProps) {
 
         {/* Current date marker */}
         <div
-          className="absolute w-4 h-4 bg-destructive rounded-full cursor-pointer"
+          className="absolute w-4 h-4 bg-blue-500 rounded-full cursor-pointer"
           style={{
             left: `${((today.getDate() - 1) / (daysInMonth - 1)) * 100}%`,
             top: '-5px',
