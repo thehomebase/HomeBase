@@ -119,14 +119,12 @@ export function KanbanBoard({ transactions }: { transactions: Transaction[] }) {
     if (!over) return;
 
     const transactionId = Number(active.id);
-    const newStatus = over.id;
+    const newStatus = over.id.toString();
 
-    if (newStatus) {
-      updateTransactionStatus.mutate({
-        id: transactionId,
-        newStatus: newStatus,
-      });
-    }
+    updateTransactionStatus.mutate({
+      id: transactionId,
+      newStatus: newStatus,
+    });
   };
 
   return (
