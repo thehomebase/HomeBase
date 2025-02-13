@@ -9,6 +9,7 @@ export function NavTabs() {
 
   const tabs = [
     { name: "Transactions", href: "/" },
+    ...(isClient ? [{ name: "Calculators", href: "/calculators" }] : []),
     ...(isClient ? [] : [{ name: "Clients", href: "/clients" }]),
     { name: "Calendar", href: "/calendar" },
     ...(user?.role === 'agent' ? [{ name: "Data", href: "/data" }] : []),
