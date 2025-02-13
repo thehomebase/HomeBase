@@ -98,7 +98,7 @@ function DraggableCard({
         </div>
         <div className="text-xs space-y-1.5">
           <div className="flex justify-between items-center">
-            <span className="capitalize font-medium text-primary">
+            <span className="capitalize font-medium text-primary dark:text-white">
               {transaction.type === "buy" ? "Purchase" : "Sale"}
             </span>
             <span>{formatPrice(transaction.contractPrice)}</span>
