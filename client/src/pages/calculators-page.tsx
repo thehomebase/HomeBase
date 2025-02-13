@@ -10,6 +10,7 @@ export default function CalculatorsPage() {
     purchasePrice: 250000,
     downPayment: 12500,
     annualTaxes: 2500,
+    taxRate: 1,
     interestRate: 5,
     loanTerm: "30",
     annualInsurance: 600,
@@ -92,14 +93,32 @@ export default function CalculatorsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium">Annual Taxes ($)</label>
-                  <Input
-                    type="number"
-                    value={mortgageInputs.annualTaxes}
-                    onChange={(e) => setMortgageInputs({...mortgageInputs, annualTaxes: Number(e.target.value)})}
+                  <label className="text-sm font-medium">Loan Term</label>
+                  <select 
+                    className="w-full h-9 px-3 rounded-md border mt-2"
+                    value={mortgageInputs.loanTerm}
+                    onChange={(e) => setMortgageInputs({...mortgageInputs, loanTerm: e.target.value})}
+                  >
+                    <option value="30">30 Years</option>
+                    <option value="15">15 Years</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Annual Tax Rate ({mortgageInputs.taxRate}%)</label>
+                  <Slider
+                    value={[mortgageInputs.taxRate]}
+                    onValueChange={(value) => setMortgageInputs({
+                      ...mortgageInputs,
+                      taxRate: value[0],
+                      annualTaxes: Math.round(mortgageInputs.purchasePrice * value[0] / 100)
+                    })}
+                    max={3}
+                    step={0.1}
                   />
+                  <div className="text-sm text-muted-foreground">Annual Tax: ${mortgageInputs.annualTaxes.toLocaleString()}</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Annual Insurance ($)</label>
