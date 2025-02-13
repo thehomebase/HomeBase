@@ -24,8 +24,8 @@ export function NavTabs() {
               className={cn(
                 "whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors",
                 location === tab.href
-                  ? "border-primary text-white"
-                  : "border-transparent text-white/70 hover:border-white/40 hover:text-white"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:border-primary/40 hover:text-primary"
               )}
             >
               {tab.name}
