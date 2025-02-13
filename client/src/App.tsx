@@ -66,6 +66,7 @@ function Router() {
           </Route>
           <ProtectedRoute path="/" component={TransactionsPage} />
           <ProtectedRoute path="/transactions" component={TransactionsPage} />
+          <ProtectedRoute path="/calculators" component={CalculatorsPage} />
           <ProtectedRoute path="/clients" component={ClientsPage} />
           <ProtectedRoute path="/calendar" component={CalendarPage} />
           <Route path="/data" component={DataPage} />
