@@ -1,3 +1,13 @@
+
+export const privateMessages = pgTable("private_messages", {
+  id: serial("id").primaryKey(),
+  senderId: integer("sender_id").notNull(),
+  recipientId: integer("recipient_id").notNull(),
+  content: text("content").notNull(),
+  timestamp: text("timestamp").notNull(),
+  read: boolean("read").notNull().default(false),
+});
+
 import { pgTable, serial, text, timestamp, integer, boolean, json, numeric } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from "zod";

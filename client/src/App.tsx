@@ -34,9 +34,9 @@ function Layout({ children }: { children: React.ReactNode }) {
               <span className="text-sm text-muted-foreground">
                 Logged in as {user.username} ({user.role})
               </span>
-              <Button variant="outline" size="sm" onClick={() => window.location.href = `mailto:${user.email}`}>
+              <Button variant="outline" size="sm" onClick={() => window.location.href = "/messages"}>
                 <Mail className="h-4 w-4 mr-2" />
-                Mail
+                Messages
               </Button>
               <Button variant="outline" size="sm" onClick={() => logoutMutation.mutate()}>
                 <LogOut className="h-4 w-4 mr-2" />
