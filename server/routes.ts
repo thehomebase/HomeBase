@@ -313,7 +313,35 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Messages
-  app.get("/api/messages", async (req, res) => {
+  app.get("/api/messages/recipients", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      // Get all transactions for the user
+      const transactions = await storage.getTransactionsByUser(req.user.id);
+      
+      // Get all unique contacts from these transactions
+      const contacts = await Promise.all(
+        transactions.map(t => storage.getContactsByTransaction(t.id))
+      );
+      
+      // Flatten and remove duplicates
+      const uniqueContacts = Array.from(new Set(
+        contacts.flat().map(c => ({
+          id: c.id,
+          name: `${c.firstName} ${c.lastName}`,
+          role: c.role,
+          email: c.email
+        }))
+      ));
+      
+      res.json(uniqueContacts);
+    } catch (error) {
+      console.error('Error fetching recipients:', error);
+      res.status(500).send('Error fetching recipients');
+    }
+  });
+
+app.get("/api/messages", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const transactionId = req.query.transactionId ? Number(req.query.transactionId) : undefined;

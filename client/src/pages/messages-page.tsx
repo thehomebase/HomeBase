@@ -7,17 +7,25 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface Recipient {
+  id: number;
+  name: string;
+  role: string;
+  email: string;
+}
 
 export default function MessagesPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState("");
-  const [selectedUser, setSelectedUser] = useState<number | null>(null);
+  const [selectedRecipient, setSelectedRecipient] = useState<string>("");
 
-  const { data: users = [] } = useQuery({
-    queryKey: ["/api/users"],
+  const { data: recipients = [] } = useQuery<Recipient[]>({
+    queryKey: ["/api/messages/recipients"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/users");
+      const response = await apiRequest("GET", "/api/messages/recipients");
       return response.json();
     },
     enabled: !!user,
@@ -35,7 +43,7 @@ export default function MessagesPage() {
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       const response = await apiRequest("POST", "/api/messages", {
-        recipientId: selectedUser,
+        recipientId: selectedRecipient,
         content,
       });
       return response.json();
@@ -48,7 +56,7 @@ export default function MessagesPage() {
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim() && selectedUser) {
+    if (message.trim() && selectedRecipient) {
       sendMessageMutation.mutate(message);
     }
   };
@@ -57,22 +65,23 @@ export default function MessagesPage() {
     <main className="container mx-auto px-4 py-8">
       <h2 className="text-2xl font-bold mb-8">Messages</h2>
       <div className="flex gap-4">
-        <select 
-          className="mb-4 p-2 rounded border"
-          value={selectedUser || ""}
-          onChange={(e) => setSelectedUser(Number(e.target.value))}
+        <Select 
+          value={selectedRecipient} 
+          onValueChange={setSelectedRecipient}
         >
-          <option value="">Select recipient...</option>
-          {users.map((u: any) => (
-            u.id !== user?.id && (
-              <option key={u.id} value={u.id}>
-                {u.username} ({u.role})
-              </option>
-            )
-          ))}
-        </select>
+          <SelectTrigger className="w-[300px]">
+            <SelectValue placeholder="Select recipient..." />
+          </SelectTrigger>
+          <SelectContent>
+            {recipients.map((recipient) => (
+              <SelectItem key={recipient.id} value={recipient.id.toString()}>
+                {recipient.name} ({recipient.role})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      <Card className="flex flex-col h-[600px]">
+      <Card className="flex flex-col h-[600px] mt-4">
         <ScrollArea className="flex-grow p-4">
           <div className="space-y-4">
             {messages.map((msg: any) => (
@@ -106,11 +115,11 @@ export default function MessagesPage() {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Type your message..."
-            disabled={!selectedUser || sendMessageMutation.isPending}
+            disabled={!selectedRecipient || sendMessageMutation.isPending}
           />
           <Button
             type="submit"
-            disabled={!selectedUser || sendMessageMutation.isPending || !message.trim()}
+            disabled={!selectedRecipient || sendMessageMutation.isPending || !message.trim()}
           >
             Send
           </Button>
