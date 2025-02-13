@@ -7,7 +7,7 @@ import TransactionsPage from "@/pages/transactions-page";
 import ClientsPage from "@/pages/clients-page";
 import TransactionPage from "@/pages/transaction-page";
 import CalendarPage from "@/pages/calendar-page";
-import DataPage from "./pages/data-page"; // Added import for DataPage
+import DataPage from "./pages/data-page";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "./hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import React from "react";
+import CalculatorsPage from "@/pages/calculators-page"; //Import CalculatorsPage
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -46,22 +47,41 @@ function Layout({ children }: { children: React.ReactNode }) {
 }
 
 function Router() {
+  const { user } = useAuth();
+
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
-      <Route path="/transactions/:id">
-        {(params) => (
-          <ProtectedRoute
-            path="/transactions/:id"
-            component={() => <TransactionPage />}
-          />
-        )}
-      </Route>
-      <ProtectedRoute path="/" component={TransactionsPage} />
-      <ProtectedRoute path="/transactions" component={TransactionsPage} />
-      <ProtectedRoute path="/clients" component={ClientsPage} />
-      <ProtectedRoute path="/calendar" component={CalendarPage} />
-      <Route path="/data" component={DataPage} /> {/* Added route for DataPage */}
+      {user?.role === "agent" ? (
+        <>
+          <Route path="/transactions/:id">
+            {(params) => (
+              <ProtectedRoute
+                path="/transactions/:id"
+                component={() => <TransactionPage />}
+              />
+            )}
+          </Route>
+          <ProtectedRoute path="/" component={TransactionsPage} />
+          <ProtectedRoute path="/transactions" component={TransactionsPage} />
+          <ProtectedRoute path="/clients" component={ClientsPage} />
+          <ProtectedRoute path="/calendar" component={CalendarPage} />
+          <Route path="/data" component={DataPage} />
+        </>
+      ) : (
+        <>
+          <ProtectedRoute path="/" component={CalculatorsPage} />
+          <ProtectedRoute path="/calculators" component={CalculatorsPage} />
+          <Route path="/transactions/:id">
+            {(params) => (
+              <ProtectedRoute
+                path="/transactions/:id"
+                component={() => <TransactionPage />}
+              />
+            )}
+          </Route>
+        </>
+      )}
       <Route component={NotFound} />
     </Switch>
   );
