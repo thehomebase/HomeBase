@@ -528,6 +528,7 @@ export default function TransactionPage() {
                     <select
                       className="w-full h-9 px-3 rounded-md border"
                       {...form.register("clientId")}
+                      defaultValue={transaction.clientId || ""}
                     >
                       <option value="">Select client</option>
                       {clients.map((client) => (
