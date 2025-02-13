@@ -26,30 +26,67 @@ function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Logo />
-          {user && (
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">
-                Logged in as {user.username} ({user.role})
-              </span>
-              <Button variant="outline" size="sm" onClick={() => window.location.href = "/messages"}>
-                <Mail className="h-4 w-4 mr-2" />
-                Messages
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => logoutMutation.mutate()}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          )}
+    <SidebarProvider defaultOpen>
+      <div className="min-h-screen flex bg-background">
+        {user && (
+          <Sidebar side="left" collapsible="icon">
+            <SidebarHeader>
+              <Logo />
+            </SidebarHeader>
+            <SidebarContent>
+              <SidebarGroup>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Home">
+                      <a href="/">Home</a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Transactions">
+                      <a href="/transactions">Transactions</a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Clients">
+                      <a href="/clients">Clients</a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Calendar">
+                      <a href="/calendar">Calendar</a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Messages">
+                      <a href="/messages">Messages</a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Calculators">
+                      <a href="/calculators">Calculators</a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroup>
+            </SidebarContent>
+            <SidebarFooter>
+              <div className="flex flex-col gap-2">
+                <span className="text-xs text-muted-foreground px-2">
+                  {user?.username} ({user?.role})
+                </span>
+                <Button variant="outline" size="sm" onClick={() => logoutMutation.mutate()}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              </div>
+            </SidebarFooter>
+          </Sidebar>
+        )}
+        <div className="flex-1">
+          {children}
         </div>
-      </header>
-      {user && <NavTabs />}
-      {children}
-    </div>
+      </div>
+    </SidebarProvider>
   );
 }
 
