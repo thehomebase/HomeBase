@@ -5,12 +5,15 @@ import { DayPicker } from "react-day-picker"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 
-export type CalendarProps = React.ComponentProps<typeof DayPicker>
+export interface CalendarProps extends React.ComponentProps<typeof DayPicker> {
+  todayColor?: string;
+}
 
 function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  todayColor = "bg-blue-500",
   ...props
 }: CalendarProps) {
   return (
@@ -42,7 +45,7 @@ function Calendar({
         day_range_end: "day-range-end",
         day_selected:
           "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-        day_today: "bg-blue-500 text-white rounded-full hover:bg-blue-600",
+        day_today: `${todayColor} text-white rounded-full hover:${todayColor.replace('bg-', 'hover:bg-')}`,
         day_outside:
           "day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
         day_disabled: "text-muted-foreground opacity-50",
