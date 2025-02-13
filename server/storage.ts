@@ -430,7 +430,6 @@ export class DatabaseStorage implements IStorage {
         clientId: row.client_id ? Number(row.client_id) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
         contractPrice: row.contract_price ? Number(row.contract_price) : null,
-        optionPeriod: row.option_period ? Number(row.option_period) : null,
         optionFee: row.option_fee ? Number(row.option_fee) : null,
         earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
         downPayment: row.down_payment ? Number(row.down_payment) : null,
