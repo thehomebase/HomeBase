@@ -45,39 +45,40 @@ export function setupAuth(app: Express) {
   app.use(passport.session());
 
   passport.use(
-    new LocalStrategy({
-      usernameField: 'email',
-      passwordField: 'password'
-    }, async (email, password, done) => {
-      const user = await storage.getUserByEmail(email);
-      if (!user || !(await comparePasswords(password, user.password))) {
-        return done(null, false);
-      } else {
+    new LocalStrategy(async (username, password, done) => {
+      try {
+        const user = await storage.getUserByUsername(username);
+        if (!user || !(await comparePasswords(password, user.password))) {
+          return done(null, false);
+        }
         return done(null, user);
+      } catch (error) {
+        return done(error);
       }
     }),
   );
 
   passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
-    const user = await storage.getUser(id);
-    done(null, user);
+    try {
+      const user = await storage.getUser(id);
+      done(null, user);
+    } catch (error) {
+      done(error);
+    }
   });
 
   app.post("/api/register", async (req, res, next) => {
     try {
-      const existingUser = await storage.getUserByEmail(req.body.email);
+      const existingUser = await storage.getUserByUsername(req.body.username);
       if (existingUser) {
-        return res.status(400).send("Email already exists");
+        return res.status(400).send("Username already exists");
       }
 
       const user = await storage.createUser({
-        email: req.body.email,
+        username: req.body.username,
         password: await hashPassword(req.body.password),
-        first_name: req.body.firstName,
-        last_name: req.body.lastName,
-        role: req.body.role || 'client',
-        agent_id: req.body.agentId ? parseInt(req.body.agentId) : null
+        role: req.body.role || 'client'
       });
 
       req.login(user, (err) => {

@@ -143,31 +143,6 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    try {
-      const result = await db.execute(sql`
-        SELECT id, email, password, role 
-        FROM users 
-        WHERE email = ${email}
-      `);
-
-      if (result.rows.length === 0) {
-        return undefined;
-      }
-
-      const user = result.rows[0];
-      return {
-        id: Number(user.id),
-        email: String(user.email),
-        password: String(user.password),
-        role: String(user.role)
-      };
-    } catch (error) {
-      console.error('Error in getUserByEmail:', error);
-      return undefined;
-    }
-  }
-
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
       const result = await db.execute(sql`
@@ -194,8 +169,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
+    try {
+      // Validate required fields
+      if (!insertUser.username || !insertUser.password) {
+        throw new Error('Username and password are required');
+      }
+
+      const result = await db.execute(sql`
+        INSERT INTO users (username, password, role)
+        VALUES (${insertUser.username}, ${insertUser.password}, ${insertUser.role || 'user'})
+        RETURNING id, username, role
+      `);
+
+      if (!result.rows[0]) {
+        throw new Error('Failed to create user');
+      }
+
+      return {
+        id: Number(result.rows[0].id),
+        username: String(result.rows[0].username),
+        password: String(result.rows[0].password),
+        role: String(result.rows[0].role)
+      };
+    } catch (error) {
+      console.error('Error in createUser:', error);
+      throw error;
+    }
   }
 
   async getTransactionByAccessCode(accessCode: string): Promise<Transaction | null> {
@@ -400,16 +399,23 @@ export class DatabaseStorage implements IStorage {
 
   async updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction> {
     try {
-      // Remove any undefined values and format the data
       const cleanData: Record<string, any> = {};
       Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined) {
           // Convert camelCase to snake_case for SQL
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
-          // Handle date fields
+          // Handle date fields consistently
           if (['closing_date', 'contract_execution_date', 'option_period_expiration'].includes(snakeKey)) {
-            cleanData[snakeKey] = value || null;
+            console.log(`Processing date field ${snakeKey}:`, value);
+            if (value) {
+              const date = new Date(value);
+              date.setUTCHours(12, 0, 0, 0);
+              console.log(`Converted date for ${snakeKey}:`, date.toISOString());
+              cleanData[snakeKey] = date.toISOString();
+            } else {
+              cleanData[snakeKey] = null;
+            }
           } else if (key === 'participants' && Array.isArray(value)) {
             cleanData[snakeKey] = JSON.stringify(value);
           } else if (value === null) {
@@ -419,10 +425,6 @@ export class DatabaseStorage implements IStorage {
           }
         }
       });
-
-      if (Object.keys(cleanData).length === 0) {
-        throw new Error('No valid fields to update');
-      }
 
       console.log('Clean data for SQL update:', cleanData);
 
@@ -444,25 +446,7 @@ export class DatabaseStorage implements IStorage {
         UPDATE transactions
         SET ${sql.join(setColumns, sql`, `)}
         WHERE id = ${id}
-        RETURNING id, 
-          address,
-          access_code,
-          status,
-          type,
-          agent_id,
-          client_id,
-          participants,
-          contract_price,
-          option_period,
-          option_fee,
-          earnest_money,
-          down_payment,
-          seller_concessions,
-          closing_date,
-          contract_execution_date,
-          option_period_expiration,
-          mls_number,
-          financing
+        RETURNING *
       `);
 
       if (!result.rows[0]) {
@@ -480,14 +464,15 @@ export class DatabaseStorage implements IStorage {
         clientId: row.client_id ? Number(row.client_id) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
         contractPrice: row.contract_price ? Number(row.contract_price) : null,
+        optionPeriod: row.option_period ? Number(row.option_period) : null,
         optionFee: row.option_fee ? Number(row.option_fee) : null,
         earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
         downPayment: row.down_payment ? Number(row.down_payment) : null,
         sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
-        closingDate: row.closing_date ? String(row.closing_date) : null,
-        contractExecutionDate: row.contract_execution_date ? String(row.contract_execution_date) : null,
-        optionPeriodExpiration: row.option_period_expiration ? String(row.option_period_expiration) : null,
-        mlsNumber: row.mls_number ? String(row.mls_number) : null,
+        closingDate: row.closing_date ? new Date(row.closing_date).toISOString() : null,
+        contractExecutionDate: row.contract_execution_date ? new Date(row.contract_execution_date).toISOString() : null,
+        optionPeriodExpiration: row.option_period_expiration ? new Date(row.option_period_expiration).toISOString() : null,
+        mlsNumber: row.mls_number || null,
         financing: row.financing || null
       };
     } catch (error) {
@@ -910,7 +895,7 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error in createClient:', error);
       throw error;
-        }
+    }
   }
 
   async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
