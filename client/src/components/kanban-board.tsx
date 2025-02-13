@@ -77,14 +77,9 @@ function DraggableCard({
         variant="ghost"
         size="icon"
         className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 text-destructive hover:text-destructive"
-        onClick={async (e) => {
+        onClick={(e) => {
           e.stopPropagation();
-          try {
-            await deleteTransactionMutation.mutateAsync(transaction.id);
-            onDelete(transaction.id);
-          } catch (error) {
-            console.error('Failed to delete transaction:', error);
-          }
+          onDelete(transaction.id);
         }}
       >
         <Trash2 className="h-4 w-4" />

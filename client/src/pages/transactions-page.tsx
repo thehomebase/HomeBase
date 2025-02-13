@@ -94,15 +94,14 @@ export default function TransactionsPage() {
       if (!response.ok) {
         throw new Error('Failed to delete transaction');
       }
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      refetch();
       toast({
         title: "Success",
         description: "Transaction deleted successfully",
       });
-      setDeleteId(null);
     },
     onError: () => {
       toast({
