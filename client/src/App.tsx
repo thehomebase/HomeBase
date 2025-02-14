@@ -26,8 +26,8 @@ import { Logo } from "@/components/ui/logo";
 import { NavTabs } from "@/components/ui/nav-tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { 
-  LogOut, 
+import {
+  LogOut,
   Menu,
   Home,
   FileText,
@@ -68,8 +68,8 @@ function Layout({ children }: { children: React.ReactNode }) {
         )}
 
         {user && (
-          <Sidebar 
-            side="left" 
+          <Sidebar
+            side="left"
             collapsible="icon"
             className={`transition-transform duration-200 ease-in-out ${
               isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -77,8 +77,8 @@ function Layout({ children }: { children: React.ReactNode }) {
               isCompact ? 'w-[70px]' : 'w-[240px]'
             }`}
           >
-            <SidebarHeader>
-              <div className="flex items-center justify-between px-4 py-2">
+            <SidebarHeader className="mb-2">
+              <div className="flex items-center justify-between px-4 py-4">
                 <Logo isCompact={isCompact} />
                 <Button
                   variant="ghost"
@@ -97,14 +97,6 @@ function Layout({ children }: { children: React.ReactNode }) {
             <SidebarContent>
               <SidebarGroup>
                 <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild tooltip="Home">
-                      <Link href="/" className="flex items-center gap-2">
-                        <Home className="h-4 w-4" />
-                        {!isCompact && "Home"}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
                   {!isClient && (
                     <>
                       <SidebarMenuItem>
@@ -169,9 +161,9 @@ function Layout({ children }: { children: React.ReactNode }) {
                     {user?.email} ({user?.role})
                   </span>
                 )}
-                <Button 
-                  variant="outline" 
-                  size={isCompact ? "icon" : "sm"} 
+                <Button
+                  variant="outline"
+                  size={isCompact ? "icon" : "sm"}
                   onClick={() => logoutMutation.mutate()}
                   className="w-full"
                 >
