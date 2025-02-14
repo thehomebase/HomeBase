@@ -77,7 +77,7 @@ export default function CalculatorsPage() {
   }, [mortgageInputs]);
 
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main className="px-4 py-8">
       <h1 className="text-2xl font-bold mb-8">Financial Calculators</h1>
 
       <Tabs defaultValue="mortgage" className="space-y-4">
