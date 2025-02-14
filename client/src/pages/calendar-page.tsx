@@ -77,8 +77,8 @@ export default function CalendarPage() {
   };
 
   return (
-    <main className="px-4 py-8 w-full">
-      <div className="w-full px-4 py-4">
+    <main className="w-full h-full overflow-hidden">
+      <div className="p-6">
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-2xl font-bold">Calendar</h2>
         <div className="flex items-center gap-2">
@@ -110,7 +110,8 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <Card className="p-6 overflow-x-auto">
+      <Card className="h-[calc(100vh-10rem)] overflow-auto">
+        <div className="p-6">
         <Timeline transactions={transactions} />
         {!showTable ? (
           <Scheduler
@@ -197,6 +198,7 @@ export default function CalendarPage() {
             </Table>
           </div>
         )}
+        </div>
       </Card>
       </div>
     </main>
