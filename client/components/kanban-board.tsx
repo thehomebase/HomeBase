@@ -13,6 +13,7 @@ interface Column {
   tasks: Task[];
 }
 
+const isMobile = window.innerWidth <= 768; // Added media query check
 
 const KanbanBoard: React.FC<{ statusColumns: Column[] }> = ({ statusColumns }) => {
   return (
