@@ -78,18 +78,18 @@ export default function CalculatorsPage() {
 
   return (
     <main className="px-4 py-8 w-full">
-      <h1 className="text-2xl font-bold mb-8">Financial Calculators</h1>
-
-      <Tabs defaultValue="mortgage" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="mortgage">Mortgage Calculator</TabsTrigger>
-          <TabsTrigger value="refinance">Refinance Calculator</TabsTrigger>
-          <TabsTrigger value="rent">Rent vs Buy</TabsTrigger>
+      <div className="container mx-auto px-2 sm:px-4 py-4 max-w-screen-xl">
+      <h1 className="text-2xl sm:text-4xl font-bold mb-6">Financial Calculators</h1>
+      <Tabs defaultValue="mortgage" className="w-full">
+        <TabsList className="w-full flex-wrap">
+          <TabsTrigger value="mortgage" className="flex-1">Mortgage Calculator</TabsTrigger>
+          <TabsTrigger value="refinance" className="flex-1">Refinance Calculator</TabsTrigger>
+          <TabsTrigger value="rent" className="flex-1">Rent vs Buy</TabsTrigger>
         </TabsList>
 
         <TabsContent value="mortgage">
-          <div className="grid grid-cols-1 xl:grid-cols-3 lg:grid-cols-2 gap-6">
-            <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="space-y-4">
                 <label className="text-sm font-medium">Purchase Price</label>
                 <Input
@@ -335,6 +335,7 @@ export default function CalculatorsPage() {
           {/* Existing rent vs buy calculator content */}
         </TabsContent>
       </Tabs>
+      </div>
     </main>
   );
 }
