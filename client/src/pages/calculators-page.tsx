@@ -78,19 +78,19 @@ export default function CalculatorsPage() {
 
   return (
     <main className="px-4 py-8 w-full">
-      <div className="container mx-auto px-2 sm:px-4 py-4 max-w-screen-xl">
-      <h1 className="text-2xl sm:text-4xl font-bold mb-6">Financial Calculators</h1>
+      <div className="container mx-auto px-4 py-4 max-w-screen-xl">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6">Financial Calculators</h1>
       <Tabs defaultValue="mortgage" className="w-full">
-        <TabsList className="w-full flex-wrap">
-          <TabsTrigger value="mortgage" className="flex-1">Mortgage Calculator</TabsTrigger>
-          <TabsTrigger value="refinance" className="flex-1">Refinance Calculator</TabsTrigger>
-          <TabsTrigger value="rent" className="flex-1">Rent vs Buy</TabsTrigger>
+        <TabsList className="w-full flex flex-wrap">
+          <TabsTrigger value="mortgage" className="flex-1 min-w-[120px] h-10">Mortgage Calculator</TabsTrigger>
+          <TabsTrigger value="refinance" className="flex-1 min-w-[120px] h-10">Refinance Calculator</TabsTrigger>
+          <TabsTrigger value="rent" className="flex-1 min-w-[120px] h-10">Rent vs Buy</TabsTrigger>
         </TabsList>
 
         <TabsContent value="mortgage">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            <div className="space-y-4 sm:space-y-6">
-              <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              <div className="space-y-3">
                 <label className="text-sm font-medium">Purchase Price</label>
                 <Input
                   type="number"
@@ -171,7 +171,7 @@ export default function CalculatorsPage() {
               </div>
             </div>
 
-            <div className="bg-black text-white p-8 rounded-lg">
+            <div className="bg-black text-white p-6 lg:p-8 rounded-lg sticky top-4 h-fit">
               <div className="text-center mb-8">
                 <div className="text-5xl font-bold">${monthlyPayment.total.toFixed(2)}</div>
                 <div className="text-sm opacity-80 mt-2">MONTHLY PAYMENT</div>
