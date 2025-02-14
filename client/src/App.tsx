@@ -54,7 +54,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="flex min-h-screen bg-background overflow-hidden">
+      <div className="flex h-screen bg-background">
         {/* Mobile Menu Toggle */}
         {user && (
           <Button
@@ -71,7 +71,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Sidebar
             side="left"
             collapsible="icon"
-            className={`absolute md:fixed h-screen transition-all duration-200 ease-in-out ${
+            className={`fixed h-screen transition-all duration-200 ease-in-out ${
               isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
             } md:translate-x-0 ${
               isCompact ? 'w-[60px]' : 'w-[220px]'
@@ -175,11 +175,11 @@ function Layout({ children }: { children: React.ReactNode }) {
           </Sidebar>
         )}
         <main
-          className={`flex-1 min-h-screen overflow-x-hidden ${
+          className={`flex-1 h-screen overflow-x-hidden ${
             user ? (
               isCompact
-                ? 'pl-[60px]'
-                : 'pl-[220px]'
+                ? 'md:ml-[60px]'
+                : 'md:ml-[220px]'
             ) : ''
           }`}
         >
