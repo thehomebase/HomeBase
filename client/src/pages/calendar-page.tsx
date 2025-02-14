@@ -124,12 +124,6 @@ export default function CalendarPage() {
             deletable={false}
             draggable={false}
             views={["month", "week", "day"]}
-            month={{
-              weekDays: [0, 1, 2, 3, 4, 5, 6],
-              weekStartOn: 0,
-              startHour: 0,
-              endHour: 23,
-            }}
             week={{
               weekDays: [0, 1, 2, 3, 4, 5, 6],
               weekStartOn: 0,
