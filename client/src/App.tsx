@@ -62,9 +62,9 @@ function Layout({ children }: { children: React.ReactNode }) {
           }`}>
             <Sidebar
               side="left"
-              collapsible="icon"
-              className={`fixed inset-y-0 left-0 z-40 border-r bg-background ${
-                isSidebarOpen ? 'translate-x-0 w-[220px]' : 'w-[60px]'
+              collapsible="none"
+              className={`fixed inset-y-0 left-0 z-40 border-r bg-background md:border-r-0 ${
+                isSidebarOpen ? 'w-[220px]' : 'w-[60px]'
               }`}
             >
               <SidebarHeader>
