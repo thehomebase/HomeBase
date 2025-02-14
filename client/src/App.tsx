@@ -54,7 +54,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="min-h-screen flex bg-background relative">
+      <div className="min-h-screen grid grid-cols-[auto,1fr] bg-background relative">
         {/* Mobile Menu Toggle */}
         {user && (
           <Button
@@ -174,13 +174,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             </SidebarFooter>
           </Sidebar>
         )}
-        <div className={`flex-1 transition-all duration-200 overflow-x-hidden ${
-          user ? (
-            isCompact
-              ? 'p-0'
-              : 'pl-0 pr-2 md:pl-0 md:pr-4'
-          ) : 'px-2 md:px-4'
-        } py-0 md:py-0 w-full max-w-[2000px] mx-auto`}>
+        <div className="grid grid-cols-1 transition-all duration-200 overflow-x-hidden px-4 py-0 max-w-[2000px] w-full">
           {children}
         </div>
       </div>
