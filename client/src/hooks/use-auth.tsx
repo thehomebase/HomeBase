@@ -17,9 +17,10 @@ type AuthContextType = {
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
 };
 
-type LoginData = Pick<InsertUser, "username" | "password">;
+type LoginData = Pick<InsertUser, "email" | "password">;
 
 export const AuthContext = createContext<AuthContextType | null>(null);
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const {
@@ -34,12 +35,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       const res = await apiRequest("POST", "/api/login", credentials);
-      return await res.json();
+      const data = await res.json();
+      if (!data.role) {
+        throw new Error('Invalid user role received from server');
+      }
+      return data;
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      console.log('Login successful, user role:', user.role);
     },
     onError: (error: Error) => {
+      console.error('Login error:', error);
       toast({
         title: "Login failed",
         description: error.message,
@@ -57,8 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/user"], user);
       // Initialize empty clients data to prevent undefined error
       queryClient.setQueryData(["/api/clients"], []);
+      console.log('Registration successful, user role:', user.role);
     },
     onError: (error: Error) => {
+      console.error('Registration error:', error);
       toast({
         title: "Registration failed",
         description: error.message,
@@ -73,8 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
+      console.log('Logout successful');
     },
     onError: (error: Error) => {
+      console.error('Logout error:', error);
       toast({
         title: "Logout failed",
         description: error.message,

@@ -93,8 +93,14 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/clients", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated()) {
+      console.log('Auth check failed, user not authenticated');
       return res.sendStatus(401);
+    }
+
+    if (req.user.role !== "agent") {
+      console.log('Role check failed, user role:', req.user.role);
+      return res.sendStatus(403); // Changed to 403 for proper authorization error
     }
 
     try {
