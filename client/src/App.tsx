@@ -65,7 +65,6 @@ function Layout({ children }: { children: React.ReactNode }) {
               side="left"
               collapsible="none"
               className="fixed inset-y-0 left-0 z-40 border-r bg-background w-[60px]"
-              }`}
             >
               <SidebarHeader>
                 <div className="flex items-center justify-between p-2">
