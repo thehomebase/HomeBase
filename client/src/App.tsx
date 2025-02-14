@@ -69,13 +69,13 @@ function Layout({ children }: { children: React.ReactNode }) {
 
         {user && (
           <div className={`lg:relative transition-all duration-200 ease-in-out ${
-            isSidebarOpen ? 'w-[220px]' : '!w-0 lg:!w-[60px]'
+            isSidebarOpen ? 'w-[60px] lg:w-[220px]' : '!w-0 lg:!w-[60px]'
           }`}>
             <Sidebar
               side="left"
               collapsible="icon"
               className={`absolute inset-y-0 left-0 z-40 border-r bg-background ${
-                isSidebarOpen ? 'translate-x-0 w-[220px]' : '-translate-x-full md:translate-x-0 md:w-[60px]'
+                isSidebarOpen ? 'translate-x-0 w-[60px] lg:w-[220px]' : '-translate-x-full md:translate-x-0 md:w-[60px]'
               }`}
             >
               <SidebarHeader>
