@@ -68,111 +68,113 @@ function Layout({ children }: { children: React.ReactNode }) {
         )}
 
         {user && (
-          <Sidebar
-            side="left"
-            collapsible="icon"
-            className={`fixed h-screen transition-all duration-200 ease-in-out ${
-              isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-            } md:translate-x-0 ${
-              isCompact ? 'w-[60px]' : 'w-[220px]'
-            } z-40 border-r bg-background`}
-          >
-            <SidebarHeader>
-              <div className="flex items-center justify-between p-2">
-                <Logo isCompact={isCompact} />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleCompact}
-                  className="hidden md:flex"
-                >
-                  {isCompact ? (
-                    <PanelLeft className="h-4 w-4" />
-                  ) : (
-                    <PanelLeftClose className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </SidebarHeader>
-            <SidebarContent>
-              <SidebarGroup>
-                <SidebarMenu>
-                  {!isClient && (
-                    <>
-                      <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Transactions">
-                          <Link href="/transactions" className="flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
-                            {!isCompact && "Transactions"}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                      <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Clients">
-                          <Link href="/clients" className="flex items-center gap-2">
-                            <Users className="h-4 w-4" />
-                            {!isCompact && "Clients"}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    </>
-                  )}
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild tooltip="Calendar">
-                      <Link href="/calendar" className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        {!isCompact && "Calendar"}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild tooltip="Messages">
-                      <Link href="/messages" className="flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4" />
-                        {!isCompact && "Messages"}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild tooltip="Calculators">
-                      <Link href="/calculators" className="flex items-center gap-2">
-                        <Calculator className="h-4 w-4" />
-                        {!isCompact && "Calculators"}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  {isClient && (
+          <div className={`md:relative transition-all duration-200 ease-in-out ${
+            isSidebarOpen ? 'w-[220px]' : '!w-0 md:!w-[60px]'
+          }`}>
+            <Sidebar
+              side="left"
+              collapsible="icon"
+              className={`absolute inset-y-0 left-0 z-40 border-r bg-background ${
+                isSidebarOpen ? 'translate-x-0 w-[220px]' : '-translate-x-full md:translate-x-0 md:w-[60px]'
+              }`}
+            >
+              <SidebarHeader>
+                <div className="flex items-center justify-between p-2">
+                  <Logo isCompact={!isSidebarOpen} />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleCompact}
+                    className="hidden md:flex"
+                  >
+                    {!isSidebarOpen ? (
+                      <PanelLeft className="h-4 w-4" />
+                    ) : (
+                      <PanelLeftClose className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </SidebarHeader>
+              <SidebarContent>
+                <SidebarGroup>
+                  <SidebarMenu>
+                    {!isClient && (
+                      <>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Transactions">
+                            <Link href="/transactions" className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              {isSidebarOpen && "Transactions"}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Clients">
+                            <Link href="/clients" className="flex items-center gap-2">
+                              <Users className="h-4 w-4" />
+                              {isSidebarOpen && "Clients"}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </>
+                    )}
                     <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="Glossary">
-                        <Link href="/glossary" className="flex items-center gap-2">
-                          <Book className="h-4 w-4" />
-                          {!isCompact && "Glossary"}
+                      <SidebarMenuButton asChild tooltip="Calendar">
+                        <Link href="/calendar" className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          {isSidebarOpen && "Calendar"}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="Messages">
+                        <Link href="/messages" className="flex items-center gap-2">
+                          <MessageSquare className="h-4 w-4" />
+                          {isSidebarOpen && "Messages"}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="Calculators">
+                        <Link href="/calculators" className="flex items-center gap-2">
+                          <Calculator className="h-4 w-4" />
+                          {isSidebarOpen && "Calculators"}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    {isClient && (
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Glossary">
+                          <Link href="/glossary" className="flex items-center gap-2">
+                            <Book className="h-4 w-4" />
+                            {isSidebarOpen && "Glossary"}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )}
+                  </SidebarMenu>
+                </SidebarGroup>
+              </SidebarContent>
+              <SidebarFooter>
+                <div className="p-2">
+                  {isSidebarOpen && (
+                    <span className="text-xs text-muted-foreground block mb-2 px-2 truncate">
+                      {user?.email} ({user?.role})
+                    </span>
                   )}
-                </SidebarMenu>
-              </SidebarGroup>
-            </SidebarContent>
-            <SidebarFooter>
-              <div className="p-2">
-                {!isCompact && (
-                  <span className="text-xs text-muted-foreground block mb-2 px-2 truncate">
-                    {user?.email} ({user?.role})
-                  </span>
-                )}
-                <Button
-                  variant="outline"
-                  size={isCompact ? "icon" : "sm"}
-                  onClick={() => logoutMutation.mutate()}
-                  className="w-full"
-                >
-                  <LogOut className="h-4 w-4" />
-                  {!isCompact && <span className="ml-2">Logout</span>}
-                </Button>
-              </div>
-            </SidebarFooter>
-          </Sidebar>
+                  <Button
+                    variant="outline"
+                    size={!isSidebarOpen ? "icon" : "sm"}
+                    onClick={() => logoutMutation.mutate()}
+                    className="w-full"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    {isSidebarOpen && <span className="ml-2">Logout</span>}
+                  </Button>
+                </div>
+              </SidebarFooter>
+            </Sidebar>
+          </div>
         )}
         <main className="flex-1 h-screen overflow-x-hidden">
           {children}
