@@ -109,8 +109,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <Card>
-        <div className="min-h-[calc(100vh-12rem)]">
+      <div className="w-full min-h-[calc(100vh-12rem)]">
         <Timeline transactions={transactions} />
         {!showTable ? (
           <Scheduler
@@ -192,7 +191,6 @@ export default function CalendarPage() {
           </div>
         )}
         </div>
-      </Card>
     </main>
   );
 }
