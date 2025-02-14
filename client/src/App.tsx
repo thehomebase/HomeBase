@@ -56,16 +56,16 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="flex h-screen bg-background">
+      <div className="flex h-screen overflow-hidden bg-background">
         {user && (
           <div className={`relative transition-all duration-200 ease-in-out ${
-            isSidebarOpen ? 'w-[220px]' : 'w-[60px]'
+            isSidebarOpen ? 'w-0 md:w-[220px]' : 'w-0 md:w-[60px]'
           }`}>
             <Sidebar
               side="left"
               collapsible="offcanvas"
               className={`fixed inset-y-0 left-0 z-40 border-r bg-background ${
-                isSidebarOpen ? 'w-[220px] md:w-[220px]' : 'w-[60px]'
+                isSidebarOpen ? 'w-[280px] md:w-[220px]' : 'w-[60px]'
               }`}
             >
               <SidebarHeader>
@@ -166,8 +166,8 @@ function Layout({ children }: { children: React.ReactNode }) {
             </Sidebar>
           </div>
         )}
-        <main className="flex-1 h-screen w-full overflow-x-hidden">
-          <div className="w-full max-w-[2000px] mx-auto px-4">
+        <main className="flex-1 h-screen w-full overflow-y-auto overflow-x-hidden">
+          <div className="w-full max-w-[2000px] mx-auto px-4 py-4">
             {children}
           </div>
         </main>
