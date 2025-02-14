@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
-import { 
+import {
   SidebarProvider,
   Sidebar,
   SidebarHeader,
@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton
 } from "./components/ui/sidebar";
-import { Switch, Route } from "wouter";
+import { Switch, Route, Link as WouterLink } from "wouter";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import TransactionsPage from "@/pages/transactions-page";
@@ -26,21 +26,40 @@ import { Logo } from "@/components/ui/logo";
 import { NavTabs } from "@/components/ui/nav-tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { LogOut, Mail } from "lucide-react";
-import React from "react";
-import CalculatorsPage from "@/pages/calculators-page"; //Import CalculatorsPage
-import GlossaryPage from "./pages/glossary-page"; // Added import for GlossaryPage
-import MessagesPage from "./pages/messages-page"; // Added import for MessagesPage
-
+import { LogOut, Menu } from "lucide-react";
+import React, { useState } from "react";
+import CalculatorsPage from "@/pages/calculators-page";
+import GlossaryPage from "./pages/glossary-page";
+import MessagesPage from "./pages/messages-page";
+import { Link } from "wouter";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
-    <SidebarProvider defaultOpen>
-      <div className="min-h-screen flex bg-background">
+    <SidebarProvider defaultOpen={isSidebarOpen}>
+      <div className="min-h-screen flex bg-background relative">
+        {/* Mobile Menu Toggle */}
         {user && (
-          <Sidebar side="left" collapsible="icon">
+          <Button
+            variant="outline"
+            size="icon"
+            className="fixed top-4 left-4 z-50 md:hidden"
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+        )}
+
+        {user && (
+          <Sidebar 
+            side="left" 
+            collapsible="icon"
+            className={`transition-transform duration-200 ease-in-out ${
+              isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            } md:translate-x-0`}
+          >
             <SidebarHeader>
               <Logo />
             </SidebarHeader>
@@ -49,32 +68,32 @@ function Layout({ children }: { children: React.ReactNode }) {
                 <SidebarMenu>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild tooltip="Home">
-                      <a href="/">Home</a>
+                      <Link href="/">Home</Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild tooltip="Transactions">
-                      <a href="/transactions">Transactions</a>
+                      <Link href="/transactions">Transactions</Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild tooltip="Clients">
-                      <a href="/clients">Clients</a>
+                      <Link href="/clients">Clients</Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild tooltip="Calendar">
-                      <a href="/calendar">Calendar</a>
+                      <Link href="/calendar">Calendar</Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild tooltip="Messages">
-                      <a href="/messages">Messages</a>
+                      <Link href="/messages">Messages</Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild tooltip="Calculators">
-                      <a href="/calculators">Calculators</a>
+                      <Link href="/calculators">Calculators</Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>
@@ -83,7 +102,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             <SidebarFooter>
               <div className="flex flex-col gap-2">
                 <span className="text-xs text-muted-foreground px-2">
-                  {user?.username} ({user?.role})
+                  {user?.email} ({user?.role})
                 </span>
                 <Button variant="outline" size="sm" onClick={() => logoutMutation.mutate()}>
                   <LogOut className="h-4 w-4 mr-2" />
@@ -93,7 +112,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             </SidebarFooter>
           </Sidebar>
         )}
-        <div className="flex-1">
+        <div className="flex-1 p-4 md:p-8 w-full max-w-[1600px] mx-auto">
           {children}
         </div>
       </div>
@@ -119,7 +138,7 @@ function Router() {
       <Route path="/calendar">
         <ProtectedRoute path="/calendar" component={CalendarPage} />
       </Route>
-      
+
       {/* Agent specific routes */}
       {user?.role === "agent" ? (
         <>

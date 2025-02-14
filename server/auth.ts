@@ -30,14 +30,15 @@ async function comparePasswords(supplied: string, stored: string) {
 
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.REPL_ID!,
-    resave: true,
-    saveUninitialized: true,
+    secret: process.env.REPL_ID!, // Using REPL_ID as secret in Replit environment
+    resave: true, // Changed to true to ensure session is saved
+    saveUninitialized: true, // Changed to true to create session for all users
     store: storage.sessionStore,
     cookie: {
       secure: false, // Set to true in production with HTTPS
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'lax'
+      sameSite: 'lax',
+      path: '/'
     },
     name: 'session' // Custom session cookie name
   };

@@ -55,49 +55,39 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Clean shutdown function
-function shutdown(server: HttpServer) {
-  return new Promise<void>((resolve) => {
-    server.close(() => {
-      console.log('Server shutdown complete');
-      resolve();
-    });
-  });
-}
+// Improved server startup function with better port handling
+async function startServer(server: HttpServer, initialPort: number = 5000, maxAttempts: number = 5) {
+  let port = initialPort;
+  const maxPort = initialPort + maxAttempts;
 
-// Improved server startup function
-async function startServer(server: HttpServer, initialPort: number = 3000, maxAttempts: number = 3) {
-  let currentServer: HttpServer | null = null;
-
-  for (let port = initialPort; port < initialPort + maxAttempts; port++) {
+  while (port < maxPort) {
     try {
       await new Promise<void>((resolve, reject) => {
-        // Close any existing server before attempting to start a new one
-        if (currentServer) {
-          currentServer.close();
-        }
-
-        currentServer = server.listen(port, '0.0.0.0', () => {
-          console.log(`Server API endpoints running on port ${port}`);
-        })
+        log(`Attempting to start server on port ${port}...`);
+        server.listen(port, '0.0.0.0')
           .once('listening', () => {
-            log(`Server running on port ${port}`);
+            log(`Server successfully started and running on port ${port}`);
             resolve();
           })
           .once('error', (err: NodeJS.ErrnoException) => {
             if (err.code === 'EADDRINUSE') {
               log(`Port ${port} is in use, trying next port...`);
+              server.close();
+              port++;
               reject(err);
             } else {
+              log(`Error starting server: ${err.message}`);
               reject(err);
             }
           });
       });
       return port; // Successfully started
     } catch (err) {
-      if (port === initialPort + maxAttempts - 1) {
+      if (port >= maxPort) {
         throw new Error(`Failed to find an available port after ${maxAttempts} attempts`);
       }
+      // Continue to next port
+      continue;
     }
   }
   throw new Error('Failed to start server');
@@ -108,7 +98,7 @@ async function startServer(server: HttpServer, initialPort: number = 3000, maxAt
   try {
     const server = registerRoutes(app);
 
-    // Error handling middleware
+    // Setup error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       console.error('Error in request:', err);
       const status = err.status || err.statusCode || 500;
@@ -123,21 +113,26 @@ async function startServer(server: HttpServer, initialPort: number = 3000, maxAt
       serveStatic(app);
     }
 
-    // Start server with port fallback
+    // Start server with port fallback, using PORT from environment or 5000 as default
     const initialPort = parseInt(process.env.PORT || '5000', 10);
+    log(`Starting server with initial port ${initialPort}`);
     await startServer(server, initialPort);
 
     // Graceful shutdown handlers
     process.on('SIGTERM', async () => {
       console.log('SIGTERM received. Starting graceful shutdown...');
-      await shutdown(server);
-      process.exit(0);
+      server.close(() => {
+        console.log('Server shutdown complete');
+        process.exit(0);
+      });
     });
 
     process.on('SIGINT', async () => {
       console.log('SIGINT received. Starting graceful shutdown...');
-      await shutdown(server);
-      process.exit(0);
+      server.close(() => {
+        console.log('Server shutdown complete');
+        process.exit(0);
+      });
     });
 
   } catch (error) {
