@@ -78,7 +78,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             }`}
           >
             <SidebarHeader className="mb-2">
-              <div className="flex items-center justify-between px-4 py-4">
+              <div className="flex items-center justify-between px-2 py-4">
                 <Logo isCompact={isCompact} />
                 <Button
                   variant="ghost"
