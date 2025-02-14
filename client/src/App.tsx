@@ -63,9 +63,9 @@ function Layout({ children }: { children: React.ReactNode }) {
           }`}>
             <Sidebar
               side="left"
-              collapsible="none"
-              className={`fixed inset-y-0 left-0 z-40 border-r bg-background md:border-r-0 ${
-                isSidebarOpen ? 'w-[220px]' : 'w-[60px]'
+              collapsible="offcanvas"
+              className={`fixed inset-y-0 left-0 z-40 border-r bg-background ${
+                isSidebarOpen ? 'w-[220px] md:w-[220px]' : 'w-[60px]'
               }`}
             >
               <SidebarHeader>
@@ -166,8 +166,8 @@ function Layout({ children }: { children: React.ReactNode }) {
             </Sidebar>
           </div>
         )}
-        <main className="flex-1 h-screen overflow-x-hidden w-full">
-          <div className="w-full max-w-[2000px] mx-auto">
+        <main className="flex-1 h-screen w-full overflow-x-hidden">
+          <div className="w-full max-w-[2000px] mx-auto px-4">
             {children}
           </div>
         </main>
