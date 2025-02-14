@@ -16,11 +16,13 @@ export function Logo({ className, isCompact = false, ...props }: LogoProps) {
         src={isCompact ? "/homebaselogoicon.png" : "/homebaselogo.png"}
         alt="Homebase Logo"
         className={`transition-all dark:invert ${
-          isCompact ? 'h-8 w-8' : 'h-8 md:h-10 w-auto'
+          isCompact ? 'h-8 w-8' : 'h-8 md:h-10'
         }`}
         style={{ 
+          width: isCompact ? '32px' : 'auto',
           maxWidth: isCompact ? '32px' : '140px',
-          aspectRatio: 'auto'
+          objectFit: 'contain',
+          aspectRatio: isCompact ? '1' : 'auto'
         }} 
       />
     </div>
