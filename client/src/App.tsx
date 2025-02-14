@@ -47,15 +47,15 @@ import MessagesPage from "./pages/messages-page";
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isCompact, setIsCompact] = useState(false);
   const isClient = user?.role === 'client';
 
-  const toggleCompact = () => setIsCompact(!isCompact);
+  const toggleCompact = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
       <div className="flex h-screen bg-background">
-        {/* Mobile Menu Toggle */}
         {user && (
           <Button
             variant="outline"
@@ -200,7 +200,6 @@ function Router() {
         <ProtectedRoute path="/calendar" component={CalendarPage} />
       </Route>
 
-      {/* Agent specific routes */}
       {user?.role === "agent" ? (
         <>
           <Route path="/transactions/:id">
