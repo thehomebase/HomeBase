@@ -121,21 +121,30 @@ export class DatabaseStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
     try {
       const result = await db.execute(sql`
-        SELECT id, username, password, role 
+        SELECT id, email, password, first_name as "firstName", 
+               last_name as "lastName", role, agent_id as "agentId",
+               claimed_transaction_id as "claimedTransactionId",
+               claimed_access_code as "claimedAccessCode"
         FROM users 
         WHERE id = ${id}
       `);
 
       if (result.rows.length === 0) {
+        console.log('No user found with ID:', id);
         return undefined;
       }
 
       const user = result.rows[0];
       return {
         id: Number(user.id),
-        username: String(user.username),
+        email: String(user.email),
         password: String(user.password),
-        role: String(user.role)
+        firstName: String(user.firstName),
+        lastName: String(user.lastName),
+        role: String(user.role),
+        agentId: user.agentId ? Number(user.agentId) : null,
+        claimedTransactionId: user.claimedTransactionId ? Number(user.claimedTransactionId) : null,
+        claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null
       };
     } catch (error) {
       console.error('Error in getUser:', error);
