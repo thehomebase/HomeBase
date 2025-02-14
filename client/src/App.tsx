@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { 
-  SidebarRoot as SidebarProvider,
+  SidebarProvider,
   Sidebar,
   SidebarHeader,
   SidebarContent,
