@@ -269,8 +269,8 @@ export default function CalculatorsPage() {
             </div>
 
             <div className="space-y-6">
-              <div className="bg-white p-6 rounded-lg border">
-                <p className="text-sm leading-relaxed">
+              <div className="bg-background border p-6 rounded-lg">
+                <p className="text-foreground text-sm leading-relaxed">
                   By refinancing your current loan balance of ${refinanceInputs.currentBalance.toLocaleString()} at {refinanceInputs.newRate}% over {refinanceInputs.newTerm} years, 
                   you will {calculateMonthlySavings() > 0 ? 'decrease' : 'increase'} your monthly payments by ${Math.abs(calculateMonthlySavings()).toFixed(2)}.
                   The total interest paid over the life of the loan will {calculateInterestSavings() > 0 ? 'decrease' : 'increase'} by ${Math.abs(calculateInterestSavings()).toFixed(2)}.
@@ -278,38 +278,38 @@ export default function CalculatorsPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-50 p-6 rounded-lg">
-                  <h4 className="text-lg font-semibold mb-4">Current Loan</h4>
+                <div className="bg-card p-6 rounded-lg border">
+                  <h4 className="text-foreground text-lg font-semibold mb-4">Current Loan</h4>
                   <div className="space-y-2">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-foreground">
                       <span>Monthly Payment</span>
                       <span>${refinanceInputs.currentPayment.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-foreground">
                       <span>Interest Rate</span>
                       <span>{refinanceInputs.currentRate}%</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-foreground">
                       <span>Total Interest</span>
                       <span>${(refinanceInputs.currentPayment * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-slate-50 p-6 rounded-lg">
-                  <h4 className="text-lg font-semibold mb-4">Refinanced Loan</h4>
+                <div className="bg-card p-6 rounded-lg border">
+                  <h4 className="text-foreground text-lg font-semibold mb-4">Refinanced Loan</h4>
                   <div className="space-y-2">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-foreground">
                       <span>Monthly Payment</span>
-                      <span className="text-emerald-600">${calculateNewPayment().toFixed(2)}</span>
+                      <span className="text-emerald-500">${calculateNewPayment().toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-foreground">
                       <span>Interest Rate</span>
-                      <span className="text-emerald-600">{refinanceInputs.newRate}%</span>
+                      <span className="text-emerald-500">{refinanceInputs.newRate}%</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-foreground">
                       <span>Total Interest</span>
-                      <span className="text-emerald-600">${(calculateNewPayment() * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance).toFixed(2)}</span>
+                      <span className="text-emerald-500">${(calculateNewPayment() * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
