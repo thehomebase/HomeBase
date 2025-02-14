@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -118,36 +117,37 @@ export default function CalendarPage() {
               className="w-full min-w-[800px]"
               deletable={false}
               draggable={false}
-            views={["month", "week", "day"]}
-            height={window.innerHeight - 250}
-            week={{
-              weekDays: [0, 1, 2, 3, 4, 5, 6],
-              weekStartOn: 0,
-              startHour: 0,
-              endHour: 23,
-            }}
-            day={{
-              startHour: 0,
-              endHour: 23,
-            }}
-            navigation={{
-              toolbar: (toolbar) => {
-                const { onNavigate, date } = toolbar;
-                return (
-                  <div className="flex justify-between items-center mb-4">
-                    <div className="flex gap-2">
-                      <button onClick={() => onNavigate('PREV')} className="p-1">←</button>
-                      <span>{format(date, 'MMMM yyyy')}</span>
-                      <button onClick={() => onNavigate('NEXT')} className="p-1">→</button>
+              views={["month", "week", "day"]}
+              height={window.innerHeight - 250}
+              week={{
+                weekDays: [0, 1, 2, 3, 4, 5, 6],
+                weekStartOn: 0,
+                startHour: 0,
+                endHour: 23
+              }}
+              day={{
+                startHour: 0,
+                endHour: 23,
+              }}
+              navigation={{
+                toolbar: (toolbar) => {
+                  const { onNavigate, date } = toolbar;
+                  return (
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="flex gap-2">
+                        <button onClick={() => onNavigate('PREV')} className="p-1">←</button>
+                        <span>{format(date, 'MMMM yyyy')}</span>
+                        <button onClick={() => onNavigate('NEXT')} className="p-1">→</button>
+                      </div>
                     </div>
-                  </div>
-                );
-              }
-            }}
-            selectedDate={new Date()}
-            fields={[]}
-            dialogMaxWidth="lg"
-          />
+                  );
+                }
+              }}
+              selectedDate={new Date()}
+              fields={[]}
+              dialogMaxWidth="lg"
+            />
+          </div>
         ) : (
           <div>
             <h3 className="text-lg font-semibold mb-4">Upcoming Events</h3>
@@ -187,7 +187,6 @@ export default function CalendarPage() {
             </Table>
           </div>
         )}
-        </div>
       </div>
     </main>
   );
