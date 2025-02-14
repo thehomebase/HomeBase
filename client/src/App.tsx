@@ -71,10 +71,10 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Sidebar
             side="left"
             collapsible="icon"
-            className={`transition-transform duration-200 ease-in-out ${
+            className={`transform transition-all duration-300 ease-in-out ${
               isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
             } md:translate-x-0 ${
-              isCompact ? 'w-[70px]' : 'w-[240px]'
+              isCompact ? 'w-16' : 'w-60'
             }`}
           >
             <SidebarHeader className="mb-2">
@@ -174,13 +174,13 @@ function Layout({ children }: { children: React.ReactNode }) {
             </SidebarFooter>
           </Sidebar>
         )}
-        <div className={`flex-1 transition-all duration-200 overflow-x-hidden ${
+        <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${
           user ? (
             isCompact
-              ? 'p-0'
-              : 'pl-0 pr-2 md:pl-0 md:pr-4'
-          ) : 'px-2 md:px-4'
-        } py-0 md:py-0 w-full max-w-[2000px] mx-auto`}>
+              ? 'px-2'
+              : 'px-4'
+          ) : 'px-4'
+        } py-2 w-full max-w-[2000px] mx-auto`}>
           {children}
         </div>
       </div>
