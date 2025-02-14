@@ -7,17 +7,26 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Add error logging middleware
+// Add error logging middleware with more detail
 app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
   console.error('Unhandled error:', err);
+  if (err.stack) {
+    console.error('Stack trace:', err.stack);
+  }
   next(err);
 });
 
-// Request logging middleware
+// Enhanced request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
+
+  // Log session information for debugging
+  if (req.session) {
+    console.log('Session ID:', req.sessionID);
+    console.log('Session Data:', req.session);
+  }
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {

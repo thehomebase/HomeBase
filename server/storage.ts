@@ -145,24 +145,22 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     try {
-      const result = await db.execute(sql`
-        SELECT id, email, password, role, first_name, last_name 
-        FROM users 
-        WHERE email = ${email}
-      `);
-
-      if (result.rows.length === 0) {
+      const [user] = await db.select().from(users).where(sql`email = ${email}`);
+      if (!user) {
+        console.log('No user found with email:', email);
         return undefined;
       }
 
-      const user = result.rows[0];
       return {
         id: Number(user.id),
         email: String(user.email),
         password: String(user.password),
-        firstName: String(user.first_name),
-        lastName: String(user.last_name),
-        role: String(user.role)
+        firstName: String(user.firstName),
+        lastName: String(user.lastName),
+        role: String(user.role),
+        agentId: user.agentId ? Number(user.agentId) : null,
+        claimedTransactionId: user.claimedTransactionId ? Number(user.claimedTransactionId) : null,
+        claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null
       };
     } catch (error) {
       console.error('Error in getUserByEmail:', error);
@@ -177,29 +175,34 @@ export class DatabaseStorage implements IStorage {
         throw new Error('Email and password are required');
       }
 
-      const result = await db.execute(sql`
-        INSERT INTO users (email, password, first_name, last_name, role)
-        VALUES (
-          ${insertUser.email}, 
-          ${insertUser.password}, 
-          ${insertUser.firstName},
-          ${insertUser.lastName},
-          ${insertUser.role || 'user'}
-        )
-        RETURNING id, email, first_name, last_name, role
-      `);
+      const [user] = await db
+        .insert(users)
+        .values({
+          email: insertUser.email,
+          password: insertUser.password,
+          firstName: insertUser.firstName,
+          lastName: insertUser.lastName,
+          role: insertUser.role || 'user',
+          agentId: null,
+          claimedTransactionId: null,
+          claimedAccessCode: null
+        })
+        .returning();
 
-      if (!result.rows[0]) {
+      if (!user) {
         throw new Error('Failed to create user');
       }
 
       return {
-        id: Number(result.rows[0].id),
-        email: String(result.rows[0].email),
-        password: String(result.rows[0].password),
-        firstName: String(result.rows[0].first_name),
-        lastName: String(result.rows[0].last_name),
-        role: String(result.rows[0].role)
+        id: Number(user.id),
+        email: String(user.email),
+        password: String(user.password),
+        firstName: String(user.firstName),
+        lastName: String(user.lastName),
+        role: String(user.role),
+        agentId: user.agentId ? Number(user.agentId) : null,
+        claimedTransactionId: user.claimedTransactionId ? Number(user.claimedTransactionId) : null,
+        claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null
       };
     } catch (error) {
       console.error('Error in createUser:', error);
