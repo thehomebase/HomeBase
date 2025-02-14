@@ -60,7 +60,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Button
             variant="outline"
             size="icon"
-            className="fixed top-4 left-4 z-50 md:hidden"
+            className="fixed top-4 left-4 z-50 lg:hidden"
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           >
             <Menu className="h-4 w-4" />
@@ -68,8 +68,8 @@ function Layout({ children }: { children: React.ReactNode }) {
         )}
 
         {user && (
-          <div className={`md:relative transition-all duration-200 ease-in-out ${
-            isSidebarOpen ? 'w-[220px]' : '!w-0 md:!w-[60px]'
+          <div className={`lg:relative transition-all duration-200 ease-in-out ${
+            isSidebarOpen ? 'w-[220px]' : '!w-0 lg:!w-[60px]'
           }`}>
             <Sidebar
               side="left"
