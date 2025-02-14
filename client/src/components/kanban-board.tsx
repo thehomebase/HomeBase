@@ -141,31 +141,8 @@ function KanbanColumn({
     id: status,
   });
 
-  const deleteTransactionMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `/api/transactions/${id}`);
-      if (!response.ok) {
-        throw new Error('Failed to delete transaction');
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      toast({
-        title: "Success",
-        description: "Transaction deleted successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete transaction",
-        variant: "destructive",
-      });
-    },
-  });
-
   return (
-    <div ref={setNodeRef} className="flex flex-col min-w-[200px] bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50">
+    <div ref={setNodeRef} className="flex flex-col min-w-[180px] bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50">
       <div className="flex justify-between items-center mb-2">
         <h3 className="font-semibold text-sm dark:text-white">{title}</h3>
         <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
@@ -190,16 +167,18 @@ function KanbanColumn({
 interface KanbanBoardProps {
   transactions: Transaction[];
   onDeleteTransaction: (id: number) => void;
+  onTransactionClick: (id: number) => void;
+  clients: Client[];
 }
 
-export function KanbanBoard({ transactions, onDeleteTransaction }: KanbanBoardProps) {
+export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionClick, clients }: KanbanBoardProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<number | null>(null);
   const [localTransactions, setLocalTransactions] = useState<Transaction[]>(transactions);
 
-  const { data: clients = [] } = useQuery<Client[]>({
+  const { data: clientsData = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
   });
 
@@ -279,23 +258,25 @@ export function KanbanBoard({ transactions, onDeleteTransaction }: KanbanBoardPr
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="block md:flex md:flex-row gap-4">
-        {statusColumns.map((column) => (
-          <KanbanColumn 
-            key={column.id} 
-            status={column.id} 
-            title={column.title} 
-            transactions={localTransactions.filter((t) => t.status === column.id)}
-            onDelete={onDeleteTransaction}
-            onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
-            clients={clients}
-          />
-        ))}
+      <div className="overflow-x-auto">
+        <div className="flex gap-4 min-w-min pb-4">
+          {statusColumns.map((column) => (
+            <KanbanColumn 
+              key={column.id} 
+              status={column.id} 
+              title={column.title} 
+              transactions={localTransactions.filter((t) => t.status === column.id)}
+              onDelete={onDeleteTransaction}
+              onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
+              clients={clientsData}
+            />
+          ))}
+        </div>
       </div>
 
       <DragOverlay>
         {activeId && activeTransaction && activeTransaction.client ? (
-          <Card className="p-3 w-[200px] shadow-lg cursor-grabbing dark:bg-gray-700">
+          <Card className="p-3 w-[180px] shadow-lg cursor-grabbing dark:bg-gray-700">
             <div className="font-medium text-sm truncate dark:text-white">
               {activeTransaction.address}
             </div>

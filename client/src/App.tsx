@@ -54,7 +54,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="flex min-h-screen bg-background">
+      <div className="flex min-h-screen bg-background relative">
         {/* Mobile Menu Toggle */}
         {user && (
           <Button
@@ -71,10 +71,10 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Sidebar
             side="left"
             collapsible="icon"
-            className={`fixed h-screen transition-all duration-200 ease-in-out ${
+            className={`absolute md:fixed h-screen transition-all duration-200 ease-in-out ${
               isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
             } md:translate-x-0 ${
-              isCompact ? 'w-[70px]' : 'w-[240px]'
+              isCompact ? 'w-[60px]' : 'w-[220px]'
             } z-40 border-r bg-background`}
           >
             <SidebarHeader className="mb-2">
@@ -174,16 +174,16 @@ function Layout({ children }: { children: React.ReactNode }) {
             </SidebarFooter>
           </Sidebar>
         )}
-        <main 
-          className={`flex-1 min-w-0 transition-all duration-200 ${
+        <main
+          className={`flex-1 transition-all duration-200 ${
             user ? (
               isCompact
-                ? 'md:ml-[50px]'
+                ? 'md:ml-[60px]'
                 : 'md:ml-[220px]'
             ) : 'ml-0'
           }`}
         >
-          <div className="p-2 md:p-4">
+          <div className="p-4">
             {children}
           </div>
         </main>
