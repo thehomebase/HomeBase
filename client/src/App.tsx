@@ -77,8 +77,8 @@ function Layout({ children }: { children: React.ReactNode }) {
               isCompact ? 'w-[60px]' : 'w-[220px]'
             } z-40 border-r bg-background`}
           >
-            <SidebarHeader className="mb-2">
-              <div className="flex items-center justify-between px-2 py-4">
+            <SidebarHeader>
+              <div className="flex items-center justify-between p-2">
                 <Logo isCompact={isCompact} />
                 <Button
                   variant="ghost"
@@ -94,7 +94,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                 </Button>
               </div>
             </SidebarHeader>
-            <SidebarContent className="flex-1 overflow-y-auto">
+            <SidebarContent>
               <SidebarGroup>
                 <SidebarMenu>
                   {!isClient && (
@@ -155,9 +155,9 @@ function Layout({ children }: { children: React.ReactNode }) {
               </SidebarGroup>
             </SidebarContent>
             <SidebarFooter>
-              <div className={`flex flex-col gap-2 ${isCompact ? 'px-2' : 'px-4'} py-4`}>
+              <div className="p-2">
                 {!isCompact && (
-                  <span className="text-xs text-muted-foreground truncate">
+                  <span className="text-xs text-muted-foreground block mb-2 px-2 truncate">
                     {user?.email} ({user?.role})
                   </span>
                 )}
@@ -168,14 +168,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                   className="w-full"
                 >
                   <LogOut className="h-4 w-4" />
-                  {!isCompact && "Logout"}
+                  {!isCompact && <span className="ml-2">Logout</span>}
                 </Button>
               </div>
             </SidebarFooter>
           </Sidebar>
         )}
         <main
-          className={`flex-1 transition-all duration-200 ${
+          className={`flex-1 ${
             user ? (
               isCompact
                 ? 'md:ml-[60px]'
@@ -183,9 +183,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             ) : 'ml-0'
           }`}
         >
-          <div className="p-4">
-            {children}
-          </div>
+          {children}
         </main>
       </div>
     </SidebarProvider>
