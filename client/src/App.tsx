@@ -107,6 +107,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/messages" component={MessagesPage} />
+      <Route path="/glossary" component={GlossaryPage} />
       {user?.role === "agent" ? (
         <>
           <Route path="/transactions/:id">
@@ -122,14 +124,13 @@ function Router() {
           <ProtectedRoute path="/calculators" component={CalculatorsPage} />
           <ProtectedRoute path="/clients" component={ClientsPage} />
           <ProtectedRoute path="/calendar" component={CalendarPage} />
-          <Route path="/data" component={DataPage} />
-          <Route path="/messages" component={MessagesPage} /> {/* Added messages route */}
-
+          <ProtectedRoute path="/data" component={DataPage} />
         </>
       ) : (
         <>
           <ProtectedRoute path="/" component={CalculatorsPage} />
           <ProtectedRoute path="/calculators" component={CalculatorsPage} />
+          <ProtectedRoute path="/calendar" component={CalendarPage} />
           <Route path="/transactions/:id">
             {(params) => (
               <ProtectedRoute
@@ -138,10 +139,8 @@ function Router() {
               />
             )}
           </Route>
-          <Route path="/messages" component={MessagesPage} /> {/* Added messages route */}
         </>
       )}
-      <Route path="/glossary" component={GlossaryPage} /> {/* Added glossary route */}
       <Route component={NotFound} />
     </Switch>
   );
