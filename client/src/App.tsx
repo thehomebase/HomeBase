@@ -174,15 +174,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             </SidebarFooter>
           </Sidebar>
         )}
-        <main
-          className={`flex-1 h-screen overflow-x-hidden ${
-            user ? (
-              isCompact
-                ? 'md:ml-[60px]'
-                : 'md:ml-[220px]'
-            ) : ''
-          }`}
-        >
+        <main className="flex-1 h-screen overflow-x-hidden">
           {children}
         </main>
       </div>
