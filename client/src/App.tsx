@@ -47,7 +47,7 @@ import MessagesPage from "./pages/messages-page";
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
   const { isMobile } = useAuth();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
+  const [isSidebarOpen] = useState(false);
   const isClient = user?.role === 'client';
 
   const toggleCompact = () => {
@@ -59,13 +59,12 @@ function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen overflow-hidden bg-background">
         {user && (
           <div className={`relative transition-all duration-200 ease-in-out ${
-            isSidebarOpen ? 'w-0 md:w-[220px]' : 'w-0 md:w-[60px]'
+            'w-[60px]'
           }`}>
             <Sidebar
               side="left"
-              collapsible="offcanvas"
-              className={`fixed inset-y-0 left-0 z-40 border-r bg-background ${
-                isSidebarOpen ? 'w-[280px] md:w-[220px]' : 'w-[60px]'
+              collapsible="none"
+              className="fixed inset-y-0 left-0 z-40 border-r bg-background w-[60px]"
               }`}
             >
               <SidebarHeader>
