@@ -174,10 +174,10 @@ function Layout({ children }: { children: React.ReactNode }) {
             </SidebarFooter>
           </Sidebar>
         )}
-        <div className={`flex-1 transition-all duration-300 ease-in-out overflow-x-hidden pl-0 ${
-          user ? 'ml-[70px]' : ''
-        } ${isCompact ? 'md:ml-[70px]' : 'md:ml-[240px]'} w-full max-w-[2000px]`}>
-          <div className="h-full py-4 px-4">
+        <div className={`flex-1 transition-all duration-300 ease-in-out overflow-x-hidden ${
+          user ? 'ml-0' : ''
+        } w-full max-w-[2000px]`}>
+          <div className="h-full py-4 pr-4">
             {children}
           </div>
         </div>
