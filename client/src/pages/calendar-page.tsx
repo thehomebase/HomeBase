@@ -77,7 +77,7 @@ export default function CalendarPage() {
   };
 
   return (
-    <main className="flex-1 p-6">
+    <main className="flex-1 p-6 w-full">
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-2xl font-bold">Calendar</h2>
         <div className="flex items-center gap-2">
@@ -114,12 +114,7 @@ export default function CalendarPage() {
         {!showTable ? (
           <Scheduler
             events={events}
-            month={{
-              weekDays: [0, 1, 2, 3, 4, 5, 6],
-              weekStartOn: 0,
-              startHour: 0,
-              endHour: 23,
-            }}
+            className="w-full"
             deletable={false}
             draggable={false}
             views={["month", "week", "day"]}
