@@ -47,7 +47,7 @@ import MessagesPage from "./pages/messages-page";
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
   const { isMobile } = useAuth();
-  const [isSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
   const isClient = user?.role === 'client';
 
   const toggleCompact = () => {
