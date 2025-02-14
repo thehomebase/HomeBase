@@ -176,9 +176,11 @@ function Layout({ children }: { children: React.ReactNode }) {
         )}
         <div className={`flex-1 transition-all duration-300 ease-in-out ${
           !user ? '' : isCompact ? 'md:ml-[70px]' : 'md:ml-[240px]'
-          } relative z-0 min-w-0`}>
-          <div className="container mx-auto px-4 h-full max-w-full">
-            {children}
+          } relative z-0 min-w-0 overflow-x-hidden`}>
+          <div className="h-full px-4 w-full">
+            <div className="max-w-[2000px] mx-auto">
+              {children}
+            </div>
           </div>
         </div>
       </div>
