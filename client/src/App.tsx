@@ -46,8 +46,7 @@ import MessagesPage from "./pages/messages-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
-  const { isMobile } = useAuth();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const isClient = user?.role === 'client';
 
   const toggleCompact = () => {
@@ -56,15 +55,17 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="flex h-screen overflow-hidden bg-background">
+      <div className="flex h-screen bg-background">
         {user && (
           <div className={`relative transition-all duration-200 ease-in-out ${
-            isSidebarOpen ? 'w-[256px]' : 'w-[60px]'
+            isSidebarOpen ? 'w-[220px]' : 'w-[60px]'
           }`}>
             <Sidebar
               side="left"
-              collapsible="none"
-              className={`fixed inset-y-0 left-0 z-40 border-r bg-background ${isSidebarOpen ? 'w-[256px]' : 'w-[60px]'}`}
+              collapsible="icon"
+              className={`fixed inset-y-0 left-0 z-40 border-r bg-background ${
+                isSidebarOpen ? 'translate-x-0 w-[220px]' : 'w-[60px]'
+              }`}
             >
               <SidebarHeader>
                 <div className="flex items-center justify-between p-2">
@@ -164,8 +165,8 @@ function Layout({ children }: { children: React.ReactNode }) {
             </Sidebar>
           </div>
         )}
-        <main className="flex-1 h-screen w-full overflow-y-auto overflow-x-hidden">
-          <div className="w-full max-w-[2000px] mx-auto px-4 py-4">
+        <main className="flex-1 h-screen overflow-x-hidden w-full">
+          <div className="w-full max-w-[2000px] mx-auto">
             {children}
           </div>
         </main>
