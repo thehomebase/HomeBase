@@ -146,9 +146,9 @@ export default function TransactionsPage() {
   };
 
   return (
-    <main className="px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
+    <main className="py-8">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8 px-4 md:px-0">
+        <div className="flex flex-wrap items-center gap-4">
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
           <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1 dark:bg-gray-800/50">
             <Toggle
@@ -323,7 +323,7 @@ export default function TransactionsPage() {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 px-4 md:px-0">
             {transactions.map((transaction) => (
               <Card 
                 key={transaction.id} 
