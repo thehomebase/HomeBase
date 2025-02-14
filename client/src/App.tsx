@@ -35,134 +35,104 @@ import {
   Calendar,
   MessageSquare,
   Calculator,
-  Book,
-  PanelLeftClose,
-  PanelLeft
+  Book
 } from "lucide-react";
-import React, { useState } from "react";
+import React from "react";
 import CalculatorsPage from "@/pages/calculators-page";
 import GlossaryPage from "./pages/glossary-page";
 import MessagesPage from "./pages/messages-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
-  const { isMobile } = useAuth();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
   const isClient = user?.role === 'client';
 
-  const toggleCompact = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
   return (
-    <SidebarProvider defaultOpen={isSidebarOpen}>
+    <SidebarProvider>
       <div className="flex h-screen overflow-hidden bg-background">
         {user && (
-          <div className={`relative transition-all duration-200 ease-in-out ${
-            isSidebarOpen ? 'w-[256px]' : 'w-[60px]'
-          }`}>
-            <Sidebar
-              side="left"
-              collapsible="none"
-              className={`fixed inset-y-0 left-0 z-40 border-r bg-background ${isSidebarOpen ? 'w-[256px]' : 'w-[60px]'}`}
-            >
-              <SidebarHeader>
-                <div className="flex items-center justify-between p-2">
-                  <Logo isCompact={!isSidebarOpen} />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={toggleCompact}
-                    className="hidden md:flex"
-                  >
-                    {!isSidebarOpen ? (
-                      <PanelLeft className="h-4 w-4" />
-                    ) : (
-                      <PanelLeftClose className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </SidebarHeader>
-              <SidebarContent>
-                <SidebarGroup>
-                  <SidebarMenu>
-                    {!isClient && (
-                      <>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Transactions">
-                            <Link href="/transactions" className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              {isSidebarOpen && "Transactions"}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Clients">
-                            <Link href="/clients" className="flex items-center gap-2">
-                              <Users className="h-4 w-4" />
-                              {isSidebarOpen && "Clients"}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      </>
-                    )}
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="Calendar">
-                        <Link href="/calendar" className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          {isSidebarOpen && "Calendar"}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="Messages">
-                        <Link href="/messages" className="flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4" />
-                          {isSidebarOpen && "Messages"}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="Calculators">
-                        <Link href="/calculators" className="flex items-center gap-2">
-                          <Calculator className="h-4 w-4" />
-                          {isSidebarOpen && "Calculators"}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    {isClient && (
+          <Sidebar side="left" className="w-64 border-r">
+            <SidebarHeader>
+              <div className="flex items-center justify-between p-2">
+                <Logo />
+              </div>
+            </SidebarHeader>
+            <SidebarContent>
+              <SidebarGroup>
+                <SidebarMenu>
+                  {!isClient && (
+                    <>
                       <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Glossary">
-                          <Link href="/glossary" className="flex items-center gap-2">
-                            <Book className="h-4 w-4" />
-                            {isSidebarOpen && "Glossary"}
+                        <SidebarMenuButton asChild>
+                          <Link href="/transactions" className="flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            Transactions
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
-                    )}
-                  </SidebarMenu>
-                </SidebarGroup>
-              </SidebarContent>
-              <SidebarFooter>
-                <div className="p-2">
-                  {isSidebarOpen && (
-                    <span className="text-xs text-muted-foreground block mb-2 px-2 truncate">
-                      {user?.email} ({user?.role})
-                    </span>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild>
+                          <Link href="/clients" className="flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            Clients
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </>
                   )}
-                  <Button
-                    variant="outline"
-                    size={!isSidebarOpen ? "icon" : "sm"}
-                    onClick={() => logoutMutation.mutate()}
-                    className="w-full"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    {isSidebarOpen && <span className="ml-2">Logout</span>}
-                  </Button>
-                </div>
-              </SidebarFooter>
-            </Sidebar>
-          </div>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href="/calendar" className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Calendar
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href="/messages" className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Messages
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link href="/calculators" className="flex items-center gap-2">
+                        <Calculator className="h-4 w-4" />
+                        Calculators
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  {isClient && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <Link href="/glossary" className="flex items-center gap-2">
+                          <Book className="h-4 w-4" />
+                          Glossary
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
+                </SidebarMenu>
+              </SidebarGroup>
+            </SidebarContent>
+            <SidebarFooter>
+              <div className="p-2">
+                <span className="text-xs text-muted-foreground block mb-2 px-2 truncate">
+                  {user?.email} ({user?.role})
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => logoutMutation.mutate()}
+                  className="w-full"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              </div>
+            </SidebarFooter>
+          </Sidebar>
         )}
         <main className="flex-1 h-screen w-full overflow-y-auto overflow-x-hidden">
           <div className="w-full max-w-[2000px] mx-auto px-4 py-4">
