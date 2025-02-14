@@ -109,12 +109,12 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div className="w-full min-h-[calc(100vh-12rem)]">
+      <div className="w-full min-h-[calc(100vh-12rem)] overflow-x-auto">
         <Timeline transactions={transactions} />
         {!showTable ? (
           <Scheduler
             events={events}
-            className="w-full"
+            className="w-full min-w-full"
             deletable={false}
             draggable={false}
             views={["month", "week", "day"]}
