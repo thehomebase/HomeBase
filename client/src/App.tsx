@@ -54,7 +54,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="min-h-screen flex bg-background relative">
+      <div className="flex min-h-screen bg-background">
         {/* Mobile Menu Toggle */}
         {user && (
           <Button
@@ -71,11 +71,11 @@ function Layout({ children }: { children: React.ReactNode }) {
           <Sidebar
             side="left"
             collapsible="icon"
-            className={`transition-transform duration-200 ease-in-out ${
+            className={`fixed h-screen transition-all duration-200 ease-in-out ${
               isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
             } md:translate-x-0 ${
               isCompact ? 'w-[70px]' : 'w-[240px]'
-            }`}
+            } z-40 border-r bg-background`}
           >
             <SidebarHeader className="mb-2">
               <div className="flex items-center justify-between px-2 py-4">
@@ -94,7 +94,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                 </Button>
               </div>
             </SidebarHeader>
-            <SidebarContent>
+            <SidebarContent className="flex-1 overflow-y-auto">
               <SidebarGroup>
                 <SidebarMenu>
                   {!isClient && (
@@ -155,9 +155,9 @@ function Layout({ children }: { children: React.ReactNode }) {
               </SidebarGroup>
             </SidebarContent>
             <SidebarFooter>
-              <div className={`flex flex-col gap-2 ${isCompact ? 'px-2' : 'px-4'}`}>
+              <div className={`flex flex-col gap-2 ${isCompact ? 'px-2' : 'px-4'} py-4`}>
                 {!isCompact && (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground truncate">
                     {user?.email} ({user?.role})
                   </span>
                 )}
@@ -174,15 +174,19 @@ function Layout({ children }: { children: React.ReactNode }) {
             </SidebarFooter>
           </Sidebar>
         )}
-        <div className={`flex-1 transition-all duration-300 ease-in-out ${
-          !user ? '' : isCompact ? 'md:ml-[70px]' : 'md:ml-[240px]'
-          } relative z-0 min-w-0 overflow-x-hidden`}>
-          <div className="h-full px-4 w-full">
-            <div className="max-w-[2000px] mx-auto">
-              {children}
-            </div>
+        <main 
+          className={`flex-1 min-w-0 transition-all duration-200 ${
+            user ? (
+              isCompact
+                ? 'md:ml-[50px]'
+                : 'md:ml-[220px]'
+            ) : 'ml-0'
+          }`}
+        >
+          <div className="p-2 md:p-4">
+            {children}
           </div>
-        </div>
+        </main>
       </div>
     </SidebarProvider>
   );
