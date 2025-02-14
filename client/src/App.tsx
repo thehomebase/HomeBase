@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton
 } from "./components/ui/sidebar";
-import { Switch, Route, Link as WouterLink } from "wouter";
+import { Switch, Route, Link } from "wouter";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import TransactionsPage from "@/pages/transactions-page";
@@ -31,11 +31,11 @@ import React, { useState } from "react";
 import CalculatorsPage from "@/pages/calculators-page";
 import GlossaryPage from "./pages/glossary-page";
 import MessagesPage from "./pages/messages-page";
-import { Link } from "wouter";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const isClient = user?.role === 'client';
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
@@ -71,16 +71,20 @@ function Layout({ children }: { children: React.ReactNode }) {
                       <Link href="/">Home</Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild tooltip="Transactions">
-                      <Link href="/transactions">Transactions</Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild tooltip="Clients">
-                      <Link href="/clients">Clients</Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  {!isClient && (
+                    <>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Transactions">
+                          <Link href="/transactions">Transactions</Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Clients">
+                          <Link href="/clients">Clients</Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </>
+                  )}
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild tooltip="Calendar">
                       <Link href="/calendar">Calendar</Link>
@@ -96,6 +100,13 @@ function Layout({ children }: { children: React.ReactNode }) {
                       <Link href="/calculators">Calculators</Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  {isClient && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="Glossary">
+                        <Link href="/glossary">Glossary</Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
                 </SidebarMenu>
               </SidebarGroup>
             </SidebarContent>
@@ -122,16 +133,13 @@ function Layout({ children }: { children: React.ReactNode }) {
 
 function Router() {
   const { user } = useAuth();
+  const isClient = user?.role === 'client';
 
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
       <Route path="/messages" component={MessagesPage} />
-      <Route path="/glossary" component={GlossaryPage} />
-      {/* Common routes for all authenticated users */}
-      <Route path="/auth" component={AuthPage} />
-      <Route path="/messages" component={MessagesPage} />
-      <Route path="/glossary" component={GlossaryPage} />
+      {isClient && <Route path="/glossary" component={GlossaryPage} />}
       <Route path="/calculators">
         <ProtectedRoute path="/calculators" component={CalculatorsPage} />
       </Route>
