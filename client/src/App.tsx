@@ -177,7 +177,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         <div className={`flex-1 transition-all duration-200 overflow-x-hidden ${
           user ? (
             isCompact
-              ? 'pl-[70px] pr-2 md:pl-[70px] md:pr-4'
+              ? 'p-0'
               : 'pl-0 pr-2 md:pl-0 md:pr-4'
           ) : 'px-2 md:px-4'
         } py-0 md:py-0 w-full max-w-[2000px] mx-auto`}>
