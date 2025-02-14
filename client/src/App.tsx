@@ -174,14 +174,16 @@ function Layout({ children }: { children: React.ReactNode }) {
             </SidebarFooter>
           </Sidebar>
         )}
-        <div className={`flex-1 transition-all duration-200 overflow-x-hidden ${
+        <div className={`flex-1 transition-all duration-300 ease-in-out overflow-x-hidden ${
           user ? (
             isCompact
-              ? '-ml-4 px-4'
+              ? '-ml-6 px-6'
               : 'px-4'
           ) : 'px-4'
         } w-full max-w-[2000px] mx-auto`}>
-          {children}
+          <div className="h-full py-4">
+            {children}
+          </div>
         </div>
       </div>
     </SidebarProvider>
