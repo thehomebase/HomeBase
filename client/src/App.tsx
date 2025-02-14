@@ -175,8 +175,8 @@ function Layout({ children }: { children: React.ReactNode }) {
           </Sidebar>
         )}
         <div className={`flex-1 transition-all duration-300 ease-in-out overflow-x-hidden ${
-          !user ? '' : 'md:ml-0'
-          } w-full max-w-[2000px]`}>
+          !user ? '' : isCompact ? 'md:ml-[70px]' : 'md:ml-[240px]'
+        } w-full max-w-[2000px]`}>
           <div className="h-full py-4 pr-4">
             {children}
           </div>
