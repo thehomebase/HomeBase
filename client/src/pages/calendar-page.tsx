@@ -188,6 +188,7 @@ export default function CalendarPage() {
           </div>
         )}
         </div>
+      </div>
     </main>
   );
 }
