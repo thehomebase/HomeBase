@@ -146,7 +146,7 @@ export default function TransactionsPage() {
   };
 
   return (
-    <main className="container mx-auto px-2 py-8">
+    <main className="w-full px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
@@ -312,64 +312,69 @@ export default function TransactionsPage() {
         )}
       </div>
 
-      {view === 'board' ? (
-        <KanbanBoard 
-          transactions={transactions} 
-          onDeleteTransaction={handleDeleteTransaction}
-          clients={clients}
-        />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {transactions.map((transaction) => (
-            <Card 
-              key={transaction.id} 
-              className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800"
-              onClick={() => setLocation(`/transactions/${transaction.id}`)}
-            >
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle 
-                  className="text-lg hover:underline dark:text-white"
-                  onClick={() => setLocation(`/transactions/${transaction.id}`)}
-                >
-                  {transaction.address}
-                </CardTitle>
-                {user?.role === "agent" && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteTransaction(transaction.id);
-                    }}
+      <div className="overflow-x-auto">
+        {view === 'board' ? (
+          <div className="min-w-0 overflow-x-auto">
+            <KanbanBoard 
+              transactions={transactions} 
+              onDeleteTransaction={handleDeleteTransaction}
+              onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
+              clients={clients}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {transactions.map((transaction) => (
+              <Card 
+                key={transaction.id} 
+                className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800"
+                onClick={() => setLocation(`/transactions/${transaction.id}`)}
+              >
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle 
+                    className="text-lg hover:underline dark:text-white"
+                    onClick={() => setLocation(`/transactions/${transaction.id}`)}
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize">Status: {transaction.status.replace('_', ' ')}</p>
-                <p className="text-sm text-muted-foreground dark:text-gray-300">
-                  Client: {clients.find(c => c.id === transaction.clientId) 
-                    ? `${clients.find(c => c.id === transaction.clientId)?.firstName} ${clients.find(c => c.id === transaction.clientId)?.lastName}` 
-                    : 'Not set'}
-                </p>
-                {transaction.secondaryClient && (
+                    {transaction.address}
+                  </CardTitle>
+                  {user?.role === "agent" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTransaction(transaction.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize">Status: {transaction.status.replace('_', ' ')}</p>
                   <p className="text-sm text-muted-foreground dark:text-gray-300">
-                    Secondary Client: {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}
+                    Client: {clients.find(c => c.id === transaction.clientId) 
+                      ? `${clients.find(c => c.id === transaction.clientId)?.firstName} ${clients.find(c => c.id === transaction.clientId)?.lastName}` 
+                      : 'Not set'}
                   </p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  {transaction.secondaryClient && (
+                    <p className="text-sm text-muted-foreground dark:text-gray-300">
+                      Secondary Client: {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
 
-          {transactions.length === 0 && (
-            <div className="col-span-full text-center py-12 text-muted-foreground dark:text-gray-400">
-              No transactions found. {user?.role === "agent" ? "Create one to get started!" : "Ask your agent for an access code to join a transaction."}
-            </div>
-          )}
-        </div>
-      )}
+            {transactions.length === 0 && (
+              <div className="col-span-full text-center py-12 text-muted-foreground dark:text-gray-400">
+                No transactions found. {user?.role === "agent" ? "Create one to get started!" : "Ask your agent for an access code to join a transaction."}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>

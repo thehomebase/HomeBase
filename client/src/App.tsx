@@ -54,7 +54,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="flex min-h-screen bg-background relative">
+      <div className="flex min-h-screen bg-background overflow-hidden">
         {/* Mobile Menu Toggle */}
         {user && (
           <Button
@@ -175,12 +175,12 @@ function Layout({ children }: { children: React.ReactNode }) {
           </Sidebar>
         )}
         <main
-          className={`flex-1 ${
+          className={`flex-1 min-h-screen overflow-x-hidden ${
             user ? (
               isCompact
-                ? 'md:ml-[60px]'
-                : 'md:ml-[220px]'
-            ) : 'ml-0'
+                ? 'pl-[60px]'
+                : 'pl-[220px]'
+            ) : ''
           }`}
         >
           {children}
