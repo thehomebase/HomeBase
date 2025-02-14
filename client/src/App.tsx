@@ -177,8 +177,8 @@ function Layout({ children }: { children: React.ReactNode }) {
         <div className={`flex-1 transition-all duration-200 ${
           user ? (
             isCompact
-              ? 'pl-[60px] pr-2 md:pl-[62px] md:pr-4'
-              : 'pl-2 pr-2 md:pl-[222px] md:pr-4'
+              ? 'pl-[50px] pr-2 md:pl-[52px] md:pr-4'
+              : 'pl-2 pr-2 md:pl-[202px] md:pr-4'
           ) : 'px-2 md:px-4'
         } py-2 md:py-4 w-full max-w-[1600px] mx-auto`}>
           {children}
