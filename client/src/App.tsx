@@ -59,12 +59,12 @@ function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen overflow-hidden bg-background">
         {user && (
           <div className={`relative transition-all duration-200 ease-in-out ${
-            'w-[60px]'
+            isSidebarOpen ? 'w-[256px]' : 'w-[60px]'
           }`}>
             <Sidebar
               side="left"
               collapsible="none"
-              className="fixed inset-y-0 left-0 z-40 border-r bg-background w-[60px]"
+              className={`fixed inset-y-0 left-0 z-40 border-r bg-background ${isSidebarOpen ? 'w-[256px]' : 'w-[60px]'}`}
             >
               <SidebarHeader>
                 <div className="flex items-center justify-between p-2">
