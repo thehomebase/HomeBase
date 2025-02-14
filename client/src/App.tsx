@@ -57,25 +57,14 @@ function Layout({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen={isSidebarOpen}>
       <div className="flex h-screen bg-background">
         {user && (
-          <Button
-            variant="outline"
-            size="icon"
-            className="fixed top-4 left-4 z-50 lg:hidden"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-        )}
-
-        {user && (
-          <div className={`lg:relative transition-all duration-200 ease-in-out ${
-            isSidebarOpen ? 'w-[60px] lg:w-[220px]' : '!w-0 lg:!w-[60px]'
+          <div className={`relative transition-all duration-200 ease-in-out ${
+            isSidebarOpen ? 'w-[60px] sm:w-[220px]' : 'w-[60px]'
           }`}>
             <Sidebar
               side="left"
               collapsible="icon"
-              className={`absolute inset-y-0 left-0 z-40 border-r bg-background ${
-                isSidebarOpen ? 'translate-x-0 w-[60px] lg:w-[220px]' : '-translate-x-full md:translate-x-0 md:w-[60px]'
+              className={`fixed inset-y-0 left-0 z-40 border-r bg-background ${
+                isSidebarOpen ? 'translate-x-0 w-[60px] sm:w-[220px]' : 'w-[60px]'
               }`}
             >
               <SidebarHeader>
