@@ -146,8 +146,8 @@ export default function TransactionsPage() {
   };
 
   return (
-    <main className="p-2 sm:p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 mb-4 sm:mb-8 w-full">
+    <main className="p-0 sm:p-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 sm:gap-4 mb-2 sm:mb-8 w-full px-2 sm:px-0">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full">
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
           <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1 dark:bg-gray-800/50">
