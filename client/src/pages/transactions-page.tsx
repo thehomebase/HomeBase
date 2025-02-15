@@ -323,11 +323,11 @@ export default function TransactionsPage() {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 w-full">
             {transactions.map((transaction) => (
               <Card 
                 key={transaction.id} 
-                className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800"
+                className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800 w-full mx-auto"
                 onClick={() => setLocation(`/transactions/${transaction.id}`)}
               >
                 <CardHeader className="flex flex-row items-center justify-between">
