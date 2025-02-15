@@ -66,7 +66,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         {user && (
           <div className={`relative transition-all duration-200 ease-in-out ${
             isSidebarOpen ? 'w-[220px]' : 'w-[60px]'
-          }`}>
+          } ${isMobile ? 'w-[60px]' : ''}`}>
             <Sidebar
               side="left"
               collapsible="icon"
