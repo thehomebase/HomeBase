@@ -100,7 +100,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="Transactions">
                             <Link href="/transactions" className="flex items-center gap-2">
                               <FileText className="h-4 w-4" />
-                              {isSidebarOpen && "Transactions"}
+                              <span className="hidden md:inline">Transactions</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -108,7 +108,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="Clients">
                             <Link href="/clients" className="flex items-center gap-2">
                               <Users className="h-4 w-4" />
-                              {isSidebarOpen && "Clients"}
+                              <span className="hidden md:inline">Clients</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -118,7 +118,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild tooltip="Calendar">
                         <Link href="/calendar" className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
-                          {isSidebarOpen && "Calendar"}
+                          <span className="hidden md:inline">Calendar</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -126,7 +126,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild tooltip="Messages">
                         <Link href="/messages" className="flex items-center gap-2">
                           <MessageSquare className="h-4 w-4" />
-                          {isSidebarOpen && "Messages"}
+                          <span className="hidden md:inline">Messages</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -134,7 +134,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild tooltip="Calculators">
                         <Link href="/calculators" className="flex items-center gap-2">
                           <Calculator className="h-4 w-4" />
-                          {isSidebarOpen && "Calculators"}
+                          <span className="hidden md:inline">Calculators</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -143,7 +143,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                         <SidebarMenuButton asChild tooltip="Glossary">
                           <Link href="/glossary" className="flex items-center gap-2">
                             <Book className="h-4 w-4" />
-                            {isSidebarOpen && "Glossary"}
+                            <span className="hidden md:inline">Glossary</span>
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
