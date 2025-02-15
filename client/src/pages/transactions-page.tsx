@@ -147,8 +147,8 @@ export default function TransactionsPage() {
 
   return (
     <main className="px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 w-full">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full">
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
           <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1 dark:bg-gray-800/50">
             <Toggle
@@ -185,7 +185,7 @@ export default function TransactionsPage() {
         {user?.role === "agent" && (
           <Dialog>
             <DialogTrigger asChild>
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 dark:text-white">
+              <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 dark:text-white">
                 <Plus className="h-4 w-4 mr-2" />
                 New Transaction
               </Button>
