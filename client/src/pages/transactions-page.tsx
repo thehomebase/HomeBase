@@ -146,7 +146,7 @@ export default function TransactionsPage() {
   };
 
   return (
-    <main className="px-4 py-8">
+    <main className="px-2 sm:px-4 py-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 w-full">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full">
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
@@ -323,7 +323,7 @@ export default function TransactionsPage() {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full px-0 sm:px-4">
             {transactions.map((transaction) => (
               <Card 
                 key={transaction.id} 
