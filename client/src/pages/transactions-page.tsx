@@ -314,7 +314,7 @@ export default function TransactionsPage() {
 
       <div className="overflow-x-auto w-full"> {/* Changed this line */}
         {view === 'board' ? (
-          <div className="min-w-0">
+          <div className="min-w-0 pl-4">
             <KanbanBoard 
               transactions={transactions} 
               onDeleteTransaction={handleDeleteTransaction}
