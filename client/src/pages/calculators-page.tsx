@@ -78,7 +78,7 @@ export default function CalculatorsPage() {
 
   return (
     <main className="px-4 py-8 w-full">
-      <div className="container mx-auto px-4 py-4 max-w-[1920px]">
+      <div className="w-full px-4 py-4">
       <h1 className="text-2xl sm:text-3xl font-bold mb-6">Financial Calculators</h1>
       <Tabs defaultValue="mortgage" className="w-full">
         <TabsList className="w-full flex flex-wrap">
@@ -87,8 +87,8 @@ export default function CalculatorsPage() {
           <TabsTrigger value="rent" className="flex-1 min-w-[120px] h-10">Rent vs Buy</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="mortgage">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <TabsContent value="mortgage" className="w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr,400px] gap-6 w-full">
             <div className="space-y-6 w-full">
               <div className="space-y-3">
                 <label className="text-sm font-medium">Purchase Price</label>
