@@ -75,18 +75,6 @@ function Layout({ children }: { children: React.ReactNode }) {
               <SidebarHeader>
                 <div className="flex items-center justify-between p-2">
                   <Logo isCompact={!isSidebarOpen} />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={toggleCompact}
-                    className="hidden md:flex"
-                  >
-                    {!isSidebarOpen ? (
-                      <PanelLeft className="h-4 w-4" />
-                    ) : (
-                      <PanelLeftClose className="h-4 w-4" />
-                    )}
-                  </Button>
                 </div>
               </SidebarHeader>
               <SidebarContent>
@@ -156,15 +144,30 @@ function Layout({ children }: { children: React.ReactNode }) {
                       {user?.email} ({user?.role})
                     </span>
                   )}
-                  <Button
-                    variant="outline"
-                    size={!isSidebarOpen ? "icon" : "sm"}
-                    onClick={() => logoutMutation.mutate()}
-                    className="w-full"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    {isSidebarOpen && <span className="ml-2">Logout</span>}
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      variant="ghost"
+                      size={!isSidebarOpen ? "icon" : "sm"}
+                      onClick={toggleCompact}
+                      className="w-full"
+                    >
+                      {!isSidebarOpen ? (
+                        <PanelLeft className="h-4 w-4" />
+                      ) : (
+                        <PanelLeftClose className="h-4 w-4" />
+                      )}
+                      {isSidebarOpen && <span className="ml-2">Compact View</span>}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size={!isSidebarOpen ? "icon" : "sm"}
+                      onClick={() => logoutMutation.mutate()}
+                      className="w-full"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      {isSidebarOpen && <span className="ml-2">Logout</span>}
+                    </Button>
+                  </div>
                 </div>
               </SidebarFooter>
             </Sidebar>
