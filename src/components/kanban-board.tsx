@@ -54,14 +54,14 @@ export const KanbanBoard: FC<KanbanBoardProps> = ({ columns, onDragEnd }) => {
       collisionDetection={closestCenter}
       onDragEnd={onDragEnd}
     >
-      <div className={`flex ${isDesktop ? 'flex-row px-4' : 'flex-col px-0'} gap-4 w-full ${isDesktop ? 'overflow-x-auto' : ''}`}>
+      <div className={`flex ${isDesktop ? 'flex-row' : 'flex-col'} gap-2 w-full ${isDesktop ? 'overflow-x-auto' : ''}`}>
         {columns.map((column) => (
           <div 
             key={column.title}
             className={`
-              ${isDesktop ? 'w-[300px] min-w-[300px] mx-0' : 'w-full'} 
+              ${isDesktop ? 'w-[300px] min-w-[300px]' : 'w-full'} 
               bg-muted/50 rounded-lg 
-              ${isDesktop ? 'p-4' : 'p-3'}
+              ${isDesktop ? 'p-3' : 'p-2'}
             `}
           >
             <h3 className="font-semibold mb-4 flex items-center gap-2">
