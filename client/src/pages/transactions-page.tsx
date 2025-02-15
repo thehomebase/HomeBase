@@ -312,7 +312,7 @@ export default function TransactionsPage() {
         )}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto w-full"> {/* Changed this line */}
         {view === 'board' ? (
           <div className="min-w-0">
             <KanbanBoard 
