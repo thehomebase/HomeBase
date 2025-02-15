@@ -78,7 +78,7 @@ export default function CalculatorsPage() {
 
   return (
     <main className="px-4 py-8 w-full">
-      <div className="container mx-auto px-4 py-4 max-w-screen-xl">
+      <div className="container mx-auto px-4 py-4 max-w-[1920px]">
       <h1 className="text-2xl sm:text-3xl font-bold mb-6">Financial Calculators</h1>
       <Tabs defaultValue="mortgage" className="w-full">
         <TabsList className="w-full flex flex-wrap">
