@@ -88,8 +88,8 @@ export default function CalculatorsPage() {
         </TabsList>
 
         <TabsContent value="mortgage">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr,auto] gap-6">
+            <div className="space-y-6 w-full">
               <div className="space-y-3">
                 <label className="text-sm font-medium">Purchase Price</label>
                 <Input
