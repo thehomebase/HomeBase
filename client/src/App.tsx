@@ -96,7 +96,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                       <>
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Transactions">
-                            <Link href="/transactions" className="flex items-center gap-2">
+                            <Link href="/transactions" className={`flex items-center gap-2 ${!isSidebarOpen ? 'w-8 overflow-hidden' : ''}`}>
                               <FileText className="h-4 w-4" />
                               {!isMobile && <span>{isSidebarOpen && "Transactions"}</span>}
                             </Link>

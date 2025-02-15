@@ -185,7 +185,7 @@ export default function TransactionsPage() {
         {user?.role === "agent" && (
           <Dialog>
             <DialogTrigger asChild>
-              <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 dark:text-white">
+              <Button className="w-auto bg-primary text-primary-foreground hover:bg-primary/90 dark:text-white">
                 <Plus className="h-4 w-4 mr-2" />
                 New Transaction
               </Button>
