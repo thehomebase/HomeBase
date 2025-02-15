@@ -125,7 +125,6 @@ function Layout({ children }: { children: React.ReactNode }) {
                         <Link href="/messages" className="flex items-center gap-2">
                           <MessageSquare className="h-4 w-4" />
                           {isSidebarOpen && <span>Messages</span>}
-                          <span className="hidden md:inline">Messages</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -133,7 +132,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild tooltip="Calculators">
                         <Link href="/calculators" className="flex items-center gap-2">
                           <Calculator className="h-4 w-4" />
-                          <span className="hidden md:inline">Calculators</span>
+                          {isSidebarOpen && <span>Calculators</span>}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
