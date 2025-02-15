@@ -98,7 +98,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="Transactions">
                             <Link href="/transactions" className="flex items-center gap-2">
                               <FileText className="h-4 w-4" />
-                              {isSidebarOpen && !isMobile && <span>Transactions</span>}
+                              {isSidebarOpen && <span>Transactions</span>}
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -106,7 +106,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="Clients">
                             <Link href="/clients" className="flex items-center gap-2">
                               <Users className="h-4 w-4" />
-                              <span className="hidden md:inline">Clients</span>
+                              {isSidebarOpen && <span>Clients</span>}
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -116,7 +116,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild tooltip="Calendar">
                         <Link href="/calendar" className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
-                          <span className="hidden md:inline">Calendar</span>
+                          {isSidebarOpen && <span>Calendar</span>}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -124,6 +124,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild tooltip="Messages">
                         <Link href="/messages" className="flex items-center gap-2">
                           <MessageSquare className="h-4 w-4" />
+                          {isSidebarOpen && <span>Messages</span>}
                           <span className="hidden md:inline">Messages</span>
                         </Link>
                       </SidebarMenuButton>
