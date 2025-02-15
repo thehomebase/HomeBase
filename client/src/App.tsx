@@ -69,10 +69,8 @@ function Layout({ children }: { children: React.ReactNode }) {
           }`}>
             <Sidebar
               side="left"
-              collapsible="icon"
-              className={`fixed inset-y-0 left-0 z-40 border-r bg-background ${
-                isMobile ? 'w-[60px]' : (isSidebarOpen ? 'w-[220px]' : 'w-[60px]')
-              }`}
+              collapsible={isMobile ? "none" : "icon"}
+              className="fixed inset-y-0 left-0 z-40 border-r bg-background w-[60px] md:w-auto"
             >
               <SidebarHeader>
                 <div className="flex items-center justify-between p-2">
@@ -100,7 +98,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="Transactions">
                             <Link href="/transactions" className="flex items-center gap-2">
                               <FileText className="h-4 w-4" />
-                              <span className="hidden md:inline">Transactions</span>
+                              {!isMobile && <span>{isSidebarOpen && "Transactions"}</span>}
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
