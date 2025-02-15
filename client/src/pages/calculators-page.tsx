@@ -77,9 +77,9 @@ export default function CalculatorsPage() {
   }, [mortgageInputs]);
 
   return (
-    <main className="px-4 py-8 w-full">
-      <div className="w-full px-4 py-4">
-      <h1 className="text-2xl sm:text-3xl font-bold mb-6">Financial Calculators</h1>
+    <main className="w-full">
+      <div className="w-full">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6 px-4">Financial Calculators</h1>
       <Tabs defaultValue="mortgage" className="w-full">
         <TabsList className="w-full flex flex-wrap">
           <TabsTrigger value="mortgage" className="flex-1 min-w-[120px] h-10">Mortgage Calculator</TabsTrigger>
@@ -87,8 +87,8 @@ export default function CalculatorsPage() {
           <TabsTrigger value="rent" className="flex-1 min-w-[120px] h-10">Rent vs Buy</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="mortgage" className="w-full overflow-visible">
-          <div className="grid grid-cols-1 lg:grid-cols-[2fr,400px] gap-6 w-full">
+        <TabsContent value="mortgage" className="w-full overflow-visible px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr),400px] gap-6 w-full">
             <div className="space-y-6 w-full">
               <div className="space-y-3">
                 <label className="text-sm font-medium">Purchase Price</label>
