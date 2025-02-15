@@ -40,6 +40,7 @@ import {
   PanelLeft
 } from "lucide-react";
 import React, { useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import CalculatorsPage from "@/pages/calculators-page";
 import GlossaryPage from "./pages/glossary-page";
 import MessagesPage from "./pages/messages-page";
