@@ -170,8 +170,8 @@ function Layout({ children }: { children: React.ReactNode }) {
             </Sidebar>
           </div>
         )}
-        <main className="flex-1 h-screen w-full">
-          <div className="w-full md:px-6">
+        <main className="flex-1 h-screen w-full overflow-x-hidden">
+          <div className="w-full">
             {children}
           </div>
         </main>
