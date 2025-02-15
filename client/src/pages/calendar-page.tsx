@@ -108,7 +108,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div className="w-full min-h-[calc(100vh-12rem)]">
+      <div className="w-full min-h-[calc(100vh-12rem)] overflow-x-hidden">
         <Timeline transactions={transactions} />
         {!showTable ? (
           <div className="w-full">
@@ -118,6 +118,7 @@ export default function CalendarPage() {
               deletable={false}
               draggable={false}
               views={["month", "week", "day"]}
+              defaultView="month"
               height={window.innerHeight - 250}
               week={{
                 weekDays: [0, 1, 2, 3, 4, 5, 6],
