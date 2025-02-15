@@ -87,8 +87,8 @@ export default function CalculatorsPage() {
           <TabsTrigger value="rent" className="flex-1 min-w-[120px] h-10">Rent vs Buy</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="mortgage" className="w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <TabsContent value="mortgage" className="w-full overflow-visible">
+          <div className="grid grid-cols-1 lg:grid-cols-[2fr,400px] gap-6 w-full">
             <div className="space-y-6 w-full">
               <div className="space-y-3">
                 <label className="text-sm font-medium">Purchase Price</label>
