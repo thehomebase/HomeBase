@@ -88,7 +88,7 @@ export default function CalculatorsPage() {
         </TabsList>
 
         <TabsContent value="mortgage">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr,auto] gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-6 w-full">
               <div className="space-y-3">
                 <label className="text-sm font-medium">Purchase Price</label>
@@ -171,7 +171,7 @@ export default function CalculatorsPage() {
               </div>
             </div>
 
-            <div className="bg-black text-white p-6 lg:p-8 rounded-lg sticky top-4 h-fit">
+            <div className="bg-black text-white p-6 lg:p-8 rounded-lg h-fit">
               <div className="text-center mb-8">
                 <div className="text-5xl font-bold">${monthlyPayment.total.toFixed(2)}</div>
                 <div className="text-sm opacity-80 mt-2">MONTHLY PAYMENT</div>
