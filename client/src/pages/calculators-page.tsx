@@ -281,15 +281,15 @@ export default function CalculatorsPage() {
                 <div className="bg-card p-6 rounded-lg border">
                   <h4 className="text-foreground text-lg font-semibold mb-4">Current Loan</h4>
                   <div className="space-y-2">
-                    <div className="flex justify-between text-foreground">
+                    <div className="flex flex-col sm:flex-row sm:justify-between text-foreground">
                       <span>Monthly Payment</span>
                       <span>${refinanceInputs.currentPayment.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-foreground">
+                    <div className="flex flex-col sm:flex-row sm:justify-between text-foreground">
                       <span>Interest Rate</span>
                       <span>{refinanceInputs.currentRate}%</span>
                     </div>
-                    <div className="flex justify-between text-foreground">
+                    <div className="flex flex-col sm:flex-row sm:justify-between text-foreground">
                       <span>Total Interest</span>
                       <span>${((refinanceInputs.currentPayment * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance)/1000).toFixed(0)}k</span>
                     </div>
@@ -299,15 +299,15 @@ export default function CalculatorsPage() {
                 <div className="bg-card p-6 rounded-lg border">
                   <h4 className="text-foreground text-lg font-semibold mb-4">Refinanced Loan</h4>
                   <div className="space-y-2">
-                    <div className="flex justify-between text-foreground">
+                    <div className="flex flex-col sm:flex-row sm:justify-between text-foreground">
                       <span>Monthly Payment</span>
                       <span className="text-emerald-500">${calculateNewPayment().toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-foreground">
+                    <div className="flex flex-col sm:flex-row sm:justify-between text-foreground">
                       <span>Interest Rate</span>
                       <span className="text-emerald-500">{refinanceInputs.newRate}%</span>
                     </div>
-                    <div className="flex justify-between text-foreground">
+                    <div className="flex flex-col sm:flex-row sm:justify-between text-foreground">
                       <span>Total Interest</span>
                       <span className="text-emerald-500">${((calculateNewPayment() * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance)/1000).toFixed(0)}k</span>
                     </div>
