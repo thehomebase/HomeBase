@@ -316,14 +316,14 @@ export default function CalculatorsPage() {
               </div>
 
               <div className="bg-black text-white p-6 rounded-lg">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span>Monthly Savings</span>
-                    <span className="text-2xl font-bold text-emerald-400">${calculateMonthlySavings().toFixed(2)}</span>
+                <div className="space-y-4 text-center">
+                  <div className="space-y-1">
+                    <div>Monthly Savings</div>
+                    <div className="text-2xl font-bold text-emerald-400">${calculateMonthlySavings().toFixed(2)}</div>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Break-even Period</span>
-                    <span>{calculateBreakEven()} months</span>
+                  <div className="space-y-1">
+                    <div>Break-even Period</div>
+                    <div>{calculateBreakEven()} months</div>
                   </div>
                 </div>
               </div>
