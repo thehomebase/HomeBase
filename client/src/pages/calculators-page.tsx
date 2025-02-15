@@ -271,9 +271,9 @@ export default function CalculatorsPage() {
             <div className="space-y-6">
               <div className="bg-background border p-6 rounded-lg">
                 <p className="text-foreground text-sm leading-relaxed">
-                  By refinancing your current loan balance of ${refinanceInputs.currentBalance.toLocaleString()} at {refinanceInputs.newRate}% over {refinanceInputs.newTerm} years, 
-                  you will {calculateMonthlySavings() > 0 ? 'decrease' : 'increase'} your monthly payments by ${Math.abs(calculateMonthlySavings()).toFixed(2)}.
-                  The total interest paid over the life of the loan will {calculateInterestSavings() > 0 ? 'decrease' : 'increase'} by ${Math.abs(calculateInterestSavings()).toFixed(2)}.
+                  Refinancing ${(refinanceInputs.currentBalance/1000).toFixed(0)}k at {refinanceInputs.newRate}% over {refinanceInputs.newTerm}y will 
+                  {calculateMonthlySavings() > 0 ? ' decrease ' : ' increase '} 
+                  monthly payments by ${Math.abs(calculateMonthlySavings()).toFixed(0)}.
                 </p>
               </div>
 
@@ -291,7 +291,7 @@ export default function CalculatorsPage() {
                     </div>
                     <div className="flex justify-between text-foreground">
                       <span>Total Interest</span>
-                      <span>${(refinanceInputs.currentPayment * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance).toFixed(2)}</span>
+                      <span>${((refinanceInputs.currentPayment * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance)/1000).toFixed(0)}k</span>
                     </div>
                   </div>
                 </div>
@@ -309,7 +309,7 @@ export default function CalculatorsPage() {
                     </div>
                     <div className="flex justify-between text-foreground">
                       <span>Total Interest</span>
-                      <span className="text-emerald-500">${(calculateNewPayment() * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance).toFixed(2)}</span>
+                      <span className="text-emerald-500">${((calculateNewPayment() * refinanceInputs.newTerm * 12 - refinanceInputs.currentBalance)/1000).toFixed(0)}k</span>
                     </div>
                   </div>
                 </div>
