@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DndContext,
   DragOverlay,
@@ -172,6 +173,7 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionClick, clients }: KanbanBoardProps) {
+  const isMobile = useIsMobile();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -258,8 +260,8 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="overflow-x-auto">
-        <div className="flex gap-4 min-w-min pb-4">
+      <div className={`${isMobile ? '' : 'overflow-x-auto'}`}>
+        <div className={`${isMobile ? 'flex flex-col gap-4' : 'flex gap-4 min-w-min'} pb-4`}>
           {statusColumns.map((column) => (
             <KanbanColumn 
               key={column.id} 
