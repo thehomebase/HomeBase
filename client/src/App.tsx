@@ -171,7 +171,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <main className="flex-1 h-screen w-full">
-          <div className="w-full px-0 md:px-6">
+          <div className="w-full md:px-6">
             {children}
           </div>
         </main>
