@@ -119,6 +119,7 @@ export default function CalendarPage() {
               draggable={false}
               views={["month", "week", "day"]}
               defaultView="month"
+              defaultView="month"
               height={window.innerHeight - 250}
               week={{
                 weekDays: [0, 1, 2, 3, 4, 5, 6],
