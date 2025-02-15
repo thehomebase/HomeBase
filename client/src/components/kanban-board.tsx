@@ -150,7 +150,7 @@ function KanbanColumn({
           {transactions.length}
         </span>
       </div>
-      <div className="flex flex-col gap-2 min-h-[100px]">
+      <div className="flex flex-col gap-2 min-h-[100px] px-1">
         {transactions.map((transaction) => (
           <DraggableCard
             key={transaction.id}
