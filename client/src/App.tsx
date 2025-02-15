@@ -149,7 +149,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                       variant="ghost"
                       size={!isSidebarOpen ? "icon" : "sm"}
                       onClick={toggleCompact}
-                      className="w-full"
+                      className="w-full hidden md:flex"
                     >
                       {!isSidebarOpen ? (
                         <PanelLeft className="h-4 w-4" />
