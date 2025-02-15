@@ -77,7 +77,7 @@ export default function CalendarPage() {
 
   return (
     <main className="flex-1 p-6 w-full max-w-none">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <h2 className="text-2xl font-bold">Calendar</h2>
         <div className="flex items-center gap-2">
           <DropdownMenu>
