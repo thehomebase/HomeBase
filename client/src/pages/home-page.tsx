@@ -4,13 +4,33 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Plus, LogOut, Mail, Phone } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { format } from "date-fns";
@@ -47,8 +67,8 @@ export default function HomePage() {
     },
   });
 
-  const sellers = clients.filter(client => client.type === 'seller');
-  const buyers = clients.filter(client => client.type === 'buyer');
+  const sellers = clients.filter((client) => client.type === "seller");
+  const buyers = clients.filter((client) => client.type === "buyer");
 
   const ClientTable = ({ clients }: { clients: Client[] }) => (
     <Table>
@@ -79,22 +99,29 @@ export default function HomePage() {
             </TableCell>
             <TableCell>{client.address}</TableCell>
             <TableCell>
-              <span className={`px-2 py-1 rounded-full text-xs ${
-                client.status === 'active' 
-                  ? 'bg-green-100 text-green-800' 
-                  : client.status === 'pending'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
+              <span
+                className={`px-2 py-1 rounded-full text-xs ${
+                  client.status === "active"
+                    ? "bg-green-100 text-green-800"
+                    : client.status === "pending"
+                      ? "bg-yellow-100 text-yellow-800"
+                      : "bg-gray-100 text-gray-800"
+                }`}
+              >
                 {client.status}
               </span>
             </TableCell>
-            <TableCell>{format(new Date(client.createdAt), 'MMM d, yyyy')}</TableCell>
+            <TableCell>
+              {format(new Date(client.createdAt), "MMM d, yyyy")}
+            </TableCell>
           </TableRow>
         ))}
         {clients.length === 0 && (
           <TableRow>
-            <TableCell colSpan={5} className="text-center text-muted-foreground">
+            <TableCell
+              colSpan={5}
+              className="text-center text-muted-foreground"
+            >
               No clients found. Add your first client to get started!
             </TableCell>
           </TableRow>
@@ -112,7 +139,11 @@ export default function HomePage() {
             <span className="text-sm text-muted-foreground">
               Logged in as {user?.username} ({user?.role})
             </span>
-            <Button variant="outline" size="sm" onClick={() => logoutMutation.mutate()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => logoutMutation.mutate()}
+            >
               <LogOut className="h-4 w-4 mr-2" />
               Logout
             </Button>
@@ -135,7 +166,12 @@ export default function HomePage() {
                 <DialogTitle>Add New Client</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit((data) => createClientMutation.mutate(data))} className="space-y-4">
+                <form
+                  onSubmit={form.handleSubmit((data) =>
+                    createClientMutation.mutate(data),
+                  )}
+                  className="space-y-4"
+                >
                   <FormField
                     control={form.control}
                     name="name"
@@ -226,7 +262,11 @@ export default function HomePage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full" disabled={createClientMutation.isPending}>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={createClientMutation.isPending}
+                  >
                     Add Client
                   </Button>
                 </form>
