@@ -22,10 +22,10 @@ export function LoginForm({
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <form onSubmit={handleSubmit}>
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col items-center gap-2">
+    <div className={cn("flex flex-col gap-8", className)} {...props}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-8">
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col items-center gap-4">
             <Logo className="h-12 md:h-16" />
             <h1 className="text-xl font-bold">Welcome to Homebase</h1>
             <div className="text-center text-sm">
@@ -35,7 +35,7 @@ export function LoginForm({
               </a>
             </div>
           </div>
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4">
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -43,6 +43,16 @@ export function LoginForm({
                 name="email"
                 type="email"
                 placeholder="m@example.com"
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="Enter your password"
                 required
               />
             </div>
