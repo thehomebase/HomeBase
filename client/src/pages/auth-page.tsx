@@ -13,8 +13,8 @@ export default function AuthPage() {
   }, [user, setLocation]);
 
   return (
-    <div className="grid min-h-screen place-items-center bg-background px-6 py-4">
-      <div className="w-full max-w-sm mx-auto">
+    <div className="grid min-h-screen place-items-center bg-background p-4">
+      <div className="w-full max-w-sm">
         <LoginForm />
       </div>
     </div>
