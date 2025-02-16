@@ -81,10 +81,10 @@ export default function CalculatorsPage() {
       <div className="w-full">
       <h1 className="text-2xl sm:text-3xl font-bold mb-6 px-4">Financial Calculators</h1>
       <Tabs defaultValue="mortgage" className="w-full">
-        <TabsList className="w-full flex flex-wrap">
-          <TabsTrigger value="mortgage" className="flex-1 min-w-[120px] h-10">Mortgage Calculator</TabsTrigger>
-          <TabsTrigger value="refinance" className="flex-1 min-w-[120px] h-10">Refinance Calculator</TabsTrigger>
-          <TabsTrigger value="rent" className="flex-1 min-w-[120px] h-10">Rent vs Buy</TabsTrigger>
+        <TabsList className="w-full flex flex-wrap gap-1">
+          <TabsTrigger value="mortgage" className="flex-1 h-10 text-sm sm:text-base">Mortgage</TabsTrigger>
+          <TabsTrigger value="refinance" className="flex-1 h-10 text-sm sm:text-base">Refinance</TabsTrigger>
+          <TabsTrigger value="rent" className="flex-1 h-10 text-sm sm:text-base">Rent vs Buy</TabsTrigger>
         </TabsList>
 
         <TabsContent value="mortgage" className="w-full overflow-visible px-4">
