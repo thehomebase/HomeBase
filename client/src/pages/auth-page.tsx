@@ -5,24 +5,42 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Logo } from "@/components/ui/logo";
+
+// Updated schema to include email, first name, last name, and agent association
+const registerSchema = z.object({
+  email: z.string().email(),
+  password: z.string(),
+  firstName: z.string(),
+  lastName: z.string(),
+  role: z.string().min(1, "Role is required"),
+  agentId: z.string().optional(),
+});
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string(),
 });
+
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
-  const { user, loginMutation } = useAuth();
+  const { user, loginMutation, registerMutation } = useAuth();
 
-  const form = useForm({
+  const loginForm = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
+  });
+
+  const registerForm = useForm({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { email: "", password: "", firstName: "", lastName: "", role: "", agentId: "" },
   });
 
   useEffect(() => {
@@ -30,55 +48,203 @@ export default function AuthPage() {
   }, [user, setLocation]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gradient-to-br from-primary/10 to-secondary/10 p-6">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="flex flex-col items-center space-y-2">
-          <Logo className="h-12" />
-          <p className="text-sm text-muted-foreground">
-            Sign in to your account to continue
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-primary/10 to-secondary/10 flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl mx-auto grid md:grid-cols-2 gap-8 items-start">
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Logo className="mb-4" />
+            <p className="text-muted-foreground">
+              Streamline your real estate transactions with our collaborative platform.
+            </p>
+          </div>
+
+          <Tabs defaultValue="login">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="register">Register</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="login">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Login to your account</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Form {...loginForm}>
+                    <form onSubmit={loginForm.handleSubmit((data) => loginMutation.mutate(data))} className="space-y-4">
+                      <FormField
+                        control={loginForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Label>Email</Label>
+                            <FormControl>
+                              <Input type="email" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={loginForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Label>Password</Label>
+                            <FormControl>
+                              <Input type="password" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+                        Login
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="register">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Create an account</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Form {...registerForm}>
+                    <form onSubmit={registerForm.handleSubmit((data) => registerMutation.mutate(data))} className="space-y-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Label>Email</Label>
+                            <FormControl>
+                              <Input type="email" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Label>Password</Label>
+                            <FormControl>
+                              <Input type="password" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Label>First Name</Label>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Label>Last Name</Label>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="role"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Label>Role</Label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select your role" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="agent">Agent</SelectItem>
+                                <SelectItem value="client">Client</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="agentId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <Label>Associated Agent</Label>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}> {/* Requires backend integration for agent options */}
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select an agent" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {/* Placeholder -  Replace with actual agent data fetched from backend */}
+                                <SelectItem value="agent1">Agent 1</SelectItem>
+                                <SelectItem value="agent2">Agent 2</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
+                        Register
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl text-center">Welcome back</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit((data) => loginMutation.mutate(data))} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <Label>Email</Label>
-                      <FormControl>
-                        <Input type="email" placeholder="name@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <Label>Password</Label>
-                      <FormControl>
-                        <Input type="password" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
-                  Sign In
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+        <div className="hidden md:block bg-primary/5 rounded-lg p-8">
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold">Platform Features</h2>
+            <ul className="space-y-2">
+              <li className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-primary rounded-full" />
+                <span>Secure transaction management</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-primary rounded-full" />
+                <span>Role-based access control</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-primary rounded-full" />
+                <span>Real-time progress tracking</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-primary rounded-full" />
+                <span>Integrated chat communication</span>
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
