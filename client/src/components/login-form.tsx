@@ -22,8 +22,8 @@ export function LoginForm({
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+    <div className={cn("flex flex-col gap-6 w-full", className)} {...props}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6 w-full">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-4">
             <Logo className="h-12 md:h-16" />
