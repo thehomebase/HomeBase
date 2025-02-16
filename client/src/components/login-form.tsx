@@ -22,11 +22,11 @@ export function LoginForm({
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
+    <div className={cn("flex flex-col gap-6 p-6", className)} {...props}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-4">
-            <Logo className="h-12 md:h-16" />
+            <Logo className="h-16 md:h-20" />
             <h1 className="text-xl font-bold">Welcome to Homebase</h1>
             <div className="text-center text-sm">
               Don&apos;t have an account?{" "}
