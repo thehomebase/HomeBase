@@ -26,9 +26,9 @@ export function LoginForm({
       <form onSubmit={handleSubmit}>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-2">
-            <Logo className="h-16 md:h-20 mb-4" />
-            <h1 className="text-2xl font-bold text-center">Welcome to Homebase</h1>
-            <div className="text-center text-sm mt-2">
+            <Logo className="h-12 md:h-16" />
+            <h1 className="text-xl font-bold">Welcome to Homebase</h1>
+            <div className="text-center text-sm">
               Don&apos;t have an account?{" "}
               <a href="#" className="underline underline-offset-4">
                 Sign up
