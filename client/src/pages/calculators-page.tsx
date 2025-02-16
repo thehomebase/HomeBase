@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
@@ -198,6 +199,60 @@ export default function CalculatorsPage() {
                   <div>Monthly Insurance</div>
                   <div>${monthlyPayment.insurance.toFixed(2)}</div>
                 </div>
+              </div>
+            </div>
+
+            <div className="bg-background border rounded-lg p-6 mt-6">
+              <h3 className="text-lg font-semibold mb-4">Amortization Schedule</h3>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={Array.from({length: Number(mortgageInputs.loanTerm) * 12}, (_, i) => {
+                      const month = i + 1;
+                      const principal = mortgageInputs.purchasePrice - mortgageInputs.downPayment;
+                      const monthlyRate = mortgageInputs.interestRate / 100 / 12;
+                      const payment = monthlyPayment.principal;
+                      
+                      let remainingBalance = principal * Math.pow(1 + monthlyRate, month) - 
+                        (payment * (Math.pow(1 + monthlyRate, month) - 1)) / monthlyRate;
+                      
+                      let totalInterest = (payment * month) - (principal - remainingBalance);
+                      
+                      return {
+                        month,
+                        balance: Math.max(0, remainingBalance),
+                        totalInterest: Math.max(0, totalInterest)
+                      };
+                    })}
+                    margin={{ top: 20, right: 30, left: 70, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="month" 
+                      label={{ value: 'Months', position: 'insideBottom', offset: -5 }}
+                    />
+                    <YAxis 
+                      tickFormatter={(value) => `$${(value/1000).toFixed(0)}k`}
+                      label={{ value: 'Amount ($)', angle: -90, position: 'insideLeft', offset: -60 }}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => `$${value.toFixed(2)}`}
+                      labelFormatter={(label) => `Month ${label}`}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="balance" 
+                      stroke="#000000" 
+                      name="Remaining Balance"
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="totalInterest" 
+                      stroke="#16a34a" 
+                      name="Total Interest Paid"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>
