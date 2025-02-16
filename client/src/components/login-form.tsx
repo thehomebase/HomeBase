@@ -56,16 +56,6 @@ export function LoginForm({
               </button>
             </div>
           </div>
-              Don&apos;t have an account?{" "}
-              <button
-                type="button"
-                onClick={() => setShowRegister(true)}
-                className="underline underline-offset-4"
-              >
-                Sign up
-              </button>
-            </div>
-          </div>
           <div className="flex flex-col gap-4">
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
