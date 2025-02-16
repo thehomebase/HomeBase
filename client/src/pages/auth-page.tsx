@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
@@ -13,8 +12,8 @@ export default function AuthPage() {
   }, [user, setLocation]);
 
   return (
-    <div className="min-h-screen w-full bg-background grid place-items-center">
-      <div className="w-full p-8">
+    <div className="min-h-screen w-full bg-background flex items-center justify-center">
+      <div className="w-full max-w-md mx-auto px-4">
         <LoginForm />
       </div>
     </div>

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -39,8 +38,8 @@ export function LoginForm({
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <form onSubmit={handleLogin} className="flex flex-col gap-6">
+    <div className={cn("w-full flex flex-col gap-6", className)} {...props}>
+      <form onSubmit={handleLogin} className="flex flex-col gap-6 w-full">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-2">
             <Logo className="h-12 md:h-16" />
@@ -56,7 +55,7 @@ export function LoginForm({
               </button>
             </div>
           </div>
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 w-full">
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -89,7 +88,7 @@ export function LoginForm({
       </div>
 
       <Dialog open={showRegister} onOpenChange={setShowRegister}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Create an Account</DialogTitle>
           </DialogHeader>
