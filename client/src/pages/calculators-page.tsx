@@ -92,8 +92,8 @@ export default function CalculatorsPage() {
         </TabsList>
 
         <TabsContent value="mortgage" className="w-full overflow-visible px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full">
-            <div className="space-y-6 w-full max-w-none">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-[1400px] mx-auto">
+            <div className="space-y-6 w-full">
               <div className="space-y-4">
                 <label className="text-sm font-medium">Purchase Price</label>
                 <Input
@@ -204,8 +204,8 @@ export default function CalculatorsPage() {
         </TabsContent>
 
         <TabsContent value="refinance">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-[1400px] mx-auto">
+            <div className="space-y-6 w-full">
               <Card className="p-6">
                 <h3 className="text-lg font-semibold mb-4">Current Loan</h3>
                 <div className="space-y-4">
