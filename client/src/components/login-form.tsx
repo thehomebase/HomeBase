@@ -42,7 +42,20 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <form onSubmit={handleLogin} className="flex flex-col gap-6">
         <div className="flex flex-col gap-6">
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-2">
+            <Logo className="h-12 md:h-16" />
+            <h1 className="text-xl font-bold">Welcome to Homebase</h1>
+            <div className="text-center text-sm">
+              Don&apos;t have an account?{" "}
+              <button
+                type="button"
+                onClick={() => setShowRegister(true)}
+                className="underline underline-offset-4 hover:text-primary"
+              >
+                Sign up
+              </button>
+            </div>
+          </div>
             <Logo className="h-12 md:h-16" />
             <h1 className="text-xl font-bold">Welcome to Homebase</h1>
             <div className="text-center text-sm">
