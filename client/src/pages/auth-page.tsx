@@ -12,8 +12,8 @@ export default function AuthPage() {
   }, [user, setLocation]);
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-background">
-      <div className="w-full max-w-[1200px] mx-4 flex justify-center items-center border border-border rounded-lg p-8">
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="w-[90%] sm:w-[1200px] flex justify-center items-center border border-border rounded-lg p-8">
         <LoginForm />
       </div>
     </div>
