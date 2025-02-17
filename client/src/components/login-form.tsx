@@ -38,7 +38,7 @@ export function LoginForm({
   };
 
   return (
-    <div className={cn("w-full max-w-sm mx-auto text-center", className)} {...props}>
+    <div className={cn("w-full max-w-sm mx-auto", className)} {...props}>
       <form onSubmit={handleLogin} className="space-y-6">
         <div className="flex flex-col items-center gap-4">
           <Logo className="h-12 md:h-16" />
