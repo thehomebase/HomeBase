@@ -13,7 +13,7 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-[1200px] mx-4 border rounded-lg p-8">
+      <div className="w-full max-w-[1200px] mx-4">
         <LoginForm />
       </div>
     </div>
