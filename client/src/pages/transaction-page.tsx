@@ -275,7 +275,7 @@ export default function TransactionPage() {
   return (
     <div>
       <header className="border-b">
-        <div className="container mx-auto px-6 py-4">
+        <div className="w-full px-6 py-4">
           <div className="flex items-center gap-4">
             <Link href="/transactions">
               <Button variant="ghost" size="icon">
@@ -307,7 +307,7 @@ export default function TransactionPage() {
         </div>
       </header>
 
-      <main className="container mx-auto p-6">
+      <main className="w-full p-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex justify-between items-center mb-4">
