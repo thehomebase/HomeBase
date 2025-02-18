@@ -78,7 +78,7 @@ export default function CalculatorsPage() {
   }, [mortgageInputs]);
 
   return (
-    <main className="w-full w-screen max-w-[8000px] mx-auto">
+    <main className="w-full overflow-x-hidden">
       <header className="border-b">
         <div className="container mx-auto px-6 py-4">
           <h1 className="text-2xl font-bold">Financial Calculators</h1>
