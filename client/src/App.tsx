@@ -62,25 +62,21 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="flex min-h-screen bg-background">
+      <div className="flex h-screen bg-background">
         {user && (
-          <aside className="bg-background flex-shrink-0" style={{
-            width: isMobile ? '60px' : (isSidebarOpen ? '220px' : '60px'),
-            borderRight: '1px solid var(--border)'
-          }}>
-            <Sidebar
-              side="left"
-              collapsible={isMobile ? "none" : "icon"}
-              className="top-0 z-40 h-full flex-shrink-0"
-            >
-                <SidebarHeader>
-                  <div className="flex items-center justify-between p-2">
-                    <Logo isCompact={!isSidebarOpen} />
-                  </div>
-                </SidebarHeader>
-                <SidebarContent>
-                  <SidebarGroup>
-                    <SidebarMenu>
+          <Sidebar
+            side="left"
+            collapsible={isMobile ? "none" : "icon"}
+            className="sticky top-0 z-40 h-screen shrink-0 border-r"
+          >
+            <SidebarHeader>
+              <div className="flex items-center justify-between p-2">
+                  <Logo isCompact={!isSidebarOpen} />
+                </div>
+              </SidebarHeader>
+              <SidebarContent>
+                <SidebarGroup>
+                  <SidebarMenu>
                     {!isClient && (
                       <>
                         <SidebarMenuItem>
@@ -136,20 +132,21 @@ function Layout({ children }: { children: React.ReactNode }) {
                       </SidebarMenuItem>
                     )}
                   </SidebarMenu>
-                  </SidebarGroup>
-                </SidebarContent>
-                <SidebarFooter>
-                  <div className="p-2 flex flex-col gap-2">
-                    {isSidebarOpen && (
-                      <span className="text-xs text-muted-foreground truncate">
-                        {user?.email} ({user?.role})
-                      </span>
-                    )}
+                </SidebarGroup>
+              </SidebarContent>
+              <SidebarFooter>
+                <div className="p-2">
+                  {isSidebarOpen && (
+                    <span className="text-xs text-muted-foreground block mb-2 px-2 truncate">
+                      {user?.email} ({user?.role})
+                    </span>
+                  )}
+                  <div className="flex flex-col gap-2">
                     <Button
                       variant="ghost"
-                      size="icon"
+                      size={!isSidebarOpen ? "icon" : "sm"}
                       onClick={toggleCompact}
-                      className={`hidden md:inline-flex justify-center ${isSidebarOpen ? 'w-full' : 'w-9 h-9'}`}
+                      className="w-full hidden md:inline-flex justify-center"
                     >
                       {!isSidebarOpen ? (
                         <PanelLeft className="h-4 w-4" />
@@ -162,20 +159,23 @@ function Layout({ children }: { children: React.ReactNode }) {
                     </Button>
                     <Button
                       variant="outline"
-                      size="icon"
+                      size={!isSidebarOpen ? "icon" : "sm"}
                       onClick={() => logoutMutation.mutate()}
-                      className={`inline-flex justify-center ${isSidebarOpen ? 'w-full' : 'w-9 h-9'}`}
+                      className="w-full inline-flex justify-center"
                     >
                       <LogOut className="h-4 w-4" />
                       {isSidebarOpen && <span className="ml-2">Logout</span>}
                     </Button>
                   </div>
-                </SidebarFooter>
-              </Sidebar>
-            </aside>
-          )}
-        <main className="flex-1 overflow-auto min-w-0">
-          {children}
+                </div>
+              </SidebarFooter>
+            </Sidebar>
+          </div>
+        )}
+        <main className="h-screen overflow-auto">
+          <div className="min-h-full">
+            {children}
+          </div>
         </main>
       </div>
     </SidebarProvider>
