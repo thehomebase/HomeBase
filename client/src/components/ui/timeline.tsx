@@ -94,7 +94,7 @@ export function Timeline({ transactions }: TimelineProps) {
           <div
             key={day}
             onClick={() => setSelectedDay(selectedDay === day ? null : day)}
-            className="absolute w-4 h-4 bg-primary rounded-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+            className="absolute w-4 h-4 bg-primary dark:bg-white rounded-full cursor-pointer hover:ring-2 hover:ring-primary/50 dark:hover:ring-white/50 transition-all"
             style={{
               left: `${(day / (daysInMonth - 1)) * 100}%`,
               top: '-5px',
