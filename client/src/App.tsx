@@ -62,21 +62,25 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="flex h-screen bg-background">
-        {user && (
-          <Sidebar
-            side="left"
-            collapsible={isMobile ? "none" : "icon"}
-            className="sticky top-0 z-40 h-screen shrink-0 border-r"
-          >
-            <SidebarHeader>
-              <div className="flex items-center justify-between p-2">
-                  <Logo isCompact={!isSidebarOpen} />
-                </div>
-              </SidebarHeader>
-              <SidebarContent>
-                <SidebarGroup>
-                  <SidebarMenu>
+      <div className="h-screen bg-background">
+        <div className="grid h-screen" style={{
+          gridTemplateColumns: user ? (isMobile ? '60px 1fr' : (isSidebarOpen ? '220px 1fr' : '60px 1fr')) : '1fr'
+        }}>
+          {user && (
+            <div className="border-r bg-background">
+              <Sidebar
+                side="left"
+                collapsible={isMobile ? "none" : "icon"}
+                className="sticky top-0 z-40 h-screen"
+              >
+                <SidebarHeader>
+                  <div className="flex items-center justify-between p-2">
+                    <Logo isCompact={!isSidebarOpen} />
+                  </div>
+                </SidebarHeader>
+                <SidebarContent>
+                  <SidebarGroup>
+                    <SidebarMenu>
                     {!isClient && (
                       <>
                         <SidebarMenuItem>
@@ -132,46 +136,47 @@ function Layout({ children }: { children: React.ReactNode }) {
                       </SidebarMenuItem>
                     )}
                   </SidebarMenu>
-                </SidebarGroup>
-              </SidebarContent>
-              <SidebarFooter>
-                <div className="p-2">
-                  {isSidebarOpen && (
-                    <span className="text-xs text-muted-foreground block mb-2 px-2 truncate">
-                      {user?.email} ({user?.role})
-                    </span>
-                  )}
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      variant="ghost"
-                      size={!isSidebarOpen ? "icon" : "sm"}
-                      onClick={toggleCompact}
-                      className="w-full hidden md:inline-flex justify-center"
-                    >
-                      {!isSidebarOpen ? (
-                        <PanelLeft className="h-4 w-4" />
-                      ) : (
-                        <>
-                          <PanelLeftClose className="h-4 w-4" />
-                          <span className="ml-2">Compact View</span>
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size={!isSidebarOpen ? "icon" : "sm"}
-                      onClick={() => logoutMutation.mutate()}
-                      className="w-full inline-flex justify-center"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      {isSidebarOpen && <span className="ml-2">Logout</span>}
-                    </Button>
+                  </SidebarGroup>
+                </SidebarContent>
+                <SidebarFooter>
+                  <div className="p-2">
+                    {isSidebarOpen && (
+                      <span className="text-xs text-muted-foreground block mb-2 px-2 truncate">
+                        {user?.email} ({user?.role})
+                      </span>
+                    )}
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant="ghost"
+                        size={!isSidebarOpen ? "icon" : "sm"}
+                        onClick={toggleCompact}
+                        className="w-full hidden md:inline-flex justify-center"
+                      >
+                        {!isSidebarOpen ? (
+                          <PanelLeft className="h-4 w-4" />
+                        ) : (
+                          <>
+                            <PanelLeftClose className="h-4 w-4" />
+                            <span className="ml-2">Compact View</span>
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size={!isSidebarOpen ? "icon" : "sm"}
+                        onClick={() => logoutMutation.mutate()}
+                        className="w-full inline-flex justify-center"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        {isSidebarOpen && <span className="ml-2">Logout</span>}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </SidebarFooter>
-            </Sidebar>
-          </div>
-        )}
+                </SidebarFooter>
+              </Sidebar>
+            </div>
+          )}
+        </div>
         <main className="h-screen overflow-auto">
           <div className="min-h-full">
             {children}
