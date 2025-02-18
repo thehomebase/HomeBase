@@ -172,7 +172,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                   </div>
                 </SidebarFooter>
               </Sidebar>
-            </div>
+            </aside>
           )}
         <main className="flex-1 overflow-auto min-w-0">
           {children}
