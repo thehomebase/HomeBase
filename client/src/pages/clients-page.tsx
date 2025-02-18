@@ -250,13 +250,11 @@ export default function ClientsPage() {
   return (
     <main className="container mx-auto px-4 py-8">
       <header className="border-b">
-        <div className="container px-4 py-4">
+        <div className="container px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between">
           <h2 className="text-2xl font-bold">Client Management</h2>
-        </div>
-      </header>
-      {user?.role === "agent" && (
-        <div className="container px-4 py-3">
-          <Dialog>
+          {user?.role === "agent" && (
+            <div className="mt-4 md:mt-0">
+              <Dialog>
             <DialogTrigger asChild>
               <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90">
                 <Plus className="h-4 w-4 mr-2" />
@@ -387,6 +385,8 @@ export default function ClientsPage() {
           </Dialog>
         </div>
       )}
+        </div>
+      </header>
 
       <Card>
         <Tabs defaultValue="sellers" className="p-6">
