@@ -64,13 +64,13 @@ function Layout({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen={isSidebarOpen}>
       <div className="flex h-screen bg-background">
         {user && (
-          <div className="border-r bg-background" style={{
+          <div className="border-r bg-background flex h-screen" style={{
             width: isMobile ? '60px' : (isSidebarOpen ? '220px' : '60px')
           }}>
             <Sidebar
               side="left"
               collapsible={isMobile ? "none" : "icon"}
-              className="sticky top-0 z-40 h-screen"
+              className="sticky top-0 z-40 h-full flex-shrink-0"
             >
                 <SidebarHeader>
                   <div className="flex items-center justify-between p-2">
