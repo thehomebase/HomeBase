@@ -121,7 +121,7 @@ export default function CalendarPage() {
           <div className="w-full relative">
             <Scheduler
               events={events}
-              className="w-full overflow-x-hidden"
+              className="w-full overflow-x-hidden [&_.rs__cell]:text-foreground [&_.rs__header]:text-foreground"
               deletable={false}
               draggable={false}
               views={["month", "week", "day"]}
