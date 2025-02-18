@@ -62,7 +62,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="flex h-screen bg-background overflow-x-hidden">
+      <div className="flex h-screen bg-background">
         {user && (
           <div className={`relative transition-all duration-200 ease-in-out ${
             isMobile ? 'w-[60px]' : (isSidebarOpen ? 'w-[220px]' : 'w-[60px]')
@@ -173,8 +173,8 @@ function Layout({ children }: { children: React.ReactNode }) {
             </Sidebar>
           </div>
         )}
-        <main className="flex-1 h-screen relative min-w-0">
-          <div className="min-h-full">
+        <main className="flex-1 h-screen w-full overflow-x-hidden relative">
+          <div className="w-full min-h-full">
             {children}
           </div>
         </main>
