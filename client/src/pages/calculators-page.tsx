@@ -80,8 +80,8 @@ export default function CalculatorsPage() {
   return (
     <main className="w-full ml-[5px] relative">
       <header className="border-b">
-        <div className="container mx-auto px-6 py-4">
-          <h1 className="text-2xl font-bold">Financial Calculators</h1>
+        <div className="container px-2 py-4">
+          <h1 className="text-2xl font-bold ">Financial Calculators</h1>
         </div>
       </header>
       <div className="min-h-screen bg-background overflow-x-hidden">
@@ -259,10 +259,10 @@ export default function CalculatorsPage() {
         </TabsContent>
 
         <TabsContent value="refinance" className="w-full overflow-visible px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full max-w-full">
-            <div className="space-y-6 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
+            <div className="space-y-6">
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Current Loan</h3>
+                <h3 className="text-lg font-semibold w-screen">Current Loan</h3>
                   <div>
                     <label className="text-sm font-medium">Loan Balance ($)</label>
                     <Input
@@ -324,7 +324,7 @@ export default function CalculatorsPage() {
             </div>
 
             <div className="space-y-6">
-              <div className="bg-background border p-6 rounded-lg">
+              <div className="bg-background border p-6 rounded-lg  pr-2">
                 <p className="text-foreground text-sm leading-relaxed">
                   Refinancing ${(refinanceInputs.currentBalance/1000).toFixed(0)}k at {refinanceInputs.newRate}% over {refinanceInputs.newTerm}y will 
                   {calculateMonthlySavings() > 0 ? ' decrease ' : ' increase '} 
