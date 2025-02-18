@@ -62,15 +62,15 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="flex h-screen bg-background">
+      <div className="grid h-screen bg-background" style={{
+        gridTemplateColumns: user ? (isMobile ? '60px 1fr' : (isSidebarOpen ? '220px 1fr' : '60px 1fr')) : '1fr'
+      }}>
         {user && (
-          <div className={`relative transition-all duration-200 ease-in-out ${
-            isMobile ? 'w-[60px]' : (isSidebarOpen ? 'w-[220px]' : 'w-[60px]')
-          }`}>
+          <div className="border-r bg-background">
             <Sidebar
               side="left"
               collapsible={isMobile ? "none" : "icon"}
-              className="fixed inset-y-0 left-0 z-40 border-r bg-background w-[60px] md:w-auto"
+              className="sticky top-0 z-40 h-screen"
             >
               <SidebarHeader>
                 <div className="flex items-center justify-between p-2">
@@ -173,7 +173,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             </Sidebar>
           </div>
         )}
-        <main className="flex-1 h-screen relative min-w-0">
+        <main className="h-screen overflow-auto">
           <div className="min-h-full">
             {children}
           </div>
