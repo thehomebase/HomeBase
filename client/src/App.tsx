@@ -64,9 +64,9 @@ function Layout({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen={isSidebarOpen}>
       <div className="flex min-h-screen bg-background">
         {user && (
-          <div className="bg-background flex h-screen" style={{
+          <aside className="bg-background flex-shrink-0" style={{
             width: isMobile ? '60px' : (isSidebarOpen ? '220px' : '60px'),
-            borderRight: !isSidebarOpen ? '1px solid var(--border)' : 'none'
+            borderRight: '1px solid var(--border)'
           }}>
             <Sidebar
               side="left"
@@ -174,7 +174,7 @@ function Layout({ children }: { children: React.ReactNode }) {
               </Sidebar>
             </div>
           )}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto min-w-0">
           {children}
         </main>
       </div>
