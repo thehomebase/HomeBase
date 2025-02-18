@@ -259,11 +259,10 @@ export default function CalculatorsPage() {
         </TabsContent>
 
         <TabsContent value="refinance" className="w-full overflow-visible px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
-            <div className="space-y-6 w-full">
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Current Loan</h3>
-                <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Current Loan</h3>
                   <div>
                     <label className="text-sm font-medium">Loan Balance ($)</label>
                     <Input
@@ -289,11 +288,9 @@ export default function CalculatorsPage() {
                     />
                   </div>
                 </div>
-              </Card>
 
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">New Loan</h3>
-                <div className="space-y-4">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">New Loan</h3>
                   <div>
                     <label className="text-sm font-medium">Term (Years)</label>
                     <select 
