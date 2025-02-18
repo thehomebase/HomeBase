@@ -121,7 +121,7 @@ export default function CalendarPage() {
           <div className="w-full relative">
             <Scheduler
               events={events}
-              className="w-full overflow-x-hidden [&_.rs__cell]:!text-black [&_.rs__header]:!text-black [&_.rs__time]:!text-black [&_.rs__event]:!text-black dark:[&_.rs__cell]:!text-black dark:[&_.rs__header]:!text-black dark:[&_.rs__time]:!text-black dark:[&_.rs__event]:!text-black"
+              className="w-full overflow-x-hidden [&_.rs__cell]:!text-black [&_.rs__header]:!text-black [&_.rs__time]:!text-black [&_.rs__event]:!text-black dark:[&_.rs__cell]:!text-black dark:[&_.rs__header]:!text-black dark:[&_.rs__time]:!text-black dark:[&_.rs__event]:!text-black [&_.rs__today]:!text-black dark:[&_.rs__today]:!text-black [&_.rs__time-indicator]:!text-black dark:[&_.rs__time-indicator]:!text-black"
               deletable={false}
               draggable={false}
               views={["month", "week", "day"]}
