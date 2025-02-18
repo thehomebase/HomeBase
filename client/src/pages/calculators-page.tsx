@@ -321,7 +321,6 @@ export default function CalculatorsPage() {
                     />
                   </div>
                 </div>
-              </Card>
             </div>
 
             <div className="space-y-6">
