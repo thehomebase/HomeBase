@@ -63,14 +63,14 @@ function Layout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
       <div className="grid h-screen bg-background" style={{
-        gridTemplateColumns: user ? (isMobile ? '60px 1fr' : (isSidebarOpen ? '220px 1fr' : '60px 1fr')) : '1fr'
+        gridTemplateColumns: user ? (isMobile ? 'var(--sidebar-width-icon) 1fr' : (isSidebarOpen ? 'var(--sidebar-width) 1fr' : 'var(--sidebar-width-icon) 1fr')) : '1fr'
       }}>
         {user && (
-          <div className="border-r bg-background">
+          <div className="bg-background">
             <Sidebar
               side="left"
               collapsible={isMobile ? "none" : "icon"}
-              className="sticky top-0 z-40 h-screen"
+              className="sticky top-0 z-40 h-screen border-r"
             >
               <SidebarHeader>
                 <div className="flex items-center justify-between p-2">
