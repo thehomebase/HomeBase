@@ -78,13 +78,13 @@ export default function CalculatorsPage() {
   }, [mortgageInputs]);
 
   return (
-    <main className="w-full w-screen max-w-[8000px] mx-auto">
+    <main className="w-full relative">
       <header className="border-b">
         <div className="container mx-auto px-6 py-4">
           <h1 className="text-2xl font-bold">Financial Calculators</h1>
         </div>
       </header>
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-background overflow-x-hidden">
       <Tabs defaultValue="mortgage" className="w-full">
         <TabsList className="w-full flex flex-wrap gap-1">
           <TabsTrigger value="mortgage" className="flex-1 h-10 text-sm sm:text-base">Mortgage</TabsTrigger>
