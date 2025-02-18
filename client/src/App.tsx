@@ -175,8 +175,6 @@ function Layout({ children }: { children: React.ReactNode }) {
               </Sidebar>
             </div>
           )}
-        </div>
-        )}
         <main className="flex-1 overflow-auto">
           {children}
         </main>
