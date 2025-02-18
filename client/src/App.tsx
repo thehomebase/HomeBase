@@ -62,18 +62,15 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="grid h-screen bg-background" style={{
-        gridTemplateColumns: user ? (isMobile ? 'var(--sidebar-width-icon) 1fr' : (isSidebarOpen ? 'var(--sidebar-width) 1fr' : 'var(--sidebar-width-icon) 1fr')) : '1fr'
-      }}>
+      <div className="flex h-screen bg-background">
         {user && (
-          <div className="bg-background">
-            <Sidebar
-              side="left"
-              collapsible={isMobile ? "none" : "icon"}
-              className="sticky top-0 z-40 h-screen border-r"
-            >
-              <SidebarHeader>
-                <div className="flex items-center justify-between p-2">
+          <Sidebar
+            side="left"
+            collapsible={isMobile ? "none" : "icon"}
+            className="sticky top-0 z-40 h-screen shrink-0 border-r"
+          >
+            <SidebarHeader>
+              <div className="flex items-center justify-between p-2">
                   <Logo isCompact={!isSidebarOpen} />
                 </div>
               </SidebarHeader>
@@ -149,20 +146,22 @@ function Layout({ children }: { children: React.ReactNode }) {
                       variant="ghost"
                       size={!isSidebarOpen ? "icon" : "sm"}
                       onClick={toggleCompact}
-                      className="w-full hidden md:flex"
+                      className="w-full hidden md:inline-flex justify-center"
                     >
                       {!isSidebarOpen ? (
                         <PanelLeft className="h-4 w-4" />
                       ) : (
-                        <PanelLeftClose className="h-4 w-4" />
+                        <>
+                          <PanelLeftClose className="h-4 w-4" />
+                          <span className="ml-2">Compact View</span>
+                        </>
                       )}
-                      {isSidebarOpen && <span className="ml-2">Compact View</span>}
                     </Button>
                     <Button
                       variant="outline"
                       size={!isSidebarOpen ? "icon" : "sm"}
                       onClick={() => logoutMutation.mutate()}
-                      className="w-full"
+                      className="w-full inline-flex justify-center"
                     >
                       <LogOut className="h-4 w-4" />
                       {isSidebarOpen && <span className="ml-2">Logout</span>}
