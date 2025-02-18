@@ -138,38 +138,36 @@ function Layout({ children }: { children: React.ReactNode }) {
                   </SidebarGroup>
                 </SidebarContent>
                 <SidebarFooter>
-                  <div className="p-2">
+                  <div className="p-2 flex flex-col gap-2">
                     {isSidebarOpen && (
-                      <span className="text-xs text-muted-foreground block mb-2 px-2 truncate">
+                      <span className="text-xs text-muted-foreground truncate">
                         {user?.email} ({user?.role})
                       </span>
                     )}
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        variant="ghost"
-                        size={!isSidebarOpen ? "icon" : "sm"}
-                        onClick={toggleCompact}
-                        className="w-full hidden md:inline-flex justify-center"
-                      >
-                        {!isSidebarOpen ? (
-                          <PanelLeft className="h-4 w-4" />
-                        ) : (
-                          <>
-                            <PanelLeftClose className="h-4 w-4" />
-                            <span className="ml-2">Compact View</span>
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size={!isSidebarOpen ? "icon" : "sm"}
-                        onClick={() => logoutMutation.mutate()}
-                        className="w-full inline-flex justify-center"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        {isSidebarOpen && <span className="ml-2">Logout</span>}
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={toggleCompact}
+                      className={`hidden md:inline-flex justify-center ${isSidebarOpen ? 'w-full' : 'w-9 h-9'}`}
+                    >
+                      {!isSidebarOpen ? (
+                        <PanelLeft className="h-4 w-4" />
+                      ) : (
+                        <>
+                          <PanelLeftClose className="h-4 w-4" />
+                          <span className="ml-2">Compact View</span>
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => logoutMutation.mutate()}
+                      className={`inline-flex justify-center ${isSidebarOpen ? 'w-full' : 'w-9 h-9'}`}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      {isSidebarOpen && <span className="ml-2">Logout</span>}
+                    </Button>
                   </div>
                 </SidebarFooter>
               </Sidebar>
