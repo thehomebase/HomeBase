@@ -249,28 +249,88 @@ export default function ClientsPage() {
 
   return (
     <main className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-bold">Client Management</h2>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Client
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Client</DialogTitle>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+      <header className="border-b">
+        <div className="container px-4 py-4">
+          <h2 className="text-2xl font-bold">Client Management</h2>
+        </div>
+      </header>
+      {user?.role === "agent" && (
+        <div className="container px-4 py-3">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Client
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Client</DialogTitle>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <FormField
                     control={form.control}
-                    name="firstName"
+                    name="address"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>First Name</FormLabel>
+                        <FormLabel>Address</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -280,27 +340,18 @@ export default function ClientsPage() {
                   />
                   <FormField
                     control={form.control}
-                    name="lastName"
+                    name="type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Last Name</FormLabel>
+                        <FormLabel>Client Type</FormLabel>
                         <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" {...field} />
+                          <select
+                            {...field}
+                            className="w-full px-3 py-2 border rounded-md"
+                          >
+                            <option value="seller">Seller</option>
+                            <option value="buyer">Buyer</option>
+                          </select>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -308,79 +359,34 @@ export default function ClientsPage() {
                   />
                   <FormField
                     control={form.control}
-                    name="phone"
+                    name="notes"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Phone</FormLabel>
+                        <FormLabel>Notes</FormLabel>
                         <FormControl>
-                          <Input {...field} />
+                          <textarea
+                            {...field}
+                            className="w-full px-3 py-2 border rounded-md"
+                            rows={3}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Address</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Client Type</FormLabel>
-                      <FormControl>
-                        <select
-                          {...field}
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="seller">Seller</option>
-                          <option value="buyer">Buyer</option>
-                        </select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notes</FormLabel>
-                      <FormControl>
-                        <textarea
-                          {...field}
-                          className="w-full px-3 py-2 border rounded-md"
-                          rows={3}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={createClientMutation.isPending}
-                >
-                  {createClientMutation.isPending ? 'Adding...' : 'Add Client'}
-                </Button>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </div>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={createClientMutation.isPending}
+                  >
+                    {createClientMutation.isPending ? 'Adding...' : 'Add Client'}
+                  </Button>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
 
       <Card>
         <Tabs defaultValue="sellers" className="p-6">
