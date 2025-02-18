@@ -78,7 +78,7 @@ export default function CalculatorsPage() {
   }, [mortgageInputs]);
 
   return (
-    <main className="w-full w-screen relative ml-[20px]">
+    <main className="w-full ml-[20px] relative">
       <header className="border-b">
         <div className="container mx-auto px-6 py-4">
           <h1 className="text-2xl font-bold">Financial Calculators</h1>
@@ -258,7 +258,7 @@ export default function CalculatorsPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="refinance">
+        <TabsContent value="refinance" className="w-full overflow-visible px-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
             <div className="space-y-6 w-full">
               <Card className="p-6">
