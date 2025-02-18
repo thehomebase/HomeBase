@@ -85,7 +85,7 @@ export default function CalculatorsPage() {
         </div>
       </header>
       <div className="min-h-screen flex items-center justify-center bg-background overflow-x-hidden">
-      <Tabs defaultValue="mortgage" className="w-full">
+      <Tabs defaultValue="mortgage" className="w-full max-w-full">
         <TabsList className="w-full flex flex-wrap gap-1">
           <TabsTrigger value="mortgage" className="flex-1 h-10 text-sm sm:text-base">Mortgage</TabsTrigger>
           <TabsTrigger value="refinance" className="flex-1 h-10 text-sm sm:text-base">Refinance</TabsTrigger>
