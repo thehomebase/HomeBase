@@ -62,17 +62,16 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="h-screen bg-background">
-        <div className="grid h-screen" style={{
-          gridTemplateColumns: user ? (isMobile ? '60px 1fr' : (isSidebarOpen ? '220px 1fr' : '60px 1fr')) : '1fr'
-        }}>
-          {user && (
-            <div className="border-r bg-background">
-              <Sidebar
-                side="left"
-                collapsible={isMobile ? "none" : "icon"}
-                className="sticky top-0 z-40 h-screen"
-              >
+      <div className="flex h-screen bg-background">
+        {user && (
+          <div className="border-r bg-background" style={{
+            width: isMobile ? '60px' : (isSidebarOpen ? '220px' : '60px')
+          }}>
+            <Sidebar
+              side="left"
+              collapsible={isMobile ? "none" : "icon"}
+              className="sticky top-0 z-40 h-screen"
+            >
                 <SidebarHeader>
                   <div className="flex items-center justify-between p-2">
                     <Logo isCompact={!isSidebarOpen} />
@@ -177,10 +176,9 @@ function Layout({ children }: { children: React.ReactNode }) {
             </div>
           )}
         </div>
-        <main className="h-screen overflow-auto">
-          <div className="min-h-full">
-            {children}
-          </div>
+        )}
+        <main className="flex-1 overflow-auto">
+          {children}
         </main>
       </div>
     </SidebarProvider>
