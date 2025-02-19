@@ -12,7 +12,7 @@ import {
   Bar, 
   XAxis, 
   YAxis, 
-  Tooltip, 
+  Tooltip as RechartsTooltip, 
   ResponsiveContainer,
   Line,
   ComposedChart,
@@ -269,7 +269,7 @@ export default function DataPage() {
                     offset: -90
                   }}
                 />
-                <Tooltip 
+                <RechartsTooltip 
                   formatter={(value: number, name: string) => {
                     if (name === "transactionCount") return [value, "Transactions"];
                     return [formatCurrency(value), name === "totalVolume" ? "Monthly Volume" : "Cumulative Volume"];
@@ -316,7 +316,7 @@ export default function DataPage() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <RechartsTooltip />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -331,7 +331,7 @@ export default function DataPage() {
               <BarChart data={activityData}>
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip />
+                <RechartsTooltip />
                 <Legend />
                 <Bar dataKey="meetings" name="Meetings" fill="#8884d8" />
                 <Bar dataKey="calls" name="Calls" fill="#82ca9d" />
@@ -347,7 +347,7 @@ export default function DataPage() {
               <BarChart data={dealStagesData}>
                 <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
                 <YAxis />
-                <Tooltip />
+                <RechartsTooltip />
                 <Bar dataKey="value" fill="hsl(var(--primary))">
                   {dealStagesData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
