@@ -170,7 +170,7 @@ export default function TransactionsPage() {
   return (
     <main
       className={cn(
-        "relative w-screen py-4 overflow-x-hidden",
+        "relative py-4 overflow-x-hidden",
         isMobile
           ? {
               'px-2': deviceSize === 'mobile-xs',
