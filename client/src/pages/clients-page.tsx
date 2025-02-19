@@ -258,17 +258,32 @@ export default function ClientsPage() {
                             }
                           }}
                         >
-                          {client[field as keyof Client]?.toString() || ''}
-                          {(field === 'lastName' || field === 'firstName') && (
-                            <button
-                              className="opacity-0 group-hover:opacity-100 absolute right-2 top-1/2 -translate-y-1/2"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditClick(client, field);
-                              }}
-                            >
-                              ✎
-                            </button>
+                          {field === 'labels' ? (
+                            <div className="flex flex-wrap gap-1">
+                              {(client.labels || []).map((label, index) => (
+                                <span
+                                  key={index}
+                                  className="px-2 py-1 bg-primary/10 rounded-full text-sm"
+                                >
+                                  {label}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <>
+                              {client[field as keyof Client]?.toString() || ''}
+                              {(field === 'lastName' || field === 'firstName') && (
+                                <button
+                                  className="opacity-0 group-hover:opacity-100 absolute right-2 top-1/2 -translate-y-1/2"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditClick(client, field);
+                                  }}
+                                >
+                                  ✎
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       )}
