@@ -601,21 +601,23 @@ export default function ClientsPage() {
                                     const usedColors = Array.from(existingLabelsWithColors.values());
                                     // Filter out colors that are already used
                                     const availableColors = allColors.filter(color => !usedColors.includes(color));
-                                    // If no colors are available, restart from the beginning
-                                    const colors = availableColors.length > 0 ? availableColors : allColors;
-                                    
-                                    const getColorForLabel = () => {
-                                      const existingColor = existingLabelsWithColors.get(label);
-                                      if (existingColor) {
-                                        return existingColor;
-                                      }
-                                      const colorIndex = existingLabelsWithColors.size % colors.length;
-                                      const newColor = colors[colorIndex];
-                                      existingLabelsWithColors.set(label, newColor);
-                                      return newColor;
+                                    const allColors = [
+                                      'bg-blue-100 text-blue-800',
+                                      'bg-red-100 text-red-800',
+                                      'bg-green-100 text-green-800',
+                                      'bg-yellow-100 text-yellow-800',
+                                      'bg-orange-100 text-orange-800',
+                                      'bg-purple-100 text-purple-800'
+                                    ];
+
+                                    const getLabelColor = (labelText: string) => {
+                                      const index = Math.abs(labelText.split('').reduce((acc, char) => {
+                                        return acc + char.charCodeAt(0);
+                                      }, 0)) % allColors.length;
+                                      return allColors[index];
                                     };
 
-                                    const labelColor = getColorForLabel();
+                                    const labelColor = getLabelColor(label);
                                     
                                     form.setValue('labelColors', {
                                       ...(form.getValues('labelColors') || {}),
