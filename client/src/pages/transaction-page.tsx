@@ -527,12 +527,12 @@ export default function TransactionPage() {
                   <p className="text-sm text-muted-foreground">Primary Client</p>
                   {isEditing ? (
                     <select
-                      className="w-full h-9 px-3 rounded-md border"
-                      {...form.register("clientId")}
+                      className="w-full h-9 px-3 rounded-md border bg-background"
                       value={form.getValues("clientId") || ""}
                       onChange={(e) => {
                         const value = e.target.value ? Number(e.target.value) : null;
                         form.setValue("clientId", value);
+                        form.handleSubmit(onSubmit)();
                       }}
                     >
                       <option value="">Select client</option>
