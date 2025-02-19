@@ -84,7 +84,7 @@ export default function ClientsPage() {
 
   const onSubmit = async (data: InsertClient) => {
     if (!user?.id) return;
-    
+
     try {
       await createClientMutation.mutateAsync({
         ...data,
@@ -132,13 +132,6 @@ export default function ClientsPage() {
     },
   });
 
-  const onSubmit = (data: InsertClient) => {
-    const submitData = {
-      ...data,
-      agentId: user?.id as number,
-    };
-    createClientMutation.mutate(submitData);
-  };
 
   const sortData = (data: Client[], config: SortConfig) => {
     if (!config) return data;
