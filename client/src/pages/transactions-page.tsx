@@ -165,13 +165,15 @@ export default function TransactionsPage() {
   const isMobile = useIsMobile();
 
   return (
-        <main className={cn(
-          "relative container mx-auto px-2 py-4",
-          isMobile 
-            ? "w-full" 
-            : "w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full w-full ml-[5px]"
-        )}>
-          <div className="container space-y-4">
+    <main
+      className={cn(
+        "relative container mx-auto px-2 py-4 overflow-x-hidden",
+        isMobile
+          ? "w-full max-w-full"
+          : "w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full"
+      )}
+    >
+      <div className="container space-y-4">
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1 dark:bg-gray-800/50">
@@ -224,7 +226,6 @@ export default function TransactionsPage() {
               </option>
             ))}
           </select>
-          
         </div>
 
         {user?.role === "agent" && (
@@ -357,9 +358,9 @@ export default function TransactionsPage() {
         )}
       </div>
 
-      <div className="flex-1 w-full min-h-screen bg-background overflow-x-hidden">
+      <div className="flex-1 w-full bg-background overflow-x-hidden">
         {view === 'board' ? (
-          <div className="min-w-0 pl-0 py-4">
+          <div className="min-w-0 pl-0 py-4 overflow-y-auto">
             <KanbanBoard 
               transactions={filteredTransactions} 
               onDeleteTransaction={handleDeleteTransaction}
@@ -368,7 +369,7 @@ export default function TransactionsPage() {
             />
           </div>
         ) : view === 'table' ? (
-          <div className="px-4">
+          <div className="px-4 overflow-y-auto">
             <TransactionTable
               transactions={filteredTransactions}
               onDeleteTransaction={handleDeleteTransaction}
@@ -376,16 +377,16 @@ export default function TransactionsPage() {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 w-full px-2 overflow-y-auto">
             {filteredTransactions.map((transaction) => (
               <Card 
                 key={transaction.id} 
-                className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800 w-full"
+                className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800 w-full min-w-0"
                 onClick={() => setLocation(`/transactions/${transaction.id}`)}
               >
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle 
-                    className="text-lg hover:underline dark:text-white"
+                    className="text-lg hover:underline dark:text-white truncate"
                     onClick={() => setLocation(`/transactions/${transaction.id}`)}
                   >
                     {transaction.address}
@@ -405,14 +406,14 @@ export default function TransactionsPage() {
                   )}
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize">Status: {transaction.status.replace('_', ' ')}</p>
-                  <p className="text-sm text-muted-foreground dark:text-gray-300">
+                  <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize truncate">Status: {transaction.status.replace('_', ' ')}</p>
+                  <p className="text-sm text-muted-foreground dark:text-gray-300 break-words">
                     Client: {clients.find(c => c.id === transaction.clientId) 
                       ? `${clients.find(c => c.id === transaction.clientId)?.firstName} ${clients.find(c => c.id === transaction.clientId)?.lastName}` 
                       : 'Not set'}
                   </p>
                   {transaction.secondaryClient && (
-                    <p className="text-sm text-muted-foreground dark:text-gray-300">
+                    <p className="text-sm text-muted-foreground dark:text-gray-300 break-words">
                       Secondary Client: {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}
                     </p>
                   )}
