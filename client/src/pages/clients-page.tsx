@@ -164,61 +164,44 @@ export default function ClientsPage() {
       <div className="hidden md:block">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="cursor-pointer" onClick={() => requestSort('firstName')}>
-                <div className="flex items-center gap-1">
-                  First Name {getSortIcon('firstName')}
-                </div>
-              </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => requestSort('lastName')}>
+            <TableRow className="bg-gray-100 dark:bg-gray-800">
+              <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('lastName')}>
                 <div className="flex items-center gap-1">
                   Last Name {getSortIcon('lastName')}
                 </div>
               </TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Address</TableHead>
-              <TableHead className="cursor-pointer" onClick={() => requestSort('status')}>
+              <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('firstName')}>
                 <div className="flex items-center gap-1">
-                  Status {getSortIcon('status')}
+                  First Name {getSortIcon('firstName')}
                 </div>
               </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => requestSort('createdAt')}>
-                <div className="flex items-center gap-1">
-                  Added {getSortIcon('createdAt')}
-                </div>
-              </TableHead>
+              <TableHead className="py-3 font-semibold">Email</TableHead>
+              <TableHead className="py-3 font-semibold">Current Address</TableHead>
+              <TableHead className="py-3 font-semibold">Phone</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {clients.map((client) => (
-              <TableRow key={client.id}>
-                <TableCell className="font-medium">{client.firstName}</TableCell>
-                <TableCell className="font-medium">{client.lastName}</TableCell>
-                <TableCell>
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      {client.email}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      {client.phone}
-                    </div>
+            {clients.map((client, index) => (
+              <TableRow 
+                key={client.id}
+                className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                  index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
+                }`}
+                onClick={() => {/* Add edit functionality */}}
+              >
+                <TableCell className="py-3">{client.lastName}</TableCell>
+                <TableCell className="py-3">{client.firstName}</TableCell>
+                <TableCell className="py-3 text-blue-600">
+                  <div className="flex items-center gap-2">
+                    {client.email}
                   </div>
                 </TableCell>
-                <TableCell>{client.address}</TableCell>
-                <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    client.status === 'active'
-                      ? 'bg-green-100 text-green-800'
-                      : client.status === 'pending'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {client.status}
-                  </span>
+                <TableCell className="py-3">{client.address}</TableCell>
+                <TableCell className="py-3">
+                  <div className="flex items-center gap-2">
+                    {client.phone}
+                  </div>
                 </TableCell>
-                <TableCell>{format(new Date(client.createdAt), 'MMM d, yyyy')}</TableCell>
               </TableRow>
             ))}
             {clients.length === 0 && (
