@@ -274,7 +274,7 @@ export default function TransactionPage() {
 
   return (
     <div>
-      <header className="border-b">
+      <header className="">
         <div className="w-full px-3 sm:px-6 py-2 sm:py-4">
           <div className="flex items-center gap-4">
             <Link href="/transactions">
@@ -307,7 +307,7 @@ export default function TransactionPage() {
         </div>
       </header>
 
-      <main className="w-full max-w-[100vw] overflow-x-hidden p-2 sm:p-6">
+      <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] pr-24 max-w-full">
         <Card className="overflow-x-hidden w-full">
           <CardContent className="p-3 sm:p-6">
             <div className="flex justify-between items-center mb-4">
