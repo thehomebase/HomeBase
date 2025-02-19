@@ -75,7 +75,6 @@ const ClientCard = ({ client }: { client: Client }) => {
     </Card>
   );
 };
-);
 
 export default function ClientsPage() {
  const { user } = useAuth();
