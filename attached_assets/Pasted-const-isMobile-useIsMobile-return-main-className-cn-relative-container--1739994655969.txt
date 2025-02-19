@@ -1,0 +1,90 @@
+const isMobile = useIsMobile();
+
+return (
+  <main
+    className={cn(
+      "relative container mx-auto px-2 py-4 overflow-x-hidden",
+      isMobile
+        ? "w-full max-w-full"
+        : "w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full"
+    )}
+  >
+    <div className="container space-y-4">
+      {/* Header, controls, and New Transaction button remain unchanged */}
+    </div>
+
+    <div className="flex-1 w-full bg-background overflow-x-hidden">
+      {view === 'board' ? (
+        <div className="min-w-0 pl-0 py-4 overflow-y-auto">
+          <KanbanBoard 
+            transactions={filteredTransactions} 
+            onDeleteTransaction={handleDeleteTransaction}
+            onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
+            clients={clients}
+          />
+        </div>
+      ) : view === 'table' ? (
+        <div className="px-4 overflow-y-auto">
+          <TransactionTable
+            transactions={filteredTransactions}
+            onDeleteTransaction={handleDeleteTransaction}
+            onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 w-full px-2 overflow-y-auto">
+          {filteredTransactions.map((transaction) => (
+            <Card 
+              key={transaction.id} 
+              className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800 w-full min-w-0"
+              onClick={() => setLocation(`/transactions/${transaction.id}`)}
+            >
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle 
+                  className="text-lg hover:underline dark:text-white truncate"
+                  onClick={() => setLocation(`/transactions/${transaction.id}`)}
+                >
+                  {transaction.address}
+                </CardTitle>
+                {user?.role === "agent" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteTransaction(transaction.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize truncate">Status: {transaction.status.replace('_', ' ')}</p>
+                <p className="text-sm text-muted-foreground dark:text-gray-300 break-words">
+                  Client: {clients.find(c => c.id === transaction.clientId) 
+                    ? `${clients.find(c => c.id === transaction.clientId)?.firstName} ${clients.find(c => c.id === transaction.clientId)?.lastName}` 
+                    : 'Not set'}
+                </p>
+                {transaction.secondaryClient && (
+                  <p className="text-sm text-muted-foreground dark:text-gray-300 break-words">
+                    Secondary Client: {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+
+          {filteredTransactions.length === 0 && (
+            <div className="col-span-full text-center py-12 text-muted-foreground dark:text-gray-400">
+              No transactions found. {user?.role === "agent" ? "Create one to get started!" : "Ask your agent for an access code to join a transaction."}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+
+    {/* AlertDialog remains unchanged */}
+  </main>
+);
