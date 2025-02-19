@@ -229,7 +229,7 @@ export default function ClientsPage() {
                     index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
                   }`}
                 >
-                  {['lastName', 'firstName', 'email', 'address', 'phone'].map((field) => (
+                  {['lastName', 'firstName', 'email', 'address', 'phone', 'labels'].map((field) => (
                     <TableCell 
                       key={field}
                       className="py-3 group relative"
@@ -274,16 +274,6 @@ export default function ClientsPage() {
                       )}
                     </TableCell>
                   ))}
-                  <TableCell className="py-3">
-                    {client.labels?.map((label, i) => (
-                      <span 
-                        key={i}
-                        className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-1"
-                      >
-                        {label}
-                      </span>
-                    ))}
-                  </TableCell>
                 </TableRow>
               ))}
               {clients.length === 0 && (
