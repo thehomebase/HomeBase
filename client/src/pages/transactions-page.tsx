@@ -170,7 +170,7 @@ export default function TransactionsPage() {
   return (
     <main
       className={cn(
-        "relative w-full py-4 overflow-x-hidden",
+        "relative w-screen py-4 overflow-x-hidden",
         isMobile
           ? {
               'px-2': deviceSize === 'mobile-xs',
@@ -180,7 +180,7 @@ export default function TransactionsPage() {
               'px-10': deviceSize === 'tablet-sm',
               'px-12': deviceSize === 'tablet-md',
             }[deviceSize]
-          : "max-w-screen-xl mx-auto px-2"
+          : "w-[calc(100vw-230px)] px-4"
       )}
     >
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
