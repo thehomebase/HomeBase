@@ -45,6 +45,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import CalculatorsPage from "@/pages/calculators-page";
 import GlossaryPage from "./pages/glossary-page";
 import MessagesPage from "./pages/messages-page";
+import ClientPage from "@/pages/client-page"; // Import the new ClientPage component
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -220,6 +221,9 @@ function Router() {
           </Route>
           <Route path="/clients">
             <ProtectedRoute path="/clients" component={ClientsPage} />
+          </Route>
+          <Route path="/clients/:id"> {/* Added route for individual client pages */}
+            <ProtectedRoute path="/clients/:id" component={ClientPage} /> {/* Added route for individual client pages */}
           </Route>
           <Route path="/data">
             <ProtectedRoute path="/data" component={DataPage} />

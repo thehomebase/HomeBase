@@ -15,6 +15,7 @@ import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin } from "lucide-react"
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { useRouter } from 'next/router';
 
 type SortConfig = {
   key: keyof Client;
@@ -65,6 +66,8 @@ export default function ClientsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const router = useRouter();
+  const [location, setLocation] = useState('');
 
   const form = useForm<InsertClient>({
     resolver: zodResolver(insertClientSchema),
@@ -229,8 +232,7 @@ export default function ClientsPage() {
                   {['lastName', 'firstName', 'email', 'address', 'phone'].map((field) => (
                     <TableCell 
                       key={field}
-                      className="py-3 cursor-pointer"
-                      onClick={() => handleEditClick(client, field)}
+                      className="py-3 group relative"
                     >
                       {editingCell?.id === client.id && editingCell.field === field ? (
                         <Input
@@ -244,8 +246,30 @@ export default function ClientsPage() {
                           }}
                         />
                       ) : (
-                        <div className="min-h-[24px]">
+                        <div 
+                          className="min-h-[24px] hover:bg-accent/50 rounded px-2 py-1 cursor-pointer"
+                          onClick={() => field === 'lastName' || field === 'firstName' ? 
+                            setLocation(`/clients/${client.id}`) : 
+                            handleEditClick(client, field)
+                          }
+                          onMouseEnter={(e) => {
+                            if (field === 'lastName' || field === 'firstName') {
+                              e.currentTarget.title = "Click to view details, hover to edit";
+                            }
+                          }}
+                        >
                           {client[field as keyof Client]?.toString() || ''}
+                          {(field === 'lastName' || field === 'firstName') && (
+                            <button
+                              className="opacity-0 group-hover:opacity-100 absolute right-2 top-1/2 -translate-y-1/2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditClick(client, field);
+                              }}
+                            >
+                              ✎
+                            </button>
+                          )}
                         </div>
                       )}
                     </TableCell>
