@@ -403,6 +403,71 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
               Add Contact
             </Button>
           </div>
+          {isAddingContact && (
+            <div className="p-4 space-y-4 border-b">
+              <select
+                className="w-full px-3 py-2 border rounded-md bg-background"
+                value={newContact.role}
+                onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
+                required
+              >
+                <option value="">Select role</option>
+                {CONTACT_ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
+              <Input
+                placeholder="First Name"
+                value={newContact.firstName}
+                onChange={(e) => setNewContact({ ...newContact, firstName: e.target.value })}
+                className="mt-2"
+              />
+              <Input
+                placeholder="Last Name"
+                value={newContact.lastName}
+                onChange={(e) => setNewContact({ ...newContact, lastName: e.target.value })}
+                className="mt-2"
+              />
+              <Input
+                type="email"
+                placeholder="Email"
+                value={newContact.email}
+                onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                className="mt-2"
+              />
+              <Input
+                type="tel"
+                placeholder="Phone"
+                value={newContact.phone}
+                onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+                className="mt-2"
+              />
+              <Input
+                type="tel"
+                placeholder="Mobile"
+                value={newContact.mobilePhone}
+                onChange={(e) => setNewContact({ ...newContact, mobilePhone: e.target.value })}
+                className="mt-2"
+              />
+              <div className="flex justify-end space-x-2 mt-4">
+                <Button
+                  variant="default"
+                  onClick={handleSubmit}
+                  disabled={addContactMutation.isPending}
+                >
+                  Save
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsAddingContact(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="divide-y">
             {contacts.map((contact: Contact) => (
               <div key={contact.id} className="p-4 space-y-2">
