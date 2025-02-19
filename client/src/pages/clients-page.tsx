@@ -580,7 +580,15 @@ export default function ClientsPage() {
                                       )
                                     );
 
-                                    const availableColors = [
+                                    const colorHash = (str: string) => {
+                                      let hash = 0;
+                                      for (let i = 0; i < str.length; i++) {
+                                        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                                      }
+                                      return Math.abs(hash);
+                                    };
+                                    
+                                    const colors = [
                                       'bg-blue-100 text-blue-800',
                                       'bg-green-100 text-green-800',
                                       'bg-yellow-100 text-yellow-800',
@@ -593,10 +601,13 @@ export default function ClientsPage() {
                                       'bg-pink-100 text-pink-800',
                                       'bg-indigo-100 text-indigo-800',
                                       'bg-teal-100 text-teal-800'
-                                    ].filter(color => !Array.from(existingLabelsWithColors.values()).includes(color));
+                                    ];
+                                    
+                                    const getColorForLabel = (label: string) => {
+                                      return colors[colorHash(label) % colors.length];
+                                    };
 
-                                    const labelColor = existingLabelsWithColors.get(label) || 
-                                      (availableColors.length > 0 ? availableColors[0] : 'bg-gray-100 text-gray-800');
+                                    const labelColor = getColorForLabel(label);
                                     
                                     if (!existingLabelsWithColors.has(label) && availableColors.length > 0) {
                                       form.setValue('labelColors', {
