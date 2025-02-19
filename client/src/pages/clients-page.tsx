@@ -70,7 +70,7 @@ export default function ClientsPage() {
   const [, navigate] = useLocation();
   const [location, setLocation] = useState('');
 
-  const form = useForm<InsertClient>({
+  const form = useForm<InsertClient & { labelColors: Record<string, string> }>({
     resolver: zodResolver(insertClientSchema),
     defaultValues: {
       firstName: "",
@@ -83,6 +83,7 @@ export default function ClientsPage() {
       notes: "",
       agentId: user?.id || 0,
       labels: [],
+      labelColors: {},
     },
   });
 
@@ -579,7 +580,14 @@ export default function ClientsPage() {
                                 </FormControl>
                                 <div className="flex flex-wrap gap-2">
                                   {field.value?.map((label: string) => {
-                                    const colors = [
+                                    // Get all existing labels and their colors
+                                    const existingLabelsWithColors = new Map(
+                                      clients.flatMap(client => 
+                                        (client.labels || []).map(label => [label, (client as any).labelColors?.[label]])
+                                      )
+                                    );
+
+                                    const availableColors = [
                                       'bg-blue-100 text-blue-800',
                                       'bg-green-100 text-green-800',
                                       'bg-yellow-100 text-yellow-800',
@@ -592,8 +600,18 @@ export default function ClientsPage() {
                                       'bg-pink-100 text-pink-800',
                                       'bg-indigo-100 text-indigo-800',
                                       'bg-teal-100 text-teal-800'
-                                    ];
-                                    const colorIndex = Math.abs(label.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
+                                    ].filter(color => !Array.from(existingLabelsWithColors.values()).includes(color));
+
+                                    const labelColor = existingLabelsWithColors.get(label) || 
+                                      (availableColors.length > 0 ? availableColors[0] : 'bg-gray-100 text-gray-800');
+                                    
+                                    if (!existingLabelsWithColors.has(label) && availableColors.length > 0) {
+                                      form.setValue('labelColors', {
+                                        ...(form.getValues('labelColors') || {}),
+                                        [label]: labelColor
+                                      });
+                                    }
+                                    
                                     return (
                                       <span
                                         key={label}
