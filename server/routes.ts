@@ -100,20 +100,38 @@ export function registerRoutes(app: Express): Server {
 
     if (req.user.role !== "agent") {
       console.log('Role check failed, user role:', req.user.role);
-      return res.sendStatus(403); // Changed to 403 for proper authorization error
+      return res.sendStatus(403);
     }
 
     try {
       const parsed = insertClientSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).send(parsed.error.message);
+        console.error('Validation error:', parsed.error);
+        return res.status(400).json(parsed.error);
       }
 
-      const client = await storage.createClient(parsed.data);
+      // Ensure required fields are present
+      const clientData = {
+        ...parsed.data,
+        agentId: req.user.id,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      console.log('Creating client with data:', clientData);
+      const client = await storage.createClient(clientData);
+      
+      if (!client) {
+        throw new Error('Failed to create client record');
+      }
+
       res.status(201).json(client);
     } catch (error) {
       console.error('Error creating client:', error);
-      res.status(500).send('Error creating client');
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to create client',
+        details: error instanceof Error ? error.stack : undefined
+      });
     }
   });
 
