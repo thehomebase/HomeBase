@@ -160,8 +160,15 @@ export default function TransactionsPage() {
   });
 
 
+  const isMobile = useIsMobile();
+
   return (
-        <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full w-full ml-[5px] relative container mx-auto px-2 py-4">
+        <main className={cn(
+          "relative container mx-auto px-2 py-4",
+          isMobile 
+            ? "w-full" 
+            : "w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full w-full ml-[5px]"
+        )}>
           <div className="container space-y-4">
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
         <div className="flex items-center gap-2">
