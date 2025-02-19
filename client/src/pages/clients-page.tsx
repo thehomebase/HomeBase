@@ -23,44 +23,58 @@ type SortConfig = {
  direction: 'asc' | 'desc';
 } | null;
 
-const ClientCard = ({ client }: { client: Client }) => (
- <Card className="mb-4">
-  <CardHeader>
-    <CardTitle className="text-lg">
-      {client.firstName} {client.lastName}
-    </CardTitle>
-    <div className="text-sm text-muted-foreground">
-      Added {format(new Date(client.createdAt), 'MMM d, yyyy')}
-    </div>
-  </CardHeader>
-  <CardContent>
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <Mail className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm">{client.email || 'No email'}</span>
+const ClientCard = ({ client }: { client: Client }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  return (
+    <Card className="mb-2">
+      <div 
+        className="p-3 flex items-center justify-between cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center gap-3">
+          <div>
+            <h3 className="font-medium">
+              {client.firstName} {client.lastName}
+            </h3>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              client.status === 'active'
+                ? 'bg-green-100 text-green-800'
+                : client.status === 'pending'
+                ? 'bg-yellow-100 text-yellow-800'
+                : 'bg-gray-100 text-gray-800'
+            }`}>
+              {client.status}
+            </span>
+          </div>
+        </div>
+        <ChevronDown className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
       </div>
-      <div className="flex items-center gap-2">
-        <Phone className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm">{client.phone || 'No phone'}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <MapPin className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm">{client.address || 'No address'}</span>
-      </div>
-      <div className="pt-2">
-        <span className={`px-2 py-1 rounded-full text-xs ${
-          client.status === 'active'
-            ? 'bg-green-100 text-green-800'
-            : client.status === 'pending'
-            ? 'bg-yellow-100 text-yellow-800'
-            : 'bg-gray-100 text-gray-800'
-        }`}>
-          {client.status}
-        </span>
-      </div>
-    </div>
-  </CardContent>
- </Card>
+      
+      {isExpanded && (
+        <CardContent className="pt-0 pb-3 border-t">
+          <div className="space-y-2 mt-2">
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">{client.email || 'No email'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">{client.phone || 'No phone'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">{client.address || 'No address'}</span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Added {format(new Date(client.createdAt), 'MMM d, yyyy')}
+            </div>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+};
 );
 
 export default function ClientsPage() {
