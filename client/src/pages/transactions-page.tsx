@@ -56,7 +56,10 @@ export default function TransactionsPage() {
   const [theme, setTheme] = useState<'light' | 'dark'>(
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   );
-  const [selectedYear, setSelectedYear] = useState<number | null>(null); // Added state for year filter
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>(""); // Added state for date range filter
+
 
   const { data: clients = [] } = useQuery({
     queryKey: ["/api/clients"],
@@ -100,7 +103,7 @@ export default function TransactionsPage() {
         participants: [],
         clientId: data.clientId || null,
         secondaryClientId: data.secondaryClientId || null,
-        year: new Date().getFullYear() //Added year to new transaction
+        year: new Date().getFullYear() 
       });
       if (!response.ok) {
         throw new Error('Failed to create transaction');
@@ -149,9 +152,13 @@ export default function TransactionsPage() {
     }
   };
 
-  const filteredTransactions = selectedYear
-    ? transactions.filter((transaction) => new Date(transaction.participants[0].createdAt).getFullYear() === selectedYear)
-    : transactions;
+  const filteredTransactions = transactions.filter((transaction) => {
+    const transactionDate = new Date(transaction.participants[0].createdAt);
+    const yearMatch = selectedYear === null || transactionDate.getFullYear() === selectedYear;
+    const startDateMatch = startDate === "" || transactionDate >= new Date(startDate);
+    const endDateMatch = endDate === "" || transactionDate <= new Date(endDate);
+    return yearMatch && startDateMatch && endDateMatch;
+  });
 
 
   return (
@@ -209,6 +216,8 @@ export default function TransactionsPage() {
               </option>
             ))}
           </select>
+          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-24"/>
+          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-24"/>
         </div>
 
         {user?.role === "agent" && (
