@@ -57,8 +57,8 @@ export default function TransactionsPage() {
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   );
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  
-
+  const [startDate, setStartDate] = useState<string>(new Date(new Date().getFullYear(), 0, 1).toISOString());
+  const [endDate, setEndDate] = useState<string>("");
 
   const { data: clients = [] } = useQuery({
     queryKey: ["/api/clients"],
