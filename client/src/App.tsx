@@ -98,6 +98,16 @@ function Layout({ children }: { children: React.ReactNode }) {
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
+                        {user?.role === "agent" && (
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Data">
+                              <Link href="/data" className="flex items-center gap-2">
+                                <Calculator className="h-4 w-4" />
+                                {isSidebarOpen && <span>Data</span>}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        )}
                       </>
                     )}
                     <SidebarMenuItem>
