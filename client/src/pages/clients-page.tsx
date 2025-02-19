@@ -192,7 +192,7 @@ export default function ClientsPage() {
           const error = await response.text();
           throw new Error(error || "Failed to delete client");
         }
-        return response.json();
+        return { success: true };
       },
       onSuccess: async () => {
         await refetchClients();
@@ -299,7 +299,7 @@ export default function ClientsPage() {
                         >
                           {field === 'labels' ? (
                             <div className="flex flex-wrap gap-1">
-                              {(client.labels || []).map((label, index) => {
+                              {(Array.isArray(client.labels) ? client.labels : []).map((label, index) => {
                                 // Generate a consistent color based on the label text
                                 const colors = [
                                   'bg-blue-100 text-blue-800',
