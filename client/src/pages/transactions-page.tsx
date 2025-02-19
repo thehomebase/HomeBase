@@ -377,7 +377,10 @@ export default function TransactionsPage() {
             {filteredTransactions.map((transaction) => (
               <Card 
                 key={transaction.id} 
-                className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800 w-full min-w-0"
+                className={cn(
+                  "cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800 w-full",
+                  isMobile ? "max-w-[100vw]" : "min-w-0"
+                )}
                 onClick={() => setLocation(`/transactions/${transaction.id}`)}
               >
                 <CardHeader className="flex flex-row items-center justify-between">
