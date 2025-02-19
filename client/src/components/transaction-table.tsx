@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Settings2, GripVertical } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Search, Settings2, GripVertical, Plus, Pencil, X } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -43,21 +44,14 @@ interface Column {
   id: string;
   title: string;
   visible: boolean;
+  isCustom?: boolean;
 }
 
-const defaultColumns: Column[] = [
-  { id: 'title', title: 'Title', visible: true },
-  { id: 'closed_sales_price', title: 'Closed Sales Price', visible: true },
-  { id: 'commission', title: 'Commission (%)', visible: true },
-  { id: 'commission_usd', title: 'Commission ($USD)', visible: true },
-  { id: 'value', title: 'Value', visible: true },
-  { id: 'contact_person', title: 'Contact person', visible: true },
-  { id: 'deal_created', title: 'Deal created', visible: true },
-  { id: 'won_time', title: 'Won time', visible: true },
-  { id: 'deal_duration', title: 'Deal Duration', visible: true },
-];
-
-function SortableHeader({ column }: { column: Column }) {
+function SortableHeader({ column, onEdit, onDelete }: { 
+  column: Column; 
+  onEdit: (column: Column) => void;
+  onDelete: (columnId: string) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: column.id,
   });
@@ -72,13 +66,39 @@ function SortableHeader({ column }: { column: Column }) {
     <th
       ref={setNodeRef}
       style={style}
-      className="relative h-10 px-2 text-left align-middle font-medium text-muted-foreground hover:bg-accent/50"
+      className="relative h-10 px-2 text-left align-middle font-medium text-muted-foreground hover:bg-accent/50 group"
       {...attributes}
       {...listeners}
     >
       <div className="flex items-center gap-2">
         <GripVertical className="h-4 w-4" />
         {column.title}
+        {column.isCustom && (
+          <div className="hidden group-hover:flex items-center gap-1 ml-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(column);
+              }}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(column.id);
+              }}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
       </div>
     </th>
   );
@@ -93,8 +113,21 @@ export function TransactionTable({
   onDeleteTransaction: (id: number) => void;
   onTransactionClick: (id: number) => void;
 }) {
-  const [columns, setColumns] = useState<Column[]>(defaultColumns);
+  const [columns, setColumns] = useState<Column[]>([
+    { id: 'title', title: 'Title', visible: true },
+    { id: 'closed_sales_price', title: 'Closed Sales Price', visible: true },
+    { id: 'commission', title: 'Commission (%)', visible: true },
+    { id: 'commission_usd', title: 'Commission ($USD)', visible: true },
+    { id: 'value', title: 'Value', visible: true },
+    { id: 'contact_person', title: 'Contact person', visible: true },
+    { id: 'deal_created', title: 'Deal created', visible: true },
+    { id: 'won_time', title: 'Won time', visible: true },
+    { id: 'deal_duration', title: 'Deal Duration', visible: true },
+  ]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingColumn, setEditingColumn] = useState<Column | null>(null);
+  const [newColumnTitle, setNewColumnTitle] = useState("");
+  const [showColumnDialog, setShowColumnDialog] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -121,6 +154,45 @@ export function TransactionTable({
     setColumns(columns.map(col => 
       col.id === columnId ? { ...col, visible: !col.visible } : col
     ));
+  };
+
+  const addColumn = () => {
+    setEditingColumn(null);
+    setNewColumnTitle("");
+    setShowColumnDialog(true);
+  };
+
+  const editColumn = (column: Column) => {
+    setEditingColumn(column);
+    setNewColumnTitle(column.title);
+    setShowColumnDialog(true);
+  };
+
+  const deleteColumn = (columnId: string) => {
+    setColumns(columns.filter(col => col.id !== columnId));
+  };
+
+  const handleSaveColumn = () => {
+    if (newColumnTitle.trim()) {
+      if (editingColumn) {
+        setColumns(columns.map(col =>
+          col.id === editingColumn.id
+            ? { ...col, title: newColumnTitle.trim() }
+            : col
+        ));
+      } else {
+        const newId = `custom_${Date.now()}`;
+        setColumns([...columns, {
+          id: newId,
+          title: newColumnTitle.trim(),
+          visible: true,
+          isCustom: true
+        }]);
+      }
+      setShowColumnDialog(false);
+      setNewColumnTitle("");
+      setEditingColumn(null);
+    }
   };
 
   const formatValue = (value: any, type: string) => {
@@ -178,6 +250,9 @@ export function TransactionTable({
       case 'deal_duration':
         return transaction.dealDuration ? `${transaction.dealDuration} days` : '-';
       default:
+        if (columnId.startsWith('custom_')) {
+          return '-'; // Custom columns can be extended to store/display custom values
+        }
         return '-';
     }
   };
@@ -198,26 +273,57 @@ export function TransactionTable({
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm">
               <Settings2 className="h-4 w-4 mr-2" />
-              Choose columns
+              Manage columns
             </Button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-48">
-            <div className="space-y-2">
-              {columns.map((column) => (
-                <div key={column.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={column.id}
-                    checked={column.visible}
-                    onCheckedChange={() => toggleColumn(column.id)}
-                  />
-                  <label
-                    htmlFor={column.id}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    {column.title}
-                  </label>
-                </div>
-              ))}
+          <PopoverContent align="end" className="w-72">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium">Column Visibility</h4>
+                <Button variant="outline" size="sm" onClick={addColumn}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Column
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {columns.map((column) => (
+                  <div key={column.id} className="flex items-center justify-between space-x-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id={column.id}
+                        checked={column.visible}
+                        onCheckedChange={() => toggleColumn(column.id)}
+                      />
+                      <label
+                        htmlFor={column.id}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {column.title}
+                      </label>
+                    </div>
+                    {column.isCustom && (
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => editColumn(column)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive"
+                          onClick={() => deleteColumn(column.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </PopoverContent>
         </Popover>
@@ -239,7 +345,12 @@ export function TransactionTable({
                   {columns
                     .filter(column => column.visible)
                     .map((column) => (
-                      <SortableHeader key={column.id} column={column} />
+                      <SortableHeader 
+                        key={column.id} 
+                        column={column}
+                        onEdit={editColumn}
+                        onDelete={deleteColumn}
+                      />
                     ))}
                 </SortableContext>
               </DndContext>
@@ -274,6 +385,37 @@ export function TransactionTable({
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingColumn ? 'Edit Column' : 'Add New Column'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="columnTitle" className="text-sm font-medium">
+                Column Title
+              </label>
+              <Input
+                id="columnTitle"
+                value={newColumnTitle}
+                onChange={(e) => setNewColumnTitle(e.target.value)}
+                placeholder="Enter column title"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowColumnDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveColumn}>
+              {editingColumn ? 'Save Changes' : 'Add Column'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
