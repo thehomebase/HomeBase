@@ -300,20 +300,13 @@ export default function ClientsPage() {
                         >
                           {field === 'labels' ? (
                             <div className="flex flex-wrap gap-1">
-                              {client.labels && Array.isArray(client.labels) && client.labels.map((label, index) => {
-                                const colors = [
-                                  'bg-blue-100 text-blue-800',
-                                  'bg-green-100 text-green-800',
-                                  'bg-purple-100 text-purple-800',
-                                  'bg-yellow-100 text-yellow-800',
-                                  'bg-pink-100 text-pink-800',
-                                  'bg-indigo-100 text-indigo-800'
-                                ];
-                                const colorIndex = Math.abs(label.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
+                              {client.labels && Array.isArray(client.labels) && client.labels.map((label) => {
+                                // Get the color from labelColors if it exists
+                                const labelColor = (client as any).labelColors?.[label] || 'bg-gray-100 text-gray-800';
                                 return (
                                   <span
-                                    key={index}
-                                    className={`inline-flex items-center px-2 py-1 m-1 rounded-full text-xs ${colors[colorIndex]} dark:bg-opacity-20`}
+                                    key={label}
+                                    className={`inline-flex items-center px-2 py-1 m-1 rounded-full text-xs ${labelColor} dark:bg-opacity-20`}
                                   >
                                     {label}
                                   </span>
