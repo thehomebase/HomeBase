@@ -601,20 +601,17 @@ export default function ClientsPage() {
                                     const usedColors = Array.from(existingLabelsWithColors.values());
                                     // Filter out colors that are already used
                                     const availableColors = allColors.filter(color => !usedColors.includes(color));
-                                    const allColors = [
-                                      'bg-blue-100 text-blue-800',
-                                      'bg-red-100 text-red-800',
-                                      'bg-green-100 text-green-800',
-                                      'bg-yellow-100 text-yellow-800',
-                                      'bg-orange-100 text-orange-800',
-                                      'bg-purple-100 text-purple-800'
-                                    ];
-
                                     const getLabelColor = (labelText: string) => {
+                                      const availableColors = colors.filter(color => 
+                                        !Array.from(existingLabelsWithColors.values()).includes(color)
+                                      );
+                                      if (availableColors.length > 0) {
+                                        return availableColors[0];
+                                      }
                                       const index = Math.abs(labelText.split('').reduce((acc, char) => {
                                         return acc + char.charCodeAt(0);
-                                      }, 0)) % allColors.length;
-                                      return allColors[index];
+                                      }, 0)) % colors.length;
+                                      return colors[index];
                                     };
 
                                     const labelColor = getLabelColor(label);
