@@ -604,13 +604,15 @@ export default function ClientsPage() {
                                     // If no colors are available, restart from the beginning
                                     const colors = availableColors.length > 0 ? availableColors : allColors;
                                     
-                                    const labelIndex = 0; // Always use the first available color
                                     const getColorForLabel = () => {
-                                      if (labelIndex >= 0) {
-                                        return existingLabelsWithColors.get(label);
+                                      const existingColor = existingLabelsWithColors.get(label);
+                                      if (existingColor) {
+                                        return existingColor;
                                       }
                                       const colorIndex = existingLabelsWithColors.size % colors.length;
-                                      return colors[colorIndex];
+                                      const newColor = colors[colorIndex];
+                                      existingLabelsWithColors.set(label, newColor);
+                                      return newColor;
                                     };
 
                                     const labelColor = getColorForLabel();
