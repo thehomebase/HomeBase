@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2 } from "lucide-react";
+import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -82,6 +82,23 @@ export default function ClientsPage() {
  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
  const [, navigate] = useLocation();
  const [location, setLocation] = useState('');
+ const [searchQuery, setSearchQuery] = useState('');
+ 
+ const filterClients = (clients: Client[]) => {
+   return clients.filter(client => {
+     const searchFields = [
+       client.firstName,
+       client.lastName,
+       client.email,
+       client.phone,
+       client.address,
+       ...(client.labels || [])
+     ].map(field => field?.toLowerCase() || '');
+     
+     const query = searchQuery.toLowerCase();
+     return searchFields.some(field => field.includes(query));
+   });
+ };
 
  const form = useForm<InsertClient & { labelColors: Record<string, string> }>({
    resolver: zodResolver(insertClientSchema),
@@ -186,8 +203,8 @@ export default function ClientsPage() {
    return sortConfig.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
  };
 
- const sellers = sortData(clients.filter(client => client.type === 'seller'), sortConfig);
- const buyers = sortData(clients.filter(client => client.type === 'buyer'), sortConfig);
+ const sellers = sortData(filterClients(clients.filter(client => client.type === 'seller')), sortConfig);
+ const buyers = sortData(filterClients(clients.filter(client => client.type === 'buyer')), sortConfig);
 
  const ClientTable = ({ clients }: { clients: Client[] }) => {
    const [editingCell, setEditingCell] = useState<{id: number, field: string} | null>(null);
@@ -408,9 +425,10 @@ export default function ClientsPage() {
  return (
    <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full w-full ml-[5px] relative container mx-auto px-4 py-8">
      <header className="border-b">
-       <div className="container px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between">
-         <h2 className="text-2xl font-bold">Client Management</h2>
-         {user?.role === "agent" && (
+       <div className="container px-4 py-4 space-y-4">
+         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+           <h2 className="text-2xl font-bold">Client Management</h2>
+           {user?.role === "agent" && (
            <div className="mt-4 md:mt-0">
              <Dialog>
                <DialogTrigger asChild>
@@ -618,6 +636,17 @@ export default function ClientsPage() {
              </Dialog>
            </div>
          )}
+         </div>
+         <div className="relative">
+           <Input
+             type="text"
+             placeholder="Search clients..."
+             value={searchQuery}
+             onChange={(e) => setSearchQuery(e.target.value)}
+             className="w-full md:w-96"
+           />
+           <Search className="absolute right-3 top-2.5 h-5 w-5 text-muted-foreground" />
+         </div>
        </div>
      </header>
 
