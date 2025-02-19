@@ -237,7 +237,7 @@ function Router() {
           <ProtectedRoute path="/" component={CalculatorsPage} />
         </Route>
       )}
-      <Route component={NotFound} />
+      <Route path="*" component={NotFound} />
     </Switch>
   );
 }
