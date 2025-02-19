@@ -202,7 +202,7 @@ export default function TransactionsPage() {
             value={selectedYear || ""}
             onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value, 10) : null)}
           >
-            <option value="">Select Year</option>
+            <option value="">{new Date().getFullYear()}</option>
             {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map((year) => (
               <option key={year} value={year}>
                 {year}
