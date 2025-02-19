@@ -176,6 +176,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
   return (
     <Card>
       <CardContent>
+        <div className="hidden sm:block"> {/* Desktop View */}
         <Table>
           <TableHeader>
             <TableRow>
@@ -385,6 +386,65 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
             )}
           </TableBody>
         </Table>
+        </div>
+
+        {/* Mobile View */}
+        <div className="block sm:hidden">
+          <div className="flex justify-between items-center p-4 border-b">
+            <h3 className="font-semibold">Contacts</h3>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setIsAddingContact(true)}
+              disabled={isAddingContact}
+              className="bg-black hover:bg-black/90"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Contact
+            </Button>
+          </div>
+          <div className="divide-y">
+            {contacts.map((contact: Contact) => (
+              <div key={contact.id} className="p-4 space-y-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-medium">{contact.role}</div>
+                    <div>{contact.firstName} {contact.lastName}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    {user?.role === 'agent' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setEditingContact(contact)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => contact.id && deleteContactMutation.mutate(contact.id)}
+                      disabled={deleteContactMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <div>{contact.email}</div>
+                  {contact.phone && <div>Phone: {contact.phone}</div>}
+                  {contact.mobilePhone && <div>Mobile: {contact.mobilePhone}</div>}
+                </div>
+              </div>
+            ))}
+            {contacts.length === 0 && !isAddingContact && (
+              <div className="p-4 text-center text-muted-foreground">
+                No contacts added yet
+              </div>
+            )}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
