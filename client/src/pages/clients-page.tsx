@@ -278,7 +278,7 @@ export default function ClientsPage() {
   };
 
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full w-full ml-[5px] relative container mx-auto px-4 py-8">
       <header className="border-b">
         <div className="container px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between">
           <h2 className="text-2xl font-bold">Client Management</h2>
