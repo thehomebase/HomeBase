@@ -15,7 +15,7 @@ import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin } from "lucide-react"
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { useRouter } from 'next/router';
+import { useLocation } from 'wouter';
 
 type SortConfig = {
   key: keyof Client;
@@ -66,7 +66,7 @@ export default function ClientsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
-  const router = useRouter();
+  const [, setLocation] = useLocation();
   const [location, setLocation] = useState('');
 
   const form = useForm<InsertClient>({
