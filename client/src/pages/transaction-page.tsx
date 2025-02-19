@@ -307,9 +307,9 @@ export default function TransactionPage() {
         </div>
       </header>
 
-      <main className="w-full p-3 sm:p-6">
-        <Card>
-          <CardContent className="p-6">
+      <main className="w-full p-2 sm:p-6">
+        <Card className="overflow-x-hidden">
+          <CardContent className="p-3 sm:p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Transaction Summary</h3>
               {user.role === 'agent' && (
@@ -333,7 +333,7 @@ export default function TransactionPage() {
               )}
             </div>
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Transaction Type</p>
                   <p className="font-medium capitalize">
@@ -594,16 +594,16 @@ export default function TransactionPage() {
         <Card className="mt-6">
           <CardContent className="p-6">
             <Tabs defaultValue="progress">
-              <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 gap-2">
-                <TabsTrigger value="progress">
+              <TabsList className="flex w-full flex-wrap sm:flex-nowrap gap-1 p-1">
+                <TabsTrigger className="flex-1 min-w-20" value="progress">
                   <ClipboardCheck className="h-4 w-4 mr-2" />
                   Progress
                 </TabsTrigger>
-                <TabsTrigger value="contacts">
+                <TabsTrigger className="flex-1 min-w-20" value="contacts">
                   <UserPlus className="h-4 w-4 mr-2" />
                   Contacts
                 </TabsTrigger>
-                <TabsTrigger value="documents">
+                <TabsTrigger className="flex-1 min-w-20" value="documents">
                   <FileText className="h-4 w-4 mr-2" />
                   Documents
                 </TabsTrigger>
