@@ -601,20 +601,19 @@ export default function ClientsPage() {
                                     const usedColors = Array.from(existingLabelsWithColors.values());
                                     const availableColors = allColors.filter(color => !usedColors.includes(color));
 
-                                    const getLabelColor = (labelText: string) => {
-                                      const availableColors = allColors.filter(color => 
-                                        !Array.from(existingLabelsWithColors.values()).includes(color)
-                                      );
-                                      if (availableColors.length > 0) {
-                                        return availableColors[0];
-                                      }
-                                      const index = Math.abs(labelText.split('').reduce((acc, char) => {
-                                        return acc + char.charCodeAt(0);
-                                      }, 0)) % allColors.length;
-                                      return allColors[index];
+                                    const getLabelColor = (labelText: string, index: number) => {
+                                      const allColors = [
+                                        'bg-blue-100 text-blue-800',
+                                        'bg-red-100 text-red-800',
+                                        'bg-green-100 text-green-800',
+                                        'bg-yellow-100 text-yellow-800',
+                                        'bg-orange-100 text-orange-800',
+                                        'bg-purple-100 text-purple-800'
+                                      ];
+                                      return allColors[index % allColors.length];
                                     };
 
-                                    const labelColor = getLabelColor(label);
+                                    const labelColor = getLabelColor(label, field.value.indexOf(label));
                                     
                                     form.setValue('labelColors', {
                                       ...(form.getValues('labelColors') || {}),
