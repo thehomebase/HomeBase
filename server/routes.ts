@@ -5,7 +5,6 @@ import { setupAuth } from "./auth";
 import { z } from "zod";
 import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema } from "@shared/schema";
 import ical from "ical-generator";
-import socialRoutes from "./routes/social";
 
 // Seller checklist items
 const SELLER_CHECKLIST_ITEMS = [
@@ -80,9 +79,6 @@ const BUYER_CHECKLIST_ITEMS = [
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
-
-  // Add social media routes
-  app.use("/api/social", socialRoutes);
 
   // Clients
   app.get("/api/clients", async (req, res) => {
