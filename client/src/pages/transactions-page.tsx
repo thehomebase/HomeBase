@@ -358,9 +358,9 @@ export default function TransactionsPage() {
         )}
       </div>
 
-      <div className="flex-1 w-full bg-background overflow-x-hidden">
+      <div className="flex-1 w-full bg-background">
         {view === 'board' ? (
-          <div className="min-w-0 pl-0 py-4 overflow-y-auto">
+          <div className="min-w-0 pl-0 py-4">
             <KanbanBoard 
               transactions={filteredTransactions} 
               onDeleteTransaction={handleDeleteTransaction}
@@ -369,7 +369,7 @@ export default function TransactionsPage() {
             />
           </div>
         ) : view === 'table' ? (
-          <div className="px-4 overflow-y-auto">
+          <div className="px-4">
             <TransactionTable
               transactions={filteredTransactions}
               onDeleteTransaction={handleDeleteTransaction}
@@ -377,7 +377,7 @@ export default function TransactionsPage() {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 w-full px-2 overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 w-full px-2">
             {filteredTransactions.map((transaction) => (
               <Card 
                 key={transaction.id} 
