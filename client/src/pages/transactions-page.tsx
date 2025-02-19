@@ -153,7 +153,7 @@ export default function TransactionsPage() {
   };
 
   const filteredTransactions = transactions.filter((transaction) => {
-    const transactionDate = new Date(transaction.participants[0].createdAt);
+    const transactionDate = transaction.createdAt ? new Date(transaction.createdAt) : new Date();
     const yearMatch = selectedYear === null || transactionDate.getFullYear() === selectedYear;
     const startDateMatch = startDate === "" || transactionDate >= new Date(startDate);
     const endDateMatch = endDate === "" || transactionDate <= new Date(endDate);

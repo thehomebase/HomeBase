@@ -29,6 +29,9 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function DataPage() {
   const { user } = useAuth();
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
 
   const { data: transactions = [], isLoading, error } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -58,7 +61,14 @@ export default function DataPage() {
     .filter(t => {
       if (!t.closingDate || !t.contractPrice) return false;
       const closeDate = new Date(t.closingDate);
-      return t.status === "closed" && getYear(closeDate) === currentYear;
+      const matchesStatus = !selectedStatus || t.status === selectedStatus;
+      const matchesStartDate = !startDate || closeDate >= new Date(startDate);
+      const matchesEndDate = !endDate || closeDate <= new Date(endDate);
+      return t.status === "closed" && 
+             getYear(closeDate) === currentYear && 
+             matchesStatus && 
+             matchesStartDate && 
+             matchesEndDate;
     })
     .reduce((acc, transaction) => {
       const date = new Date(transaction.closingDate!);
@@ -156,7 +166,35 @@ export default function DataPage() {
 
   return (
     <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full container mx-auto px-4 py-8">
-      <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+        <h2 className="text-2xl font-bold">Sales Data Analysis</h2>
+        <div className="flex gap-2 mt-4 sm:mt-0">
+          <Input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-32"
+            placeholder="Start Date"
+          />
+          <Input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="w-32"
+            placeholder="End Date"
+          />
+          <select
+            className="h-9 rounded-md border bg-background px-3"
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+          >
+            <option value="">All Status</option>
+            <option value="prospect">Prospect</option>
+            <option value="active">Active</option>
+            <option value="closed">Closed</option>
+          </select>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <Card className="p-6">
