@@ -11,12 +11,13 @@ import { Toggle } from "@/components/ui/toggle";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
-import { Plus, List, LayoutGrid, Trash2, Moon, Sun } from "lucide-react";
+import { Plus, List, LayoutGrid, Table2, Trash2, Moon, Sun } from "lucide-react";
 import { NavTabs } from "@/components/ui/nav-tabs";
 import { KanbanBoard } from "@/components/kanban-board";
 import { useState } from "react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { TransactionTable } from "@/components/transaction-table";
 
 interface Transaction {
   id: number;
@@ -48,7 +49,7 @@ const createTransactionSchema = z.object({
 export default function TransactionsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const [view, setView] = useState<'list' | 'board'>('board');
+  const [view, setView] = useState<'list' | 'board' | 'table'>('board');
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const { toast } = useToast();
   const [theme, setTheme] = useState<'light' | 'dark'>(
@@ -166,6 +167,14 @@ export default function TransactionsPage() {
               className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
             >
               <LayoutGrid className="h-4 w-4" />
+            </Toggle>
+            <Toggle
+              pressed={view === 'table'}
+              onPressedChange={() => setView('table')}
+              aria-label="Table view"
+              className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
+            >
+              <Table2 className="h-4 w-4" />
             </Toggle>
           </div>
           <Toggle
@@ -320,6 +329,14 @@ export default function TransactionsPage() {
               onDeleteTransaction={handleDeleteTransaction}
               onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
               clients={clients}
+            />
+          </div>
+        ) : view === 'table' ? (
+          <div className="px-4">
+            <TransactionTable
+              transactions={transactions}
+              onDeleteTransaction={handleDeleteTransaction}
+              onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
             />
           </div>
         ) : (
