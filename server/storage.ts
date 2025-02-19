@@ -907,6 +907,15 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async deleteClient(clientId: number): Promise<void> {
+    try {
+      await db.delete(clients).where(sql`id = ${clientId}`);
+    } catch (error) {
+      console.error('Error in deleteClient:', error);
+      throw error;
+    }
+  }
+
   async createClient(insertClient: InsertClient): Promise<Client> {
     try {
       const clientData = {

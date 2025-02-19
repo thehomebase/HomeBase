@@ -120,7 +120,7 @@ export function registerRoutes(app: Express): Server {
 
       console.log('Creating client with data:', clientData);
       const client = await storage.createClient(clientData);
-      
+
       if (!client) {
         throw new Error('Failed to create client record');
       }
@@ -134,6 +134,31 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
+
+  app.delete("/api/clients/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      await storage.deleteClient(Number(req.params.id));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      res.status(500).json({ error: 'Failed to delete client' });
+    }
+  });
+
+  app.patch("/api/clients/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+    try {
+      const client = await storage.updateClient(Number(req.params.id), req.body);
+      res.json(client);
+    } catch (error) {
+      console.error('Error updating client:', error);
+      res.status(500).json({ error: 'Failed to update client' });
+    }
+  });
+
 
   // Transactions
   app.get("/api/transactions", async (req, res) => {

@@ -188,20 +188,23 @@ export default function ClientsPage() {
     const deleteClientMutation = useMutation({
       mutationFn: async (clientId: number) => {
         const response = await apiRequest("DELETE", `/api/clients/${clientId}`);
-        if (!response.ok) throw new Error("Failed to delete client");
+        if (!response.ok) {
+          const error = await response.text();
+          throw new Error(error || "Failed to delete client");
+        }
+        return response.json();
       },
       onSuccess: async () => {
-        await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
         await refetchClients();
         toast({
           title: "Success", 
           description: "Client deleted successfully",
         });
       },
-      onError: () => {
+      onError: (error: Error) => {
         toast({
           title: "Error",
-          description: "Failed to delete client",
+          description: error.message,
           variant: "destructive",
         });
       },
