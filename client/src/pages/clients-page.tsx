@@ -92,8 +92,6 @@ export default function ClientsPage() {
         firstName: data.firstName,
         lastName: data.lastName,
         labels: data.labels || [],
-        agentId: user.id,
-        labels: data.labels || [],
       });
       form.reset();
     } catch (error) {
