@@ -177,6 +177,10 @@ export default function ClientsPage() {
   const ClientTable = ({ clients }: { clients: Client[] }) => {
     const [editingCell, setEditingCell] = useState<{id: number, field: string} | null>(null);
     const [editValue, setEditValue] = useState("");
+    const { refetch } = useQuery<Client[]>({
+      queryKey: ["/api/clients"],
+      enabled: false, // Initially disabled
+    });
 
     const handleEditClick = (client: Client, field: string) => {
       setEditingCell({ id: client.id, field });
@@ -191,9 +195,15 @@ export default function ClientsPage() {
           [editingCell.field]: editValue
         });
         if (!response.ok) throw new Error("Failed to update client");
-        queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+        await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+        await refetch();
       } catch (error) {
         console.error("Error updating client:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update client",
+          variant: "destructive",
+        });
       }
       setEditingCell(null);
     };
@@ -271,7 +281,7 @@ export default function ClientsPage() {
                                   'bg-indigo-100 text-indigo-800'
                                 ];
                                 const colorIndex = Math.abs(label.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
-                                
+
                                 return (
                                   <span
                                     key={index}
