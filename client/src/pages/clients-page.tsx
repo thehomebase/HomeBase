@@ -66,7 +66,7 @@ export default function ClientsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
-  const [, setLocation] = useLocation();
+  const [, navigate] = useLocation();
   const [location, setLocation] = useState('');
 
   const form = useForm<InsertClient>({
