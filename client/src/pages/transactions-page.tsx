@@ -57,8 +57,7 @@ export default function TransactionsPage() {
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   );
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>(""); // Added state for date range filter
+  
 
 
   const { data: clients = [] } = useQuery({
@@ -216,8 +215,7 @@ export default function TransactionsPage() {
               </option>
             ))}
           </select>
-          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-24"/>
-          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-24"/>
+          
         </div>
 
         {user?.role === "agent" && (
