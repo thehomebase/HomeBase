@@ -405,16 +405,75 @@ export default function ClientsPage() {
                       <FormField
                         control={form.control}
                         name="labels"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Labels</FormLabel>
-                            <FormControl>
-                              <Input type="text" {...field} placeholder="Comma-separated labels" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      /> {/* Added labels input field */}
+                        render={({ field }) => {
+                          // Get unique existing labels from all clients
+                          const existingLabels = Array.from(new Set(
+                            clients.flatMap(client => client.labels || [])
+                          ));
+
+                          return (
+                            <FormItem>
+                              <FormLabel>Labels</FormLabel>
+                              <div className="space-y-2">
+                                {existingLabels.length > 0 && (
+                                  <select
+                                    className="w-full h-9 px-3 rounded-md border bg-background"
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      if (value && !field.value?.includes(value)) {
+                                        field.onChange([...(field.value || []), value]);
+                                      }
+                                    }}
+                                  >
+                                    <option value="">Select existing label</option>
+                                    {existingLabels.map((label) => (
+                                      <option key={label} value={label}>
+                                        {label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                                <FormControl>
+                                  <Input
+                                    type="text"
+                                    placeholder="Add new label"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        const value = e.currentTarget.value.trim();
+                                        if (value && !field.value?.includes(value)) {
+                                          field.onChange([...(field.value || []), value]);
+                                          e.currentTarget.value = '';
+                                        }
+                                      }
+                                    }}
+                                  />
+                                </FormControl>
+                                <div className="flex flex-wrap gap-2">
+                                  {field.value?.map((label: string) => (
+                                    <span
+                                      key={label}
+                                      className="px-2 py-1 bg-primary/10 rounded-full text-sm flex items-center gap-1"
+                                    >
+                                      {label}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          field.onChange(field.value.filter((l: string) => l !== label));
+                                        }}
+                                        className="hover:text-destructive"
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
                       <Button
                         type="submit"
                         className="w-full"
