@@ -307,8 +307,8 @@ export default function TransactionPage() {
         </div>
       </header>
 
-      <main className="w-full p-2 sm:p-6">
-        <Card className="overflow-x-hidden">
+      <main className="w-full max-w-[100vw] overflow-x-hidden p-2 sm:p-6">
+        <Card className="overflow-x-hidden w-full">
           <CardContent className="p-3 sm:p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Transaction Summary</h3>
@@ -594,7 +594,7 @@ export default function TransactionPage() {
         <Card className="mt-6">
           <CardContent className="p-6">
             <Tabs defaultValue="progress">
-              <TabsList className="flex w-full flex-wrap sm:flex-nowrap gap-1 p-1">
+              <TabsList className="flex w-full flex-wrap sm:flex-nowrap gap-1 p-1 max-w-[100vw]">
                 <TabsTrigger className="flex-1 min-w-20" value="progress">
                   <ClipboardCheck className="h-4 w-4 mr-2" />
                   Progress
