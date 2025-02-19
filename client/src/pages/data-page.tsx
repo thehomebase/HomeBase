@@ -237,11 +237,11 @@ export default function DataPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Monthly Sales Performance</h3>
+        <Card className="p-4">
+          <h3 className="text-lg font-semibold mb-2">Monthly Sales Performance</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData} margin={{ top: 20, right: 30, bottom: 60, left: 70 }}>
+              <ComposedChart data={chartData} margin={{ top: 20, right: 40, bottom: 60, left: 80 }}>
                 <XAxis 
                   dataKey="month" 
                   angle={-45} 
@@ -255,7 +255,7 @@ export default function DataPage() {
                     value: 'Monthly Volume', 
                     angle: -90, 
                     position: 'insideLeft',
-                    offset: -80
+                    offset: -60
                   }}
                 />
                 <YAxis 
