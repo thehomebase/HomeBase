@@ -578,11 +578,21 @@ export default function ClientsPage() {
                                   />
                                 </FormControl>
                                 <div className="flex flex-wrap gap-2">
-                                  {field.value?.map((label: string) => (
-                                    <span
-                                      key={label}
-                                      className="px-2 py-1 bg-primary/10 rounded-full text-sm flex items-center gap-1"
-                                    >
+                                  {field.value?.map((label: string) => {
+                                    const colors = [
+                                      'bg-blue-100 text-blue-800',
+                                      'bg-green-100 text-green-800',
+                                      'bg-purple-100 text-purple-800',
+                                      'bg-yellow-100 text-yellow-800',
+                                      'bg-pink-100 text-pink-800',
+                                      'bg-indigo-100 text-indigo-800'
+                                    ];
+                                    const colorIndex = Math.abs(label.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
+                                    return (
+                                      <span
+                                        key={label}
+                                        className={`px-2 py-1 ${colors[colorIndex]} rounded-full text-sm flex items-center gap-1`}
+                                      >
                                       {label}
                                       <button
                                         type="button"
@@ -594,7 +604,8 @@ export default function ClientsPage() {
                                         ×
                                       </button>
                                     </span>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </div>
                               <FormMessage />
