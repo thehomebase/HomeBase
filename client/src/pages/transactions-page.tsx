@@ -161,10 +161,10 @@ export default function TransactionsPage() {
 
 
   return (
-        <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full w-full ml-[5px] relative container mx-auto px-4 py-8">
-          <div className="container px-4 py-4 space-y-4">
+        <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full w-full ml-[5px] relative container mx-auto px-2 py-4">
+          <div className="container space-y-4">
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1 dark:bg-gray-800/50">
             <Toggle
               pressed={view === 'list'}
@@ -204,7 +204,7 @@ export default function TransactionsPage() {
             )}
           </Toggle>
           <select 
-            className="w-24 h-9 px-3 rounded-md border text-base bg-background"
+            className="w-20 h-9 px-3 rounded-md border text-base bg-background"
             value={selectedYear || ""}
             onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value, 10) : null)}
           >
@@ -348,9 +348,9 @@ export default function TransactionsPage() {
         )}
       </div>
 
-      <div className="min-h-screen bg-background overflow-x-hidden">
+      <div className="flex-1 w-full min-h-screen bg-background overflow-x-hidden">
         {view === 'board' ? (
-          <div className="min-w-0 pl-4">
+          <div className="min-w-0 pl-0 py-4">
             <KanbanBoard 
               transactions={filteredTransactions} 
               onDeleteTransaction={handleDeleteTransaction}
