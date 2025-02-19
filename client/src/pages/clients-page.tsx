@@ -594,7 +594,7 @@ export default function ClientsPage() {
                                       }
                                       return Math.abs(hash);
                                     };
-                                    
+
                                     const allColors = [
                                       'bg-blue-100 text-blue-800',
                                       'bg-red-100 text-red-800',
@@ -603,7 +603,7 @@ export default function ClientsPage() {
                                       'bg-orange-100 text-orange-800',
                                       'bg-purple-100 text-purple-800'
                                     ];
-                                    
+
                                     // Get used colors from existing labels
                                     const usedColors = Array.from(existingLabelsWithColors.values());
                                     const availableColors = allColors.filter(color => !usedColors.includes(color));
@@ -621,12 +621,12 @@ export default function ClientsPage() {
                                     };
 
                                     const labelColor = getLabelColor(label, field.value.indexOf(label));
-                                    
+
                                     form.setValue('labelColors', {
                                       ...(form.getValues('labelColors') || {}),
                                       [label]: labelColor
                                     });
-                                    
+
                                     return (
                                       <span
                                         key={label}
