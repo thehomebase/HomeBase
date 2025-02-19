@@ -255,7 +255,7 @@ export default function DataPage() {
                     value: 'Monthly Volume', 
                     angle: -90, 
                     position: 'insideLeft',
-                    offset: -60
+                    offset: -80
                   }}
                 />
                 <YAxis 
@@ -266,7 +266,7 @@ export default function DataPage() {
                     value: 'Cumulative Volume', 
                     angle: 90, 
                     position: 'insideRight',
-                    offset: -70
+                    offset: -90
                   }}
                 />
                 <Tooltip 
