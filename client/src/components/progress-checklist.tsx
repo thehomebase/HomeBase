@@ -335,20 +335,33 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
         <CardTitle className="text-lg">Progress</CardTitle>
         <Progress value={progress} className="h-2" />
         <div className="text-sm text-muted-foreground">{progress}% complete</div>
-        <div className="flex gap-2 overflow-x-auto py-2">
-          {phases.map((phase) => (
-            <button
-              key={phase}
-              onClick={() => setActivePhase(phase)}
-              className={`px-3 py-1 text-sm rounded-full whitespace-nowrap ${
-                activePhase === phase
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted hover:bg-muted-foreground/10"
-              }`}
-            >
-              {phase}
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row gap-2 py-2">
+          <select
+            value={activePhase}
+            onChange={(e) => setActivePhase(e.target.value)}
+            className="w-full sm:hidden p-2 rounded-md border bg-background text-sm"
+          >
+            {phases.map((phase) => (
+              <option key={phase} value={phase}>
+                {phase}
+              </option>
+            ))}
+          </select>
+          <div className="hidden sm:flex gap-2 overflow-x-auto">
+            {phases.map((phase) => (
+              <button
+                key={phase}
+                onClick={() => setActivePhase(phase)}
+                className={`px-3 py-1 text-sm rounded-full whitespace-nowrap ${
+                  activePhase === phase
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted hover:bg-muted-foreground/10"
+                }`}
+              >
+                {phase}
+              </button>
+            ))}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
