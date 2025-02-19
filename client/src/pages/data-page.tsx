@@ -155,7 +155,7 @@ export default function DataPage() {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full container mx-auto px-4 py-8">
       <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
