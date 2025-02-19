@@ -532,7 +532,7 @@ export default function TransactionPage() {
                       onChange={(e) => {
                         const value = e.target.value ? Number(e.target.value) : null;
                         form.setValue("clientId", value);
-                        form.handleSubmit(onSubmit)();
+                        handleSubmit(form.getValues());
                       }}
                     >
                       <option value="">Select client</option>
