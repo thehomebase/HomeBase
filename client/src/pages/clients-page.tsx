@@ -105,7 +105,7 @@ export default function ClientsPage() {
     }
   };
 
-  const { data: clients = [] } = useQuery<Client[]>({
+  const { data: clients = [], refetch: refetchClients } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
     enabled: !!user,
   });
@@ -190,10 +190,11 @@ export default function ClientsPage() {
         const response = await apiRequest("DELETE", `/api/clients/${clientId}`);
         if (!response.ok) throw new Error("Failed to delete client");
       },
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+        await refetchClients();
         toast({
-          title: "Success",
+          title: "Success", 
           description: "Client deleted successfully",
         });
       },
