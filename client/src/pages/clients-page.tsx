@@ -15,6 +15,7 @@ import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2 } from "lucid
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useLocation } from 'wouter';
 
 type SortConfig = {
