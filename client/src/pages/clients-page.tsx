@@ -78,6 +78,7 @@ export default function ClientsPage() {
       status: "active",
       notes: "",
       agentId: user?.id || 0,
+      labels: [], // Added labels field to default values
     },
   });
 
@@ -158,77 +159,123 @@ export default function ClientsPage() {
   const sellers = sortData(clients.filter(client => client.type === 'seller'), sortConfig);
   const buyers = sortData(clients.filter(client => client.type === 'buyer'), sortConfig);
 
-  const ClientTable = ({ clients }: { clients: Client[] }) => (
-    <>
-      {/* Desktop view - Table */}
-      <div className="hidden md:block">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-100 dark:bg-gray-800">
-              <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('lastName')}>
-                <div className="flex items-center gap-1">
-                  Last Name {getSortIcon('lastName')}
-                </div>
-              </TableHead>
-              <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('firstName')}>
-                <div className="flex items-center gap-1">
-                  First Name {getSortIcon('firstName')}
-                </div>
-              </TableHead>
-              <TableHead className="py-3 font-semibold">Email</TableHead>
-              <TableHead className="py-3 font-semibold">Current Address</TableHead>
-              <TableHead className="py-3 font-semibold">Phone</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {clients.map((client, index) => (
-              <TableRow 
-                key={client.id}
-                className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                  index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
-                }`}
-                onClick={() => {/* Add edit functionality */}}
-              >
-                <TableCell className="py-3">{client.lastName}</TableCell>
-                <TableCell className="py-3">{client.firstName}</TableCell>
-                <TableCell className="py-3 text-blue-600">
-                  <div className="flex items-center gap-2">
-                    {client.email}
-                  </div>
-                </TableCell>
-                <TableCell className="py-3">{client.address}</TableCell>
-                <TableCell className="py-3">
-                  <div className="flex items-center gap-2">
-                    {client.phone}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-            {clients.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  No clients found. Add your first client to get started!
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+  const ClientTable = ({ clients }: { clients: Client[] }) => {
+    const [editingCell, setEditingCell] = useState<{id: number, field: string} | null>(null);
+    const [editValue, setEditValue] = useState("");
 
-      {/* Mobile view - Cards */}
-      <div className="md:hidden space-y-4">
-        {clients.length === 0 ? (
-          <div className="text-center text-muted-foreground py-8">
-            No clients found. Add your first client to get started!
-          </div>
-        ) : (
-          clients.map((client) => (
-            <ClientCard key={client.id} client={client} />
-          ))
-        )}
-      </div>
-    </>
-  );
+    const handleEditClick = (client: Client, field: string) => {
+      setEditingCell({ id: client.id, field });
+      setEditValue(client[field as keyof Client]?.toString() || '');
+    };
+
+    const handleEditSave = async (client: Client) => {
+      if (!editingCell) return;
+
+      try {
+        const response = await apiRequest("PATCH", `/api/clients/${client.id}`, {
+          [editingCell.field]: editValue
+        });
+        if (!response.ok) throw new Error("Failed to update client");
+        queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      } catch (error) {
+        console.error("Error updating client:", error);
+      }
+      setEditingCell(null);
+    };
+
+    return (
+      <>
+        {/* Desktop view - Table */}
+        <div className="hidden md:block">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-100 dark:bg-gray-800">
+                <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('lastName')}>
+                  <div className="flex items-center gap-1">
+                    Last Name {getSortIcon('lastName')}
+                  </div>
+                </TableHead>
+                <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('firstName')}>
+                  <div className="flex items-center gap-1">
+                    First Name {getSortIcon('firstName')}
+                  </div>
+                </TableHead>
+                <TableHead className="py-3 font-semibold">Email</TableHead>
+                <TableHead className="py-3 font-semibold">Current Address</TableHead>
+                <TableHead className="py-3 font-semibold">Phone</TableHead>
+                <TableHead className="py-3 font-semibold">Labels</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {clients.map((client, index) => (
+                <TableRow 
+                  key={client.id}
+                  className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                    index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
+                  }`}
+                >
+                  {['lastName', 'firstName', 'email', 'address', 'phone'].map((field) => (
+                    <TableCell 
+                      key={field}
+                      className="py-3 cursor-pointer"
+                      onClick={() => handleEditClick(client, field)}
+                    >
+                      {editingCell?.id === client.id && editingCell.field === field ? (
+                        <Input
+                          autoFocus
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => handleEditSave(client)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleEditSave(client);
+                            if (e.key === 'Escape') setEditingCell(null);
+                          }}
+                        />
+                      ) : (
+                        <div className="min-h-[24px]">
+                          {client[field as keyof Client]?.toString() || ''}
+                        </div>
+                      )}
+                    </TableCell>
+                  ))}
+                  <TableCell className="py-3">
+                    {client.labels?.map((label, i) => (
+                      <span 
+                        key={i}
+                        className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-1"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {clients.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    No clients found. Add your first client to get started!
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Mobile view - Cards */}
+        <div className="md:hidden space-y-4">
+          {clients.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              No clients found. Add your first client to get started!
+            </div>
+          ) : (
+            clients.map((client) => (
+              <ClientCard key={client.id} client={client} />
+            ))
+          )}
+        </div>
+      </>
+    );
+  };
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -238,136 +285,149 @@ export default function ClientsPage() {
           {user?.role === "agent" && (
             <div className="mt-4 md:mt-0">
               <Dialog>
-            <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Client
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Client</DialogTitle>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="firstName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>First Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="lastName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Last Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <FormField
-                    control={form.control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Address</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Client Type</FormLabel>
-                        <FormControl>
-                          <select
-                            {...field}
-                            className="w-full px-3 py-2 border rounded-md"
-                          >
-                            <option value="seller">Seller</option>
-                            <option value="buyer">Buyer</option>
-                          </select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="notes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Notes</FormLabel>
-                        <FormControl>
-                          <textarea
-                            {...field}
-                            className="w-full px-3 py-2 border rounded-md"
-                            rows={3}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={createClientMutation.isPending}
-                  >
-                    {createClientMutation.isPending ? 'Adding...' : 'Add Client'}
+                <DialogTrigger asChild>
+                  <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Client
                   </Button>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Client</DialogTitle>
+                  </DialogHeader>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="firstName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>First Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="lastName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Last Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input type="email" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="phone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Phone</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="address"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Address</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Client Type</FormLabel>
+                            <FormControl>
+                              <select
+                                {...field}
+                                className="w-full px-3 py-2 border rounded-md"
+                              >
+                                <option value="seller">Seller</option>
+                                <option value="buyer">Buyer</option>
+                              </select>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Notes</FormLabel>
+                            <FormControl>
+                              <textarea
+                                {...field}
+                                className="w-full px-3 py-2 border rounded-md"
+                                rows={3}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="labels"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Labels</FormLabel>
+                            <FormControl>
+                              <Input type="text" {...field} placeholder="Comma-separated labels" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      /> {/* Added labels input field */}
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={createClientMutation.isPending}
+                      >
+                        {createClientMutation.isPending ? 'Adding...' : 'Add Client'}
+                      </Button>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
         </div>
       </header>
 
