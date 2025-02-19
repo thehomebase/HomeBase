@@ -602,7 +602,7 @@ export default function ClientsPage() {
                                     // Filter out colors that are already used
                                     const availableColors = allColors.filter(color => !usedColors.includes(color));
                                     const getLabelColor = (labelText: string) => {
-                                      const availableColors = colors.filter(color => 
+                                      const availableColors = allColors.filter(color => 
                                         !Array.from(existingLabelsWithColors.values()).includes(color)
                                       );
                                       if (availableColors.length > 0) {
@@ -610,8 +610,8 @@ export default function ClientsPage() {
                                       }
                                       const index = Math.abs(labelText.split('').reduce((acc, char) => {
                                         return acc + char.charCodeAt(0);
-                                      }, 0)) % colors.length;
-                                      return colors[index];
+                                      }, 0)) % allColors.length;
+                                      return allColors[index];
                                     };
 
                                     const labelColor = getLabelColor(label);
