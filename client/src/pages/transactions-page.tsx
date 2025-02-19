@@ -167,10 +167,10 @@ export default function TransactionsPage() {
   return (
     <main
       className={cn(
-        "relative px-2 py-4 overflow-x-hidden w-screen",
+        "relative px-2 py-4 overflow-x-hidden",
         isMobile
-          ? "max-w-full"
-          : "lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)]"
+          ? "w-full max-w-full"
+          : "w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full"
       )}
     >
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
