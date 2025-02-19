@@ -36,6 +36,7 @@ interface Transaction {
     firstName: string;
     lastName: string;
   } | null;
+  year: number; // Added year property
 }
 
 const createTransactionSchema = z.object({
@@ -55,6 +56,7 @@ export default function TransactionsPage() {
   const [theme, setTheme] = useState<'light' | 'dark'>(
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   );
+  const [selectedYear, setSelectedYear] = useState<number | null>(null); // Added state for year filter
 
   const { data: clients = [] } = useQuery({
     queryKey: ["/api/clients"],
@@ -97,7 +99,8 @@ export default function TransactionsPage() {
         status: 'prospect',
         participants: [],
         clientId: data.clientId || null,
-        secondaryClientId: data.secondaryClientId || null
+        secondaryClientId: data.secondaryClientId || null,
+        year: new Date().getFullYear() //Added year to new transaction
       });
       if (!response.ok) {
         throw new Error('Failed to create transaction');
@@ -146,6 +149,11 @@ export default function TransactionsPage() {
     }
   };
 
+  const filteredTransactions = selectedYear
+    ? transactions.filter((transaction) => new Date(transaction.participants[0].createdAt).getFullYear() === selectedYear)
+    : transactions;
+
+
   return (
     <main className="w-full ml-[5px] relative">
       <div className="w-screen flex flex-col sm:flex-row items-start gap-4 mb-6 mt-4 px-4">
@@ -189,6 +197,18 @@ export default function TransactionsPage() {
               <Sun className="h-4 w-4" />
             )}
           </Toggle>
+          <select 
+            className="w-24 h-9 px-3 rounded-md border text-base bg-background"
+            value={selectedYear || ""}
+            onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value, 10) : null)}
+          >
+            <option value="">Select Year</option>
+            {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
         </div>
 
         {user?.role === "agent" && (
@@ -325,7 +345,7 @@ export default function TransactionsPage() {
         {view === 'board' ? (
           <div className="min-w-0 pl-4">
             <KanbanBoard 
-              transactions={transactions} 
+              transactions={filteredTransactions} 
               onDeleteTransaction={handleDeleteTransaction}
               onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
               clients={clients}
@@ -334,14 +354,14 @@ export default function TransactionsPage() {
         ) : view === 'table' ? (
           <div className="px-4">
             <TransactionTable
-              transactions={transactions}
+              transactions={filteredTransactions}
               onDeleteTransaction={handleDeleteTransaction}
               onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
             />
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full px-4">
-            {transactions.map((transaction) => (
+            {filteredTransactions.map((transaction) => (
               <Card 
                 key={transaction.id} 
                 className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800 w-full"
@@ -384,7 +404,7 @@ export default function TransactionsPage() {
               </Card>
             ))}
 
-            {transactions.length === 0 && (
+            {filteredTransactions.length === 0 && (
               <div className="col-span-full text-center py-12 text-muted-foreground dark:text-gray-400">
                 No transactions found. {user?.role === "agent" ? "Create one to get started!" : "Ask your agent for an access code to join a transaction."}
               </div>
