@@ -34,6 +34,7 @@ import {
   Users,
   Calendar,
   MessageSquare,
+  BarChart3,
   Calculator,
   Book,
   PanelLeftClose,
@@ -102,7 +103,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuItem>
                             <SidebarMenuButton asChild tooltip="Data">
                               <Link href="/data" className="flex items-center gap-2">
-                                <Calculator className="h-4 w-4" />
+                                <BarChart3 className="h-4 w-4" />
                                 {isSidebarOpen && <span>Data</span>}
                               </Link>
                             </SidebarMenuButton>

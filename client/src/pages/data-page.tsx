@@ -11,7 +11,10 @@ import {
   ResponsiveContainer,
   Line,
   ComposedChart,
-  Legend
+  Legend,
+  PieChart,
+  Pie,
+  Cell
 } from "recharts";
 import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } from "date-fns";
 
@@ -21,6 +24,8 @@ interface MonthlyData {
   cumulativeVolume: number;
   transactionCount: number;
 }
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function DataPage() {
   const { user } = useAuth();
@@ -84,6 +89,22 @@ export default function DataPage() {
       };
     });
 
+  // Example data for deal stages (you would need to calculate this from your transactions)
+  const dealStagesData = [
+    { name: 'Prospect', value: 4 },
+    { name: 'Active Listing', value: 6 },
+    { name: 'Live Listing', value: 3 },
+    { name: 'Mutual Acceptance', value: 2 },
+    { name: 'Closing in 1 Week', value: 1 }
+  ];
+
+  // Calculate activity data (you would need to adjust this based on your actual data)
+  const activityData = [
+    { month: 'Feb', meetings: 2, calls: 2 },
+    { month: 'Mar', meetings: 1, calls: 0 },
+    { month: 'Apr', meetings: 0, calls: 0 }
+  ];
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -96,6 +117,7 @@ export default function DataPage() {
   const totalTransactions = chartData.reduce((sum, data) => sum + data.transactionCount, 0);
   const totalVolume = chartData.reduce((sum, data) => sum + data.totalVolume, 0);
   const averageDealSize = totalTransactions > 0 ? totalVolume / totalTransactions : 0;
+  const winRate = 65; // Example win rate - calculate from actual data
 
   if (!user || user.role !== "agent") {
     return (
@@ -136,7 +158,7 @@ export default function DataPage() {
     <main className="container mx-auto px-4 py-8">
       <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <Card className="p-6">
           <h3 className="text-sm font-medium text-muted-foreground mb-2">Total Volume</h3>
           <p className="text-2xl font-bold">{formatCurrency(totalVolume)}</p>
@@ -149,67 +171,134 @@ export default function DataPage() {
           <h3 className="text-sm font-medium text-muted-foreground mb-2">Average Deal Size</h3>
           <p className="text-2xl font-bold">{formatCurrency(averageDealSize)}</p>
         </Card>
+        <Card className="p-6">
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Win Rate</h3>
+          <p className="text-2xl font-bold">{winRate}%</p>
+        </Card>
       </div>
 
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Monthly Sales Performance</h3>
-        <div className="h-[400px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 20, right: 30, bottom: 60, left: 70 }}>
-              <XAxis 
-                dataKey="month" 
-                angle={-45} 
-                textAnchor="end" 
-                height={60}
-              />
-              <YAxis 
-                yAxisId="left"
-                tickFormatter={formatCurrency}
-                label={{ 
-                  value: 'Monthly Volume', 
-                  angle: -90, 
-                  position: 'insideLeft',
-                  offset: -60
-                }}
-              />
-              <YAxis 
-                yAxisId="right"
-                orientation="right"
-                tickFormatter={formatCurrency}
-                label={{ 
-                  value: 'Cumulative Volume', 
-                  angle: 90, 
-                  position: 'insideRight',
-                  offset: -70
-                }}
-              />
-              <Tooltip 
-                formatter={(value: number, name: string) => {
-                  if (name === "transactionCount") return [value, "Transactions"];
-                  return [formatCurrency(value), name === "totalVolume" ? "Monthly Volume" : "Cumulative Volume"];
-                }}
-                labelFormatter={(label) => `Month: ${label}`}
-              />
-              <Legend />
-              <Bar 
-                yAxisId="left"
-                dataKey="totalVolume" 
-                fill="hsl(var(--primary))" 
-                name="Monthly Volume"
-              />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="cumulativeVolume"
-                stroke="#16a34a"
-                strokeWidth={2}
-                dot={false}
-                name="Cumulative Volume"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Monthly Sales Performance</h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData} margin={{ top: 20, right: 30, bottom: 60, left: 70 }}>
+                <XAxis 
+                  dataKey="month" 
+                  angle={-45} 
+                  textAnchor="end" 
+                  height={60}
+                />
+                <YAxis 
+                  yAxisId="left"
+                  tickFormatter={formatCurrency}
+                  label={{ 
+                    value: 'Monthly Volume', 
+                    angle: -90, 
+                    position: 'insideLeft',
+                    offset: -60
+                  }}
+                />
+                <YAxis 
+                  yAxisId="right"
+                  orientation="right"
+                  tickFormatter={formatCurrency}
+                  label={{ 
+                    value: 'Cumulative Volume', 
+                    angle: 90, 
+                    position: 'insideRight',
+                    offset: -70
+                  }}
+                />
+                <Tooltip 
+                  formatter={(value: number, name: string) => {
+                    if (name === "transactionCount") return [value, "Transactions"];
+                    return [formatCurrency(value), name === "totalVolume" ? "Monthly Volume" : "Cumulative Volume"];
+                  }}
+                  labelFormatter={(label) => `Month: ${label}`}
+                />
+                <Legend />
+                <Bar 
+                  yAxisId="left"
+                  dataKey="totalVolume" 
+                  fill="hsl(var(--primary))" 
+                  name="Monthly Volume"
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="cumulativeVolume"
+                  stroke="#16a34a"
+                  strokeWidth={2}
+                  dot={false}
+                  name="Cumulative Volume"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Deal Stages</h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={dealStagesData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {dealStagesData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Activities Completed</h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={activityData}>
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="meetings" name="Meetings" fill="#8884d8" />
+                <Bar dataKey="calls" name="Calls" fill="#82ca9d" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Deal Progress</h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dealStagesData}>
+                <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="value" fill="hsl(var(--primary))">
+                  {dealStagesData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
     </main>
   );
 }
