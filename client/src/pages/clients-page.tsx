@@ -607,14 +607,12 @@ export default function ClientsPage() {
                                       return colors[colorHash(label) % colors.length];
                                     };
 
-                                    const labelColor = getColorForLabel(label);
+                                    const labelColor = existingLabelsWithColors.get(label) || getColorForLabel(label);
                                     
-                                    if (!existingLabelsWithColors.has(label) && availableColors.length > 0) {
-                                      form.setValue('labelColors', {
-                                        ...(form.getValues('labelColors') || {}),
-                                        [label]: labelColor
-                                      });
-                                    }
+                                    form.setValue('labelColors', {
+                                      ...(form.getValues('labelColors') || {}),
+                                      [label]: labelColor
+                                    });
                                     
                                     return (
                                       <span
