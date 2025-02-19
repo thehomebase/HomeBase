@@ -167,16 +167,15 @@ export default function TransactionsPage() {
   return (
     <main
       className={cn(
-        "relative container mx-auto px-2 py-4 overflow-x-hidden",
+        "relative px-2 py-4 overflow-x-hidden",
         isMobile
           ? "w-full max-w-full"
           : "w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full"
       )}
     >
-      <div className="container space-y-4">
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1 dark:bg-gray-800/50">
+          <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
             <Toggle
               pressed={view === 'list'}
               onPressedChange={() => setView('list')}
@@ -356,11 +355,11 @@ export default function TransactionsPage() {
             </DialogContent>
           </Dialog>
         )}
-      </div>
+      
 
       <div className="flex-1 w-full bg-background">
         {view === 'board' ? (
-          <div className="min-w-0 pl-0 py-4">
+          <div className="min-w-0 py-4">
             <KanbanBoard 
               transactions={filteredTransactions} 
               onDeleteTransaction={handleDeleteTransaction}
