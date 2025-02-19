@@ -1,0 +1,53 @@
+If you prefer not to rely solely on Tailwind breakpoints, you can enhance useIsMobile to detect specific device widths or orientations and apply custom styles programmatically. For example:
+jsx
+import { useEffect, useState } from 'react';
+
+const useDeviceSize = () => {
+  const [width, setWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Define custom device categories
+  if (width < 360) return 'mobile-xs'; // Very small mobiles
+  if (width < 375) return 'mobile-sm'; // iPhone SE, etc.
+  if (width < 390) return 'mobile-md'; // iPhone 12/13/14
+  if (width < 430) return 'mobile-lg'; // iPhone 14 Pro
+  if (width < 600) return 'tablet-sm'; // Large phones in landscape
+  if (width < 768) return 'tablet-md'; // Smaller tablets
+  return 'desktop'; // Non-mobile
+};
+
+const isMobile = useDeviceSize() !== 'desktop';
+
+export default function YourComponent() {
+  const deviceSize = useDeviceSize();
+
+  return (
+    <main
+      className={cn(
+        "relative w-full py-4 overflow-x-hidden",
+        isMobile
+          ? {
+              'px-2': deviceSize === 'mobile-xs',
+              'px-4': deviceSize === 'mobile-sm',
+              'px-6': deviceSize === 'mobile-md',
+              'px-8': deviceSize === 'mobile-lg',
+              'px-10': deviceSize === 'tablet-sm',
+              'px-12': deviceSize === 'tablet-md',
+            }
+          : "max-w-screen-xl mx-auto px-2"
+      )}
+    >
+      <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
+      <div className="w-full flex items-center gap-2">
+        <div className="w-full flex items-center gap-2 bg-muted/50 rounded-lg p-1 dark:bg-gray-800/50">
+          <Toggle
+            pressed={view === 'list'}
+            onPressedChange={() => setView('list')}
+            aria-label="List view"
+            className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
+          >

@@ -356,7 +356,7 @@ export default function TransactionsPage() {
 
       <div className="flex-1 w-full bg-background">
         {view === 'board' ? (
-          <div className="min-w-0 py-4">
+          <div className="min-w-0 w-full py-4">
             <KanbanBoard 
               transactions={filteredTransactions} 
               onDeleteTransaction={handleDeleteTransaction}
