@@ -603,11 +603,15 @@ export default function ClientsPage() {
                                       'bg-teal-100 text-teal-800'
                                     ];
                                     
-                                    const getColorForLabel = (label: string) => {
-                                      return colors[colorHash(label) % colors.length];
+                                    const usedColors = new Set(Array.from(existingLabelsWithColors.values()));
+                                    const availableColors = colors.filter(color => !usedColors.has(color));
+                                    
+                                    const getColorForLabel = () => {
+                                      if (availableColors.length === 0) return colors[0];
+                                      return availableColors[0];
                                     };
 
-                                    const labelColor = existingLabelsWithColors.get(label) || getColorForLabel(label);
+                                    const labelColor = existingLabelsWithColors.get(label) || getColorForLabel();
                                     
                                     form.setValue('labelColors', {
                                       ...(form.getValues('labelColors') || {}),
