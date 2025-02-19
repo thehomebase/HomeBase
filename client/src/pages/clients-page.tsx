@@ -177,9 +177,32 @@ export default function ClientsPage() {
   const ClientTable = ({ clients }: { clients: Client[] }) => {
     const [editingCell, setEditingCell] = useState<{id: number, field: string} | null>(null);
     const [editValue, setEditValue] = useState("");
+    const [clientToDelete, setClientToDelete] = useState<number | null>(null);
+    const { toast } = useToast();
     const { refetch } = useQuery<Client[]>({
       queryKey: ["/api/clients"],
-      enabled: false, // Initially disabled
+      enabled: false,
+    });
+
+    const deleteClientMutation = useMutation({
+      mutationFn: async (clientId: number) => {
+        const response = await apiRequest("DELETE", `/api/clients/${clientId}`);
+        if (!response.ok) throw new Error("Failed to delete client");
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+        toast({
+          title: "Success",
+          description: "Client deleted successfully",
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Error",
+          description: "Failed to delete client",
+          variant: "destructive",
+        });
+      },
     });
 
     const handleEditClick = (client: Client, field: string) => {
@@ -229,6 +252,7 @@ export default function ClientsPage() {
                 <TableHead className="py-3 font-semibold">Current Address</TableHead>
                 <TableHead className="py-3 font-semibold">Phone</TableHead>
                 <TableHead className="py-3 font-semibold">Labels</TableHead>
+                <TableHead className="py-3 font-semibold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -312,8 +336,45 @@ export default function ClientsPage() {
                       )}
                     </TableCell>
                   ))}
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setClientToDelete(client.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
+              <AlertDialog open={clientToDelete !== null} onOpenChange={() => setClientToDelete(null)}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Client</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you would like to remove this client? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        if (clientToDelete) {
+                          deleteClientMutation.mutate(clientToDelete);
+                          setClientToDelete(null);
+                        }
+                      }}
+                      className="bg-destructive hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               {clients.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground">
