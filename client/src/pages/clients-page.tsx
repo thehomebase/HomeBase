@@ -292,53 +292,24 @@ export default function ClientsPage() {
                            setLocation(`/clients/${client.id}`) : 
                            handleEditClick(client, field)
                          }
-                         onMouseEnter={(e) => {
-                           if (field === 'lastName' || field === 'firstName') {
-                             e.currentTarget.title = "Click to view details, hover to edit";
-                           }
-                         }}
                        >
-                         {field === 'labels' && client.labels && Array.isArray(client.labels) ? (
+                         {field === 'labels' ? (
                            <div className="flex flex-wrap gap-1">
-                             {client.labels.map((label, index) => {
-                               const getLabelColor = (index: number) => {
-                                 const colors = [
-                                   'bg-blue-100 text-blue-800',
-                                   'bg-red-100 text-red-800',
-                                   'bg-green-100 text-green-800',
-                                   'bg-yellow-100 text-yellow-800',
-                                   'bg-orange-100 text-orange-800',
-                                   'bg-purple-100 text-purple-800'
-                                 ];
-                                 return colors[index % colors.length];
-                               };
-                               return (
+                             {Array.isArray(client.labels) && client.labels.length > 0 ? (
+                               client.labels.map((label, index) => (
                                  <span
                                    key={label}
-                                   className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${getLabelColor(index)}`}
+                                   className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${getLabelColor(label, index)}`}
                                  >
                                    {label}
                                  </span>
-                               );
-                             })}
-                           </div>
-                         ) : field === 'labels' ? (
-                           <div className="text-muted-foreground text-sm">No labels</div>
-                         ) : (
-                           <>
-                             {client[field as keyof Client]?.toString() || ''}
-                             {(field === 'lastName' || field === 'firstName') && (
-                               <button
-                                 className="opacity-0 group-hover:opacity-100 absolute right-2 top-1/2 -translate-y-1/2"
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   handleEditClick(client, field);
-                                 }}
-                               >
-                                 ✎
-                               </button>
+                               ))
+                             ) : (
+                               <div className="text-muted-foreground text-sm">No labels</div>
                              )}
-                           </>
+                           </div>
+                         ) : (
+                           client[field as keyof Client]?.toString() || ''
                          )}
                        </div>
                      )}
@@ -410,6 +381,18 @@ export default function ClientsPage() {
    );
  };
 
+ const getLabelColor = (label: string, index: number) => {
+  const allColors = [
+    'bg-blue-100 text-blue-800',
+    'bg-red-100 text-red-800',
+    'bg-green-100 text-green-800',
+    'bg-yellow-100 text-yellow-800',
+    'bg-orange-100 text-orange-800',
+    'bg-purple-100 text-purple-800'
+  ];
+  return allColors[index % allColors.length];
+};
+
  return (
    <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full w-full ml-[5px] relative container mx-auto px-4 py-8">
      <header className="border-b">
@@ -466,7 +449,7 @@ export default function ClientsPage() {
                            <FormItem>
                              <FormLabel>Email</FormLabel>
                              <FormControl>
-                               <Input type="email" {...field} />
+                               <Input type="email" {...field} value={field.value || ""} />
                              </FormControl>
                              <FormMessage />
                            </FormItem>
@@ -479,7 +462,7 @@ export default function ClientsPage() {
                            <FormItem>
                              <FormLabel>Phone</FormLabel>
                              <FormControl>
-                               <Input {...field} />
+                               <Input {...field} value={field.value || ""} />
                              </FormControl>
                              <FormMessage />
                            </FormItem>
@@ -493,7 +476,7 @@ export default function ClientsPage() {
                          <FormItem>
                            <FormLabel>Address</FormLabel>
                            <FormControl>
-                             <Input {...field} />
+                             <Input {...field} value={field.value || ""} />
                            </FormControl>
                            <FormMessage />
                          </FormItem>
@@ -527,6 +510,7 @@ export default function ClientsPage() {
                            <FormControl>
                              <textarea
                                {...field}
+                               value={field.value || ""}
                                className="w-full px-3 py-2 border rounded-md"
                                rows={3}
                              />
@@ -539,7 +523,6 @@ export default function ClientsPage() {
                        control={form.control}
                        name="labels"
                        render={({ field }) => {
-                         // Get unique existing labels from all clients
                          const existingLabels = Array.from(new Set(
                            clients.flatMap(client => client.labels || [])
                          ));
@@ -583,54 +566,8 @@ export default function ClientsPage() {
                                  />
                                </FormControl>
                                <div className="flex flex-wrap gap-2">
-                                 {field.value?.map((label: string) => {
-                                   // Get all existing labels and their colors
-                                   const existingLabelsWithColors = new Map(
-                                     clients.flatMap(client => 
-                                       (client.labels || []).map(label => [label, (client as any).labelColors?.[label]])
-                                     )
-                                   );
-
-                                   const colorHash = (str: string) => {
-                                     let hash = 0;
-                                     for (let i = 0; i < str.length; i++) {
-                                       hash = str.charCodeAt(i) + ((hash << 5) - hash);
-                                     }
-                                     return Math.abs(hash);
-                                   };
-
-                                   const allColors = [
-                                     'bg-blue-100 text-blue-800',
-                                     'bg-red-100 text-red-800',
-                                     'bg-green-100 text-green-800',
-                                     'bg-yellow-100 text-yellow-800',
-                                     'bg-orange-100 text-orange-800',
-                                     'bg-purple-100 text-purple-800'
-                                   ];
-
-                                   // Get used colors from existing labels
-                                   const usedColors = Array.from(existingLabelsWithColors.values());
-                                   const availableColors = allColors.filter(color => !usedColors.includes(color));
-
-                                   const getLabelColor = (labelText: string, index: number) => {
-                                     const allColors = [
-                                       'bg-blue-100 text-blue-800',
-                                       'bg-red-100 text-red-800',
-                                       'bg-green-100 text-green-800',
-                                       'bg-yellow-100 text-yellow-800',
-                                       'bg-orange-100 text-orange-800',
-                                       'bg-purple-100 text-purple-800'
-                                     ];
-                                     return allColors[index % allColors.length];
-                                   };
-
-                                   const labelColor = getLabelColor(label, field.value.indexOf(label));
-
-                                   form.setValue('labelColors', {
-                                     ...(form.getValues('labelColors') || {}),
-                                     [label]: labelColor
-                                   });
-
+                                 {(field.value || []).map((label: string, index: number) => {
+                                   const labelColor = getLabelColor(label, index);
                                    return (
                                      <span
                                        key={label}
@@ -640,7 +577,7 @@ export default function ClientsPage() {
                                        <button
                                          type="button"
                                          onClick={() => {
-                                           field.onChange(field.value.filter((l: string) => l !== label));
+                                           field.onChange((field.value || []).filter((l: string) => l !== label));
                                          }}
                                          className="hover:text-destructive"
                                        >
