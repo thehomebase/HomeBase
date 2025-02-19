@@ -78,9 +78,28 @@ export default function ClientsPage() {
       status: "active",
       notes: "",
       agentId: user?.id || 0,
-      labels: [], // Added labels field to default values
+      labels: [],
     },
   });
+
+  const onSubmit = async (data: InsertClient) => {
+    if (!user?.id) return;
+    
+    try {
+      await createClientMutation.mutateAsync({
+        ...data,
+        agentId: user.id,
+        labels: data.labels || [],
+      });
+      form.reset();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create client",
+        variant: "destructive",
+      });
+    }
+  };
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
