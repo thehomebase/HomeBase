@@ -588,7 +588,7 @@ export default function ClientsPage() {
                                       return Math.abs(hash);
                                     };
                                     
-                                    const colors = [
+                                    const allColors = [
                                       'bg-blue-100 text-blue-800',
                                       'bg-red-100 text-red-800',
                                       'bg-green-100 text-green-800',
@@ -597,7 +597,14 @@ export default function ClientsPage() {
                                       'bg-purple-100 text-purple-800'
                                     ];
                                     
-                                    const labelIndex = Array.from(existingLabelsWithColors.keys()).indexOf(label);
+                                    // Get used colors from existing labels
+                                    const usedColors = Array.from(existingLabelsWithColors.values());
+                                    // Filter out colors that are already used
+                                    const availableColors = allColors.filter(color => !usedColors.includes(color));
+                                    // If no colors are available, restart from the beginning
+                                    const colors = availableColors.length > 0 ? availableColors : allColors;
+                                    
+                                    const labelIndex = 0; // Always use the first available color
                                     const getColorForLabel = () => {
                                       if (labelIndex >= 0) {
                                         return existingLabelsWithColors.get(label);
