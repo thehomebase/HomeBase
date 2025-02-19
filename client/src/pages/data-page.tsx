@@ -10,14 +10,16 @@ import {
   Tooltip, 
   ResponsiveContainer,
   Line,
-  ComposedChart
+  ComposedChart,
+  Legend
 } from "recharts";
-import { format, parse, startOfYear, eachMonthOfInterval, endOfYear } from "date-fns";
+import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } from "date-fns";
 
 interface MonthlyData {
   month: string;
   totalVolume: number;
   cumulativeVolume: number;
+  transactionCount: number;
 }
 
 export default function DataPage() {
@@ -25,17 +27,7 @@ export default function DataPage() {
 
   const { data: transactions = [], isLoading, error } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
-    queryFn: async () => {
-      const response = await fetch("/api/transactions");
-      if (!response.ok) {
-        throw new Error("Failed to fetch transactions");
-      }
-      return response.json();
-    },
-    enabled: !!user,
-    refetchInterval: 5000, // Refetch every 5 seconds
-    staleTime: 1000, // Consider data stale after 1 second
-    refetchOnWindowFocus: true, // Refetch when window regains focus
+    enabled: !!user && user.role === "agent",
   });
 
   // Get all months in current year
@@ -50,21 +42,26 @@ export default function DataPage() {
     acc[monthKey] = {
       month: monthKey,
       totalVolume: 0,
-      cumulativeVolume: 0
+      cumulativeVolume: 0,
+      transactionCount: 0
     };
     return acc;
   }, {});
 
   // Process transactions to get monthly totals
   const monthlyData = transactions
-    .filter(t => t.status === "closed" && t.closingDate && t.contractPrice)
+    .filter(t => {
+      if (!t.closingDate || !t.contractPrice) return false;
+      const closeDate = new Date(t.closingDate);
+      return t.status === "closed" && getYear(closeDate) === currentYear;
+    })
     .reduce((acc, transaction) => {
-      const date = transaction.closingDate ? new Date(transaction.closingDate) : null;
-      if (!date || date.getFullYear() !== currentYear) return acc;
-
+      const date = new Date(transaction.closingDate!);
       const monthKey = format(date, 'MMM');
-      if (acc[monthKey] && transaction.contractPrice) {
-        acc[monthKey].totalVolume += transaction.contractPrice;
+
+      if (acc[monthKey]) {
+        acc[monthKey].totalVolume += transaction.contractPrice || 0;
+        acc[monthKey].transactionCount += 1;
       }
       return acc;
     }, initialMonthlyData);
@@ -82,7 +79,8 @@ export default function DataPage() {
       return {
         month,
         totalVolume: data.totalVolume,
-        cumulativeVolume: runningTotal
+        cumulativeVolume: runningTotal,
+        transactionCount: data.transactionCount
       };
     });
 
@@ -94,6 +92,23 @@ export default function DataPage() {
       maximumFractionDigits: 1,
     }).format(value);
   };
+
+  const totalTransactions = chartData.reduce((sum, data) => sum + data.transactionCount, 0);
+  const totalVolume = chartData.reduce((sum, data) => sum + data.totalVolume, 0);
+  const averageDealSize = totalTransactions > 0 ? totalVolume / totalTransactions : 0;
+
+  if (!user || user.role !== "agent") {
+    return (
+      <main className="container mx-auto px-4 py-8">
+        <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
+        <Card className="p-6">
+          <p className="text-center text-muted-foreground">
+            This page is only available to agents.
+          </p>
+        </Card>
+      </main>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -117,30 +132,27 @@ export default function DataPage() {
     );
   }
 
-  const closedTransactions = transactions.filter(t => 
-    t.status === "closed" && t.closingDate && t.contractPrice
-  );
-
-  if (!user || !closedTransactions.length) {
-    return (
-      <main className="container mx-auto px-4 py-8">
-        <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
-        <Card className="p-6">
-          <p className="text-center text-muted-foreground">
-            {closedTransactions.length === 0 
-              ? "No closed transactions available."
-              : "Loading transaction data..."}
-          </p>
-        </Card>
-      </main>
-    );
-  }
-
   return (
     <main className="container mx-auto px-4 py-8">
       <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <Card className="p-6">
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Total Volume</h3>
+          <p className="text-2xl font-bold">{formatCurrency(totalVolume)}</p>
+        </Card>
+        <Card className="p-6">
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Total Transactions</h3>
+          <p className="text-2xl font-bold">{totalTransactions}</p>
+        </Card>
+        <Card className="p-6">
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Average Deal Size</h3>
+          <p className="text-2xl font-bold">{formatCurrency(averageDealSize)}</p>
+        </Card>
+      </div>
+
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Monthly Sales Volume & Cumulative Total</h3>
+        <h3 className="text-lg font-semibold mb-4">Monthly Sales Performance</h3>
         <div className="h-[400px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 20, right: 30, bottom: 60, left: 70 }}>
@@ -172,13 +184,17 @@ export default function DataPage() {
                 }}
               />
               <Tooltip 
-                formatter={(value: number) => formatCurrency(value)}
+                formatter={(value: number, name: string) => {
+                  if (name === "transactionCount") return [value, "Transactions"];
+                  return [formatCurrency(value), name === "totalVolume" ? "Monthly Volume" : "Cumulative Volume"];
+                }}
                 labelFormatter={(label) => `Month: ${label}`}
               />
+              <Legend />
               <Bar 
                 yAxisId="left"
                 dataKey="totalVolume" 
-                fill="hsl(var(--foreground))" 
+                fill="hsl(var(--primary))" 
                 name="Monthly Volume"
               />
               <Line
