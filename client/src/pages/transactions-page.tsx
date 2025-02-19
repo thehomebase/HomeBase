@@ -164,11 +164,23 @@ export default function TransactionsPage() {
 
   const isMobile = useIsMobile();
 
+  const deviceSize = useDeviceSize();
+  
   return (
     <main
       className={cn(
-        "relative ml-[5px] py-4 overflow-x-hidden w-full",
-             )}
+        "relative w-full py-4 overflow-x-hidden",
+        isMobile
+          ? {
+              'px-2': deviceSize === 'mobile-xs',
+              'px-4': deviceSize === 'mobile-sm',
+              'px-6': deviceSize === 'mobile-md',
+              'px-8': deviceSize === 'mobile-lg',
+              'px-10': deviceSize === 'tablet-sm',
+              'px-12': deviceSize === 'tablet-md',
+            }[deviceSize]
+          : "max-w-screen-xl mx-auto px-2"
+      )}
     >
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
         <div className="flex items-center gap-2">
