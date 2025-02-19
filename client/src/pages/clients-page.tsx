@@ -295,18 +295,14 @@ export default function ClientsPage() {
                        >
                          {field === 'labels' ? (
                            <div className="flex flex-wrap gap-1">
-                             {Array.isArray(client.labels) && client.labels.length > 0 ? (
-                               client.labels.map((label, index) => (
-                                 <span
-                                   key={label}
-                                   className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${getLabelColor(label, index)}`}
-                                 >
-                                   {label}
-                                 </span>
-                               ))
-                             ) : (
-                               <div className="text-muted-foreground text-sm">No labels</div>
-                             )}
+                             {client.labels && Array.isArray(client.labels) && client.labels.map((label, index) => (
+                               <span
+                                 key={label}
+                                 className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${getLabelColor(label, index)}`}
+                               >
+                                 {label}
+                               </span>
+                             ))}
                            </div>
                          ) : (
                            client[field as keyof Client]?.toString() || ''
