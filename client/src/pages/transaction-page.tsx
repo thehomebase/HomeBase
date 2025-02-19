@@ -275,7 +275,7 @@ export default function TransactionPage() {
   return (
     <div>
       <header className="border-b">
-        <div className="w-full px-6 py-4">
+        <div className="w-full px-3 sm:px-6 py-2 sm:py-4">
           <div className="flex items-center gap-4">
             <Link href="/transactions">
               <Button variant="ghost" size="icon">
@@ -307,7 +307,7 @@ export default function TransactionPage() {
         </div>
       </header>
 
-      <main className="w-full p-6">
+      <main className="w-full p-3 sm:p-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex justify-between items-center mb-4">
@@ -333,7 +333,7 @@ export default function TransactionPage() {
               )}
             </div>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Transaction Type</p>
                   <p className="font-medium capitalize">
@@ -594,7 +594,7 @@ export default function TransactionPage() {
         <Card className="mt-6">
           <CardContent className="p-6">
             <Tabs defaultValue="progress">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 gap-2">
                 <TabsTrigger value="progress">
                   <ClipboardCheck className="h-4 w-4 mr-2" />
                   Progress
