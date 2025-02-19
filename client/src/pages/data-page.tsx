@@ -171,12 +171,12 @@ export default function DataPage() {
 
   return (
     <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full w-full ml-[5px] relative container mx-auto px-4 py-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+      <div className="flex flex-col gap-4 mb-8">
         <h2 className="text-2xl font-bold">Sales Data Analysis</h2>
-        <div className="flex gap-2 mt-4 sm:mt-0">
+        <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
+              <Button variant="outline" className="w-[180px] justify-start text-left font-normal">
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {startDate ? format(new Date(startDate), 'PP') : 'Start Date'}
               </Button>
@@ -191,7 +191,7 @@ export default function DataPage() {
           </Popover>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
+              <Button variant="outline" className="w-[180px] justify-start text-left font-normal">
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {endDate ? format(new Date(endDate), 'PP') : 'End Date'}
               </Button>
@@ -205,7 +205,7 @@ export default function DataPage() {
             </PopoverContent>
           </Popover>
           <select
-            className="h-9 rounded-md border bg-background px-3"
+            className="h-9 rounded-md border bg-background px-3 w-[180px]"
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
           >
