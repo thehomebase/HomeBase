@@ -615,7 +615,7 @@ export default function ClientsPage() {
                                     return (
                                       <span
                                         key={label}
-                                        className={`px-2 py-1 ${colors[colorIndex]} rounded-full text-sm flex items-center gap-1`}
+                                        className={`px-2 py-1 ${labelColor} rounded-full text-sm flex items-center gap-1`}
                                       >
                                       {label}
                                       <button
