@@ -167,9 +167,8 @@ export default function TransactionsPage() {
   return (
     <main
       className={cn(
-        "relative px-4 md:px-8 py-4 overflow-x-hidden w-full",
-        !isMobile && "max-w-[calc(100vw-230px)]"
-      )}
+        "relative ml-[5px] py-4 overflow-x-hidden w-full",
+             )}
     >
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
         <div className="flex items-center gap-2">
