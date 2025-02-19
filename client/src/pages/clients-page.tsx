@@ -312,7 +312,7 @@ export default function ClientsPage() {
                                 return (
                                   <span
                                     key={index}
-                                    className={`px-2 py-1 rounded-full text-xs ${colors[colorIndex]} dark:bg-opacity-20`}
+                                    className={`inline-flex items-center px-2 py-1 m-1 rounded-full text-xs ${colors[colorIndex]} dark:bg-opacity-20`}
                                   >
                                     {label}
                                   </span>
@@ -566,7 +566,7 @@ export default function ClientsPage() {
                                     type="text"
                                     placeholder="Add new label"
                                     onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
+                                      if (e.key === ' ' || e.key === 'Enter') {
                                         e.preventDefault();
                                         const value = e.currentTarget.value.trim();
                                         if (value && !field.value?.includes(value)) {
