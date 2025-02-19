@@ -167,7 +167,7 @@ export default function TransactionsPage() {
   return (
     <main
       className={cn(
-        "relative px-2 xs:px-2 sm:px-4 md:px-8 lg:px-8 py-4 overflow-x-hidden w-full",
+        "relative px-4 md:px-8 py-4 overflow-x-hidden w-full",
         !isMobile && "max-w-[calc(100vw-230px)]"
       )}
     >
