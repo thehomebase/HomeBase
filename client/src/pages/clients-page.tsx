@@ -89,6 +89,10 @@ export default function ClientsPage() {
       await createClientMutation.mutateAsync({
         ...data,
         agentId: user.id,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        labels: data.labels || [],
+        agentId: user.id,
         labels: data.labels || [],
       });
       form.reset();
