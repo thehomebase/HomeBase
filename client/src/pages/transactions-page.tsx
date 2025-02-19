@@ -1,6 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useDeviceSize } from "@/hooks/use-device-size";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -165,23 +164,11 @@ export default function TransactionsPage() {
 
   const isMobile = useIsMobile();
 
-  const deviceSize = useDeviceSize();
-  
   return (
     <main
       className={cn(
-        "relative py-4 overflow-x-hidden",
-        isMobile
-          ? {
-              'px-2': deviceSize === 'mobile-xs',
-              'px-4': deviceSize === 'mobile-sm',
-              'px-6': deviceSize === 'mobile-md',
-              'px-8': deviceSize === 'mobile-lg',
-              'px-10': deviceSize === 'tablet-sm',
-              'px-12': deviceSize === 'tablet-md',
-            }[deviceSize]
-          : "w-[calc(100vw-230px)] px-4"
-      )}
+        "relative ml-[5px] py-4 overflow-x-hidden w-full",
+             )}
     >
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
         <div className="flex items-center gap-2">
@@ -369,7 +356,7 @@ export default function TransactionsPage() {
 
       <div className="flex-1 w-full bg-background">
         {view === 'board' ? (
-          <div className="min-w-0 w-full py-4">
+          <div className="min-w-0 py-4">
             <KanbanBoard 
               transactions={filteredTransactions} 
               onDeleteTransaction={handleDeleteTransaction}
