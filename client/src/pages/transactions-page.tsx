@@ -167,7 +167,7 @@ export default function TransactionsPage() {
   return (
     <main
       className={cn(
-        "relative ml-[5px] py-4 overflow-x-hidden w-full",
+        "ml-[5px] py-4",
              )}
     >
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
