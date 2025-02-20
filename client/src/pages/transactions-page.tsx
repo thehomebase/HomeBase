@@ -245,6 +245,13 @@ export default function TransactionsPage() {
           </div>
         </div>
 
+                  </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
                   <FormField
                     control={form.control}
                     name="address"
