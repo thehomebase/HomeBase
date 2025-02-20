@@ -165,8 +165,8 @@ export default function TransactionsPage() {
   const isMobile = useIsMobile();
 
   return (
-    <main className="w-full ml-[5px] relative">
-      <div className="min-h-screen bg-background overflow-x-hidden px-2 sm:px-4 py-8 w-full">
+    <main className="ml-[5px] relative w-full max-w-full">
+      <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 gap-4 mx-auto bg-background overflow-x-hidden px-2 sm:px-4 py-8">
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
@@ -176,7 +176,7 @@ export default function TransactionsPage() {
               aria-label="List view"
               className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
             >
-              <List className="h-4 w-4" />
+              <List className="h-4" />
             </Toggle>
             <Toggle
               pressed={view === 'board'}
@@ -351,7 +351,7 @@ export default function TransactionsPage() {
         )}
 
 
-      <div className="flex-1 w-full max-w-[2000px] mx-auto bg-background">
+      <div className="flex-1 w-full bg-background">
         {view === 'board' ? (
           <div className="min-w-0 py-4">
             <KanbanBoard 

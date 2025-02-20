@@ -143,7 +143,7 @@ function KanbanColumn({
   });
 
   return (
-    <div ref={setNodeRef} className="flex-1 relative flex flex-col w-full bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50">
+    <div ref={setNodeRef} className="bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50">
       <div className="flex justify-between items-center mb-2">
         <h3 className="font-semibold text-sm dark:text-white">{title}</h3>
         <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
