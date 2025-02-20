@@ -165,8 +165,8 @@ export default function TransactionsPage() {
   const isMobile = useIsMobile();
 
   return (
-    <main className="relative w-full">
-      <div className="min-h-screen bg-background px-4 py-8">
+    <main className="ml-[5px] relative w-full max-w-full">
+      <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2 gap-4 mx-auto bg-background overflow-x-hidden px-2 sm:px-4 py-8">
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
