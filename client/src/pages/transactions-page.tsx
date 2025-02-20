@@ -167,7 +167,7 @@ export default function TransactionsPage() {
   return (
     <main
       className={cn(
-        "ml-[5px] py-4",
+        "w-full max-w-[100vw] lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] ml-[5px] relative container mx-auto px-4 py-8 overflow-hidden",
              )}
     >
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
@@ -352,7 +352,7 @@ export default function TransactionsPage() {
             </DialogContent>
           </Dialog>
         )}
-      
+
 
       <div className="flex-1 w-full bg-background">
         {view === 'board' ? (

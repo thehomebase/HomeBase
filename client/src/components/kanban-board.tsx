@@ -260,8 +260,8 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className={`${isMobile ? 'w-full' : 'overflow-x-auto w-full'}`}>
-        <div className={`${isMobile ? 'flex flex-col gap-4' : 'flex gap-4 w-full'} pb-4`}>
+      <div className="w-full overflow-x-auto">
+        <div className={`${isMobile ? 'flex flex-col' : 'flex'} gap-4 min-w-fit pb-4`}>
           {statusColumns.map((column) => (
             <KanbanColumn 
               key={column.id} 
