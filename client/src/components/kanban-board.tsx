@@ -143,7 +143,7 @@ function KanbanColumn({
   });
 
   return (
-    <div ref={setNodeRef} className="bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50 min-w-[250px] flex-1">
+    <div ref={setNodeRef} className="bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50 flex-1">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-sm dark:text-white">{title}</h3>
         <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
@@ -260,8 +260,8 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="w-full overflow-x-auto">
-        <div className={`${isMobile ? 'flex flex-col w-full' : 'flex'} gap-4 pb-4 min-w-fit`}>
+      <div className="w-full">
+        <div className={`${isMobile ? 'flex flex-col w-full' : 'flex'} gap-4 pb-4`}>
           {statusColumns.map((column) => (
             <KanbanColumn 
               key={column.id} 
