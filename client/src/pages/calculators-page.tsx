@@ -94,7 +94,7 @@ export default function CalculatorsPage() {
 
         <TabsContent value="mortgage" className="w-full overflow-visible px-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
-            <div className="space-y-6 w-full p-6 border rounded-lg">
+            <div className="space-y-6 w-full">
               <div className="space-y-4">
                 <label className="text-sm font-medium">Purchase Price</label>
                 <Input
@@ -176,7 +176,7 @@ export default function CalculatorsPage() {
               </div>
             </div>
 
-            <div className="bg-black text-white p-6 lg:p-8 rounded-lg h-fit border-2 border-primary">
+            <div className="bg-black text-white p-6 lg:p-8 rounded-lg h-fit">
               <div className="text-center mb-8">
                 <div className="text-5xl font-bold">${monthlyPayment.total.toFixed(2)}</div>
                 <div className="text-sm opacity-80 mt-2">MONTHLY PAYMENT</div>
@@ -202,7 +202,7 @@ export default function CalculatorsPage() {
               </div>
             </div>
 
-            <div className="bg-background border-2 rounded-lg p-6 mt-6">
+            <div className="bg-background border rounded-lg p-6 mt-6">
               <h3 className="text-lg font-semibold mb-4">Amortization Schedule</h3>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
