@@ -22,6 +22,7 @@ import {
   Cell
 } from "recharts";
 import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } from "date-fns";
+import { useIsMobile } from "@/hooks/use-mobile"; // Added import
 
 interface MonthlyData {
   month: string;
@@ -34,6 +35,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function DataPage() {
   const { user } = useAuth();
+  const isMobile = useIsMobile(); // Added useIsMobile hook usage
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
@@ -306,8 +308,8 @@ export default function DataPage() {
                   data={dealStagesData}
                   cx="50%"
                   cy="50%"
-                  labelLine={!isMobile}
-                  label={!isMobile ? ({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)` : undefined}
+                  labelLine={!isMobile} // Conditional rendering of labelLine
+                  label={!isMobile ? ({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)` : undefined} // Conditional rendering of label
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
