@@ -423,7 +423,7 @@ export default function ClientsPage() {
 };
 
  return (
-   <main className="xs:w-full w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] max-w-full  relative container mx-auto px-2 py-4">
+   <main className="xs:w-full w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] max-w-full ml-[5px] relative container mx-auto px-4 py-8">
      <header className="border-b">
        <div className="container px-4 py-4 space-y-4">
          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
