@@ -78,7 +78,7 @@ export function LoginForm({
               className="w-full"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+          <Button type="submit" className="w-full dark:bg-white dark:text-black" disabled={loginMutation.isPending}>
             Login
           </Button>
         </div>

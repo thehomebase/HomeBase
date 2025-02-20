@@ -165,7 +165,7 @@ export default function TransactionsPage() {
   const isMobile = useIsMobile();
 
   return (
-    <main className="flex-1 min-w-0 overflow-x-auto px-4">
+    <main className="flex-1 min-w-0 overflow-x-hidden px-4">
       <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
         <div className="flex flex-col sm:flex-row flex-grow sm:items-center gap-2 mb-2">
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
@@ -175,7 +175,7 @@ export default function TransactionsPage() {
                 pressed={view === 'list'}
                 onPressedChange={() => setView('list')}
                 aria-label="List view"
-                className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
+                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
               >
                 <List className="h-4" />
               </Toggle>
@@ -183,7 +183,7 @@ export default function TransactionsPage() {
                 pressed={view === 'board'}
                 onPressedChange={() => setView('board')}
                 aria-label="Board view"
-                className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
+                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
               >
                 <LayoutGrid className="h-4 w-4" />
               </Toggle>
@@ -191,7 +191,7 @@ export default function TransactionsPage() {
                 pressed={view === 'table'}
                 onPressedChange={() => setView('table')}
                 aria-label="Table view"
-                className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
+                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
               >
                 <Table2 className="h-4 w-4" />
               </Toggle>
@@ -225,7 +225,7 @@ export default function TransactionsPage() {
         {user?.role === "agent" && (
           <Dialog>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white mb-0">
+              <Button className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white mb-0 mr-64">
                 <Plus className="h-4 w-4 mr-2" />
                 New Transaction
               </Button>
