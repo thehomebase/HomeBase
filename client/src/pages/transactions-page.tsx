@@ -167,16 +167,69 @@ export default function TransactionsPage() {
   return (
     <main className="relative w-full">
       <div className="min-h-screen bg-background px-4 py-8">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
-          {user?.role === "agent" && (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="w-auto bg-primary text-primary-foreground hover:bg-primary/90 dark:text-white">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Transaction
-                </Button>
-              </DialogTrigger>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
+              <Toggle
+                pressed={view === 'list'}
+                onPressedChange={() => setView('list')}
+                aria-label="List view"
+                className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
+              >
+                <List className="h-4" />
+              </Toggle>
+              <Toggle
+                pressed={view === 'board'}
+                onPressedChange={() => setView('board')}
+                aria-label="Board view"
+                className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Toggle>
+              <Toggle
+                pressed={view === 'table'}
+                onPressedChange={() => setView('table')}
+                aria-label="Table view"
+                className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
+              >
+                <Table2 className="h-4 w-4" />
+              </Toggle>
+            </div>
+            <Toggle
+              pressed={theme === 'dark'}
+              onPressedChange={toggleTheme}
+              aria-label="Toggle theme"
+              className="ml-2 hover:text-foreground dark:text-white dark:hover:text-white"
+            >
+              {theme === 'light' ? (
+                <Moon className="h-4 w-4" />
+              ) : (
+                <Sun className="h-4 w-4" />
+              )}
+            </Toggle>
+            <select 
+              className="w-20 h-9 px-3 rounded-md border text-base bg-background"
+              value={selectedYear || ""}
+              onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value, 10) : null)}
+            >
+              <option value="">{new Date().getFullYear()}</option>
+              {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {user?.role === "agent" && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 dark:text-white mb-4">
+                <Plus className="h-4 w-4 mr-2" />
+                New Transaction
+              </Button>
+            </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Create New Transaction</DialogTitle>
@@ -298,58 +351,7 @@ export default function TransactionsPage() {
             </Dialog>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
-            <Toggle
-              pressed={view === 'list'}
-              onPressedChange={() => setView('list')}
-              aria-label="List view"
-              className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
-            >
-              <List className="h-4" />
-            </Toggle>
-            <Toggle
-              pressed={view === 'board'}
-              onPressedChange={() => setView('board')}
-              aria-label="Board view"
-              className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Toggle>
-            <Toggle
-              pressed={view === 'table'}
-              onPressedChange={() => setView('table')}
-              aria-label="Table view"
-              className="data-[state=on]:bg-background data-[state=on]:text-foreground hover:text-foreground dark:text-white dark:hover:text-white"
-            >
-              <Table2 className="h-4 w-4" />
-            </Toggle>
-          </div>
-          <Toggle
-            pressed={theme === 'dark'}
-            onPressedChange={toggleTheme}
-            aria-label="Toggle theme"
-            className="ml-2 hover:text-foreground dark:text-white dark:hover:text-white"
-          >
-            {theme === 'light' ? (
-              <Moon className="h-4 w-4" />
-            ) : (
-              <Sun className="h-4 w-4" />
-            )}
-          </Toggle>
-          <select 
-            className="w-20 h-9 px-3 rounded-md border text-base bg-background"
-            value={selectedYear || ""}
-            onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value, 10) : null)}
-          >
-            <option value="">{new Date().getFullYear()}</option>
-            {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-        </div>
+        
 
         
 
