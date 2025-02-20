@@ -168,7 +168,29 @@ export default function TransactionsPage() {
     <main className="relative w-full overflow-x-hidden ml-2 max-w-[95%]">
       <div className="flex flex-wrap  bg-background relative px-2 py-8">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
-          <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full">
+            <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
+            {user?.role === "agent" && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white">
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Transaction
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create New Transaction</DialogTitle>
+                  </DialogHeader>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit((data) => createTransactionMutation.mutate(data))} className="space-y-4">
+                      {/* Keep existing form content */}
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
               <Toggle
@@ -222,20 +244,7 @@ export default function TransactionsPage() {
             </select>
           </div>
         </div>
-        {user?.role === "agent" && (
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white mb-0">
-                <Plus className="h-4 w-4 mr-2" />
-                New Transaction
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Transaction</DialogTitle>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit((data) => createTransactionMutation.mutate(data))} className="space-y-4">
+        
                   <FormField
                     control={form.control}
                     name="address"
