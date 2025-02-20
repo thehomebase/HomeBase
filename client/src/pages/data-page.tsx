@@ -306,8 +306,8 @@ export default function DataPage() {
                   data={dealStagesData}
                   cx="50%"
                   cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                  labelLine={!isMobile}
+                  label={!isMobile ? ({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)` : undefined}
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
@@ -316,6 +316,15 @@ export default function DataPage() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
+                <Legend
+                  layout="horizontal"
+                  verticalAlign="bottom"
+                  formatter={(value, entry) => {
+                    const item = dealStagesData.find(d => d.name === value);
+                    const percent = item ? (item.value / dealStagesData.reduce((acc, curr) => acc + curr.value, 0) * 100).toFixed(0) : 0;
+                    return isMobile ? `${value} (${percent}%)` : value;
+                  }}
+                />
                 <RechartsTooltip />
               </PieChart>
             </ResponsiveContainer>
