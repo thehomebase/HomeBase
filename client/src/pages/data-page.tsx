@@ -301,7 +301,7 @@ export default function DataPage() {
 
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Deal Stages</h3>
-          <div className="h-[300px] w-full">
+          <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
