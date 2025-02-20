@@ -165,8 +165,8 @@ export default function TransactionsPage() {
   const isMobile = useIsMobile();
 
   return (
-    <main className="relative w-full overflow-x-hidden">
-      <div className="flex flex-wrap  bg-background relative px-2 py-4">
+    <main className="relative w-full overflow-x-hidden ml-2 max-w-[95%]">
+      <div className="flex flex-wrap  bg-background relative px-2 py-8">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
           <div className="flex items-center gap-2">
@@ -225,7 +225,7 @@ export default function TransactionsPage() {
         {user?.role === "agent" && (
           <Dialog>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white mb-0 mt-2">
+              <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white mb-0">
                 <Plus className="h-4 w-4 mr-2" />
                 New Transaction
               </Button>
