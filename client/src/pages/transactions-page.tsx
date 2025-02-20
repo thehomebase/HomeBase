@@ -351,7 +351,7 @@ export default function TransactionsPage() {
         )}
 
 
-      <div className="flex-1 w-full bg-background">
+      <div className="flex-1 w-full max-w-[2000px] mx-auto bg-background">
         {view === 'board' ? (
           <div className="min-w-0 py-4">
             <KanbanBoard 
