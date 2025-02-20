@@ -184,115 +184,7 @@ export default function TransactionsPage() {
                   </DialogHeader>
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit((data) => createTransactionMutation.mutate(data))} className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="address"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Property Address</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="Enter property address" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="type"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Transaction Type</FormLabel>
-                            <FormControl>
-                              <div className="grid grid-cols-2 gap-4">
-                                <Button
-                                  type="button"
-                                  variant={field.value === 'buy' ? 'default' : 'outline'}
-                                  className={`${field.value === 'buy' ? 'bg-green-500 hover:bg-green-600' : ''} dark:text-white`}
-                                  onClick={() => field.onChange('buy')}
-                                >
-                                  Buy
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant={field.value === 'sell' ? 'default' : 'outline'}
-                                  className={`${field.value === 'sell' ? 'bg-red-500 hover:bg-red-600' : ''} dark:text-white`}
-                                  onClick={() => field.onChange('sell')}
-                                >
-                                  Sell
-                                </Button>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="accessCode"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Passkey</FormLabel>
-                            <FormControl>
-                              <Input {...field} type="text" placeholder="Enter passkey (min. 6 characters)" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      {user?.role === "agent" && (
-                        <div className="space-y-4">
-                          <FormField
-                            control={form.control}
-                            name="clientId"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Primary Client</FormLabel>
-                                <FormControl>
-                                  <select 
-                                    className="w-full h-9 px-3 rounded-md border text-base bg-background"
-                                    value={field.value || ""}
-                                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                                  >
-                                    <option value="">Select primary client</option>
-                                    {clients.map((client) => (
-                                      <option key={client.id} value={client.id}>
-                                        {client.firstName} {client.lastName}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="secondaryClientId"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Secondary Client</FormLabel>
-                                <FormControl>
-                                  <select 
-                                    className="w-full h-9 px-3 rounded-md border text-base bg-background"
-                                    value={field.value || ""}
-                                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                                  >
-                                    <option value="">Select secondary client</option>
-                                    {clients.map((client) => (
-                                      <option key={client.id} value={client.id}>
-                                        {client.firstName} {client.lastName}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      )}
-                      <Button type="submit" className="w-full bg-primary text-white hover:bg-primary/90" disabled={createTransactionMutation.isPending}>
-                        Create Transaction
-                      </Button>
+                      {/* Keep existing form content */}
                     </form>
                   </Form>
                 </DialogContent>
@@ -352,7 +244,123 @@ export default function TransactionsPage() {
             </select>
           </div>
         </div>
-
+        
+                  <FormField
+                    control={form.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Property Address</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Enter property address" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Transaction Type</FormLabel>
+                        <FormControl>
+                          <div className="grid grid-cols-2 gap-4">
+                            <Button
+                              type="button"
+                              variant={field.value === 'buy' ? 'default' : 'outline'}
+                              className={`${field.value === 'buy' ? 'bg-green-500 hover:bg-green-600' : ''} dark:text-white`}
+                              onClick={() => field.onChange('buy')}
+                            >
+                              Buy
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={field.value === 'sell' ? 'default' : 'outline'}
+                              className={`${field.value === 'sell' ? 'bg-red-500 hover:bg-red-600' : ''} dark:text-white`}
+                              onClick={() => field.onChange('sell')}
+                            >
+                              Sell
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="accessCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Passkey</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="text" placeholder="Enter passkey (min. 6 characters)" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {user?.role === "agent" && (
+                    <div className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="clientId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Primary Client</FormLabel>
+                            <FormControl>
+                              <select 
+                                className="w-full h-9 px-3 rounded-md border text-base bg-background"
+                                value={field.value || ""}
+                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                              >
+                                <option value="">Select primary client</option>
+                                {clients.map((client) => (
+                                  <option key={client.id} value={client.id}>
+                                    {client.firstName} {client.lastName}
+                                  </option>
+                                ))}
+                              </select>
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="secondaryClientId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Secondary Client</FormLabel>
+                            <FormControl>
+                              <select 
+                                className="w-full h-9 px-3 rounded-md border text-base bg-background"
+                                value={field.value || ""}
+                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                              >
+                                <option value="">Select secondary client</option>
+                                {clients.map((client) => (
+                                  <option key={client.id} value={client.id}>
+                                    {client.firstName} {client.lastName}
+                                  </option>
+                                ))}
+                              </select>
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+                  <Button type="submit" className="w-full bg-primary text-white hover:bg-primary/90" disabled={createTransactionMutation.isPending}>
+                    Create Transaction
+                  </Button>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+      <div className="flex-1 w-full bg-background">
         {view === 'board' ? (
           <div className="min-w-0 py-4">
             <KanbanBoard 
