@@ -166,7 +166,7 @@ export default function TransactionsPage() {
 
   return (
     <main className="w-full ml-[5px] relative">
-      <div className="min-h-screen bg-background overflow-x-hidden px-4 py-8">
+      <div className="min-h-screen bg-background overflow-x-hidden px-2 sm:px-4 py-8 w-full">
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
