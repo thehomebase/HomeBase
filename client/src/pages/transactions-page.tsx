@@ -165,8 +165,8 @@ export default function TransactionsPage() {
   const isMobile = useIsMobile();
 
   return (
-    <main className="relative w-full">
-      <div className="min-h-screen bg-background px-4 py-4">
+    <main className="relative w-full overflow-x-hidden">
+      <div className="flex flex-wrap  bg-background relative px-2 py-4">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
           <div className="flex items-center gap-2">
@@ -209,7 +209,7 @@ export default function TransactionsPage() {
               )}
             </Toggle>
             <select 
-              className="w-20 h-9 px-3 rounded-md border text-base bg-background"
+              className="w-20 h-9 px-2 rounded-md border text-base bg-background"
               value={selectedYear || ""}
               onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value, 10) : null)}
             >
