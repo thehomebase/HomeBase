@@ -144,13 +144,13 @@ function KanbanColumn({
 
   return (
     <div ref={setNodeRef} className="bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50">
-      <div className="flex justify-between items-center mb-2">
+      <div className="flex justify-between items-center">
         <h3 className="font-semibold text-sm dark:text-white">{title}</h3>
         <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
           {transactions.length}
         </span>
       </div>
-      <div className="flex flex-col gap-2 min-h-[100px] px-1">
+      <div className="flex flex-col gap-2 min-h-[100px] px-1 mt-1">
         {transactions.map((transaction) => (
           <DraggableCard
             key={transaction.id}
