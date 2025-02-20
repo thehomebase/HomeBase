@@ -165,11 +165,8 @@ export default function TransactionsPage() {
   const isMobile = useIsMobile();
 
   return (
-    <main
-      className={cn(
-        "w-full max-w-[100vw] lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] ml-[5px] relative container mx-auto px-4 py-8 overflow-hidden",
-             )}
-    >
+    <main className="w-full ml-[5px] relative">
+      <div className="min-h-screen bg-background overflow-x-hidden px-4 py-8">
         <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
@@ -373,14 +370,11 @@ export default function TransactionsPage() {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 w-full px-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
             {filteredTransactions.map((transaction) => (
               <Card 
                 key={transaction.id} 
-                className={cn(
-                  "cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800 w-full",
-                  isMobile ? "max-w-[100vw]" : "min-w-0"
-                )}
+                className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800 w-full min-w-0"
                 onClick={() => setLocation(`/transactions/${transaction.id}`)}
               >
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -452,6 +446,7 @@ export default function TransactionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </main>
   );
 }
