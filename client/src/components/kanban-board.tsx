@@ -80,7 +80,7 @@ function DraggableCard({
     <Card
       ref={setNodeRef}
       style={style}
-      className="p-3 w-full cursor-move hover:shadow-md transition-shadow relative group dark:bg-gray-700"
+      className="p-3  w-full cursor-move hover:shadow-md transition-shadow relative group dark:bg-gray-700"
       {...attributes}
       {...listeners}
     >
@@ -143,7 +143,7 @@ function KanbanColumn({
   });
 
   return (
-    <div ref={setNodeRef} className="bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50 flex-1">
+    <div ref={setNodeRef} className="bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50 flex-1 border border-border">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-sm dark:text-white">{title}</h3>
         <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
