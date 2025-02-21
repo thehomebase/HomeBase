@@ -144,7 +144,11 @@ export default function ClientsPage() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
-      const response = await apiRequest("POST", "/api/clients", data);
+      const response = await apiRequest("POST", "/api/clients", {
+        ...data,
+        labels: data.labels || [],
+        status: data.status || 'active'
+      });
       if (!response.ok) {
         const error = await response.text();
         throw new Error(error);
