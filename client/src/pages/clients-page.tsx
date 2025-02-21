@@ -325,7 +325,7 @@ export default function ClientsPage() {
                        >
                          {field === 'labels' ? (
                            <div className="flex flex-wrap gap-1">
-                             {client.labels && client.labels.map((label, index) => (
+                             {(client.labels || []).map((label, index) => (
                                <span
                                  key={label}
                                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getLabelColor(label, index)}`}
@@ -419,248 +419,248 @@ export default function ClientsPage() {
   return allColors[index % allColors.length];
 };
 
- return (
-   <main className="xs:w-full w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] max-w-full ml-[5px] relative container mx-auto px-4 py-8">
-     <header className="border-b">
-       <div className="container px-4 py-4 space-y-4">
-         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-           <h2 className="text-2xl font-bold">Client Management</h2>
-           {user?.role === "agent" && (
-           <div className="mt-4 md:mt-0">
-             <Dialog>
-               <DialogTrigger asChild>
-                 <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90">
-                   <Plus className="h-4 w-4 mr-2" />
-                   Add Client
-                 </Button>
-               </DialogTrigger>
-               <DialogContent>
-                 <DialogHeader>
-                   <DialogTitle>Add New Client</DialogTitle>
-                 </DialogHeader>
-                 <Form {...form}>
-                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                     <div className="grid grid-cols-2 gap-4">
-                       <FormField
-                         control={form.control}
-                         name="firstName"
-                         render={({ field }) => (
-                           <FormItem>
-                             <FormLabel>First Name</FormLabel>
-                             <FormControl>
-                               <Input {...field} />
-                             </FormControl>
-                             <FormMessage />
-                           </FormItem>
-                         )}
-                       />
-                       <FormField
-                         control={form.control}
-                         name="lastName"
-                         render={({ field }) => (
-                           <FormItem>
-                             <FormLabel>Last Name</FormLabel>
-                             <FormControl>
-                               <Input {...field} />
-                             </FormControl>
-                             <FormMessage />
-                           </FormItem>
-                         )}
-                       />
-                     </div>
-                     <div className="grid grid-cols-2 gap-4">
-                       <FormField
-                         control={form.control}
-                         name="email"
-                         render={({ field }) => (
-                           <FormItem>
-                             <FormLabel>Email</FormLabel>
-                             <FormControl>
-                               <Input type="email" {...field} value={field.value || ""} />
-                             </FormControl>
-                             <FormMessage />
-                           </FormItem>
-                         )}
-                       />
-                       <FormField
-                         control={form.control}
-                         name="phone"
-                         render={({ field }) => (
-                           <FormItem>
-                             <FormLabel>Phone</FormLabel>
-                             <FormControl>
-                               <Input {...field} value={field.value || ""} />
-                             </FormControl>
-                             <FormMessage />
-                           </FormItem>
-                         )}
-                       />
-                     </div>
-                     <FormField
-                       control={form.control}
-                       name="address"
-                       render={({ field }) => (
-                         <FormItem>
-                           <FormLabel>Address</FormLabel>
-                           <FormControl>
-                             <Input {...field} value={field.value || ""} />
-                           </FormControl>
-                           <FormMessage />
-                         </FormItem>
-                       )}
-                     />
-                     <FormField
-                       control={form.control}
-                       name="type"
-                       render={({ field }) => (
-                         <FormItem>
-                           <FormLabel>Client Type</FormLabel>
-                           <FormControl>
-                             <select
-                               {...field}
-                               className="w-full px-3 py-2 border rounded-md"
-                             >
-                               <option value="seller">Seller</option>
-                               <option value="buyer">Buyer</option>
-                             </select>
-                           </FormControl>
-                           <FormMessage />
-                         </FormItem>
-                       )}
-                     />
-                     <FormField
-                       control={form.control}
-                       name="notes"
-                       render={({ field }) => (
-                         <FormItem>
-                           <FormLabel>Notes</FormLabel>
-                           <FormControl>
-                             <textarea
-                               {...field}
-                               value={field.value || ""}
-                               className="w-full px-3 py-2 border rounded-md"
-                               rows={3}
-                             />
-                           </FormControl>
-                           <FormMessage />
-                         </FormItem>
-                       )}
-                     />
-                     <FormField
-                       control={form.control}
-                       name="labels"
-                       render={({ field }) => {
-                         const existingLabels = Array.from(new Set(
-                           clients.flatMap(client => client.labels || [])
-                         ));
+return (
+  <main className="xs:w-full w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] max-w-full ml-[5px] relative container mx-auto px-4 py-8">
+    <header className="border-b">
+      <div className="container px-4 py-4 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+          <h2 className="text-2xl font-bold">Client Management</h2>
+          {user?.role === "agent" && (
+          <div className="mt-4 md:mt-0">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Client
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Client</DialogTitle>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input type="email" {...field} value={field.value || ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value || ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Address</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Client Type</FormLabel>
+                          <FormControl>
+                            <select
+                              {...field}
+                              className="w-full px-3 py-2 border rounded-md"
+                            >
+                              <option value="seller">Seller</option>
+                              <option value="buyer">Buyer</option>
+                            </select>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notes</FormLabel>
+                          <FormControl>
+                            <textarea
+                              {...field}
+                              value={field.value || ""}
+                              className="w-full px-3 py-2 border rounded-md"
+                              rows={3}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="labels"
+                      render={({ field }) => {
+                        const existingLabels = Array.from(new Set(
+                          clients.flatMap(client => client.labels || [])
+                        ));
 
-                         return (
-                           <FormItem>
-                             <FormLabel>Labels</FormLabel>
-                             <div className="space-y-2">
-                               {existingLabels.length > 0 && (
-                                 <select
-                                   className="w-full h-9 px-3 rounded-md border bg-background"
-                                   onChange={(e) => {
-                                     const value = e.target.value;
-                                     if (value && !field.value?.includes(value)) {
-                                       field.onChange([...(field.value || []), value]);
-                                     }
-                                   }}
-                                 >
-                                   <option value="">Select existing label</option>
-                                   {existingLabels.map((label) => (
-                                     <option key={label} value={label}>
-                                       {label}
-                                     </option>
-                                   ))}
-                                 </select>
-                               )}
-                               <FormControl>
-                                 <Input
-                                   type="text"
-                                   placeholder="Add new label"
-                                   onKeyDown={(e) => {
-                                     if (e.key === ' ' || e.key === 'Enter') {
-                                       e.preventDefault();
-                                       const value = e.currentTarget.value.trim();
-                                       if (value && !field.value?.includes(value)) {
-                                         field.onChange([...(field.value || []), value]);
-                                         e.currentTarget.value = '';
-                                       }
-                                     }
-                                   }}
-                                 />
-                               </FormControl>
-                               <div className="flex flex-wrap gap-2">
-                                 {(field.value || []).map((label: string, index: number) => {
-                                   const labelColor = getLabelColor(label, index);
-                                   return (
-                                     <span
-                                       key={label}
-                                       className={`px-2 py-1 ${labelColor} rounded-full text-sm flex items-center gap-1`}
-                                     >
-                                       {label}
-                                       <button
-                                         type="button"
-                                         onClick={() => {
-                                           field.onChange((field.value || []).filter((l: string) => l !== label));
-                                         }}
-                                         className="hover:text-destructive"
-                                       >
-                                         ×
-                                       </button>
-                                     </span>
-                                   );
-                                 })}
-                               </div>
-                             </div>
-                             <FormMessage />
-                           </FormItem>
-                         );
-                       }}
-                     />
-                     <Button
-                       type="submit"
-                       className="w-full"
-                       disabled={createClientMutation.isPending}
-                     >
-                       {createClientMutation.isPending ? 'Adding...' : 'Add Client'}
-                     </Button>
-                   </form>
-                 </Form>
-               </DialogContent>
-             </Dialog>
-           </div>
-         )}
-         </div>
-         <div className="relative">
-           <Input
-             type="text"
-             placeholder="Search clients..."
-             value={searchQuery}
-             onChange={(e) => setSearchQuery(e.target.value)}
-             className="w-full md:w-96"
-           />
-           <Search className="absolute right-3 top-2.5 h-5 w-5 text-muted-foreground" />
-         </div>
-       </div>
-     </header>
+                        return (
+                          <FormItem>
+                            <FormLabel>Labels</FormLabel>
+                            <div className="space-y-2">
+                              {existingLabels.length > 0 && (
+                                <select
+                                  className="w-full h-9 px-3 rounded-md border bg-background"
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (value && !field.value?.includes(value)) {
+                                      field.onChange([...(field.value || []), value]);
+                                    }
+                                  }}
+                                >
+                                  <option value="">Select existing label</option>
+                                  {existingLabels.map((label) => (
+                                    <option key={label} value={label}>
+                                      {label}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                              <FormControl>
+                                <Input
+                                  type="text"
+                                  placeholder="Add new label"
+                                  onKeyDown={(e) => {
+                                    if (e.key === ' ' || e.key === 'Enter') {
+                                      e.preventDefault();
+                                      const value = e.currentTarget.value.trim();
+                                      if (value && !field.value?.includes(value)) {
+                                        field.onChange([...(field.value || []), value]);
+                                        e.currentTarget.value = '';
+                                      }
+                                    }
+                                  }}
+                                />
+                              </FormControl>
+                              <div className="flex flex-wrap gap-2">
+                                {(field.value || []).map((label: string, index: number) => {
+                                  const labelColor = getLabelColor(label, index);
+                                  return (
+                                    <span
+                                      key={label}
+                                      className={`px-2 py-1 ${labelColor} rounded-full text-sm flex items-center gap-1`}
+                                    >
+                                      {label}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          field.onChange((field.value || []).filter((l: string) => l !== label));
+                                        }}
+                                        className="hover:text-destructive"
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={createClientMutation.isPending}
+                    >
+                      {createClientMutation.isPending ? 'Adding...' : 'Add Client'}
+                    </Button>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+          )}
+        </div>
+        <div className="relative">
+          <Input
+            type="text"
+            placeholder="Search clients..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full md:w-96"
+          />
+          <Search className="absolute right-3 top-2.5 h-5 w-5 text-muted-foreground" />
+        </div>
+      </div>
+    </header>
 
-     <Card>
-       <Tabs defaultValue="sellers" className="p-6">
-         <TabsList className="grid w-full grid-cols-2 mb-6">
-           <TabsTrigger value="sellers">Sellers</TabsTrigger>
-           <TabsTrigger value="buyers">Buyers</TabsTrigger>
-         </TabsList>
-         <TabsContent value="sellers">
-           <ClientTable clients={sellers} />
-         </TabsContent>
-         <TabsContent value="buyers">
-           <ClientTable clients={buyers} />
-         </TabsContent>
-       </Tabs>
-     </Card>
-   </main>
- );
+    <Card>
+      <Tabs defaultValue="sellers" className="p-6">
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="sellers">Sellers</TabsTrigger>
+          <TabsTrigger value="buyers">Buyers</TabsTrigger>
+        </TabsList>
+        <TabsContent value="sellers">
+          <ClientTable clients={sellers} />
+        </TabsContent>
+        <TabsContent value="buyers">
+          <ClientTable clients={buyers} />
+        </TabsContent>
+      </Tabs>
+    </Card>
+  </main>
+);
 }
