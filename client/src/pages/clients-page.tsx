@@ -357,7 +357,9 @@ export default function ClientsPage() {
                             </div>
                           ) : (
                             <div className="whitespace-normal break-words">
-                              {client[field as keyof Client]?.toString() || ''}
+                              <div className="whitespace-normal break-words">
+                                  {client[field as keyof Client]?.toString() || ''}
+                                </div>
                             </div>
                           )}
                         </div>
