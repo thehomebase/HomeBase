@@ -124,18 +124,11 @@ export default function ClientsPage() {
 
     try {
       const clientData = {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email || null,
-        phone: data.phone || null,
-        address: data.address || null,
-        type: data.type || "seller",
-        status: data.status || "active",
-        notes: data.notes || null,
+        ...data,
         agentId: user.id,
-        labels: Array.isArray(data.labels) ? data.labels : data.labels ? [data.labels].flat() : []
+        labels: data.labels || []
       };
-      await createClientMutation.mutateAsync(clientData);
+      await createClientMutation.mutate(clientData);
       form.reset();
     } catch (error) {
       toast({
