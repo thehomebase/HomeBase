@@ -101,7 +101,7 @@ export default function ClientsPage() {
     });
   };
 
-  const form = useForm<InsertClient & { labelColors: Record<string, string> }>({
+  const form = useForm<InsertClient>({
     resolver: zodResolver(insertClientSchema),
     defaultValues: {
       firstName: "",
@@ -113,8 +113,7 @@ export default function ClientsPage() {
       status: "active",
       notes: "",
       agentId: user?.id || 0,
-      labels: [],
-      labelColors: {},
+      labels: []
     },
   });
 
@@ -122,11 +121,13 @@ export default function ClientsPage() {
     if (!user?.id) return;
 
     try {
-      await createClientMutation.mutateAsync({
+      const clientData = {
         ...data,
         agentId: user.id,
         labels: data.labels || [],
-      });
+        status: data.status || 'active'
+      };
+      await createClientMutation.mutateAsync(clientData);
       form.reset();
     } catch (error) {
       toast({
