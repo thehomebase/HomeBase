@@ -19,8 +19,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useLocation } from 'wouter';
 
 type SortConfig = {
- key: keyof Client;
- direction: 'asc' | 'desc';
+  key: keyof Client;
+  direction: 'asc' | 'desc';
 } | null;
 
 const ClientCard = ({ client }: { client: Client }) => {
@@ -77,347 +77,321 @@ const ClientCard = ({ client }: { client: Client }) => {
 };
 
 export default function ClientsPage() {
- const { user } = useAuth();
- const { toast } = useToast();
- const [sortConfig, setSortConfig] = useState<SortConfig>(null);
- const [, navigate] = useLocation();
- const [location, setLocation] = useState('');
- const [searchQuery, setSearchQuery] = useState('');
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [, navigate] = useLocation();
+  const [location, setLocation] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
- const filterClients = (clients: Client[]) => {
-   return clients.filter(client => {
-     const searchFields = [
-       client.firstName,
-       client.lastName,
-       client.email,
-       client.phone,
-       client.address,
-       ...(client.labels || [])
-     ].map(field => field?.toLowerCase() || '');
+  const filterClients = (clients: Client[]) => {
+    return clients.filter(client => {
+      const searchFields = [
+        client.firstName,
+        client.lastName,
+        client.email,
+        client.phone,
+        client.address,
+        ...(client.labels || [])
+      ].map(field => field?.toLowerCase() || '');
 
-     const query = searchQuery.toLowerCase();
-     return searchFields.some(field => field.includes(query));
-   });
- };
+      const query = searchQuery.toLowerCase();
+      return searchFields.some(field => field.includes(query));
+    });
+  };
 
- const form = useForm<InsertClient & { labelColors: Record<string, string> }>({
-   resolver: zodResolver(insertClientSchema),
-   defaultValues: {
-     firstName: "",
-     lastName: "",
-     email: "",
-     phone: "",
-     address: "",
-     type: "seller",
-     status: "active",
-     notes: "",
-     agentId: user?.id || 0,
-     labels: [],
-     labelColors: {},
-   },
- });
+  const form = useForm<InsertClient & { labelColors: Record<string, string> }>({
+    resolver: zodResolver(insertClientSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      address: "",
+      type: "seller",
+      status: "active",
+      notes: "",
+      agentId: user?.id || 0,
+      labels: [],
+      labelColors: {},
+    },
+  });
 
- const onSubmit = async (data: InsertClient) => {
-   if (!user?.id) return;
+  const onSubmit = async (data: InsertClient) => {
+    if (!user?.id) return;
 
-   try {
-     await createClientMutation.mutateAsync({
-       ...data,
-       agentId: user.id,
-       labels: data.labels || [],
-     });
-     form.reset();
-   } catch (error) {
-     toast({
-       title: "Error",
-       description: error instanceof Error ? error.message : "Failed to create client",
-       variant: "destructive",
-     });
-   }
- };
+    try {
+      await createClientMutation.mutateAsync({
+        ...data,
+        agentId: user.id,
+        labels: data.labels || [],
+      });
+      form.reset();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create client",
+        variant: "destructive",
+      });
+    }
+  };
 
- const { data: clients = [], refetch: refetchClients } = useQuery<Client[]>({
-   queryKey: ["/api/clients"],
-   enabled: !!user,
- });
+  const { data: clients = [], refetch: refetchClients } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+    enabled: !!user,
+  });
 
- const createClientMutation = useMutation({
-   mutationFn: async (data: InsertClient) => {
-     const response = await apiRequest("POST", "/api/clients", data);
-     if (!response.ok) {
-       const error = await response.text();
-       throw new Error(error);
-     }
-     return response.json();
-   },
-   onSuccess: () => {
-     queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-     form.reset();
-     toast({
-       title: "Success",
-       description: "Client added successfully",
-     });
-   },
-   onError: (error: Error) => {
-     toast({
-       title: "Error",
-       description: error.message,
-       variant: "destructive",
-     });
-   },
- });
+  const createClientMutation = useMutation({
+    mutationFn: async (data: InsertClient) => {
+      const response = await apiRequest("POST", "/api/clients", data);
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error);
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      form.reset();
+      toast({
+        title: "Success",
+        description: "Client added successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
 
- const sortData = (data: Client[], config: SortConfig) => {
-   if (!config) return data;
+  const sortData = (data: Client[], config: SortConfig) => {
+    if (!config) return data;
 
-   return [...data].sort((a, b) => {
-     const aValue = a[config.key];
-     const bValue = b[config.key];
+    return [...data].sort((a, b) => {
+      const aValue = a[config.key];
+      const bValue = b[config.key];
 
-     if (aValue === null) return config.direction === 'asc' ? -1 : 1;
-     if (bValue === null) return config.direction === 'asc' ? 1 : -1;
+      if (aValue === null) return config.direction === 'asc' ? -1 : 1;
+      if (bValue === null) return config.direction === 'asc' ? 1 : -1;
 
-     if (aValue < bValue) return config.direction === 'asc' ? -1 : 1;
-     if (aValue > bValue) return config.direction === 'asc' ? 1 : -1;
-     return 0;
-   });
- };
+      if (aValue < bValue) return config.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return config.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
 
- const requestSort = (key: keyof Client) => {
-   setSortConfig((currentConfig) => {
-     if (!currentConfig || currentConfig.key !== key) {
-       return { key, direction: 'asc' };
-     }
-     if (currentConfig.direction === 'asc') {
-       return { key, direction: 'desc' };
-     }
-     return null;
-   });
- };
+  const requestSort = (key: keyof Client) => {
+    setSortConfig((currentConfig) => {
+      if (!currentConfig || currentConfig.key !== key) {
+        return { key, direction: 'asc' };
+      }
+      if (currentConfig.direction === 'asc') {
+        return { key, direction: 'desc' };
+      }
+      return null;
+    });
+  };
 
- const getSortIcon = (columnKey: keyof Client) => {
-   if (!sortConfig || sortConfig.key !== columnKey) {
-     return null;
-   }
-   return sortConfig.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
- };
+  const getSortIcon = (columnKey: keyof Client) => {
+    if (!sortConfig || sortConfig.key !== columnKey) {
+      return null;
+    }
+    return sortConfig.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+  };
 
- const sellers = sortData(filterClients(clients.filter(client => client.type === 'seller')), sortConfig);
- const buyers = sortData(filterClients(clients.filter(client => client.type === 'buyer')), sortConfig);
+  const sellers = sortData(filterClients(clients.filter(client => client.type === 'seller')), sortConfig);
+  const buyers = sortData(filterClients(clients.filter(client => client.type === 'buyer')), sortConfig);
 
- const ClientTable = ({ clients }: { clients: Client[] }) => {
-   const [editingCell, setEditingCell] = useState<{id: number, field: string} | null>(null);
-   const [editValue, setEditValue] = useState("");
-   const [clientToDelete, setClientToDelete] = useState<number | null>(null);
-   const { toast } = useToast();
-   const { refetch } = useQuery<Client[]>({
-     queryKey: ["/api/clients"],
-     enabled: false,
-   });
+  const ClientTable = ({ clients }: { clients: Client[] }) => {
+    const [editingCell, setEditingCell] = useState<{id: number, field: string} | null>(null);
+    const [editValue, setEditValue] = useState("");
+    const [clientToDelete, setClientToDelete] = useState<number | null>(null);
+    const { toast } = useToast();
+    const { refetch } = useQuery<Client[]>({
+      queryKey: ["/api/clients"],
+      enabled: false,
+    });
 
-   const deleteClientMutation = useMutation({
-     mutationFn: async (clientId: number) => {
-       const response = await apiRequest("DELETE", `/api/clients/${clientId}`);
-       if (!response.ok) {
-         const error = await response.text();
-         throw new Error(error || "Failed to delete client");
-       }
-       return { success: true };
-     },
-     onSuccess: async () => {
-       await refetchClients();
-       toast({
-         title: "Success", 
-         description: "Client deleted successfully",
-       });
-     },
-     onError: (error: Error) => {
-       toast({
-         title: "Error",
-         description: error.message,
-         variant: "destructive",
-       });
-     },
-   });
+    const deleteClientMutation = useMutation({
+      mutationFn: async (clientId: number) => {
+        const response = await apiRequest("DELETE", `/api/clients/${clientId}`);
+        if (!response.ok) {
+          const error = await response.text();
+          throw new Error(error || "Failed to delete client");
+        }
+        return { success: true };
+      },
+      onSuccess: async () => {
+        await refetchClients();
+        toast({
+          title: "Success", 
+          description: "Client deleted successfully",
+        });
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    });
 
-   const handleEditClick = (client: Client, field: string) => {
-     setEditingCell({ id: client.id, field });
-     setEditValue(client[field as keyof Client]?.toString() || '');
-   };
+    const handleEditClick = (client: Client, field: string) => {
+      setEditingCell({ id: client.id, field });
+      setEditValue(client[field as keyof Client]?.toString() || '');
+    };
 
-   const handleEditSave = async (client: Client) => {
-     if (!editingCell) return;
+    const handleEditSave = async (client: Client) => {
+      if (!editingCell) return;
 
-     try {
-       const response = await apiRequest("PATCH", `/api/clients/${client.id}`, {
-         [editingCell.field]: editValue
-       });
-       if (!response.ok) throw new Error("Failed to update client");
-       await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-       await refetch();
-     } catch (error) {
-       console.error("Error updating client:", error);
-       toast({
-         title: "Error",
-         description: "Failed to update client",
-         variant: "destructive",
-       });
-     }
-     setEditingCell(null);
-   };
+      try {
+        const response = await apiRequest("PATCH", `/api/clients/${client.id}`, {
+          [editingCell.field]: editValue
+        });
+        if (!response.ok) throw new Error("Failed to update client");
+        await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+        await refetch();
+      } catch (error) {
+        console.error("Error updating client:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update client",
+          variant: "destructive",
+        });
+      }
+      setEditingCell(null);
+    };
 
-   return (
-     <>
-       {/* Desktop view - Table */}
-       <div className="hidden md:block">
-         <Table>
-           <TableHeader>
-             <TableRow className="bg-gray-100 dark:bg-gray-800">
-               <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('lastName')}>
-                 <div className="flex items-center gap-1">
-                   Last Name {getSortIcon('lastName')}
-                 </div>
-               </TableHead>
-               <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('firstName')}>
-                 <div className="flex items-center gap-1">
-                   First Name {getSortIcon('firstName')}
-                 </div>
-               </TableHead>
-               <TableHead className="py-3 font-semibold">Email</TableHead>
-               <TableHead className="py-3 font-semibold">Current Address</TableHead>
-               <TableHead className="py-3 font-semibold">Phone</TableHead>
-               <TableHead className="py-3 font-semibold">Labels</TableHead>
-               <TableHead className="py-3 font-semibold">Actions</TableHead>
-             </TableRow>
-           </TableHeader>
-           <TableBody>
-             {clients.map((client, index) => (
-               <TableRow 
-                 key={client.id}
-                 className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                   index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
-                 }`}
-               >
-                 {['lastName', 'firstName', 'email', 'address', 'phone', 'labels'].map((field) => (
-                   <TableCell 
-                     key={field}
-                     className="py-3 group relative"
-                   >
-                     {editingCell?.id === client.id && editingCell.field === field ? (
-                       <Input
-                         autoFocus
-                         value={editValue}
-                         onChange={(e) => setEditValue(e.target.value)}
-                         onBlur={() => handleEditSave(client)}
-                         onKeyDown={(e) => {
-                           if (e.key === 'Enter') handleEditSave(client);
-                           if (e.key === 'Escape') setEditingCell(null);
-                         }}
-                       />
-                     ) : (
-                       <div 
-                         className="min-h-[24px] hover:bg-accent/50 rounded px-2 py-1 cursor-pointer"
-                         onClick={() => field === 'lastName' || field === 'firstName' ? 
-                           setLocation(`/clients/${client.id}`) : 
-                           handleEditClick(client, field)
-                         }
-                       >
-                         {field === 'labels' ? (
-                           <div className="flex flex-wrap gap-1">
-                             {(client.labels || []).map((label, index) => (
-                               <span
-                                 key={label}
-                                 className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getLabelColor(label, index)}`}
-                               >
-                                 {label}
-                               </span>
-                             ))}
-                           </div>
-                         ) : (
-                           client[field as keyof Client]?.toString() || ''
-                         )}
-                       </div>
-                     )}
-                   </TableCell>
-                 ))}
-                 <TableCell>
-                   <Button
-                     variant="ghost"
-                     size="icon"
-                     className="h-8 w-8 text-destructive hover:text-destructive"
-                     onClick={(e) => {
-                       e.stopPropagation();
-                       setClientToDelete(client.id);
-                     }}
-                   >
-                     <Trash2 className="h-4 w-4" />
-                   </Button>
-                 </TableCell>
-               </TableRow>
-             ))}
-             {clients.length === 0 && (
-               <TableRow>
-                 <TableCell colSpan={7} className="text-center text-muted-foreground">
-                   No clients found. Add your first client to get started!
-                 </TableCell>
-               </TableRow>
-             )}
-           </TableBody>
-         </Table>
-       </div>
+    return (
+      <>
+        {/* Desktop view - Table */}
+        <div className="hidden md:block">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-100 dark:bg-gray-800">
+                <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('lastName')}>
+                  <div className="flex items-center gap-1">
+                    Last Name {getSortIcon('lastName')}
+                  </div>
+                </TableHead>
+                <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('firstName')}>
+                  <div className="flex items-center gap-1">
+                    First Name {getSortIcon('firstName')}
+                  </div>
+                </TableHead>
+                <TableHead className="py-3 font-semibold">Email</TableHead>
+                <TableHead className="py-3 font-semibold">Current Address</TableHead>
+                <TableHead className="py-3 font-semibold">Phone</TableHead>
+                <TableHead className="py-3 font-semibold">Labels</TableHead>
+                <TableHead className="py-3 font-semibold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {clients.map((client, index) => (
+                <TableRow 
+                  key={client.id}
+                  className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                    index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
+                  }`}
+                >
+                  <TableCell className="py-3">{client.lastName}</TableCell>
+                  <TableCell className="py-3">{client.firstName}</TableCell>
+                  <TableCell className="py-3">{client.email}</TableCell>
+                  <TableCell className="py-3">{client.address}</TableCell>
+                  <TableCell className="py-3">{client.phone}</TableCell>
+                  <TableCell className="py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {(client.labels || []).map((label, index) => (
+                        <span
+                          key={`${client.id}-${label}-${index}`}
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getLabelColor(label, index)}`}
+                        >
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => setClientToDelete(client.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {clients.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    No clients found. Add your first client to get started!
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
-       {/* Mobile view - Cards */}
-       <div className="md:hidden space-y-4">
-         {clients.length === 0 ? (
-           <div className="text-center text-muted-foreground py-8">
-             No clients found. Add your first client to get started!
-           </div>
-         ) : (
-           clients.map((client) => (
-             <ClientCard key={client.id} client={client} />
-           ))
-         )}
-       </div>
-       <AlertDialog open={clientToDelete !== null} onOpenChange={() => setClientToDelete(null)}>
-         <AlertDialogContent>
-           <AlertDialogHeader>
-             <AlertDialogTitle>Delete Client</AlertDialogTitle>
-             <AlertDialogDescription>
-               Are you sure you would like to remove this client? This action cannot be undone.
-             </AlertDialogDescription>
-           </AlertDialogHeader>
-           <AlertDialogFooter>
-             <AlertDialogCancel>Cancel</AlertDialogCancel>
-             <AlertDialogAction
-               onClick={() => {
-                 if (clientToDelete) {
-                   deleteClientMutation.mutate(clientToDelete);
-                   setClientToDelete(null);
-                 }
-               }}
-               className="bg-destructive hover:bg-destructive/90"
-             >
-               Delete
-             </AlertDialogAction>
-           </AlertDialogFooter>
-         </AlertDialogContent>
-       </AlertDialog>
-     </>
-   );
- };
+        {/* Mobile view - Cards */}
+        <div className="md:hidden space-y-4">
+          {clients.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              No clients found. Add your first client to get started!
+            </div>
+          ) : (
+            clients.map((client) => (
+              <ClientCard key={client.id} client={client} />
+            ))
+          )}
+        </div>
+        <AlertDialog open={clientToDelete !== null} onOpenChange={() => setClientToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Client</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you would like to remove this client? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (clientToDelete) {
+                    deleteClientMutation.mutate(clientToDelete);
+                    setClientToDelete(null);
+                  }
+                }}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  };
 
- const getLabelColor = (label: string, index: number) => {
-  const allColors = [
-    'bg-blue-100 text-blue-800',
-    'bg-red-100 text-red-800',
-    'bg-green-100 text-green-800',
-    'bg-yellow-100 text-yellow-800',
-    'bg-orange-100 text-orange-800',
-    'bg-purple-100 text-purple-800'
-  ];
-  return allColors[index % allColors.length];
-};
+  const getLabelColor = (label: string, index: number) => {
+    const allColors = [
+      'bg-blue-100 text-blue-800 border border-blue-200',
+      'bg-red-100 text-red-800 border border-red-200',
+      'bg-green-100 text-green-800 border border-green-200',
+      'bg-yellow-100 text-yellow-800 border border-yellow-200',
+      'bg-purple-100 text-purple-800 border border-purple-200',
+      'bg-pink-100 text-pink-800 border border-pink-200',
+      'bg-orange-100 text-orange-800 border border-orange-200',
+      'bg-indigo-100 text-indigo-800 border border-indigo-200'
+    ];
+    return allColors[index % allColors.length];
+  };
 
 return (
   <main className="xs:w-full w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] max-w-full ml-[5px] relative container mx-auto px-4 py-8">
