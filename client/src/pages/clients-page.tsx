@@ -123,12 +123,10 @@ export default function ClientsPage() {
     try {
       const cleanedData = {
         ...data,
-        labels: data.labels ? prepareLabels(data.labels) : []
+        labels: Array.isArray(data.labels) ? data.labels : [],
+        agentId: user.id
       };
-      await createClientMutation.mutateAsync({
-        ...cleanedData,
-        agentId: user.id,
-      });
+      await createClientMutation.mutateAsync(cleanedData);
       form.reset();
     } catch (error) {
       toast({
