@@ -57,12 +57,14 @@ app.get('/health', (_req, res) => {
 
 // Modified server startup function to handle port configuration
 async function startServer(server: HttpServer): Promise<void> {
-  // Use PORT from environment or fallback to 3001 (changed from 5000)
+  // Use PORT from environment or fallback to 3001
   const port = Number(process.env.PORT) || 3001;
   const host = '0.0.0.0';
 
   try {
     log(`Initializing server startup sequence...`);
+    log(`Environment PORT value: ${process.env.PORT}`);
+    log(`Computed port value: ${port}`);
 
     await new Promise<void>((resolve, reject) => {
       log(`Attempting to bind server to ${host}:${port}...`);
@@ -114,9 +116,14 @@ async function startServer(server: HttpServer): Promise<void> {
       res.status(status).json({ message });
     });
 
-    // Attempt to start in production mode first
-    log(`Starting server in production mode...`);
-    serveStatic(app);
+    // Try development mode first since we haven't built the client yet
+    log(`Starting server in development mode...`);
+    try {
+      await setupVite(app, server);
+    } catch (err) {
+      log(`Failed to start in development mode, trying production: ${err}`);
+      serveStatic(app);
+    }
 
     // Start server with dynamic port
     await startServer(server);
