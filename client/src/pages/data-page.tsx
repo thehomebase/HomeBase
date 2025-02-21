@@ -256,8 +256,10 @@ export default function DataPage() {
                   label={{ 
                     value: 'Monthly Volume', 
                     angle: -90, 
-                    position: 'insidemiddle',
-                    offset: -1
+                    position: 'insideLeft',
+                    offset: 5,        // Adjust this value (positive or negative)
+                      dx: -0,        // Moves left/right (negative = left)
+                      dy: 50          // Moves up/down (positive = down)
                   }}
                 />
                 <YAxis 
