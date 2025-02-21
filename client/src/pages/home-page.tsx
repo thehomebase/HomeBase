@@ -57,13 +57,38 @@ export default function HomePage() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: typeof form.getValues) => {
-      await apiRequest("POST", "/api/clients", {
+      const sanitizedData = {
         ...data,
         agentId: user?.id,
-      });
+        labels: Array.isArray(data.labels) ? data.labels : [],
+        email: data.email || null,
+        phone: data.phone || null,
+        address: data.address || null,
+        notes: data.notes || null
+      };
+      
+      const response = await apiRequest("POST", "/api/clients", sanitizedData);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create client');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      form.reset();
+      setOpen(false);
+      toast({
+        title: "Success",
+        description: "Client created successfully"
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
     },
   });
 
