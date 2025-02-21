@@ -1,53 +1,20 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { Server as HttpServer } from "http";
 
+// Log environment details
+log(`Initial PORT environment variable: ${process.env.PORT}`);
+log(`Node environment: ${process.env.NODE_ENV}`);
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Add error logging middleware with more detail
-app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-  console.error('Unhandled error:', err);
-  if (err.stack) {
-    console.error('Stack trace:', err.stack);
-  }
-  next(err);
-});
-
-// Enhanced request logging middleware
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  // Log session information for debugging
-  if (req.session) {
-    console.log('Session ID:', req.sessionID);
-    console.log('Session Data:', req.session);
-  }
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-      log(logLine);
-    }
-  });
-  next();
+// Basic test route
+app.get('/test', (_req, res) => {
+  res.json({ message: 'Server is running' });
 });
 
 // Health check endpoint
@@ -55,49 +22,35 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Modified server startup function to handle port configuration
+// Simplified server startup function
 async function startServer(server: HttpServer): Promise<void> {
-  // Use PORT from environment or fallback to 3001
-  const port = Number(process.env.PORT) || 3001;
+  const port = Number(process.env.PORT) || 8000;
   const host = '0.0.0.0';
 
-  try {
-    log(`Initializing server startup sequence...`);
-    log(`Environment PORT value: ${process.env.PORT}`);
-    log(`Computed port value: ${port}`);
+  log(`Starting server with configuration:`);
+  log(`- PORT from environment: ${process.env.PORT}`);
+  log(`- Computed port: ${port}`);
+  log(`- Host: ${host}`);
 
+  try {
     await new Promise<void>((resolve, reject) => {
       log(`Attempting to bind server to ${host}:${port}...`);
 
-      const serverInstance = server.listen(port, host, () => {
-        log(`Server successfully bound and listening on ${host}:${port}`);
+      server.listen(port, host, () => {
+        log(`Server successfully started and listening on ${host}:${port}`);
         resolve();
-      });
-
-      // Add error handler
-      serverInstance.on('error', (err: NodeJS.ErrnoException) => {
+      }).on('error', (err: NodeJS.ErrnoException) => {
+        log(`Error while starting server: ${err.message}`);
         if (err.code === 'EADDRINUSE') {
-          log(`Error: Port ${port} is already in use. Using fallback port.`);
-          // Try another port
-          const fallbackPort = port + 1;
-          log(`Attempting to bind to fallback port ${fallbackPort}...`);
-
-          serverInstance.listen(fallbackPort, host, () => {
-            log(`Server successfully bound to fallback port ${fallbackPort}`);
-            process.env.PORT = String(fallbackPort);
-            resolve();
-          });
-        } else {
-          log(`Error starting server: ${err.message}`);
-          reject(err);
+          log(`Port ${port} is already in use, please set a different PORT in .env`);
         }
+        reject(err);
       });
     });
-
-    log(`Server startup sequence completed successfully`);
-  } catch (err) {
-    log(`Critical error during server startup: ${err instanceof Error ? err.message : String(err)}`);
-    throw err;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log(`Failed to start server: ${errorMessage}`);
+    throw error;
   }
 }
 
@@ -108,7 +61,7 @@ async function startServer(server: HttpServer): Promise<void> {
 
     const server = registerRoutes(app);
 
-    // Setup error handling middleware
+    // Setup basic error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       console.error('Error in request:', err);
       const status = err.status || err.statusCode || 500;
@@ -116,17 +69,19 @@ async function startServer(server: HttpServer): Promise<void> {
       res.status(status).json({ message });
     });
 
-    // Try development mode first since we haven't built the client yet
-    log(`Starting server in development mode...`);
+    // Start with minimal configuration first
+    log(`Starting server with minimal configuration...`);
+    await startServer(server);
+
+    // Then gradually add middleware
+    log(`Adding Vite middleware...`);
     try {
       await setupVite(app, server);
+      log(`Vite middleware setup complete`);
     } catch (err) {
       log(`Failed to start in development mode, trying production: ${err}`);
       serveStatic(app);
     }
-
-    // Start server with dynamic port
-    await startServer(server);
 
     // Graceful shutdown handlers
     process.on('SIGTERM', () => {

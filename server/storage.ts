@@ -920,65 +920,41 @@ export class DatabaseStorage implements IStorage {
 
   async createClient(insertClient: InsertClient): Promise<Client> {
     try {
-      const result = await db.execute(sql`
-        INSERT INTO clients (
-          first_name,
-          last_name,
-          email,
-          phone,
-          address,
-          type,
-          status,
-          notes,
-          labels,
-          agent_id
-        ) VALUES (
-          ${insertClient.firstName},
-          ${insertClient.lastName},
-          ${insertClient.email},
-          ${insertClient.phone},
-          ${insertClient.address},
-          ${insertClient.type},
-          ${insertClient.status},
-          ${insertClient.notes},
-          ${JSON.stringify(insertClient.labels || [])}::text[],
-          ${insertClient.agentId}
-        )
-        RETURNING 
-          id,
-          first_name as "firstName",
-          last_name as "lastName",
-          email,
-          phone,
-          address,
-          type,
-          status,
-          notes,
-          labels,
-          agent_id as "agentId",
-          created_at as "createdAt",
-          updated_at as "updatedAt"
-      `);
+      // Ensure labels is always an array
+      const labels = Array.isArray(insertClient.labels) 
+        ? insertClient.labels 
+        : insertClient.labels 
+          ? [insertClient.labels] 
+          : [];
 
-      if (!result.rows[0]) {
-        throw new Error('Failed to create client');
+      const [client] = await db
+        .insert(clients)
+        .values({
+          ...insertClient,
+          labels,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      if (!client) {
+        throw new Error('Failed to create client record');
       }
 
-      const row = result.rows[0];
       return {
-        id: Number(row.id),
-        firstName: String(row.firstName),
-        lastName: String(row.lastName),
-        email: row.email ? String(row.email) : null,
-        phone: row.phone ? String(row.phone) : null,
-        address: row.address ? String(row.address) : null,
-        type: String(row.type),
-        status: String(row.status),
-        notes: row.notes ? String(row.notes) : null,
-        labels: Array.isArray(row.labels) ? row.labels : [],
-        agentId: Number(row.agentId),
-        createdAt: new Date(row.createdAt),
-        updatedAt: new Date(row.updatedAt)
+        id: Number(client.id),
+        firstName: String(client.firstName),
+        lastName: String(client.lastName),
+        email: client.email ? String(client.email) : null,
+        phone: client.phone ? String(client.phone) : null,
+        address: client.address ? String(client.address) : null,
+        type: String(client.type),
+        status: String(client.status),
+        notes: client.notes ? String(client.notes) : null,
+        labels: Array.isArray(client.labels) ? client.labels : [],
+        agentId: Number(client.agentId),
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt
       };
     } catch (error) {
       console.error('Error in createClient:', error);
