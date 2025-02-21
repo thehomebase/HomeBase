@@ -124,9 +124,10 @@ export default function ClientsPage() {
       const clientData = {
         ...data,
         agentId: user.id,
-        labels: data.labels || []
+        // Ensure labels is always an array, even if empty
+        labels: Array.isArray(data.labels) ? data.labels : []
       };
-      await createClientMutation.mutate(clientData);
+      await createClientMutation.mutateAsync(clientData);
       form.reset();
     } catch (error) {
       toast({
@@ -144,19 +145,31 @@ export default function ClientsPage() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
-      // Ensure labels is always an array
+      // Ensure we have a valid agentId
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
+
+      // Prepare the client data with proper type handling
       const clientData = {
         ...data,
-        agentId: user?.id,
-        labels: Array.isArray(data.labels) ? data.labels : []
+        agentId: user.id,
+        labels: Array.isArray(data.labels) ? data.labels : [],
+        // Ensure optional fields are properly handled
+        email: data.email || null,
+        phone: data.phone || null,
+        address: data.address || null,
+        notes: data.notes || null
       };
 
       const response = await apiRequest("POST", "/api/clients", clientData);
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Client creation failed:', errorText);
-        throw new Error(errorText);
+        throw new Error(errorText || "Failed to create client");
       }
+
       return response.json();
     },
     onSuccess: () => {

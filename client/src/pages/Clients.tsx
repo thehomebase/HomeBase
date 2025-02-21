@@ -3,9 +3,10 @@ import { CSVImport } from '@/components/CSVImport';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { Link } from 'wouter';
+import { type Client } from '@shared/schema';
 
 export function ClientsPage() {
-  const { data: clients, isLoading } = useQuery({
+  const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
   });
 
@@ -29,7 +30,7 @@ export function ClientsPage() {
           <div>Loading clients...</div>
         ) : (
           <div className="grid gap-4">
-            {clients?.map((client: any) => (
+            {clients.map((client: Client) => (
               <div
                 key={client.id}
                 className="p-4 rounded-lg border bg-card text-card-foreground"
