@@ -113,9 +113,7 @@ export default function ClientsPage() {
       status: "active",
       notes: "",
       agentId: user?.id || 0,
-      labels: [],
-      createdAt: new Date(),
-      updatedAt: new Date()
+      labels: []
     },
   });
 
@@ -146,11 +144,14 @@ export default function ClientsPage() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
-      const response = await apiRequest("POST", "/api/clients", {
+      // Ensure labels is always an array
+      const clientData = {
         ...data,
         agentId: user?.id,
-        labels: Array.isArray(data.labels) ? data.labels : [],
-      });
+        labels: Array.isArray(data.labels) ? data.labels : []
+      };
+
+      const response = await apiRequest("POST", "/api/clients", clientData);
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Client creation failed:', errorText);
@@ -251,16 +252,21 @@ export default function ClientsPage() {
 
     const handleEditClick = (client: Client, field: string) => {
       setEditingCell({ id: client.id, field });
-      setEditValue(field === 'labels' 
-        ? (client.labels || []).join(', ')
-        : client[field as keyof Client]?.toString() || '');
+      if (field === 'labels') {
+        // For labels, join array into comma-separated string
+        setEditValue(Array.isArray(client.labels) ? client.labels.join(', ') : '');
+      } else {
+        // For other fields, convert to string if needed
+        const value = client[field as keyof Client];
+        setEditValue(value ? String(value) : '');
+      }
     };
 
     const handleEditSave = async (client: Client) => {
       if (!editingCell) return;
 
       try {
-        let valueToUpdate = editValue;
+        let valueToUpdate: string | string[] = editValue;
 
         // Special handling for labels
         if (editingCell.field === 'labels') {

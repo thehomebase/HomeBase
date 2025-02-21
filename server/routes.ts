@@ -508,7 +508,7 @@ export function registerRoutes(app: Express): Server {
       const messageData = {
         content: req.body.content,
         userId: req.user.id,
-        username: req.user.username,
+        username: `${req.user.firstName} ${req.user.lastName}`,
         role: req.user.role,
         timestamp: new Date().toISOString(),
         transactionId: Number(req.body.transactionId)
