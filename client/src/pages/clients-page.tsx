@@ -620,8 +620,11 @@ export default function ClientsPage() {
                                           className="w-full h-9 px-3 rounded-md border bg-background"
                                           onChange={(e) => {
                                             const value = e.target.value;
-                                            if (value && !field.value?.includes(value)) {
-                                              field.onChange([...(field.value || []), value]);
+                                            if (value) {
+                                              const currentLabels = Array.isArray(field.value) ? field.value : [];
+                                              if (!currentLabels.includes(value)) {
+                                                field.onChange([...currentLabels, value]);
+                                              }
                                             }
                                           }}
                                         >
@@ -638,12 +641,15 @@ export default function ClientsPage() {
                                           type="text"
                                           placeholder="Add new label"
                                           onKeyDown={(e) => {
-                                            if (e.key === ' ' || e.key === 'Enter') {
+                                            if (e.key === 'Enter') {
                                               e.preventDefault();
                                               const value = e.currentTarget.value.trim();
-                                              if (value && !field.value?.includes(value)) {
-                                                field.onChange([...(field.value || []), value]);
-                                                e.currentTarget.value = '';
+                                              if (value) {
+                                                const currentLabels = Array.isArray(field.value) ? field.value : [];
+                                                if (!currentLabels.includes(value)) {
+                                                  field.onChange([...currentLabels, value]);
+                                                  e.currentTarget.value = '';
+                                                }
                                               }
                                             }
                                           }}
