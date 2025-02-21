@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertClientSchema, type Client } from "@shared/schema";
+import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -65,10 +65,14 @@ export default function HomePage() {
         agentId: user?.id,
         labels: data.labels || []
       });
-      return response;
+      if (!response.ok) {
+        throw new Error('Failed to create client');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      form.reset();
     },
   });
 
