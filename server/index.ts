@@ -24,7 +24,7 @@ app.get('/health', (_req, res) => {
 
 // Simplified server startup function
 async function startServer(server: HttpServer): Promise<void> {
-  const port = Number(process.env.PORT) || 8000;
+  const port = Number(process.env.PORT) || 5000;
   const host = '0.0.0.0';
 
   log(`Starting server with configuration:`);
