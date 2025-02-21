@@ -25,7 +25,7 @@ type SortConfig = {
 
 const ClientCard = ({ client }: { client: Client }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   return (
     <Card className="mb-2">
       <div 
@@ -50,7 +50,7 @@ const ClientCard = ({ client }: { client: Client }) => {
         </div>
         <ChevronDown className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
       </div>
-      
+
       {isExpanded && (
         <CardContent className="pt-0 pb-3 border-t">
           <div className="space-y-2 mt-2">
@@ -83,7 +83,7 @@ export default function ClientsPage() {
  const [, navigate] = useLocation();
  const [location, setLocation] = useState('');
  const [searchQuery, setSearchQuery] = useState('');
- 
+
  const filterClients = (clients: Client[]) => {
    return clients.filter(client => {
      const searchFields = [
@@ -94,7 +94,7 @@ export default function ClientsPage() {
        client.address,
        ...(client.labels || [])
      ].map(field => field?.toLowerCase() || '');
-     
+
      const query = searchQuery.toLowerCase();
      return searchFields.some(field => field.includes(query));
    });
@@ -325,17 +325,14 @@ export default function ClientsPage() {
                        >
                          {field === 'labels' ? (
                            <div className="flex flex-wrap gap-1">
-                             {client.labels && client.labels.map((label, index) => {
-                               const labelColor = getLabelColor(label, index);
-                               return (
-                                 <span
-                                   key={label}
-                                   className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${labelColor}`}
-                                 >
-                                   {label}
-                                 </span>
-                               );
-                             })}
+                             {client.labels && client.labels.map((label, index) => (
+                               <span
+                                 key={label}
+                                 className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getLabelColor(label, index)}`}
+                               >
+                                 {label}
+                               </span>
+                             ))}
                            </div>
                          ) : (
                            client[field as keyof Client]?.toString() || ''
