@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { Server as HttpServer } from "http";
+import { createServer } from "net";
 
 const app = express();
 app.use(express.json());
@@ -55,42 +56,33 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Improved server startup function with better port handling
-async function startServer(server: HttpServer, initialPort: number = 5000, maxAttempts: number = 5) {
-  let port = initialPort;
-  const maxPort = initialPort + maxAttempts;
+// Modified server startup function to handle port 5000 specifically
+async function startServer(server: HttpServer): Promise<void> {
+  const port = 5000;
 
-  while (port < maxPort) {
-    try {
-      await new Promise<void>((resolve, reject) => {
-        log(`Attempting to start server on port ${port}...`);
-        server.listen(port, '0.0.0.0')
-          .once('listening', () => {
-            log(`Server successfully started and running on port ${port}`);
-            resolve();
-          })
-          .once('error', (err: NodeJS.ErrnoException) => {
-            if (err.code === 'EADDRINUSE') {
-              log(`Port ${port} is in use, trying next port...`);
-              server.close();
-              port++;
-              reject(err);
-            } else {
-              log(`Error starting server: ${err.message}`);
-              reject(err);
-            }
-          });
-      });
-      return port; // Successfully started
-    } catch (err) {
-      if (port >= maxPort) {
-        throw new Error(`Failed to find an available port after ${maxAttempts} attempts`);
-      }
-      // Continue to next port
-      continue;
-    }
+  try {
+    await new Promise<void>((resolve, reject) => {
+      log(`Starting server on port ${port}...`);
+
+      server.listen(port, '0.0.0.0')
+        .once('listening', () => {
+          log(`Server successfully started and running on port ${port}`);
+          resolve();
+        })
+        .once('error', (err: NodeJS.ErrnoException) => {
+          if (err.code === 'EADDRINUSE') {
+            log(`Error: Port ${port} is already in use. Please make sure no other service is running on this port.`);
+            process.exit(1);
+          } else {
+            log(`Error starting server: ${err.message}`);
+            reject(err);
+          }
+        });
+    });
+  } catch (err) {
+    log(`Failed to start server: ${err instanceof Error ? err.message : String(err)}`);
+    throw err;
   }
-  throw new Error('Failed to start server');
 }
 
 // Main application startup
@@ -113,13 +105,12 @@ async function startServer(server: HttpServer, initialPort: number = 5000, maxAt
       serveStatic(app);
     }
 
-    // Start server with port fallback, using PORT from environment or 5000 as default
-    const initialPort = parseInt(process.env.PORT || '5000', 10);
-    log(`Starting server with initial port ${initialPort}`);
-    await startServer(server, initialPort);
+    // Start server on port 5000
+    log(`Starting server...`);
+    await startServer(server);
 
     // Graceful shutdown handlers
-    process.on('SIGTERM', async () => {
+    process.on('SIGTERM', () => {
       console.log('SIGTERM received. Starting graceful shutdown...');
       server.close(() => {
         console.log('Server shutdown complete');
@@ -127,7 +118,7 @@ async function startServer(server: HttpServer, initialPort: number = 5000, maxAt
       });
     });
 
-    process.on('SIGINT', async () => {
+    process.on('SIGINT', () => {
       console.log('SIGINT received. Starting graceful shutdown...');
       server.close(() => {
         console.log('Server shutdown complete');

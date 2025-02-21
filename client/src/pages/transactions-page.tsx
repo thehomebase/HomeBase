@@ -20,8 +20,14 @@ import { useState } from "react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TransactionTable } from "@/components/transaction-table";
+import { Transaction as SchemaTransaction } from "@shared/schema";
+import { Client } from "@shared/schema";
 
-interface Transaction {
+// Add proper type for client find operations
+type ClientLookup = (client: Client) => boolean;
+
+// Update the Transaction interface to include all required fields
+interface Transaction extends Omit<SchemaTransaction, 'updatedAt'> {
   id: number;
   address: string;
   status: string;
@@ -38,7 +44,8 @@ interface Transaction {
     firstName: string;
     lastName: string;
   } | null;
-  year: number; // Added year property
+  createdAt: string;
+  year: number;
 }
 
 const createTransactionSchema = z.object({
@@ -74,9 +81,9 @@ export default function TransactionsPage() {
 
   const form = useForm({
     resolver: zodResolver(createTransactionSchema),
-    defaultValues: { 
-      address: "", 
-      accessCode: "", 
+    defaultValues: {
+      address: "",
+      accessCode: "",
       type: "buy" as const,
       clientId: null as number | null,
       secondaryClientId: null as number | null
@@ -104,7 +111,7 @@ export default function TransactionsPage() {
         participants: [],
         clientId: data.clientId || null,
         secondaryClientId: data.secondaryClientId || null,
-        year: new Date().getFullYear() 
+        year: new Date().getFullYear()
       });
       if (!response.ok) {
         throw new Error('Failed to create transaction');
@@ -153,7 +160,7 @@ export default function TransactionsPage() {
     }
   };
 
-  const filteredTransactions = transactions.filter((transaction) => {
+  const filteredTransactions = transactions.filter((transaction: Transaction) => {
     const transactionDate = transaction.createdAt ? new Date(transaction.createdAt) : new Date();
     const yearMatch = selectedYear === null || transactionDate.getFullYear() === selectedYear;
     const startDateMatch = startDate === "" || transactionDate >= new Date(startDate);
@@ -208,7 +215,7 @@ export default function TransactionsPage() {
                 <Sun className="h-4 w-4" />
               )}
             </Toggle>
-            <select 
+            <select
               className="w-20 h-9 px-2 rounded-md border text-base bg-background"
               value={selectedYear || ""}
               onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value, 10) : null)}
@@ -260,7 +267,10 @@ export default function TransactionsPage() {
                             <Button
                               type="button"
                               variant={field.value === 'buy' ? 'default' : 'outline'}
-                              className={`${field.value === 'buy' ? 'bg-green-500 hover:bg-green-600' : ''} dark:text-white`}
+                              className={cn(
+                                field.value === 'buy' && "bg-green-500 hover:bg-green-600",
+                                "dark:text-white"
+                              )}
                               onClick={() => field.onChange('buy')}
                             >
                               Buy
@@ -268,7 +278,10 @@ export default function TransactionsPage() {
                             <Button
                               type="button"
                               variant={field.value === 'sell' ? 'default' : 'outline'}
-                              className={`${field.value === 'sell' ? 'bg-red-500 hover:bg-red-600' : ''} dark:text-white`}
+                              className={cn(
+                                field.value === 'sell' && "bg-red-500 hover:bg-red-600",
+                                "dark:text-white"
+                              )}
                               onClick={() => field.onChange('sell')}
                             >
                               Sell
@@ -301,13 +314,13 @@ export default function TransactionsPage() {
                           <FormItem>
                             <FormLabel>Primary Client</FormLabel>
                             <FormControl>
-                              <select 
+                              <select
                                 className="w-full h-9 px-3 rounded-md border text-base bg-background"
                                 value={field.value || ""}
                                 onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                               >
                                 <option value="">Select primary client</option>
-                                {clients.map((client) => (
+                                {clients.map((client: Client) => (
                                   <option key={client.id} value={client.id}>
                                     {client.firstName} {client.lastName}
                                   </option>
@@ -324,13 +337,13 @@ export default function TransactionsPage() {
                           <FormItem>
                             <FormLabel>Secondary Client</FormLabel>
                             <FormControl>
-                              <select 
+                              <select
                                 className="w-full h-9 px-3 rounded-md border text-base bg-background"
                                 value={field.value || ""}
                                 onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                               >
                                 <option value="">Select secondary client</option>
-                                {clients.map((client) => (
+                                {clients.map((client: Client) => (
                                   <option key={client.id} value={client.id}>
                                     {client.firstName} {client.lastName}
                                   </option>
@@ -354,8 +367,8 @@ export default function TransactionsPage() {
       <div className="flex-1 w-full bg-background">
         {view === 'board' ? (
           <div className="min-w-0 py-4">
-            <KanbanBoard 
-              transactions={filteredTransactions} 
+            <KanbanBoard
+              transactions={filteredTransactions}
               onDeleteTransaction={handleDeleteTransaction}
               onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
               clients={clients}
@@ -371,14 +384,14 @@ export default function TransactionsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
-            {filteredTransactions.map((transaction) => (
-              <Card 
-                key={transaction.id} 
+            {filteredTransactions.map((transaction: Transaction) => (
+              <Card
+                key={transaction.id}
                 className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800 w-full min-w-0"
                 onClick={() => setLocation(`/transactions/${transaction.id}`)}
               >
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle 
+                  <CardTitle
                     className="text-lg hover:underline dark:text-white truncate"
                     onClick={() => setLocation(`/transactions/${transaction.id}`)}
                   >
@@ -401,8 +414,8 @@ export default function TransactionsPage() {
                 <CardContent>
                   <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize truncate">Status: {transaction.status.replace('_', ' ')}</p>
                   <p className="text-sm text-muted-foreground dark:text-gray-300 break-words">
-                    Client: {clients.find(c => c.id === transaction.clientId) 
-                      ? `${clients.find(c => c.id === transaction.clientId)?.firstName} ${clients.find(c => c.id === transaction.clientId)?.lastName}` 
+                    Client: {clients.find((c: Client) => c.id === transaction.clientId)
+                      ? `${clients.find((c: Client) => c.id === transaction.clientId)?.firstName} ${clients.find((c: Client) => c.id === transaction.clientId)?.lastName}`
                       : 'Not set'}
                   </p>
                   {transaction.secondaryClient && (
