@@ -12,14 +12,16 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Basic test route
+// Basic test route - BEFORE auth middleware
 app.get('/test', (_req, res) => {
-  res.json({ message: 'Server is running' });
+  log('Test route accessed');
+  res.json({ message: 'Server is running', port: process.env.PORT });
 });
 
-// Health check endpoint
+// Health check endpoint - BEFORE auth middleware
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
+  log('Health check accessed');
+  res.json({ status: 'ok', port: process.env.PORT });
 });
 
 // Simplified server startup function
