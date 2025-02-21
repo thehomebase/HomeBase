@@ -918,14 +918,53 @@ export class DatabaseStorage implements IStorage {
 
   async createClient(insertClient: InsertClient): Promise<Client> {
     try {
-      const clientData = {
-        ...insertClient,
-        labels: insertClient.labels || [],
-        createdAt: new Date(),
-        updatedAt: new Date()
+      const result = await db.execute(sql`
+        INSERT INTO clients (
+          first_name,
+          last_name,
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          agent_id,
+          labels,
+          created_at,
+          updated_at
+        ) VALUES (
+          ${insertClient.firstName},
+          ${insertClient.lastName},
+          ${insertClient.email || null},
+          ${insertClient.phone || null},
+          ${insertClient.address || null},
+          ${insertClient.type},
+          ${insertClient.status},
+          ${insertClient.notes || null},
+          ${insertClient.agentId},
+          ${JSON.stringify(Array.isArray(insertClient.labels) ? insertClient.labels : [])}::jsonb,
+          NOW(),
+          NOW()
+        )
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.first_name),
+        lastName: String(row.last_name),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agent_id),
+        createdAt: new Date(row.created_at).toISOString(),
+        updatedAt: new Date(row.updated_at).toISOString()
       };
-      const [client] = await db.insert(clients).values(clientData).returning();
-      return client;
     } catch (error) {
       console.error('Error in createClient:', error);
       throw error;
