@@ -117,12 +117,15 @@ export function registerRoutes(app: Express): Server {
         status: ['active', 'inactive', 'pending'].includes(req.body.status) ? req.body.status : 'active',
         notes: String(req.body.notes || '').trim(),
         labels: Array.isArray(req.body.labels) ? req.body.labels.filter(Boolean).map(String) : [],
-        agentId: req.user.id
+        agentId: req.user.id,
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
 
-      // Validate required fields
-      if (!sanitizedData.firstName || !sanitizedData.lastName) {
-        return res.status(400).json({ error: 'First name and last name are required' });
+      // Parse through insertClientSchema
+      const parsed = insertClientSchema.safeParse(sanitizedData);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
       }
 
       // Create the client with sanitized data
