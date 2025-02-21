@@ -539,9 +539,15 @@ return (
                       control={form.control}
                       name="labels"
                       render={({ field }) => {
+                        // Ensure field.value is always an array
+                        if (!Array.isArray(field.value)) {
+                          field.onChange([]);
+                        }
+                        
                         const existingLabels = Array.from(new Set(
-                          clients.flatMap(client => client.labels || [])
-                            .filter(label => typeof label === 'string' && label.trim().length > 0)
+                          clients.flatMap(client => 
+                            Array.isArray(client.labels) ? client.labels : []
+                          ).filter(label => typeof label === 'string' && label.trim().length > 0)
                         ));
 
                         return (
