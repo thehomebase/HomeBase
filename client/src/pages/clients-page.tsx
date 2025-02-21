@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useLocation } from 'wouter';
+import { motion, AnimatePresence } from "framer-motion";
 
 type SortConfig = {
   key: keyof Client;
@@ -573,40 +574,68 @@ return (
                                 </select>
                               )}
                               <FormControl>
-                                <Input
-                                  type="text"
-                                  placeholder="Add new label"
-                                  onKeyDown={(e) => {
-                                    if (e.key === ' ' || e.key === 'Enter') {
-                                      e.preventDefault();
-                                      const value = e.currentTarget.value.trim();
-                                      if (value && !field.value?.includes(value)) {
-                                        field.onChange([...(field.value || []), value]);
-                                        e.currentTarget.value = '';
+                                <motion.div
+                                  initial={false}
+                                  animate={{ height: "auto" }}
+                                  className="relative"
+                                >
+                                  <Input
+                                    type="text"
+                                    placeholder="Add new label"
+                                    onFocus={(e) => {
+                                      e.currentTarget.parentElement?.classList.add('ring-2', 'ring-primary', 'ring-offset-1');
+                                    }}
+                                    onBlur={(e) => {
+                                      e.currentTarget.parentElement?.classList.remove('ring-2', 'ring-primary', 'ring-offset-1');
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === ' ' || e.key === 'Enter') {
+                                        e.preventDefault();
+                                        const value = e.currentTarget.value.trim();
+                                        if (value && !field.value?.includes(value)) {
+                                          // Animate the input clear
+                                          const input = e.currentTarget;
+                                          input.style.transform = 'translateY(-2px)';
+                                          input.style.transition = 'transform 0.1s ease-in-out';
+
+                                          setTimeout(() => {
+                                            input.style.transform = 'translateY(0)';
+                                            field.onChange([...(field.value || []), value]);
+                                            input.value = '';
+                                          }, 100);
+                                        }
                                       }
-                                    }
-                                  }}
-                                />
+                                    }}
+                                    className="transition-all duration-200 ease-in-out"
+                                  />
+                                </motion.div>
                               </FormControl>
                               <div className="flex flex-wrap gap-2">
                                 {(field.value || []).map((label: string, index: number) => {
                                   const labelColor = getLabelColor(label, index);
                                   return (
-                                    <span
-                                      key={label}
-                                      className={`px-2 py-1 ${labelColor} rounded-full text-sm flex items-center gap-1`}
-                                    >
-                                      {label}
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          field.onChange((field.value || []).filter((l: string) => l !== label));
-                                        }}
-                                        className="hover:text-destructive"
+                                    <AnimatePresence key={label}>
+                                      <motion.span
+                                        initial={{ scale: 0.8, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        exit={{ scale: 0.8, opacity: 0 }}
+                                        whileHover={{ scale: 1.05 }}
+                                        className={`px-2 py-1 ${labelColor} rounded-full text-sm flex items-center gap-1`}
                                       >
-                                        ×
-                                      </button>
-                                    </span>
+                                        {label}
+                                        <motion.button
+                                          type="button"
+                                          whileHover={{ scale: 1.2 }}
+                                          whileTap={{ scale: 0.9 }}
+                                          onClick={() => {
+                                            field.onChange((field.value || []).filter((l: string) => l !== label));
+                                          }}
+                                          className="hover:text-destructive transition-colors"
+                                        >
+                                          ×
+                                        </motion.button>
+                                      </motion.span>
+                                    </AnimatePresence>
                                   );
                                 })}
                               </div>
