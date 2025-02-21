@@ -106,17 +106,28 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      const parsed = insertClientSchema.safeParse(req.body);
-      if (!parsed.success) {
-        console.error('Validation error:', parsed.error);
-        return res.status(400).json(parsed.error);
+      // Sanitize and validate incoming data
+      const sanitizedData = {
+        firstName: String(req.body.firstName || '').trim(),
+        lastName: String(req.body.lastName || '').trim(),
+        email: String(req.body.email || '').trim(),
+        phone: String(req.body.phone || '').trim(),
+        address: String(req.body.address || '').trim(),
+        type: ['buyer', 'seller'].includes(req.body.type) ? req.body.type : 'buyer',
+        status: ['active', 'inactive', 'pending'].includes(req.body.status) ? req.body.status : 'active',
+        notes: String(req.body.notes || '').trim(),
+        labels: Array.isArray(req.body.labels) ? req.body.labels.filter(Boolean).map(String) : [],
+        agentId: req.user.id
+      };
+
+      // Validate required fields
+      if (!sanitizedData.firstName || !sanitizedData.lastName) {
+        return res.status(400).json({ error: 'First name and last name are required' });
       }
 
-      // Ensure required fields are present
+      // Create the client with sanitized data
       const clientData = {
-        ...parsed.data,
-        agentId: req.user.id,
-        labels: Array.isArray(parsed.data.labels) ? parsed.data.labels : parsed.data.labels ? [parsed.data.labels] : [],
+        ...sanitizedData,
         createdAt: new Date(),
         updatedAt: new Date()
       };
