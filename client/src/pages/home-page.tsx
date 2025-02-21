@@ -40,13 +40,16 @@ export default function HomePage() {
   const form = useForm({
     resolver: zodResolver(insertClientSchema),
     defaultValues: {
-      name: "",
+      firstName: "",
+      lastName: "",
       email: "",
       phone: "",
       address: "",
       type: "seller",
       status: "active",
       notes: "",
+      labels: [],
+      agentId: user?.id || 0
     },
   });
 
@@ -56,11 +59,13 @@ export default function HomePage() {
   });
 
   const createClientMutation = useMutation({
-    mutationFn: async (data: typeof form.getValues) => {
-      await apiRequest("POST", "/api/clients", {
+    mutationFn: async (data: InsertClient) => {
+      const response = await apiRequest("POST", "/api/clients", {
         ...data,
         agentId: user?.id,
+        labels: data.labels || []
       });
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
@@ -174,10 +179,23 @@ export default function HomePage() {
                 >
                   <FormField
                     control={form.control}
-                    name="name"
+                    name="firstName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Full Name</FormLabel>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
