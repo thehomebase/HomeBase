@@ -106,39 +106,25 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Sanitize and validate incoming data
-      const sanitizedData = {
-        firstName: String(req.body.firstName || '').trim(),
-        lastName: String(req.body.lastName || '').trim(),
-        email: String(req.body.email || '').trim(),
-        phone: String(req.body.phone || '').trim(),
-        address: String(req.body.address || '').trim(),
-        type: ['buyer', 'seller'].includes(req.body.type) ? req.body.type : 'buyer',
-        status: ['active', 'inactive', 'pending'].includes(req.body.status) ? req.body.status : 'active',
-        notes: String(req.body.notes || '').trim(),
-        labels: Array.isArray(req.body.labels) ? req.body.labels.filter(Boolean).map(String) : [],
-        agentId: req.user.id,
+      // Add detailed logging for debugging
+      console.log('Received client creation request:', req.body);
+
+      // Parse through insertClientSchema first
+      const parsed = insertClientSchema.safeParse({
+        ...req.body,
+        labels: Array.isArray(req.body.labels) ? req.body.labels : [],
         createdAt: new Date(),
         updatedAt: new Date()
-      };
+      });
 
-      // Parse through insertClientSchema
-      const parsed = insertClientSchema.safeParse(sanitizedData);
       if (!parsed.success) {
+        console.error('Validation error:', parsed.error);
         return res.status(400).json({ error: parsed.error.message });
       }
 
-      // Create the client with sanitized data
-      const clientData = {
-        ...sanitizedData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      console.log('Attempting to create client with data:', clientData);
-
-      console.log('Creating client with data:', clientData);
-      const client = await storage.createClient(clientData);
+      // Create the client with validated data
+      console.log('Creating client with validated data:', parsed.data);
+      const client = await storage.createClient(parsed.data);
 
       if (!client) {
         throw new Error('Failed to create client record');

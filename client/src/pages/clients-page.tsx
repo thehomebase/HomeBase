@@ -118,18 +118,42 @@ export default function ClientsPage() {
   });
 
   const onSubmit = async (data: InsertClient) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create a client",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
+      console.log('Submitting client data:', data); // Debug log
+
       const clientData = {
         ...data,
         agentId: user.id,
         // Ensure labels is always an array, even if empty
-        labels: Array.isArray(data.labels) ? data.labels : []
+        labels: Array.isArray(data.labels) ? data.labels : [],
+        // Handle optional fields
+        email: data.email || null,
+        phone: data.phone || null,
+        address: data.address || null,
+        notes: data.notes || null
       };
+
+      console.log('Processed client data:', clientData); // Debug log
+
       await createClientMutation.mutateAsync(clientData);
+
+      toast({
+        title: "Success",
+        description: "Client created successfully",
+      });
+
       form.reset();
     } catch (error) {
+      console.error('Client creation error:', error); // Debug log
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to create client",
@@ -150,37 +174,26 @@ export default function ClientsPage() {
         throw new Error("User not authenticated");
       }
 
-      // Prepare the client data with proper type handling
-      const clientData = {
-        ...data,
-        agentId: user.id,
-        labels: Array.isArray(data.labels) ? data.labels : [],
-        // Ensure optional fields are properly handled
-        email: data.email || null,
-        phone: data.phone || null,
-        address: data.address || null,
-        notes: data.notes || null
-      };
+      try {
+        const response = await apiRequest("POST", "/api/clients", data);
 
-      const response = await apiRequest("POST", "/api/clients", clientData);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Server response error:', errorText); // Debug log
+          throw new Error(errorText || "Failed to create client");
+        }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Client creation failed:', errorText);
-        throw new Error(errorText || "Failed to create client");
+        return response.json();
+      } catch (error) {
+        console.error('Mutation error:', error); // Debug log
+        throw error;
       }
-
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      form.reset();
-      toast({
-        title: "Success",
-        description: "Client added successfully",
-      });
     },
     onError: (error: Error) => {
+      console.error('Mutation error handler:', error); // Debug log
       toast({
         title: "Error",
         description: error.message,

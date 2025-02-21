@@ -57,64 +57,50 @@ export default function HomePage() {
     },
   });
 
-  const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
-    enabled: !!user,
-  });
-
   const createClientMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
-      const sanitizedData = {
-        ...data,
-        agentId: user?.id,
-        labels: Array.isArray(data.labels) ? data.labels : [],
-        type: data.type || 'seller',
-        status: data.status || 'active'
-      };
-      const response = await apiRequest.post("/api/clients", sanitizedData);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      setOpen(false);
-      form.reset();
-      toast({
-        title: "Success",
-        description: "Client added successfully",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create client",
-        variant: "destructive",
-      });
-    }
-
-      const response = await apiRequest("POST", "/api/clients", sanitizedData);
-      if (!response.ok) {
-        const errorData = await response.json(); //Try to parse JSON error response
-        throw new Error(errorData?.message || 'Failed to create client');
+      if (!user?.id) {
+        throw new Error("User not authenticated");
       }
+
+      // Send the form data directly, letting server handle sanitization
+      const response = await apiRequest("POST", "/api/clients", {
+        ...data,
+        agentId: user.id,
+        type: data.type || 'seller',
+        status: data.status || 'active',
+        labels: data.labels || []
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create client');
+      }
+
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       form.reset();
-      setOpen(false); // Close dialog after success
+      setOpen(false);
       toast({
         title: "Success",
         description: "Client created successfully"
       });
     },
     onError: (error: Error) => {
-      console.error('Error creating client:', error);
+      console.error('Client creation error:', error);
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
     },
+  });
+
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+    enabled: !!user,
   });
 
   const sellers = clients.filter((client) => client.type === "seller");
@@ -134,7 +120,9 @@ export default function HomePage() {
       <TableBody>
         {clients.map((client) => (
           <TableRow key={client.id}>
-            <TableCell className="font-medium">{client.name}</TableCell>
+            <TableCell className="font-medium">
+              {client.firstName} {client.lastName}
+            </TableCell>
             <TableCell>
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
@@ -187,7 +175,7 @@ export default function HomePage() {
           <Logo />
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">
-              Logged in as {user?.username} ({user?.role})
+              Logged in as {user?.email} ({user?.role})
             </span>
             <Button
               variant="outline"
