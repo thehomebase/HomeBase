@@ -943,7 +943,7 @@ export class DatabaseStorage implements IStorage {
           ${insertClient.type},
           ${insertClient.status},
           ${insertClient.notes},
-          ${JSON.stringify(insertClient.labels)}::text[],
+          ${insertClient.labels}::text[],
           ${insertClient.agentId},
           NOW(),
           NOW()
