@@ -134,8 +134,6 @@ export default function ClientsPage() {
         notes: data.notes || null,
         agentId: user.id,
         labels: Array.isArray(data.labels) ? data.labels : [],
-        createdAt: new Date(),
-        updatedAt: new Date()
       };
       await createClientMutation.mutateAsync(clientData);
       form.reset();
@@ -157,8 +155,9 @@ export default function ClientsPage() {
     mutationFn: async (data: InsertClient) => {
       const response = await apiRequest("POST", "/api/clients", data);
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
+        const errorText = await response.text();
+        console.error('Client creation failed:', errorText);
+        throw new Error(errorText);
       }
       return response.json();
     },
