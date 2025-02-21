@@ -121,10 +121,13 @@ export default function ClientsPage() {
     if (!user?.id) return;
 
     try {
-      await createClientMutation.mutateAsync({
+      const cleanedData = {
         ...data,
+        labels: data.labels ? prepareLabels(data.labels) : []
+      };
+      await createClientMutation.mutateAsync({
+        ...cleanedData,
         agentId: user.id,
-        labels: data.labels || [],
       });
       form.reset();
     } catch (error) {
@@ -394,6 +397,11 @@ export default function ClientsPage() {
       'bg-indigo-100 text-indigo-800 border border-indigo-200'
     ];
     return allColors[index % allColors.length];
+  };
+
+  const prepareLabels = (labels: string[]): string[] => {
+    // Placeholder function - Replace with actual label preparation logic
+    return labels;
   };
 
 return (
