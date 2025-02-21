@@ -4,49 +4,36 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, LogOut, Mail, Phone } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
+  const { toast } = useToast();
+  const [isOpen, setOpen] = useState(false);
+
   const form = useForm({
     resolver: zodResolver(insertClientSchema),
     defaultValues: {
-      name: "",
+      firstName: "",
+      lastName: "",
       email: "",
       phone: "",
       address: "",
       type: "seller",
       status: "active",
       notes: "",
+      labels: [],
     },
   });
 
@@ -66,7 +53,7 @@ export default function HomePage() {
         address: data.address || null,
         notes: data.notes || null
       };
-      
+
       const response = await apiRequest("POST", "/api/clients", sanitizedData);
       if (!response.ok) {
         const errorData = await response.json();
@@ -95,6 +82,18 @@ export default function HomePage() {
   const sellers = clients.filter((client) => client.type === "seller");
   const buyers = clients.filter((client) => client.type === "buyer");
 
+  const getLabelColor = (label: string, index: number) => {
+    const colors = [
+      'bg-blue-100 text-blue-800 border border-blue-200',
+      'bg-red-100 text-red-800 border border-red-200',
+      'bg-green-100 text-green-800 border border-green-200',
+      'bg-yellow-100 text-yellow-800 border border-yellow-200',
+      'bg-purple-100 text-purple-800 border border-purple-200',
+      'bg-pink-100 text-pink-800 border border-pink-200',
+    ];
+    return colors[index % colors.length];
+  };
+
   const ClientTable = ({ clients }: { clients: Client[] }) => (
     <Table>
       <TableHeader>
@@ -103,13 +102,16 @@ export default function HomePage() {
           <TableHead>Contact</TableHead>
           <TableHead>Address</TableHead>
           <TableHead>Status</TableHead>
+          <TableHead>Labels</TableHead>
           <TableHead>Added</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {clients.map((client) => (
           <TableRow key={client.id}>
-            <TableCell className="font-medium">{client.name}</TableCell>
+            <TableCell className="font-medium">
+              {client.firstName} {client.lastName}
+            </TableCell>
             <TableCell>
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
@@ -137,6 +139,18 @@ export default function HomePage() {
               </span>
             </TableCell>
             <TableCell>
+              <div className="flex flex-wrap gap-1">
+                {(client.labels || []).map((label, index) => (
+                  <span
+                    key={`${client.id}-${label}-${index}`}
+                    className={`px-2 py-1 rounded-full text-xs ${getLabelColor(label, index)}`}
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </TableCell>
+            <TableCell>
               {format(new Date(client.createdAt), "MMM d, yyyy")}
             </TableCell>
           </TableRow>
@@ -144,7 +158,7 @@ export default function HomePage() {
         {clients.length === 0 && (
           <TableRow>
             <TableCell
-              colSpan={5}
+              colSpan={6}
               className="text-center text-muted-foreground"
             >
               No clients found. Add your first client to get started!
@@ -162,7 +176,7 @@ export default function HomePage() {
           <Logo />
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">
-              Logged in as {user?.username} ({user?.role})
+              Logged in as {user?.firstName} {user?.lastName} ({user?.role})
             </span>
             <Button
               variant="outline"
@@ -179,7 +193,7 @@ export default function HomePage() {
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold">Client Management</h2>
-          <Dialog>
+          <Dialog open={isOpen} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -192,24 +206,37 @@ export default function HomePage() {
               </DialogHeader>
               <Form {...form}>
                 <form
-                  onSubmit={form.handleSubmit((data) =>
-                    createClientMutation.mutate(data),
-                  )}
+                  onSubmit={form.handleSubmit(createClientMutation.mutate)}
                   className="space-y-4"
                 >
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -283,6 +310,50 @@ export default function HomePage() {
                             rows={3}
                           />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="labels"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Labels</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Add labels (press space or enter to add)"
+                            onKeyDown={(e) => {
+                              if (e.key === ' ' || e.key === 'Enter') {
+                                e.preventDefault();
+                                const value = e.currentTarget.value.trim();
+                                if (value && !field.value?.includes(value)) {
+                                  field.onChange([...(field.value || []), value]);
+                                  e.currentTarget.value = '';
+                                }
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {(field.value || []).map((label: string, index: number) => (
+                            <span
+                              key={label}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getLabelColor(label, index)}`}
+                            >
+                              {label}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  field.onChange(field.value?.filter((l: string) => l !== label));
+                                }}
+                                className="hover:text-red-600"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}

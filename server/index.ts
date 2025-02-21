@@ -2,7 +2,6 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { Server as HttpServer } from "http";
-import { createServer } from "net";
 
 const app = express();
 app.use(express.json());
@@ -56,31 +55,46 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Modified server startup function to handle port 5000 specifically
+// Modified server startup function to handle port configuration
 async function startServer(server: HttpServer): Promise<void> {
-  const port = 5000;
+  // Use PORT from environment or fallback to 3001 (changed from 5000)
+  const port = Number(process.env.PORT) || 3001;
+  const host = '0.0.0.0';
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      log(`Starting server on port ${port}...`);
+    log(`Initializing server startup sequence...`);
 
-      server.listen(port, '0.0.0.0')
-        .once('listening', () => {
-          log(`Server successfully started and running on port ${port}`);
-          resolve();
-        })
-        .once('error', (err: NodeJS.ErrnoException) => {
-          if (err.code === 'EADDRINUSE') {
-            log(`Error: Port ${port} is already in use. Please make sure no other service is running on this port.`);
-            process.exit(1);
-          } else {
-            log(`Error starting server: ${err.message}`);
-            reject(err);
-          }
-        });
+    await new Promise<void>((resolve, reject) => {
+      log(`Attempting to bind server to ${host}:${port}...`);
+
+      const serverInstance = server.listen(port, host, () => {
+        log(`Server successfully bound and listening on ${host}:${port}`);
+        resolve();
+      });
+
+      // Add error handler
+      serverInstance.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          log(`Error: Port ${port} is already in use. Using fallback port.`);
+          // Try another port
+          const fallbackPort = port + 1;
+          log(`Attempting to bind to fallback port ${fallbackPort}...`);
+
+          serverInstance.listen(fallbackPort, host, () => {
+            log(`Server successfully bound to fallback port ${fallbackPort}`);
+            process.env.PORT = String(fallbackPort);
+            resolve();
+          });
+        } else {
+          log(`Error starting server: ${err.message}`);
+          reject(err);
+        }
+      });
     });
+
+    log(`Server startup sequence completed successfully`);
   } catch (err) {
-    log(`Failed to start server: ${err instanceof Error ? err.message : String(err)}`);
+    log(`Critical error during server startup: ${err instanceof Error ? err.message : String(err)}`);
     throw err;
   }
 }
@@ -88,6 +102,8 @@ async function startServer(server: HttpServer): Promise<void> {
 // Main application startup
 (async () => {
   try {
+    log(`Beginning application initialization...`);
+
     const server = registerRoutes(app);
 
     // Setup error handling middleware
@@ -98,15 +114,11 @@ async function startServer(server: HttpServer): Promise<void> {
       res.status(status).json({ message });
     });
 
-    // Setup development environment
-    if (app.get("env") === "development") {
-      await setupVite(app, server);
-    } else {
-      serveStatic(app);
-    }
+    // Attempt to start in production mode first
+    log(`Starting server in production mode...`);
+    serveStatic(app);
 
-    // Start server on port 5000
-    log(`Starting server...`);
+    // Start server with dynamic port
     await startServer(server);
 
     // Graceful shutdown handlers
@@ -127,7 +139,7 @@ async function startServer(server: HttpServer): Promise<void> {
     });
 
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error('Fatal error during application startup:', error);
     process.exit(1);
   }
 })();

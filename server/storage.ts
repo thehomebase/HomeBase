@@ -879,6 +879,7 @@ export class DatabaseStorage implements IStorage {
           type,
           status,
           notes,
+          labels,
           agent_id as "agentId",
           created_at as "createdAt",
           updated_at as "updatedAt"
@@ -897,9 +898,10 @@ export class DatabaseStorage implements IStorage {
         type: String(row.type),
         status: String(row.status),
         notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
         agentId: Number(row.agentId),
-        createdAt: new Date(row.createdAt).toISOString(),
-        updatedAt: new Date(row.updatedAt).toISOString(),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
       }));
     } catch (error) {
       console.error('Error in getClientsByAgent:', error);
@@ -928,32 +930,45 @@ export class DatabaseStorage implements IStorage {
           type,
           status,
           notes,
-          agent_id,
           labels,
-          created_at,
-          updated_at
+          agent_id
         ) VALUES (
           ${insertClient.firstName},
           ${insertClient.lastName},
-          ${insertClient.email || null},
-          ${insertClient.phone || null},
-          ${insertClient.address || null},
+          ${insertClient.email},
+          ${insertClient.phone},
+          ${insertClient.address},
           ${insertClient.type},
           ${insertClient.status},
-          ${insertClient.notes || null},
-          ${insertClient.agentId},
-          ARRAY[]::text[],
-          NOW(),
-          NOW()
+          ${insertClient.notes},
+          ${JSON.stringify(insertClient.labels || [])}::text[],
+          ${insertClient.agentId}
         )
-        RETURNING *
+        RETURNING 
+          id,
+          first_name as "firstName",
+          last_name as "lastName",
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id as "agentId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
       `);
+
+      if (!result.rows[0]) {
+        throw new Error('Failed to create client');
+      }
 
       const row = result.rows[0];
       return {
         id: Number(row.id),
-        firstName: String(row.first_name),
-        lastName: String(row.last_name),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
         email: row.email ? String(row.email) : null,
         phone: row.phone ? String(row.phone) : null,
         address: row.address ? String(row.address) : null,
@@ -961,9 +976,9 @@ export class DatabaseStorage implements IStorage {
         status: String(row.status),
         notes: row.notes ? String(row.notes) : null,
         labels: Array.isArray(row.labels) ? row.labels : [],
-        agentId: Number(row.agent_id),
-        createdAt: new Date(row.created_at).toISOString(),
-        updatedAt: new Date(row.updated_at).toISOString()
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
       };
     } catch (error) {
       console.error('Error in createClient:', error);
