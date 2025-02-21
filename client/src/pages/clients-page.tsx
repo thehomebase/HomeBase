@@ -121,9 +121,15 @@ export default function ClientsPage() {
     if (!user?.id) return;
 
     try {
+      // Ensure labels is an array of strings
+      const cleanedLabels = data.labels ? 
+        (Array.isArray(data.labels) ? data.labels : [data.labels])
+          .filter(label => typeof label === 'string' && label.trim().length > 0) : 
+        [];
+      
       const cleanedData = {
         ...data,
-        labels: Array.isArray(data.labels) ? data.labels : [],
+        labels: cleanedLabels,
         agentId: user.id
       };
       await createClientMutation.mutateAsync(cleanedData);
@@ -535,6 +541,7 @@ return (
                       render={({ field }) => {
                         const existingLabels = Array.from(new Set(
                           clients.flatMap(client => client.labels || [])
+                            .filter(label => typeof label === 'string' && label.trim().length > 0)
                         ));
 
                         return (
