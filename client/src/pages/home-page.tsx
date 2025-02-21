@@ -34,9 +34,13 @@ import {
 import { Plus, LogOut, Mail, Phone } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
   const form = useForm({
     resolver: zodResolver(insertClientSchema),
     defaultValues: {
@@ -60,19 +64,33 @@ export default function HomePage() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
-      const response = await apiRequest("POST", "/api/clients", {
+      const sanitizedData = {
         ...data,
         agentId: user?.id,
-        labels: data.labels || []
-      });
+        labels: Array.isArray(data.labels) ? data.labels : [],
+        type: data.type || 'seller',
+        status: data.status || 'active'
+      };
+
+      const response = await apiRequest("POST", "/api/clients", sanitizedData);
       if (!response.ok) {
-        throw new Error('Failed to create client');
+        const errorData = await response.text();
+        throw new Error(errorData || 'Failed to create client');
       }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       form.reset();
+      setOpen(false); // Close dialog after success
+    },
+    onError: (error: Error) => {
+      console.error('Error creating client:', error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -163,7 +181,7 @@ export default function HomePage() {
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold">Client Management</h2>
-          <Dialog>
+          <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
