@@ -116,10 +116,12 @@ export function registerRoutes(app: Express): Server {
       const clientData = {
         ...parsed.data,
         agentId: req.user.id,
-        labels: Array.isArray(parsed.data.labels) ? parsed.data.labels : [],
+        labels: Array.isArray(parsed.data.labels) ? parsed.data.labels : parsed.data.labels ? [parsed.data.labels] : [],
         createdAt: new Date(),
         updatedAt: new Date()
       };
+
+      console.log('Attempting to create client with data:', clientData);
 
       console.log('Creating client with data:', clientData);
       const client = await storage.createClient(clientData);
