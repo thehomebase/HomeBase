@@ -153,7 +153,11 @@ export default function ClientsPage() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
-      const response = await apiRequest("POST", "/api/clients", data);
+      const response = await apiRequest("POST", "/api/clients", {
+        ...data,
+        agentId: user?.id,
+        labels: Array.isArray(data.labels) ? data.labels : [],
+      });
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Client creation failed:', errorText);
