@@ -15,11 +15,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Get the current origin to handle any port the server might be running on
-  const baseUrl = window.location.origin;
-  const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
-
-  const res = await fetch(fullUrl, {
+  const res = await fetch(url, {
     method,
     headers: {
       ...(data ? { "Content-Type": "application/json" } : {}),
@@ -38,12 +34,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const baseUrl = window.location.origin;
-    const fullUrl = (queryKey[0] as string).startsWith('http') 
-      ? queryKey[0] as string 
-      : `${baseUrl}${queryKey[0]}`;
-
-    const res = await fetch(fullUrl, {
+    const res = await fetch(queryKey[0] as string, {
       credentials: "include",
     });
 

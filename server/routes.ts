@@ -5,8 +5,6 @@ import { setupAuth } from "./auth";
 import { z } from "zod";
 import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema } from "@shared/schema";
 import ical from "ical-generator";
-import { parse } from 'csv-parse/sync';
-import type { InsertClient } from '@shared/schema';
 
 // Seller checklist items
 const SELLER_CHECKLIST_ITEMS = [
@@ -106,25 +104,22 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Add detailed logging for debugging
-      console.log('Received client creation request:', req.body);
-
-      // Parse through insertClientSchema first
-      const parsed = insertClientSchema.safeParse({
-        ...req.body,
-        labels: Array.isArray(req.body.labels) ? req.body.labels : [],
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-
+      const parsed = insertClientSchema.safeParse(req.body);
       if (!parsed.success) {
         console.error('Validation error:', parsed.error);
-        return res.status(400).json({ error: parsed.error.message });
+        return res.status(400).json(parsed.error);
       }
 
-      // Create the client with validated data
-      console.log('Creating client with validated data:', parsed.data);
-      const client = await storage.createClient(parsed.data);
+      // Ensure required fields are present
+      const clientData = {
+        ...parsed.data,
+        agentId: req.user.id,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      console.log('Creating client with data:', clientData);
+      const client = await storage.createClient(clientData);
 
       if (!client) {
         throw new Error('Failed to create client record');
@@ -164,85 +159,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/clients/import", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
-      return res.sendStatus(401);
-    }
-
-    try {
-      const csvData = req.body.csvData;
-      if (!csvData) {
-        return res.status(400).json({ error: 'No CSV data provided' });
-      }
-
-      // Parse CSV data
-      const records = parse(csvData, {
-        columns: true,
-        skip_empty_lines: true
-      });
-
-      // Map CSV fields to client schema
-      const clients: InsertClient[] = records.map((record: any) => ({
-        firstName: record.firstName || record['First Name'] || '',
-        lastName: record.lastName || record['Last Name'] || '',
-        email: record.email || record.Email || '',
-        phone: record.phone || record.Phone || '',
-        address: record.address || record.Address || '',
-        type: (record.type || record.Type || 'buyer').toLowerCase(),
-        status: (record.status || record.Status || 'active').toLowerCase(),
-        notes: record.notes || record.Notes || '',
-        labels: record.labels ? record.labels.split(',').map((l: string) => l.trim()) : [],
-        agentId: req.user.id
-      }));
-
-      // Validate each client
-      const validationErrors: any[] = [];
-      clients.forEach((client, index) => {
-        if (!client.firstName || !client.lastName) {
-          validationErrors.push({
-            row: index + 1,
-            error: 'First name and last name are required'
-          });
-        }
-        if (client.email && !client.email.includes('@')) {
-          validationErrors.push({
-            row: index + 1,
-            error: 'Invalid email format'
-          });
-        }
-        if (!['buyer', 'seller'].includes(client.type)) {
-          validationErrors.push({
-            row: index + 1,
-            error: 'Type must be either buyer or seller'
-          });
-        }
-      });
-
-      if (validationErrors.length > 0) {
-        return res.status(400).json({ 
-          error: 'Validation errors in CSV data',
-          details: validationErrors
-        });
-      }
-
-      // Insert all valid clients
-      const insertedClients = await Promise.all(
-        clients.map(client => storage.createClient(client))
-      );
-
-      res.status(201).json({
-        message: `Successfully imported ${insertedClients.length} clients`,
-        clients: insertedClients
-      });
-
-    } catch (error) {
-      console.error('Error importing clients:', error);
-      res.status(500).json({ 
-        error: 'Failed to import clients',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  });
 
   // Transactions
   app.get("/api/transactions", async (req, res) => {
@@ -497,7 +413,7 @@ export function registerRoutes(app: Express): Server {
       const messageData = {
         content: req.body.content,
         userId: req.user.id,
-        username: `${req.user.firstName} ${req.user.lastName}`,
+        username: req.user.username,
         role: req.user.role,
         timestamp: new Date().toISOString(),
         transactionId: Number(req.body.transactionId)

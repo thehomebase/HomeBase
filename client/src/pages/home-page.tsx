@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
+import { insertClientSchema, type Client } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -34,73 +34,37 @@ import {
 import { Plus, LogOut, Mail, Phone } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { format } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
-  const { toast } = useToast();
-  const [open, setOpen] = useState(false);
   const form = useForm({
     resolver: zodResolver(insertClientSchema),
     defaultValues: {
-      firstName: "",
-      lastName: "",
+      name: "",
       email: "",
       phone: "",
       address: "",
       type: "seller",
       status: "active",
       notes: "",
-      labels: [],
-      agentId: user?.id || 0
-    },
-  });
-
-  const createClientMutation = useMutation({
-    mutationFn: async (data: InsertClient) => {
-      if (!user?.id) {
-        throw new Error("User not authenticated");
-      }
-
-      // Send the form data directly, letting server handle sanitization
-      const response = await apiRequest("POST", "/api/clients", {
-        ...data,
-        agentId: user.id,
-        type: data.type || 'seller',
-        status: data.status || 'active',
-        labels: data.labels || []
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create client');
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      form.reset();
-      setOpen(false);
-      toast({
-        title: "Success",
-        description: "Client created successfully"
-      });
-    },
-    onError: (error: Error) => {
-      console.error('Client creation error:', error);
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
     },
   });
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
     enabled: !!user,
+  });
+
+  const createClientMutation = useMutation({
+    mutationFn: async (data: typeof form.getValues) => {
+      await apiRequest("POST", "/api/clients", {
+        ...data,
+        agentId: user?.id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+    },
   });
 
   const sellers = clients.filter((client) => client.type === "seller");
@@ -120,9 +84,7 @@ export default function HomePage() {
       <TableBody>
         {clients.map((client) => (
           <TableRow key={client.id}>
-            <TableCell className="font-medium">
-              {client.firstName} {client.lastName}
-            </TableCell>
+            <TableCell className="font-medium">{client.name}</TableCell>
             <TableCell>
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
@@ -175,7 +137,7 @@ export default function HomePage() {
           <Logo />
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">
-              Logged in as {user?.email} ({user?.role})
+              Logged in as {user?.username} ({user?.role})
             </span>
             <Button
               variant="outline"
@@ -192,7 +154,7 @@ export default function HomePage() {
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold">Client Management</h2>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -205,28 +167,17 @@ export default function HomePage() {
               </DialogHeader>
               <Form {...form}>
                 <form
-                  onSubmit={form.handleSubmit((data) => createClientMutation.mutate(data))}
+                  onSubmit={form.handleSubmit((data) =>
+                    createClientMutation.mutate(data),
+                  )}
                   className="space-y-4"
                 >
                   <FormField
                     control={form.control}
-                    name="firstName"
+                    name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>First Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name</FormLabel>
+                        <FormLabel>Full Name</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
