@@ -113,7 +113,9 @@ export default function ClientsPage() {
       status: "active",
       notes: "",
       agentId: user?.id || 0,
-      labels: []
+      labels: [],
+      createdAt: new Date(),
+      updatedAt: new Date()
     },
   });
 
@@ -122,10 +124,18 @@ export default function ClientsPage() {
 
     try {
       const clientData = {
-        ...data,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email || null,
+        phone: data.phone || null,
+        address: data.address || null,
+        type: data.type || "seller",
+        status: data.status || "active",
+        notes: data.notes || null,
         agentId: user.id,
-        labels: data.labels || [],
-        status: data.status || 'active'
+        labels: Array.isArray(data.labels) ? data.labels : [],
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
       await createClientMutation.mutateAsync(clientData);
       form.reset();
@@ -145,11 +155,7 @@ export default function ClientsPage() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
-      const response = await apiRequest("POST", "/api/clients", {
-        ...data,
-        labels: data.labels || [],
-        status: data.status || 'active'
-      });
+      const response = await apiRequest("POST", "/api/clients", data);
       if (!response.ok) {
         const error = await response.text();
         throw new Error(error);
