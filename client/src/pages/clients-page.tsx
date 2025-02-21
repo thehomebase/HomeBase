@@ -306,14 +306,17 @@ export default function ClientsPage() {
                   <TableCell className="py-3">{client.phone}</TableCell>
                   <TableCell className="py-3">
                     <div className="flex flex-wrap gap-1">
-                      {(client.labels || []).map((label, index) => (
-                        <span
-                          key={`${client.id}-${label}-${index}`}
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getLabelColor(label, index)}`}
-                        >
-                          {label}
-                        </span>
-                      ))}
+                      {(client.labels || []).map((label, index) => {
+                        const colorClass = getLabelColor(label, index);
+                        return (
+                          <span
+                            key={`${client.id}-${label}-${index}`}
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}
+                          >
+                            {label}
+                          </span>
+                        );
+                      })}
                     </div>
                   </TableCell>
                   <TableCell>
