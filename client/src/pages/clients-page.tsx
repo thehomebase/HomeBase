@@ -355,7 +355,7 @@ export default function ClientsPage() {
                                 );
                               })}
                             </div>
-                          ) : client[field as keyof Client]?.toString() || ''}
+                          ) : (client[field as keyof Client]?.toString() || '')}
                         </div>
                       )}
                     </TableCell>
