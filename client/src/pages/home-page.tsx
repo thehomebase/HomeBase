@@ -74,8 +74,8 @@ export default function HomePage() {
 
       const response = await apiRequest("POST", "/api/clients", sanitizedData);
       if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(errorData || 'Failed to create client');
+        const errorData = await response.json(); //Try to parse JSON error response
+        throw new Error(errorData?.message || 'Failed to create client');
       }
       return response.json();
     },
@@ -83,6 +83,10 @@ export default function HomePage() {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       form.reset();
       setOpen(false); // Close dialog after success
+      toast({
+        title: "Success",
+        description: "Client created successfully"
+      });
     },
     onError: (error: Error) => {
       console.error('Error creating client:', error);
@@ -194,9 +198,7 @@ export default function HomePage() {
               </DialogHeader>
               <Form {...form}>
                 <form
-                  onSubmit={form.handleSubmit((data) =>
-                    createClientMutation.mutate(data),
-                  )}
+                  onSubmit={form.handleSubmit((data) => createClientMutation.mutate(data))}
                   className="space-y-4"
                 >
                   <FormField
