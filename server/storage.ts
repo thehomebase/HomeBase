@@ -1,6 +1,6 @@
 import { 
-  users, transactions, checklists, messages, clients,
-  type User, type Transaction, type Checklist, type Message, type Client,
+  users, transactions, checklists, messages, clients, contacts,
+  type User, type Transaction, type Checklist, type Message, type Client, type Contact,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient 
 } from "@shared/schema";
 import { db } from "./db";
@@ -870,18 +870,19 @@ export class DatabaseStorage implements IStorage {
     try {
       const result = await db.execute(sql`
         SELECT 
-          id,
-          first_name as "firstName",
-          last_name as "lastName",
-          email,
-          phone,
-          address,
-          type,
-          status,
-          notes,
-          agent_id as "agentId",
-          created_at as "createdAt",
-          updated_at as "updatedAt"
+          id::integer,
+          first_name::text as "firstName",
+          last_name::text as "lastName",
+          email::text,
+          phone::text,
+          address::text,
+          type::text,
+          status::text,
+          notes::text,
+          labels::text[],
+          agent_id::integer as "agentId",
+          created_at::timestamptz as "createdAt",
+          updated_at::timestamptz as "updatedAt"
         FROM clients 
         WHERE agent_id = ${agentId}
         ORDER BY created_at DESC
@@ -897,9 +898,10 @@ export class DatabaseStorage implements IStorage {
         type: String(row.type),
         status: String(row.status),
         notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
         agentId: Number(row.agentId),
-        createdAt: new Date(row.createdAt).toISOString(),
-        updatedAt: new Date(row.updatedAt).toISOString(),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
       }));
     } catch (error) {
       console.error('Error in getClientsByAgent:', error);
@@ -918,14 +920,67 @@ export class DatabaseStorage implements IStorage {
 
   async createClient(insertClient: InsertClient): Promise<Client> {
     try {
-      const clientData = {
-        ...insertClient,
-        labels: insertClient.labels || [],
-        createdAt: new Date(),
-        updatedAt: new Date()
+      const result = await db.execute(sql`
+        INSERT INTO clients (
+          first_name,
+          last_name,
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id,
+          created_at,
+          updated_at
+        ) VALUES (
+          ${insertClient.firstName},
+          ${insertClient.lastName},
+          ${insertClient.email},
+          ${insertClient.phone},
+          ${insertClient.address},
+          ${insertClient.type},
+          ${insertClient.status},
+          ${insertClient.notes},
+          ${JSON.stringify(insertClient.labels)}::text[],
+          ${insertClient.agentId},
+          NOW(),
+          NOW()
+        )
+        RETURNING 
+          id,
+          first_name as "firstName",
+          last_name as "lastName",
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id as "agentId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+      `);
+
+      const row = result.rows[0];
+
+      return {
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
       };
-      const [client] = await db.insert(clients).values(clientData).returning();
-      return client;
     } catch (error) {
       console.error('Error in createClient:', error);
       throw error;
