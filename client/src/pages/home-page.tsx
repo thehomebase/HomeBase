@@ -71,6 +71,25 @@ export default function HomePage() {
         type: data.type || 'seller',
         status: data.status || 'active'
       };
+      const response = await apiRequest.post("/api/clients", sanitizedData);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      setOpen(false);
+      form.reset();
+      toast({
+        title: "Success",
+        description: "Client added successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create client",
+        variant: "destructive",
+      });
+    }
 
       const response = await apiRequest("POST", "/api/clients", sanitizedData);
       if (!response.ok) {
