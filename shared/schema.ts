@@ -33,7 +33,7 @@ export const clients = pgTable("clients", {
   type: text("type").notNull(), // 'buyer' or 'seller'
   status: text("status").notNull(), // 'active', 'inactive', 'pending'
   notes: text("notes"),
-  labels: text("labels").array().default([]),
+  labels: text("labels").array().$type<string[]>(),
   agentId: integer("agent_id").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

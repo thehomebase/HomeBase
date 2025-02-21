@@ -244,19 +244,37 @@ export default function ClientsPage() {
 
     const handleEditClick = (client: Client, field: string) => {
       setEditingCell({ id: client.id, field });
-      setEditValue(client[field as keyof Client]?.toString() || '');
+      setEditValue(field === 'labels' 
+        ? (client.labels || []).join(', ')
+        : client[field as keyof Client]?.toString() || '');
     };
 
     const handleEditSave = async (client: Client) => {
       if (!editingCell) return;
 
       try {
+        let valueToUpdate = editValue;
+
+        // Special handling for labels
+        if (editingCell.field === 'labels') {
+          const labels = editValue
+            .split(',')
+            .map(label => label.trim())
+            .filter(label => label.length > 0);
+          valueToUpdate = labels;
+        }
+
         const response = await apiRequest("PATCH", `/api/clients/${client.id}`, {
-          [editingCell.field]: editValue
+          [editingCell.field]: valueToUpdate
         });
+
         if (!response.ok) throw new Error("Failed to update client");
         await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
         await refetch();
+        toast({
+          title: "Success",
+          description: "Client updated successfully",
+        });
       } catch (error) {
         console.error("Error updating client:", error);
         toast({
@@ -266,6 +284,21 @@ export default function ClientsPage() {
         });
       }
       setEditingCell(null);
+    };
+
+    const handleLabelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, client: Client) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        const value = e.currentTarget.value.trim();
+        if (value) {
+          const currentLabels = client.labels || [];
+          if (!currentLabels.includes(value)) {
+            const newLabels = [...currentLabels, value];
+            setEditValue('');
+            handleEditSave({ ...client, labels: newLabels });
+          }
+        }
+      }
     };
 
     return (
@@ -310,10 +343,14 @@ export default function ClientsPage() {
                           autoFocus
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
-                          onBlur={() => handleEditSave(client)}
+                          onBlur={() => field === 'labels' ? null : handleEditSave(client)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleEditSave(client);
-                            if (e.key === 'Escape') setEditingCell(null);
+                            if (field === 'labels') {
+                              handleLabelKeyDown(e, client);
+                            } else {
+                              if (e.key === 'Enter') handleEditSave(client);
+                              if (e.key === 'Escape') setEditingCell(null);
+                            }
                           }}
                         />
                       ) : (

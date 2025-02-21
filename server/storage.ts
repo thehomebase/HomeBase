@@ -51,6 +51,8 @@ export interface IStorage {
   sessionStore: session.Store;
   getClientsByAgent(agentId: number):Promise<Client[]>;
   createClient(insertClient:InsertClient):Promise<Client>;
+  updateClient(id: number, data: Partial<Client>): Promise<Client>;
+  updateUser(id: number, data: Partial<User>): Promise<User>;
 
   // Document operations
   getDocumentsByTransaction(transactionId: number): Promise<Document[]>;
@@ -825,7 +827,7 @@ export class DatabaseStorage implements IStorage {
         mobilePhone: result.rows[0].mobile_phone,
         transactionId: result.rows[0].transaction_id
       };
-    } catch (error) {
+    } catch(error) {
       console.error('Error in createContact:', error);
       throw error;
     }
@@ -983,6 +985,189 @@ export class DatabaseStorage implements IStorage {
       };
     } catch (error) {
       console.error('Error in createClient:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM documents 
+        WHERE transaction_id = ${transactionId}
+        ORDER BY id ASC
+      `);
+
+      return result.rows.map(row => ({
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      }));
+    } catch (error) {
+      console.error('Error in getDocumentsByTransaction:', error);
+      return [];
+    }
+  }
+
+  async createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO documents (name, status, transaction_id)
+        VALUES (${document.name}, ${document.status},${document.transactionId})
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in createDocument:', error);
+      throw error;
+    }
+  }
+
+  async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE documents 
+        SET 
+          status = COALESCE(${data.status}, status),
+          name = COALESCE(${data.name}, name)
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in updateDocument:', error);
+      throw error;
+    }
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM documents 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteDocument:', error);
+      throw error;
+    }
+  }
+  async deleteTransaction(id: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM transactions 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteTransaction:', error);
+      throw error;
+    }
+  }
+  async updateClient(id: number, data: Partial<Client>): Promise<Client> {
+    try {
+      const updateFields = Object.entries(data)
+        .filter(([_, value]) => value !== undefined)
+        .map(([key, value]) => {
+          // Convert camelCase to snake_case
+          const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+          if (key === 'labels' && Array.isArray(value)) {
+            return sql`${sql.identifier([snakeKey])} = ${sql.array(value, 'text')}`;
+          }
+
+          if (value === null) {
+            return sql`${sql.identifier([snakeKey])} = NULL`;
+          }
+
+          return sql`${sql.identifier([snakeKey])} = ${value}`;
+        });
+
+      const result = await db.execute(sql`
+        UPDATE clients
+        SET ${sql.join(updateFields, sql`, `)}
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      if (!result.rows[0]) {
+        throw new Error('Client not found');
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.first_name),
+        lastName: String(row.last_name),
+        email: String(row.email),
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agent_id),
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at)
+      };
+    } catch (error) {
+      console.error('Error in updateClient:', error);
+      throw error;
+    }
+  }
+
+  async updateUser(id: number, data: Partial<User>): Promise<User> {
+    try {
+      const updateFields = Object.entries(data)
+        .filter(([_, value]) => value !== undefined)
+        .map(([key, value]) => {
+          // Convert camelCase to snake_case
+          const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+          if (value === null) {
+            return sql`${sql.identifier([snakeKey])} = NULL`;
+          }
+
+          return sql`${sql.identifier([snakeKey])} = ${value}`;
+        });
+
+      const result = await db.execute(sql`
+        UPDATE users
+        SET ${sql.join(updateFields, sql`, `)}
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      if (!result.rows[0]) {
+        throw new Error('User not found');
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        email: String(row.email),
+        password: String(row.password),
+        firstName: String(row.first_name),
+        lastName: String(row.last_name),
+        role: String(row.role),
+        agentId: row.agent_id ? Number(row.agent_id) : null,
+        claimedTransactionId: row.claimed_transaction_id ? Number(row.claimed_transaction_id) : null,
+        claimedAccessCode: row.claimed_access_code ? String(row.claimed_access_code) : null
+      };
+    } catch (error) {
+      console.error('Error in updateUser:', error);
       throw error;
     }
   }
