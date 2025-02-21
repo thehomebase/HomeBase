@@ -324,26 +324,27 @@ export default function ClientsPage() {
                             handleEditClick(client, field)
                           }
                         >
-                          {field === 'labels' && editingCell?.id === client.id && editingCell.field === field ? (
-                            <Input
-                              autoFocus
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              onBlur={() => handleEditSave(client)}
-                              onKeyDown={(e) => {
-                                if (e.key === ' ' || e.key === 'Enter') {
-                                  e.preventDefault();
-                                  const labels = editValue.split(' ').filter(Boolean);
-                                  setEditValue('');
-                                  handleEditSave({...client, labels});
-                                }
-                                if (e.key === 'Escape') setEditingCell(null);
-                              }}
-                            />
-                          ) : (
-                            <div className="flex flex-wrap gap-1">
-                              {client.labels && client.labels.map((label, index) => {
-                                const labelColor = getLabelColor(label, index);
+                          {field === 'labels' ? (
+                            editingCell?.id === client.id && editingCell.field === field ? (
+                              <Input
+                                autoFocus
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onBlur={() => handleEditSave(client)}
+                                onKeyDown={(e) => {
+                                  if (e.key === ' ' || e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const labels = editValue.split(' ').filter(Boolean);
+                                    setEditValue('');
+                                    handleEditSave({...client, labels});
+                                  }
+                                  if (e.key === 'Escape') setEditingCell(null);
+                                }}
+                              />
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {client.labels && client.labels.map((label, index) => {
+                                  const labelColor = getLabelColor(label, index);
                                 return (
                                   <span
                                     key={label}
