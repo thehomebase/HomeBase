@@ -133,7 +133,7 @@ export default function ClientsPage() {
         status: data.status || "active",
         notes: data.notes || null,
         agentId: user.id,
-        labels: Array.isArray(data.labels) ? data.labels : [],
+        labels: Array.isArray(data.labels) ? data.labels : data.labels ? [data.labels].flat() : []
       };
       await createClientMutation.mutateAsync(clientData);
       form.reset();
