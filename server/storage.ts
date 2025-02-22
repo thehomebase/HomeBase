@@ -1052,37 +1052,42 @@ export class DatabaseStorage implements IStorage {
   }
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      const setColumns = Object.entries(data).map(([key, value]) => {
-        const columnName = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-        
-        if (value === null) {
-          return sql`${sql.identifier([columnName])} = NULL`;
-        }
+      // Convert data to snake_case and handle labels specially
+      const updates: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
         if (key === 'labels') {
-          return sql`${sql.identifier([columnName])} = ${JSON.stringify(Array.isArray(value) ? value : [])}::text[]`;
+          updates[snakeKey] = Array.isArray(value) ? value : [];
+        } else {
+          updates[snakeKey] = value;
         }
-        return sql`${sql.identifier([columnName])} = ${value}`;
       });
 
-      const result = await db.execute(sql`
-        UPDATE clients
-        SET ${sql.join(setColumns, sql`, `)}
-        WHERE id = ${id}
-        RETURNING 
-          id,
-          first_name as "firstName",
-          last_name as "lastName",
-          email,
-          phone,
-          address,
-          type,
-          status,
-          notes,
-          labels,
-          agent_id as "agentId",
-          created_at as "createdAt",
-          updated_at as "updatedAt"
-      `);
+      const [updatedClient] = await db
+        .update(clients)
+        .set(updates)
+        .where(sql`id = ${id}`)
+        .returning();
+
+      if (!updatedClient) {
+        throw new Error('Client not found');
+      }
+
+      return {
+        id: Number(updatedClient.id),
+        firstName: String(updatedClient.firstName),
+        lastName: String(updatedClient.lastName),
+        email: updatedClient.email ? String(updatedClient.email) : null,
+        phone: updatedClient.phone ? String(updatedClient.phone) : null,
+        address: updatedClient.address ? String(updatedClient.address) : null,
+        type: String(updatedClient.type),
+        status: String(updatedClient.status),
+        notes: updatedClient.notes ? String(updatedClient.notes) : null,
+        labels: Array.isArray(updatedClient.labels) ? updatedClient.labels : [],
+        agentId: Number(updatedClient.agentId),
+        createdAt: updatedClient.createdAt,
+        updatedAt: updatedClient.updatedAt
+      };
 
       if (!result.rows[0]) {
         throw new Error('Client not found');
