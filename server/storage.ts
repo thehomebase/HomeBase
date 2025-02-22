@@ -1061,11 +1061,25 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Client with ID ${id} not found`);
       }
 
-      // Build update SET clause
-      const updateParts = [];
+      // Create a sanitized version of the data
+      const sanitizedData = { ...data };
+      
+      // Special handling for labels array
+      if (Array.isArray(sanitizedData.labels)) {
+        const labelsArray = sanitizedData.labels.filter(label => 
+          typeof label === 'string' && label.trim().length > 0
+        );
+        await db.execute(sql`
+          UPDATE clients 
+          SET labels = ${labelsArray}
+          WHERE id = ${id}
+        `);
+        delete sanitizedData.labels;
+      }
 
-      // Handle each field separately
-      Object.entries(data).forEach(([key, value]) => {
+      // Handle remaining fields
+      const updateParts = [];
+      Object.entries(sanitizedData).forEach(([key, value]) => {
         if (value !== undefined) {
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
