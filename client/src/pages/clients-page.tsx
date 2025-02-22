@@ -154,6 +154,9 @@ const ClientDetailsPanel = ({
         description: error instanceof Error ? error.message : "Failed to update client",
         variant: "destructive",
       });
+      // Revert the local state on error
+      setEditingClient(client);
+      throw error;
     }
   };
 
@@ -168,10 +171,8 @@ const ClientDetailsPanel = ({
   const handleRemoveLabel = async (indexToRemove: number) => {
     if (!editingClient?.labels) return;
     try {
-      const newLabels = [...editingClient.labels].filter((_, i) => i !== indexToRemove);
-      const updatedClient = { ...editingClient, labels: newLabels };
+      const newLabels = editingClient.labels.filter((_, i) => i !== indexToRemove);
       await handleUpdate('labels', newLabels);
-      setEditingClient(updatedClient);
     } catch (error) {
       toast({
         title: "Error",
