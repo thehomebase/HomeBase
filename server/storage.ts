@@ -1050,33 +1050,40 @@ export class DatabaseStorage implements IStorage {
   }
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      console.log('Processing client update request:', { clientId: id, updateData: data });
-
-      // Create SET clause parts
-      const setParts = [];
-      const values = [];
-      let paramCount = 1;
-
-      for (const [key, value] of Object.entries(data)) {
+      // Clean and prepare data for update
+      const cleanData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined) {
+          // Convert camelCase to snake_case for SQL
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
           if (key === 'labels') {
-            // Special handling for labels array
-            setParts.push(`${snakeKey} = $${paramCount}::text[]`);
-            values.push(value || []);
+            // Handle labels array properly
+            cleanData[snakeKey] = Array.isArray(value) ? value : [];
+          } else if (value === null) {
+            cleanData[snakeKey] = null;
           } else {
-            setParts.push(`${snakeKey} = $${paramCount}`);
-            values.push(value);
+            cleanData[snakeKey] = value;
           }
-          paramCount++;
         }
-      }
+      });
 
-      const query = `
-        UPDATE clients 
-        SET ${setParts.join(', ')}
-        WHERE id = $${paramCount}
+      // Create SET clause for SQL update
+      const setColumns = Object.entries(cleanData).map(([key, value]) => {
+        if (value === null) {
+          return sql`${sql.identifier([key])} = NULL`;
+        }
+        if (key === 'labels') {
+          // Use ARRAY constructor for labels
+          return sql`${sql.identifier([key])} = ARRAY[${value}]::text[]`;
+        }
+        return sql`${sql.identifier([key])} = ${value}`;
+      });
+
+      const result = await db.execute(sql`
+        UPDATE clients
+        SET ${sql.join(setColumns, sql`, `)}
+        WHERE id = ${id}
         RETURNING 
           id,
           first_name as "firstName",
@@ -1091,12 +1098,7 @@ export class DatabaseStorage implements IStorage {
           agent_id as "agentId",
           created_at as "createdAt",
           updated_at as "updatedAt"
-      `;
-
-      // Add the id as the last parameter
-      values.push(id);
-
-      const result = await db.execute(sql.raw(query, ...values));
+      `);
 
       if (!result.rows[0]) {
         throw new Error('Client not found');
