@@ -1072,7 +1072,7 @@ export class DatabaseStorage implements IStorage {
         
         await db.execute(sql`
           UPDATE clients 
-          SET labels = ${sql.array(labelsArray, 'text')}::text[]
+          SET labels = ${labelsArray}
           WHERE id = ${id}
         `);
         delete sanitizedData.labels;
