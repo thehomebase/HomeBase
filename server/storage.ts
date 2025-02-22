@@ -1065,13 +1065,14 @@ export class DatabaseStorage implements IStorage {
       const sanitizedData = { ...data };
       
       // Special handling for labels array
-      if (Array.isArray(sanitizedData.labels)) {
-        const labelsArray = sanitizedData.labels.filter(label => 
-          typeof label === 'string' && label.trim().length > 0
-        );
+      if ('labels' in sanitizedData) {
+        const labelsArray = Array.isArray(sanitizedData.labels) 
+          ? sanitizedData.labels.filter(label => typeof label === 'string' && label.trim().length > 0)
+          : [];
+        
         await db.execute(sql`
           UPDATE clients 
-          SET labels = ${labelsArray}
+          SET labels = ${sql.array(labelsArray, 'text')}::text[]
           WHERE id = ${id}
         `);
         delete sanitizedData.labels;
