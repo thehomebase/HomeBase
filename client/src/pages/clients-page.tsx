@@ -24,11 +24,11 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 } | null;
 
-const ClientCard = ({ client }: { client: Client }) => {
+const ClientCard = ({ client, onSelect }: { client: Client; onSelect: (client: Client) => void }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <Card className="mb-2">
+    <Card className="mb-2" onClick={() => onSelect(client)}>
       <div 
         className="p-3 flex items-center justify-between cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
@@ -77,6 +77,27 @@ const ClientCard = ({ client }: { client: Client }) => {
   );
 };
 
+const ClientDetailsDrawer = ({ client, isOpen, onClose }: { client: Client | null; isOpen: boolean; onClose: () => void }) => {
+  return (
+    <div className={`fixed inset-0 z-50 flex items-center justify-center ${isOpen ? 'block' : 'hidden'}`}>
+      <div className="bg-white w-96 p-6 rounded-lg shadow-md">
+          {client && (
+            <>
+              <h2 className="text-lg font-medium mb-4">Client Details</h2>
+              <div className="mb-2">
+                <p>Name: {client.firstName} {client.lastName}</p>
+                <p>Email: {client.email}</p>
+                <p>Phone: {client.phone}</p>
+                <p>Address: {client.address}</p>
+              </div>
+              <Button onClick={onClose}>Close</Button>
+            </>
+          )}
+      </div>
+    </div>
+  );
+};
+
 export default function ClientsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -84,6 +105,7 @@ export default function ClientsPage() {
   const [, navigate] = useLocation();
   const [location, setLocation] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
   const filterClients = (clients: Client[]) => {
     return clients.filter(client => {
@@ -127,7 +149,7 @@ export default function ClientsPage() {
         (Array.isArray(data.labels) ? data.labels : [data.labels])
           .filter(label => typeof label === 'string' && label.trim().length > 0) : 
         [];
-      
+
       const cleanedData = {
         ...data,
         labels: cleanedLabels,
@@ -358,9 +380,18 @@ export default function ClientsPage() {
             </div>
           ) : (
             clients.map((client) => (
-              <ClientCard key={client.id} client={client} />
+              <ClientCard 
+                key={client.id} 
+                client={client} 
+                onSelect={(client) => setSelectedClient(client)} 
+              />
             ))
           )}
+          <ClientDetailsDrawer 
+            client={selectedClient}
+            isOpen={!!selectedClient}
+            onClose={() => setSelectedClient(null)}
+          />
         </div>
         <AlertDialog open={clientToDelete !== null} onOpenChange={() => setClientToDelete(null)}>
           <AlertDialogContent>
@@ -544,7 +575,7 @@ return (
                         if (!Array.isArray(field.value)) {
                           field.onChange([]);
                         }
-                        
+
                         const existingLabels = Array.from(new Set(
                           clients.flatMap(client => 
                             Array.isArray(client.labels) ? client.labels : []
