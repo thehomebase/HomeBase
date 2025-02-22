@@ -1,10 +1,9 @@
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,17 +17,24 @@ import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from "framer-motion";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Pencil, X } from "lucide-react";
+
 
 type SortConfig = {
   key: keyof Client;
   direction: 'asc' | 'desc';
 } | null;
 
-const ClientCard = ({ client, onSelect }: { client: Client; onSelect: (client: Client) => void }) => {
+const ClientCard = ({ client, onSelect, onEdit }: { 
+  client: Client; 
+  onSelect: (client: Client) => void;
+  onEdit: (client: Client) => void;
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <Card className="mb-2" onClick={() => onSelect(client)}>
+    <Card className="mb-2 relative">
       <div 
         className="p-3 flex items-center justify-between cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
@@ -49,9 +55,29 @@ const ClientCard = ({ client, onSelect }: { client: Client; onSelect: (client: C
             </span>
           </div>
         </div>
-        <ChevronDown className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(client);
+            }}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(client);
+            }}
+          >
+            <ChevronDown className={`h-5 w-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+          </Button>
+        </div>
       </div>
-
       {isExpanded && (
         <CardContent className="pt-0 pb-3 border-t">
           <div className="space-y-2 mt-2">
@@ -77,24 +103,56 @@ const ClientCard = ({ client, onSelect }: { client: Client; onSelect: (client: C
   );
 };
 
-const ClientDetailsDrawer = ({ client, isOpen, onClose }: { client: Client | null; isOpen: boolean; onClose: () => void }) => {
+const ClientDetailsSheet = ({ 
+  client, 
+  isOpen, 
+  onClose 
+}: { 
+  client: Client | null; 
+  isOpen: boolean; 
+  onClose: () => void;
+}) => {
+  const updateClientMutation = useMutation({
+    mutationFn: async (updatedClient: Partial<Client>) => {
+      const response = await fetch(`/api/clients/${client?.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedClient),
+      });
+      if (!response.ok) throw new Error('Failed to update client');
+      return response.json();
+    },
+  });
+
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center ${isOpen ? 'block' : 'hidden'}`}>
-      <div className="bg-white w-96 p-6 rounded-lg shadow-md">
-          {client && (
-            <>
-              <h2 className="text-lg font-medium mb-4">Client Details</h2>
-              <div className="mb-2">
-                <p>Name: {client.firstName} {client.lastName}</p>
-                <p>Email: {client.email}</p>
-                <p>Phone: {client.phone}</p>
-                <p>Address: {client.address}</p>
+    <Sheet open={isOpen} onOpenChange={() => onClose()}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>Client Details</SheetTitle>
+        </SheetHeader>
+        {client && (
+          <div className="space-y-4 mt-4">
+            <div>
+              <h3 className="text-sm font-medium mb-2">Contact Information</h3>
+              <div className="space-y-2">
+                <p className="text-sm">Email: {client.email}</p>
+                <p className="text-sm">Phone: {client.phone}</p>
+                <p className="text-sm">Address: {client.address}</p>
               </div>
-              <Button onClick={onClose}>Close</Button>
-            </>
-          )}
-      </div>
-    </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium mb-2">Additional Details</h3>
+              <div className="space-y-2">
+                <p className="text-sm">Type: {client.type}</p>
+                <p className="text-sm">Status: {client.status}</p>
+                <p className="text-sm">Labels: {client.labels?.join(', ')}</p>
+              </div>
+            </div>
+            <Button onClick={onClose}>Close</Button>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 };
 
@@ -106,22 +164,7 @@ export default function ClientsPage() {
   const [location, setLocation] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-
-  const filterClients = (clients: Client[]) => {
-    return clients.filter(client => {
-      const searchFields = [
-        client.firstName,
-        client.lastName,
-        client.email,
-        client.phone,
-        client.address,
-        ...(client.labels || [])
-      ].map(field => field?.toLowerCase() || '');
-
-      const query = searchQuery.toLowerCase();
-      return searchFields.some(field => field.includes(query));
-    });
-  };
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
 
   const form = useForm<InsertClient & { labelColors: Record<string, string> }>({
     resolver: zodResolver(insertClientSchema),
@@ -384,15 +427,16 @@ export default function ClientsPage() {
                 key={client.id} 
                 client={client} 
                 onSelect={(client) => setSelectedClient(client)} 
+                onEdit={(client) => setEditingClient(client)}
               />
             ))
           )}
-          <ClientDetailsDrawer 
-            client={selectedClient}
-            isOpen={!!selectedClient}
-            onClose={() => setSelectedClient(null)}
-          />
         </div>
+        <ClientDetailsSheet
+          client={selectedClient}
+          isOpen={!!selectedClient}
+          onClose={() => setSelectedClient(null)}
+        />
         <AlertDialog open={clientToDelete !== null} onOpenChange={() => setClientToDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -417,6 +461,109 @@ export default function ClientsPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <AlertDialog 
+          open={editingClient !== null} 
+          onOpenChange={() => setEditingClient(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Edit Client</AlertDialogTitle>
+              <AlertDialogDescription>
+                Update client information
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {editingClient && (
+              <div className="space-y-4">
+                <Input
+                  placeholder="First Name"
+                  defaultValue={editingClient.firstName}
+                  onChange={(e) => {
+                    setEditingClient({
+                      ...editingClient,
+                      firstName: e.target.value
+                    });
+                  }}
+                />
+                <Input
+                  placeholder="Last Name"
+                  defaultValue={editingClient.lastName}
+                  onChange={(e) => {
+                    setEditingClient({
+                      ...editingClient,
+                      lastName: e.target.value
+                    });
+                  }}
+                />
+                <Input
+                  placeholder="Email"
+                  defaultValue={editingClient.email}
+                  onChange={(e) => {
+                    setEditingClient({
+                      ...editingClient,
+                      email: e.target.value
+                    });
+                  }}
+                />
+                <Input
+                  placeholder="Phone"
+                  defaultValue={editingClient.phone}
+                  onChange={(e) => {
+                    setEditingClient({
+                      ...editingClient,
+                      phone: e.target.value
+                    });
+                  }}
+                />
+                <Input
+                  placeholder="Address"
+                  defaultValue={editingClient.address}
+                  onChange={(e) => {
+                    setEditingClient({
+                      ...editingClient,
+                      address: e.target.value
+                    });
+                  }}
+                />
+              </div>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  if (editingClient) {
+                    try {
+                      const response = await fetch(`/api/clients/${editingClient.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(editingClient),
+                      });
+
+                      if (!response.ok) {
+                        throw new Error('Failed to update client');
+                      }
+
+                      await refetchClients();
+                      setEditingClient(null);
+
+                      toast({
+                        title: "Success",
+                        description: "Client updated successfully",
+                      });
+                    } catch (error) {
+                      toast({
+                        title: "Error",
+                        description: error instanceof Error ? error.message : "Failed to update client",
+                        variant: "destructive",
+                      });
+                    }
+                  }
+                }}
+              >
+                Save Changes
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </>
     );
   };
@@ -436,287 +583,42 @@ export default function ClientsPage() {
   };
 
   const prepareLabels = (labels: string[]): string[] => {
-    // Placeholder function - Replace with actual label preparation logic
     return labels;
   };
 
-return (
-  <main className="xs:w-full w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] max-w-full ml-[5px] relative container mx-auto px-4 py-8">
-    <header className="border-b">
-      <div className="container px-4 py-4 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-          <h2 className="text-2xl font-bold">Client Management</h2>
-          {user?.role === "agent" && (
-          <div className="mt-4 md:mt-0">
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Client
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Client</DialogTitle>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="firstName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>First Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="lastName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Last Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                              <Input type="email" {...field} value={field.value || ""} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Phone</FormLabel>
-                            <FormControl>
-                              <Input {...field} value={field.value || ""} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <FormField
-                      control={form.control}
-                      name="address"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Address</FormLabel>
-                          <FormControl>
-                            <Input {...field} value={field.value || ""} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Client Type</FormLabel>
-                          <FormControl>
-                            <select
-                              {...field}
-                              className="w-full px-3 py-2 border rounded-md"
-                            >
-                              <option value="seller">Seller</option>
-                              <option value="buyer">Buyer</option>
-                            </select>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="notes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Notes</FormLabel>
-                          <FormControl>
-                            <textarea
-                              {...field}
-                              value={field.value || ""}
-                              className="w-full px-3 py-2 border rounded-md"
-                              rows={3}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="labels"
-                      render={({ field }) => {
-                        // Ensure field.value is always an array
-                        if (!Array.isArray(field.value)) {
-                          field.onChange([]);
-                        }
-
-                        const existingLabels = Array.from(new Set(
-                          clients.flatMap(client => 
-                            Array.isArray(client.labels) ? client.labels : []
-                          ).filter(label => typeof label === 'string' && label.trim().length > 0)
-                        ));
-
-                        return (
-                          <FormItem>
-                            <FormLabel>Labels</FormLabel>
-                            <div className="space-y-2">
-                              {existingLabels.length > 0 && (
-                                <select
-                                  className="w-full h-9 px-3 rounded-md border bg-background"
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    if (value && !field.value?.includes(value)) {
-                                      field.onChange([...(field.value || []), value]);
-                                    }
-                                  }}
-                                >
-                                  <option value="">Select existing label</option>
-                                  {existingLabels.map((label) => (
-                                    <option key={label} value={label}>
-                                      {label}
-                                    </option>
-                                  ))}
-                                </select>
-                              )}
-                              <FormControl>
-                                <motion.div
-                                  initial={false}
-                                  animate={{ height: "auto" }}
-                                  className="relative"
-                                >
-                                  <Input
-                                    type="text"
-                                    placeholder="Add new label"
-                                    onFocus={(e) => {
-                                      e.currentTarget.parentElement?.classList.add('ring-2', 'ring-primary', 'ring-offset-1');
-                                    }}
-                                    onBlur={(e) => {
-                                      e.currentTarget.parentElement?.classList.remove('ring-2', 'ring-primary', 'ring-offset-1');
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        const value = e.currentTarget.value.trim();
-                                        if (value && !field.value?.includes(value)) {
-                                          // Animate the input clear
-                                          const input = e.currentTarget;
-                                          input.style.transform = 'translateY(-2px)';
-                                          input.style.transition = 'transform 0.1s ease-in-out';
-
-                                          setTimeout(() => {
-                                            input.style.transform = 'translateY(0)';
-                                            field.onChange([...(field.value || []), value]);
-                                            input.value = '';
-                                          }, 100);
-                                        }
-                                      }
-                                    }}
-                                    className="transition-all duration-200 ease-in-out"
-                                  />
-                                </motion.div>
-                              </FormControl>
-                              <div className="flex flex-wrap gap-2">
-                                {(field.value || []).map((label: string, index: number) => {
-                                  const labelColor = getLabelColor(label, index);
-                                  return (
-                                    <AnimatePresence key={label}>
-                                      <motion.span
-                                        initial={{ scale: 0.8, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        exit={{ scale: 0.8, opacity: 0 }}
-                                        whileHover={{ scale: 1.05 }}
-                                        className={`px-2 py-1 ${labelColor} rounded-full text-sm flex items-center gap-1`}
-                                      >
-                                        {label}
-                                        <motion.button
-                                          type="button"
-                                          whileHover={{ scale: 1.2 }}
-                                          whileTap={{ scale: 0.9 }}
-                                          onClick={() => {
-                                            field.onChange((field.value || []).filter((l: string) => l !== label));
-                                          }}
-                                          className="hover:text-destructive transition-colors"
-                                        >
-                                          ×
-                                        </motion.button>
-                                      </motion.span>
-                                    </AnimatePresence>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
-                    />
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={createClientMutation.isPending}
-                    >
-                      {createClientMutation.isPending ? 'Adding...' : 'Add Client'}
-                    </Button>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-          </div>
-          )}
-        </div>
-        <div className="relative">
-          <Input
-            type="text"
-            placeholder="Search clients..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full md:w-96"
-          />
-          <Search className="absolute right-3 top-2.5 h-5 w-5 text-muted-foreground" />
-        </div>
+  return (
+    <main className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Client Management</h2>
+        {user?.role === "agent" && (
+          <Button onClick={() => navigate("/clients/new")}>Add Client</Button>
+        )}
       </div>
-    </header>
 
-    <Card>
-      <Tabs defaultValue="sellers" className="p-6">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="sellers">Sellers</TabsTrigger>
-          <TabsTrigger value="buyers">Buyers</TabsTrigger>
-        </TabsList>
-        <TabsContent value="sellers">
-          <ClientTable clients={sellers} />
-        </TabsContent>
-        <TabsContent value="buyers">
-          <ClientTable clients={buyers} />
-        </TabsContent>
-      </Tabs>
-    </Card>
-  </main>
-);
+      <Input
+        type="text"
+        placeholder="Search clients..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full md:w-96 mb-4"
+      />
+      <Search className="absolute right-3 top-2.5 h-5 w-5 text-muted-foreground" />
+
+
+      <Card>
+        <Tabs defaultValue="sellers" className="p-6">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="sellers">Sellers</TabsTrigger>
+            <TabsTrigger value="buyers">Buyers</TabsTrigger>
+          </TabsList>
+          <TabsContent value="sellers">
+            <ClientTable clients={sellers} />
+          </TabsContent>
+          <TabsContent value="buyers">
+            <ClientTable clients={buyers} />
+          </TabsContent>
+        </Tabs>
+      </Card>
+    </main>
+  );
 }
