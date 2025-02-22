@@ -595,14 +595,6 @@ export default function ClientsPage() {
   const prepareLabels = (labels: string[]): string[] => {
     return labels;
   };
-    return clients.filter(client => 
-      client.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.address?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  };
 
   return (
     <main className="container mx-auto px-4 py-8">
