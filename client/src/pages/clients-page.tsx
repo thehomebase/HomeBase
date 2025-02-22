@@ -174,10 +174,10 @@ const ClientDetailsPanel = ({
       // Create a new array without the removed label
       const newLabels = editingClient.labels.filter((_, i) => i !== indexToRemove);
 
-      // Create updated client data
+      // Create updated client data, ensuring labels is always an array
       const updatedClient = {
         ...editingClient,
-        labels: newLabels
+        labels: newLabels || [] // Ensure labels is never undefined
       };
 
       // Update the client
@@ -185,12 +185,20 @@ const ClientDetailsPanel = ({
 
       // Update local state
       setEditingClient(updatedClient);
+
+      toast({
+        title: "Success",
+        description: "Label removed successfully"
+      });
     } catch (error) {
+      console.error("Error removing label:", error);
       toast({
         title: "Error",
-        description: "Failed to remove label",
+        description: error instanceof Error ? error.message : "Failed to remove label",
         variant: "destructive",
       });
+      // Revert local state on error
+      setEditingClient(editingClient);
     }
   };
 
@@ -540,10 +548,13 @@ export default function ClientsPage() {
 
   const handleClientUpdate = async (updatedClient: Client) => {
     try {
-      // Ensure labels is always an array
+      // Ensure labels is always an array and contains only valid string values
       const sanitizedClient = {
         ...updatedClient,
-        labels: Array.isArray(updatedClient.labels) ? updatedClient.labels : []
+        labels: (Array.isArray(updatedClient.labels) ? updatedClient.labels : [])
+          .filter((label): label is string => 
+            typeof label === 'string' && label.trim().length > 0
+          )
       };
 
       const response = await apiRequest("PATCH", `/api/clients/${sanitizedClient.id}`, sanitizedClient);
