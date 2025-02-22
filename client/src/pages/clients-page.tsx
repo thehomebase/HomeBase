@@ -166,7 +166,8 @@ const ClientDetailsPanel = ({
   };
 
   const handleRemoveLabel = (indexToRemove: number) => {
-    const newLabels = editingClient.labels?.filter((_, i) => i !== indexToRemove);
+    if (!editingClient?.labels) return;
+    const newLabels = [...editingClient.labels].filter((_, i) => i !== indexToRemove) || [];
     handleUpdate('labels', newLabels);
   };
 
