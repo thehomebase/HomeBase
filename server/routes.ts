@@ -150,12 +150,30 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated() || req.user.role !== "agent") {
       return res.sendStatus(401);
     }
+
     try {
-      const client = await storage.updateClient(Number(req.params.id), req.body);
+      // Validate client ID
+      const clientId = Number(req.params.id);
+      if (isNaN(clientId)) {
+        return res.status(400).json({ error: 'Invalid client ID' });
+      }
+
+      console.log('Processing client update request:', {
+        clientId,
+        updateData: req.body
+      });
+
+      const client = await storage.updateClient(clientId, req.body);
+
+      console.log('Client updated successfully:', client);
       res.json(client);
     } catch (error) {
       console.error('Error updating client:', error);
-      res.status(500).json({ error: 'Failed to update client' });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      res.status(500).json({ 
+        error: 'Failed to update client',
+        details: errorMessage
+      });
     }
   });
 

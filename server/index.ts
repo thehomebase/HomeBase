@@ -24,35 +24,49 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', port: process.env.PORT });
 });
 
-// Simplified server startup function
+// Simplified server startup function with port fallback
 async function startServer(server: HttpServer): Promise<void> {
-  const port = Number(process.env.PORT) || 5000;
+  const startPort = Number(process.env.PORT) || 5000;
   const host = '0.0.0.0';
+  const maxRetries = 10;
+  let currentPort = startPort;
+  let started = false;
 
-  log(`Starting server with configuration:`);
-  log(`- PORT from environment: ${process.env.PORT}`);
-  log(`- Computed port: ${port}`);
-  log(`- Host: ${host}`);
+  for (let attempt = 0; attempt < maxRetries && !started; attempt++) {
+    try {
+      log(`Attempting to start server on port ${currentPort} (attempt ${attempt + 1}/${maxRetries})`);
 
-  try {
-    await new Promise<void>((resolve, reject) => {
-      log(`Attempting to bind server to ${host}:${port}...`);
-
-      server.listen(port, host, () => {
-        log(`Server successfully started and listening on ${host}:${port}`);
-        resolve();
-      }).on('error', (err: NodeJS.ErrnoException) => {
-        log(`Error while starting server: ${err.message}`);
-        if (err.code === 'EADDRINUSE') {
-          log(`Port ${port} is already in use, please set a different PORT in .env`);
-        }
-        reject(err);
+      await new Promise<void>((resolve, reject) => {
+        server.listen(currentPort, host)
+          .once('listening', () => {
+            log(`Server successfully started and listening on ${host}:${currentPort}`);
+            // Update PORT environment variable to match actual port
+            process.env.PORT = String(currentPort);
+            started = true;
+            resolve();
+          })
+          .once('error', (err: NodeJS.ErrnoException) => {
+            if (err.code === 'EADDRINUSE') {
+              log(`Port ${currentPort} is in use, trying next port`);
+              currentPort++;
+              server.close();
+              resolve(); // Resolve to try next port
+            } else {
+              reject(err);
+            }
+          });
       });
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log(`Failed to start server: ${errorMessage}`);
-    throw error;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log(`Error on port ${currentPort}: ${errorMessage}`);
+      if (attempt === maxRetries - 1) {
+        throw new Error(`Failed to start server after ${maxRetries} attempts`);
+      }
+    }
+  }
+
+  if (!started) {
+    throw new Error(`Could not find an available port after ${maxRetries} attempts`);
   }
 }
 

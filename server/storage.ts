@@ -1052,98 +1052,83 @@ export class DatabaseStorage implements IStorage {
   }
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      if (!id || !data) {
-        throw new Error('Invalid client data provided');
+      console.log('Starting client update with ID:', id, 'and data:', data);
+
+      // Validate the client exists first
+      const checkResult = await db.execute(sql`
+        SELECT EXISTS(SELECT 1 FROM clients WHERE id = ${id})
+      `);
+
+      if (!checkResult.rows[0]?.exists) {
+        throw new Error(`Client with ID ${id} not found`);
       }
 
-      const updates = [];
-      const values: any[] = [];
-      let paramCount = 1;
+      // Build the update query dynamically
+      const updateColumns = Object.entries(data)
+        .filter(([_, value]) => value !== undefined)
+        .map(([key, value]) => {
+          // Convert camelCase to snake_case
+          const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+          if (value === null) {
+            return sql`${sql.identifier([snakeKey])} = NULL`;
+          }
+          if (Array.isArray(value)) {
+            return sql`${sql.identifier([snakeKey])} = ${JSON.stringify(value)}::jsonb`;
+          }
+          return sql`${sql.identifier([snakeKey])} = ${value}`;
+        });
 
-      if (data.firstName !== undefined) {
-        updates.push(`first_name = $${paramCount}`);
-        values.push(data.firstName);
-        paramCount++;
-      }
-      if (data.lastName !== undefined) {
-        updates.push(`last_name = $${paramCount}`);
-        values.push(data.lastName);
-        paramCount++;
-      }
-      if (data.email !== undefined) {
-        updates.push(`email = $${paramCount}`);
-        values.push(data.email);
-        paramCount++;
-      }
-      if (data.phone !== undefined) {
-        updates.push(`phone = $${paramCount}`);
-        values.push(data.phone);
-        paramCount++;
-      }
-      if (data.address !== undefined) {
-        updates.push(`address = $${paramCount}`);
-        values.push(data.address);
-        paramCount++;
-      }
-      if (data.type !== undefined) {
-        updates.push(`type = $${paramCount}`);
-        values.push(data.type);
-        paramCount++;
-      }
-      if (data.status !== undefined) {
-        updates.push(`status = $${paramCount}`);
-        values.push(data.status);
-        paramCount++;
-      }
-      if (data.notes !== undefined) {
-        updates.push(`notes = $${paramCount}`);
-        values.push(data.notes);
-        paramCount++;
-      }
-      if (data.labels !== undefined) {
-        updates.push(`labels = $${paramCount}::text[]`);
-        values.push(Array.isArray(data.labels) ? data.labels.filter(l => l && typeof l === 'string') : []);
-        paramCount++;
+      if (updateColumns.length === 0) {
+        throw new Error('No valid fields to update');
       }
 
-      updates.push('updated_at = NOW()');
-
-      const query = `
-        UPDATE clients 
-        SET ${updates.join(', ')}
-        WHERE id = $${paramCount}
-        RETURNING *
-      `;
-      values.push(id);
-
-      const result = await db.execute({
-        text: query,
-        values: values
-      });
+      const result = await db.execute(sql`
+        UPDATE clients
+        SET ${sql.join(updateColumns, sql`, `)}
+        WHERE id = ${id}
+        RETURNING 
+          id,
+          first_name as "firstName",
+          last_name as "lastName",
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id as "agentId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+      `);
 
       if (!result.rows[0]) {
-        throw new Error('Client not found');
+        throw new Error('Failed to update client record');
       }
 
-      const row = result.rows[0];
+      console.log('Successfully updated client:', result.rows[0]);
+
+      const updatedClient = result.rows[0];
       return {
-        id: Number(row.id),
-        firstName: String(row.first_name),
-        lastName: String(row.last_name),
-        email: row.email ? String(row.email) : null,
-        phone: row.phone ? String(row.phone) : null,
-        address: row.address ? String(row.address) : null,
-        type: String(row.type),
-        status: String(row.status),
-        notes: row.notes ? String(row.notes) : null,
-        labels: Array.isArray(row.labels) ? row.labels : [],
-        agentId: Number(row.agent_id),
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at)
+        id: Number(updatedClient.id),
+        firstName: String(updatedClient.firstName),
+        lastName: String(updatedClient.lastName),
+        email: String(updatedClient.email),
+        phone: updatedClient.phone ? String(updatedClient.phone) : null,
+        address: updatedClient.address ? String(updatedClient.address) : null,
+        type: String(updatedClient.type),
+        status: String(updatedClient.status),
+        notes: updatedClient.notes ? String(updatedClient.notes) : null,
+        labels: Array.isArray(updatedClient.labels) ? updatedClient.labels : [],
+        agentId: Number(updatedClient.agentId),
+        createdAt: new Date(updatedClient.createdAt).toISOString(),
+        updatedAt: new Date(updatedClient.updatedAt).toISOString()
       };
     } catch (error) {
       console.error('Error in updateClient:', error);
-      throw error;
+      throw error instanceof Error 
+        ? error 
+        : new Error('An unexpected error occurred while updating the client');
     }
   }
 
