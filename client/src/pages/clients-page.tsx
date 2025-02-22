@@ -165,10 +165,20 @@ const ClientDetailsPanel = ({
     }
   };
 
-  const handleRemoveLabel = (indexToRemove: number) => {
+  const handleRemoveLabel = async (indexToRemove: number) => {
     if (!editingClient?.labels) return;
-    const newLabels = [...editingClient.labels].filter((_, i) => i !== indexToRemove) || [];
-    handleUpdate('labels', newLabels);
+    try {
+      const newLabels = [...editingClient.labels].filter((_, i) => i !== indexToRemove);
+      const updatedClient = { ...editingClient, labels: newLabels };
+      await handleUpdate('labels', newLabels);
+      setEditingClient(updatedClient);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to remove label",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
