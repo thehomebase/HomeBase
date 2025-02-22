@@ -827,14 +827,14 @@ export class DatabaseStorage implements IStorage {
         transactionId: result.rows[0].transaction_id
       };
     } catch (error) {
-      console.error('Error increateContact:', error);
+      console.error('Error in createContact:', error);
       throw error;
     }
   }
 
   async updateContact(id: number, data: Partial<Contact>): Promise<Contact> {
     try {
-      const result = await db.execute(sql`
+            const result = awaitdb.execute(sql`
         UPDATE contacts 
         SET 
           role = COALESCE(${data.role}, role),
@@ -1050,41 +1050,45 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
-
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      // Clean and prepare data for update
-      const cleanData: Record<string, any> = {};
+      // First check if client exists
+      const existingClient = await db.execute(sql`
+        SELECT EXISTS(SELECT 1 FROM clients WHERE id = ${id})
+      `);
+
+      if (!existingClient.rows[0]?.exists) {
+        throw new Error(`Client with ID ${id} not found`);
+      }
+
+      // Build update SET clause
+      const updateParts = [];
+
+      // Handle each field separately
       Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined) {
-          // Convert camelCase to snake_case for SQL
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
           if (key === 'labels') {
-            // Ensure labels is properly formatted as a text array
-            cleanData[snakeKey] = Array.isArray(value) ? sql`ARRAY[${value}]::text[]` : sql`ARRAY[]::text[]`;
+            // Special handling for labels array - handle both empty and non-empty cases
+            const labelArray = Array.isArray(value) ? value : [];
+            // Use PostgreSQL's ARRAY constructor with proper string escaping
+            updateParts.push(sql`${sql.identifier([snakeKey])} = ${sql.array(labelArray, 'text')}`);
           } else if (value === null) {
-            cleanData[snakeKey] = null;
+            updateParts.push(sql`${sql.identifier([snakeKey])} = NULL`);
           } else {
-            cleanData[snakeKey] = value;
+            updateParts.push(sql`${sql.identifier([snakeKey])} = ${value}`);
           }
         }
       });
 
-      // Create SET clause for SQL update
-      const setColumns = Object.entries(cleanData).map(([key, value]) => {
-        if (value === null) {
-          return sql`${sql.identifier([key])} = NULL`;
-        }
-        if (key === 'labels') {
-          return sql`${sql.identifier([key])} = ${value}`;
-        }
-        return sql`${sql.identifier([key])} = ${value}`;
-      });
+      // Add updated_at timestamp
+      updateParts.push(sql`updated_at = NOW()`);
 
+      // Execute the update query
       const result = await db.execute(sql`
         UPDATE clients
-        SET ${sql.join(setColumns, sql`, `)}
+        SET ${sql.join(updateParts, sql`, `)}
         WHERE id = ${id}
         RETURNING 
           id,
@@ -1103,24 +1107,24 @@ export class DatabaseStorage implements IStorage {
       `);
 
       if (!result.rows[0]) {
-        throw new Error('Client not found');
+        throw new Error('Failed to update client');
       }
 
       const row = result.rows[0];
       return {
         id: Number(row.id),
-        firstName: String(row.firstName),
-        lastName: String(row.lastName),
+        firstName: row.firstName,
+        lastName: row.lastName,
         email: row.email,
         phone: row.phone,
         address: row.address,
-        type: row.type,
-        status: row.status,
+        type: String(row.type),
+        status: String(row.status),
         notes: row.notes,
         labels: Array.isArray(row.labels) ? row.labels : [],
         agentId: Number(row.agentId),
-        createdAt: new Date(row.createdAt),
-        updatedAt: new Date(row.updatedAt)
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt
       };
     } catch (error) {
       console.error('Error in updateClient:', error);
@@ -1311,7 +1315,6 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
-
 }
 
 export const storage = new DatabaseStorage();
