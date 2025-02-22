@@ -1050,41 +1050,41 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
+
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      console.log('Starting client update with ID:', id, 'and data:', data);
-
-      // Validate the client exists first
-      const checkResult = await db.execute(sql`
-        SELECT EXISTS(SELECT 1 FROM clients WHERE id = ${id})
-      `);
-
-      if (!checkResult.rows[0]?.exists) {
-        throw new Error(`Client with ID ${id} not found`);
-      }
-
-      // Build the update query dynamically
-      const updateColumns = Object.entries(data)
-        .filter(([_, value]) => value !== undefined)
-        .map(([key, value]) => {
-          // Convert camelCase to snake_case
+      // Clean and prepare data for update
+      const cleanData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined) {
+          // Convert camelCase to snake_case for SQL
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-          if (value === null) {
-            return sql`${sql.identifier([snakeKey])} = NULL`;
-          }
-          if (Array.isArray(value)) {
-            return sql`${sql.identifier([snakeKey])} = ${JSON.stringify(value)}::jsonb`;
-          }
-          return sql`${sql.identifier([snakeKey])} = ${value}`;
-        });
 
-      if (updateColumns.length === 0) {
-        throw new Error('No valid fields to update');
-      }
+          if (key === 'labels') {
+            // Ensure labels is properly formatted as a text array
+            cleanData[snakeKey] = Array.isArray(value) ? sql`ARRAY[${value}]::text[]` : sql`ARRAY[]::text[]`;
+          } else if (value === null) {
+            cleanData[snakeKey] = null;
+          } else {
+            cleanData[snakeKey] = value;
+          }
+        }
+      });
+
+      // Create SET clause for SQL update
+      const setColumns = Object.entries(cleanData).map(([key, value]) => {
+        if (value === null) {
+          return sql`${sql.identifier([key])} = NULL`;
+        }
+        if (key === 'labels') {
+          return sql`${sql.identifier([key])} = ${value}`;
+        }
+        return sql`${sql.identifier([key])} = ${value}`;
+      });
 
       const result = await db.execute(sql`
         UPDATE clients
-        SET ${sql.join(updateColumns, sql`, `)}
+        SET ${sql.join(setColumns, sql`, `)}
         WHERE id = ${id}
         RETURNING 
           id,
@@ -1103,32 +1103,28 @@ export class DatabaseStorage implements IStorage {
       `);
 
       if (!result.rows[0]) {
-        throw new Error('Failed to update client record');
+        throw new Error('Client not found');
       }
 
-      console.log('Successfully updated client:', result.rows[0]);
-
-      const updatedClient = result.rows[0];
+      const row = result.rows[0];
       return {
-        id: Number(updatedClient.id),
-        firstName: String(updatedClient.firstName),
-        lastName: String(updatedClient.lastName),
-        email: String(updatedClient.email),
-        phone: updatedClient.phone ? String(updatedClient.phone) : null,
-        address: updatedClient.address ? String(updatedClient.address) : null,
-        type: String(updatedClient.type),
-        status: String(updatedClient.status),
-        notes: updatedClient.notes ? String(updatedClient.notes) : null,
-        labels: Array.isArray(updatedClient.labels) ? updatedClient.labels : [],
-        agentId: Number(updatedClient.agentId),
-        createdAt: new Date(updatedClient.createdAt).toISOString(),
-        updatedAt: new Date(updatedClient.updatedAt).toISOString()
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email,
+        phone: row.phone,
+        address: row.address,
+        type: row.type,
+        status: row.status,
+        notes: row.notes,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
       };
     } catch (error) {
       console.error('Error in updateClient:', error);
-      throw error instanceof Error 
-        ? error 
-        : new Error('An unexpected error occurred while updating the client');
+      throw error;
     }
   }
 
