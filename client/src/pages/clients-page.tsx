@@ -206,12 +206,7 @@ const ClientDetailsPanel = ({
     <Sheet open={isOpen} onOpenChange={() => onClose()}>
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
         <SheetHeader className="space-y-4">
-          <SheetTitle className="flex items-center justify-between">
-            Client Details
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </SheetTitle>
+          <SheetTitle>Client Details</SheetTitle>
         </SheetHeader>
 
         <div className="space-y-6 mt-6">
