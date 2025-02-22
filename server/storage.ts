@@ -1137,28 +1137,6 @@ export class DatabaseStorage implements IStorage {
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at)
       };
-      `);
-
-      if (!result.rows[0]) {
-        throw new Error('Client not found');
-      }
-
-      const row = result.rows[0];
-      return {
-        id: Number(row.id),
-        firstName: String(row.first_name),
-        lastName: String(row.last_name),
-        email: row.email ? String(row.email) : null,
-        phone: row.phone ? String(row.phone) : null,
-        address: row.address ? String(row.address) : null,
-        type: String(row.type),
-        status: String(row.status),
-        notes: row.notes ? String(row.notes) : null,
-        labels: Array.isArray(row.labels) ? row.labels : [],
-        agentId: Number(row.agent_id),
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at)
-      };
     } catch (error) {
       console.error('Error in updateClient:', error);
       throw error;
