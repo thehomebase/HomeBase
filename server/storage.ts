@@ -1052,6 +1052,9 @@ export class DatabaseStorage implements IStorage {
   }
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
+      // Prepare labels array properly
+      const labelsArray = data.labels && Array.isArray(data.labels) ? data.labels : [];
+      
       const result = await db.execute(sql`
         UPDATE clients 
         SET 
@@ -1063,7 +1066,7 @@ export class DatabaseStorage implements IStorage {
           type = COALESCE(${data.type}, type),
           status = COALESCE(${data.status}, status),
           notes = COALESCE(${data.notes}, notes),
-          labels = COALESCE(${Array.isArray(data.labels) ? data.labels : []}::text[], labels),
+          labels = COALESCE(${sql.array(labelsArray, 'text')}::text[], labels),
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *
