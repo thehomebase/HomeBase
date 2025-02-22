@@ -1052,22 +1052,31 @@ export class DatabaseStorage implements IStorage {
   }
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      // Create SET clause for SQL update
-      const setColumns = Object.entries(data).map(([key, value]) => {
-        if (value === null) {
-          return sql`${sql.identifier([key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)])} = NULL`;
-        }
-        if (key === 'labels' && Array.isArray(value)) {
-          // Cast the array to text[] instead of jsonb
-          return sql`${sql.identifier([key])} = ${value}::text[]`;
-        }
-        return sql`${sql.identifier([key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)])} = ${value}`;
-      });
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
 
-      const result = await db.execute(sql`
-        UPDATE clients
-        SET ${sql.join(setColumns, sql`, `)}
-        WHERE id = ${id}
+      // Handle each field appropriately
+      for (const [key, value] of Object.entries(data)) {
+        const columnName = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+        if (value === null) {
+          updates.push(`${columnName} = NULL`);
+        } else if (key === 'labels') {
+          updates.push(`${columnName} = $${paramCount}::text[]`);
+          values.push(Array.isArray(value) ? value : []);
+          paramCount++;
+        } else {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        }
+      }
+
+      const query = `
+        UPDATE clients 
+        SET ${updates.join(', ')}
+        WHERE id = $${paramCount}
         RETURNING 
           id,
           first_name as "firstName",
@@ -1081,7 +1090,12 @@ export class DatabaseStorage implements IStorage {
           labels,
           agent_id as "agentId",
           created_at as "createdAt"
-      `);
+      `;
+
+      const result = await db.execute({
+        text: query,
+        values: [...values, id]
+      });
 
       if (!result.rows[0]) {
         throw new Error('Client not found');
@@ -1107,6 +1121,7 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
+
 }
 
 export const storage = new DatabaseStorage();
