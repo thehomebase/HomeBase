@@ -829,12 +829,10 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error increateContact:', error);
       throw error;
-    }
-  }
+    }    }
 
   async updateContact(id: number, data: Partial<Contact>): Promise<Contact> {
-    try {
-      const result = await db.execute(sql`
+    try {      const result = await db.execute(sql`
         UPDATE contacts 
         SET 
           role = COALESCE(${data.role}, role),
@@ -1053,38 +1051,30 @@ export class DatabaseStorage implements IStorage {
 
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      // Clean and prepare data for update
-      const cleanData: Record<string, any> = {};
+      // Build update query parts
+      const updates: any[] = [];
+
       Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined) {
-          // Convert camelCase to snake_case for SQL
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
           if (key === 'labels') {
-            // Ensure labels is properly formatted as a text array
-            cleanData[snakeKey] = Array.isArray(value) ? sql`ARRAY[${value}]::text[]` : sql`ARRAY[]::text[]`;
-          } else if (value === null) {
-            cleanData[snakeKey] = null;
+            // Handle labels as a PostgreSQL text array
+            const labelValues = Array.isArray(value) ? value : [];
+            updates.push(sql`${sql.identifier([snakeKey])} = ${sql.array(labelValues)}::text[]`);
           } else {
-            cleanData[snakeKey] = value;
+            updates.push(sql`${sql.identifier([snakeKey])} = ${value}`);
           }
         }
       });
 
-      // Create SET clause for SQL update
-      const setColumns = Object.entries(cleanData).map(([key, value]) => {
-        if (value === null) {
-          return sql`${sql.identifier([key])} = NULL`;
-        }
-        if (key === 'labels') {
-          return sql`${sql.identifier([key])} = ${value}`;
-        }
-        return sql`${sql.identifier([key])} = ${value}`;
-      });
+      if (updates.length === 0) {
+        throw new Error('No fields to update');
+      }
 
       const result = await db.execute(sql`
-        UPDATE clients
-        SET ${sql.join(setColumns, sql`, `)}
+        UPDATE clients 
+        SET ${sql.join(updates, sql`, `)}
         WHERE id = ${id}
         RETURNING 
           id,
@@ -1311,7 +1301,6 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
-
 }
 
 export const storage = new DatabaseStorage();
