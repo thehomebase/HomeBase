@@ -41,8 +41,8 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 } | null;
 
-const ClientCard = ({ client, onSelect, onEdit }: { 
-  client: Client; 
+const ClientCard = ({ client, onSelect, onEdit }: {
+  client: Client;
   onSelect: (client: Client) => void;
   onEdit: (client: Client) => void;
 }) => {
@@ -50,7 +50,7 @@ const ClientCard = ({ client, onSelect, onEdit }: {
 
   return (
     <Card className="mb-2 relative">
-      <div 
+      <div
         className="p-3 flex items-center justify-between cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -118,12 +118,12 @@ const ClientCard = ({ client, onSelect, onEdit }: {
   );
 };
 
-const ClientDetailsPanel = ({ 
-  client, 
-  isOpen, 
+const ClientDetailsPanel = ({
+  client,
+  isOpen,
   onClose,
-  onUpdate 
-}: { 
+  onUpdate
+}: {
   client: Client | null;
   isOpen: boolean;
   onClose: () => void;
@@ -171,8 +171,20 @@ const ClientDetailsPanel = ({
   const handleRemoveLabel = async (indexToRemove: number) => {
     if (!editingClient?.labels) return;
     try {
+      // Create a new array without the removed label
       const newLabels = editingClient.labels.filter((_, i) => i !== indexToRemove);
-      await handleUpdate('labels', newLabels);
+
+      // Create updated client data
+      const updatedClient = {
+        ...editingClient,
+        labels: newLabels
+      };
+
+      // Update the client
+      await onUpdate(updatedClient);
+
+      // Update local state
+      setEditingClient(updatedClient);
     } catch (error) {
       toast({
         title: "Error",
@@ -322,11 +334,11 @@ const ClientDetailsPanel = ({
   );
 };
 
-const TableContent = ({ 
+const TableContent = ({
   clients,
   onUpdate,
-  onDelete 
-}: { 
+  onDelete
+}: {
   clients: Client[];
   onUpdate: (client: Client) => Promise<void>;
   onDelete: (clientId: number) => void;
@@ -396,7 +408,7 @@ const TableContent = ({
           </TableHeader>
           <TableBody>
             {clients.map((client, index) => (
-              <TableRow 
+              <TableRow
                 key={client.id}
                 className={`hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
                   index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
@@ -457,9 +469,9 @@ const TableContent = ({
           </div>
         ) : (
           clients.map((client) => (
-            <ClientCard 
-              key={client.id} 
-              client={client} 
+            <ClientCard
+              key={client.id}
+              client={client}
               onSelect={(client) => setSelectedClient(client)}
               onEdit={(client) => setSelectedClient(client)}
             />
@@ -478,19 +490,19 @@ const TableContent = ({
   );
 };
 
-const ClientTable = ({ 
-  clients, 
+const ClientTable = ({
+  clients,
   searchQuery,
   onUpdate,
   onDelete
-}: { 
+}: {
   clients: Client[];
   searchQuery: string;
   onUpdate: (client: Client) => Promise<void>;
   onDelete: (clientId: number) => void;
 }) => {
   const filterClients = (clients: Client[]) => {
-    return clients.filter(client => 
+    return clients.filter(client =>
       client.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -528,8 +540,18 @@ export default function ClientsPage() {
 
   const handleClientUpdate = async (updatedClient: Client) => {
     try {
-      const response = await apiRequest("PATCH", `/api/clients/${updatedClient.id}`, updatedClient);
-      if (!response.ok) throw new Error("Failed to update client");
+      // Ensure labels is always an array
+      const sanitizedClient = {
+        ...updatedClient,
+        labels: Array.isArray(updatedClient.labels) ? updatedClient.labels : []
+      };
+
+      const response = await apiRequest("PATCH", `/api/clients/${sanitizedClient.id}`, sanitizedClient);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update client");
+      }
+
       await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Success",
@@ -592,9 +614,9 @@ export default function ClientsPage() {
     if (!user?.id) return;
 
     try {
-      const cleanedLabels = data.labels ? 
+      const cleanedLabels = data.labels ?
         (Array.isArray(data.labels) ? data.labels : [data.labels])
-          .filter(label => typeof label === 'string' && label.trim().length > 0) : 
+          .filter(label => typeof label === 'string' && label.trim().length > 0) :
         [];
 
       const cleanedData = {
@@ -665,9 +687,9 @@ export default function ClientsPage() {
       </div>
 
       <Card>
-        <ClientTable 
-          clients={clients} 
-          searchQuery={searchQuery} 
+        <ClientTable
+          clients={clients}
+          searchQuery={searchQuery}
           onUpdate={handleClientUpdate}
           onDelete={setClientToDelete}
         />
