@@ -1081,15 +1081,10 @@ export class DatabaseStorage implements IStorage {
       // Handle remaining fields
       const updateParts = [];
       Object.entries(sanitizedData).forEach(([key, value]) => {
-        if (value !== undefined) {
+        if (value !== undefined && key !== 'updatedAt') {
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-
-          if (key === 'labels') {
-            // Special handling for labels array - handle both empty and non-empty cases
-            const labelArray = Array.isArray(value) ? value : [];
-            // Use PostgreSQL's ARRAY constructor with proper string escaping
-            updateParts.push(sql`${sql.identifier([snakeKey])} = ${sql.array(labelArray, 'text')}`);
-          } else if (value === null) {
+          
+          if (value === null) {
             updateParts.push(sql`${sql.identifier([snakeKey])} = NULL`);
           } else {
             updateParts.push(sql`${sql.identifier([snakeKey])} = ${value}`);
@@ -1097,8 +1092,8 @@ export class DatabaseStorage implements IStorage {
         }
       });
 
-      // Add updated_at timestamp
-      updateParts.push(sql`updated_at = NOW()`);
+      // Add single updated_at timestamp
+      updateParts.push(sql`updated_at = CURRENT_TIMESTAMP`);
 
       // Execute the update query
       const result = await db.execute(sql`
