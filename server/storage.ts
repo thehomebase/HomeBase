@@ -1052,22 +1052,29 @@ export class DatabaseStorage implements IStorage {
   }
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      const result = await db.execute(sql`
-        UPDATE clients 
-        SET 
-          first_name = COALESCE(${data.firstName}, first_name),
-          last_name = COALESCE(${data.lastName}, last_name),
-          email = COALESCE(${data.email}, email),
-          phone = COALESCE(${data.phone}, phone),
-          address = COALESCE(${data.address}, address),
-          type = COALESCE(${data.type}, type),
-          status = COALESCE(${data.status}, status),
-          notes = COALESCE(${data.notes}, notes),
-          labels = COALESCE(${Array.isArray(data.labels) ? JSON.stringify(data.labels) : null}::jsonb, labels),
-          updated_at = NOW()
-        WHERE id = ${id}
-        RETURNING *
-      `);
+      // Ensure labels is an array if provided
+      const labels = data.labels ? (Array.isArray(data.labels) ? data.labels : [data.labels]) : undefined;
+
+      const result = await db
+        .update(clients)
+        .set({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
+          type: data.type,
+          status: data.status,
+          notes: data.notes,
+          labels: labels,
+          updatedAt: new Date()
+        })
+        .where(sql`id = ${id}`)
+        .returning();
+
+      if (!result || result.length === 0) {
+        throw new Error('Client not found');
+      }
 
       if (!result.rows[0]) {
         throw new Error('Client not found');
