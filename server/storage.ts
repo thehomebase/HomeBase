@@ -1052,41 +1052,42 @@ export class DatabaseStorage implements IStorage {
   }
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      // Convert data to snake_case and handle labels specially
-      const updates: Record<string, any> = {};
-      Object.entries(data).forEach(([key, value]) => {
-        const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-        if (key === 'labels') {
-          updates[snakeKey] = Array.isArray(value) ? value : [];
-        } else {
-          updates[snakeKey] = value;
-        }
-      });
+      const result = await db.execute(sql`
+        UPDATE clients 
+        SET 
+          first_name = COALESCE(${data.firstName}, first_name),
+          last_name = COALESCE(${data.lastName}, last_name),
+          email = COALESCE(${data.email}, email),
+          phone = COALESCE(${data.phone}, phone),
+          address = COALESCE(${data.address}, address),
+          type = COALESCE(${data.type}, type),
+          status = COALESCE(${data.status}, status),
+          notes = COALESCE(${data.notes}, notes),
+          labels = COALESCE(${Array.isArray(data.labels) ? JSON.stringify(data.labels) : null}::jsonb, labels),
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `);
 
-      const [updatedClient] = await db
-        .update(clients)
-        .set(updates)
-        .where(sql`id = ${id}`)
-        .returning();
-
-      if (!updatedClient) {
+      if (!result.rows[0]) {
         throw new Error('Client not found');
       }
 
+      const row = result.rows[0];
       return {
-        id: Number(updatedClient.id),
-        firstName: String(updatedClient.firstName),
-        lastName: String(updatedClient.lastName),
-        email: updatedClient.email ? String(updatedClient.email) : null,
-        phone: updatedClient.phone ? String(updatedClient.phone) : null,
-        address: updatedClient.address ? String(updatedClient.address) : null,
-        type: String(updatedClient.type),
-        status: String(updatedClient.status),
-        notes: updatedClient.notes ? String(updatedClient.notes) : null,
-        labels: Array.isArray(updatedClient.labels) ? updatedClient.labels : [],
-        agentId: Number(updatedClient.agentId),
-        createdAt: updatedClient.createdAt,
-        updatedAt: updatedClient.updatedAt
+        id: Number(row.id),
+        firstName: String(row.first_name),
+        lastName: String(row.last_name),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agent_id),
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at)
       };
 
       if (!result.rows[0]) {
