@@ -578,16 +578,6 @@ export default function ClientsPage() {
     );
   };
 
-  const filterClients = (clients: Client[]) => {
-    return clients.filter(client => 
-      client.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.address?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  };
-
   const getLabelColor = (label: string, index: number) => {
     const allColors = [
       'bg-blue-100 text-blue-800 border border-blue-200',
