@@ -1051,30 +1051,39 @@ export class DatabaseStorage implements IStorage {
 
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      // Build update query parts
-      const updates: any[] = [];
-
+      // Clean and prepare data for update
+      const cleanData: Record<string, any> = {};
       Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined) {
+          // Convert camelCase to snake_case for SQL
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
           if (key === 'labels') {
-            // Handle labels as a PostgreSQL text array
-            const labelValues = Array.isArray(value) ? value : [];
-            updates.push(sql`${sql.identifier([snakeKey])} = ${sql.array(labelValues)}::text[]`);
+            // Handle labels specifically - ensure it's always an array
+            cleanData[snakeKey] = value || [];
+          } else if (value === null) {
+            cleanData[snakeKey] = null;
           } else {
-            updates.push(sql`${sql.identifier([snakeKey])} = ${value}`);
+            cleanData[snakeKey] = value;
           }
         }
       });
 
-      if (updates.length === 0) {
-        throw new Error('No fields to update');
-      }
+      // Create SET clause for SQL update
+      const setColumns = Object.entries(cleanData).map(([key, value]) => {
+        if (value === null) {
+          return sql`${sql.identifier([key])} = NULL`;
+        }
+        if (key === 'labels') {
+          // Cast empty array as text[] for PostgreSQL
+          return sql`${sql.identifier([key])} = ${value}::text[]`;
+        }
+        return sql`${sql.identifier([key])} = ${value}`;
+      });
 
       const result = await db.execute(sql`
-        UPDATE clients 
-        SET ${sql.join(updates, sql`, `)}
+        UPDATE clients
+        SET ${sql.join(setColumns, sql`, `)}
         WHERE id = ${id}
         RETURNING 
           id,
