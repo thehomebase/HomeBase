@@ -1052,24 +1052,91 @@ export class DatabaseStorage implements IStorage {
   }
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      // Prepare labels array properly
-      const labelsArray = data.labels && Array.isArray(data.labels) ? data.labels : [];
-      
-      const result = await db.execute(sql`
+      const updates = [];
+      const values: any[] = [];
+      let paramCount = 1;
+
+      if (data.firstName !== undefined) {
+        updates.push(`first_name = $${paramCount}`);
+        values.push(data.firstName);
+        paramCount++;
+      }
+      if (data.lastName !== undefined) {
+        updates.push(`last_name = $${paramCount}`);
+        values.push(data.lastName);
+        paramCount++;
+      }
+      if (data.email !== undefined) {
+        updates.push(`email = $${paramCount}`);
+        values.push(data.email);
+        paramCount++;
+      }
+      if (data.phone !== undefined) {
+        updates.push(`phone = $${paramCount}`);
+        values.push(data.phone);
+        paramCount++;
+      }
+      if (data.address !== undefined) {
+        updates.push(`address = $${paramCount}`);
+        values.push(data.address);
+        paramCount++;
+      }
+      if (data.type !== undefined) {
+        updates.push(`type = $${paramCount}`);
+        values.push(data.type);
+        paramCount++;
+      }
+      if (data.status !== undefined) {
+        updates.push(`status = $${paramCount}`);
+        values.push(data.status);
+        paramCount++;
+      }
+      if (data.notes !== undefined) {
+        updates.push(`notes = $${paramCount}`);
+        values.push(data.notes);
+        paramCount++;
+      }
+      if (data.labels !== undefined) {
+        updates.push(`labels = $${paramCount}`);
+        values.push(Array.isArray(data.labels) ? data.labels : []);
+        paramCount++;
+      }
+
+      updates.push('updated_at = NOW()');
+
+      const query = `
         UPDATE clients 
-        SET 
-          first_name = COALESCE(${data.firstName}, first_name),
-          last_name = COALESCE(${data.lastName}, last_name),
-          email = COALESCE(${data.email}, email),
-          phone = COALESCE(${data.phone}, phone),
-          address = COALESCE(${data.address}, address),
-          type = COALESCE(${data.type}, type),
-          status = COALESCE(${data.status}, status),
-          notes = COALESCE(${data.notes}, notes),
-          labels = COALESCE(${sql.array(labelsArray, 'text')}::text[], labels),
-          updated_at = NOW()
-        WHERE id = ${id}
+        SET ${updates.join(', ')}
+        WHERE id = $${paramCount}
         RETURNING *
+      `;
+      values.push(id);
+
+      const result = await db.execute({
+        text: query,
+        values: values
+      });
+
+      if (!result.rows[0]) {
+        throw new Error('Client not found');
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.first_name),
+        lastName: String(row.last_name),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agent_id),
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at)
+      };
       `);
 
       if (!result.rows[0]) {
