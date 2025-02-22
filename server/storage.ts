@@ -1052,42 +1052,43 @@ export class DatabaseStorage implements IStorage {
   }
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      const updates = [];
-      const values = [];
-      let paramCount = 1;
+      const result = await db.execute(sql`
+        UPDATE clients 
+        SET 
+          first_name = COALESCE(${data.firstName}, first_name),
+          last_name = COALESCE(${data.lastName}, last_name),
+          email = COALESCE(${data.email}, email),
+          phone = COALESCE(${data.phone}, phone),
+          address = COALESCE(${data.address}, address),
+          type = COALESCE(${data.type}, type),
+          status = COALESCE(${data.status}, status),
+          notes = COALESCE(${data.notes}, notes),
+          labels = COALESCE(${Array.isArray(data.labels) ? data.labels : []}::text[], labels),
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `);
 
-      // Handle each field appropriately
-      for (const [key, value] of Object.entries(data)) {
-        const columnName = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-
-        if (value === null) {
-          updates.push(`${columnName} = NULL`);
-        } else if (key === 'labels') {
-          // Ensure labels is always an array, even if empty
-          const labelsArray = Array.isArray(value) ? value : [];
-          updates.push(`${columnName} = $${paramCount}::jsonb`);
-          values.push(JSON.stringify(labelsArray));
-          paramCount++;
-        } else {
-          updates.push(`${columnName} = $${paramCount}`);
-          values.push(value);
-          paramCount++;
-        }
+      if (!result.rows[0]) {
+        throw new Error('Client not found');
       }
 
-      if (updates.length === 0) {
-        throw new Error('No fields to update');
-      }
-
-      const result = await db.query(
-        `UPDATE clients 
-         SET ${updates.join(', ')}, updated_at = NOW() 
-         WHERE id = $${paramCount} 
-         RETURNING *`,
-        [...values, id]
-      );
-
-      return result.rows[0];
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.first_name),
+        lastName: String(row.last_name),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agent_id),
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at)
+      };
     } catch (error) {
       console.error('Error in updateClient:', error);
       throw error;
