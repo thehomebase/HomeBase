@@ -589,7 +589,7 @@ return (
                                       e.currentTarget.parentElement?.classList.remove('ring-2', 'ring-primary', 'ring-offset-1');
                                     }}
                                     onKeyDown={(e) => {
-                                      if (e.key === ' ' || e.key === 'Enter') {
+                                      if (e.key === 'Enter') {
                                         e.preventDefault();
                                         const value = e.currentTarget.value.trim();
                                         if (value && !field.value?.includes(value)) {
