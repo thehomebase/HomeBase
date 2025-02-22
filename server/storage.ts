@@ -51,6 +51,7 @@ export interface IStorage {
   sessionStore: session.Store;
   getClientsByAgent(agentId: number):Promise<Client[]>;
   createClient(insertClient:InsertClient):Promise<Client>;
+  updateClient(id: number, data: Partial<Client>): Promise<Client>;
 
   // Document operations
   getDocumentsByTransaction(transactionId: number): Promise<Document[]>;
@@ -1046,6 +1047,62 @@ export class DatabaseStorage implements IStorage {
       `);
     } catch (error) {
       console.error('Error in deleteTransaction:', error);
+      throw error;
+    }
+  }
+  async updateClient(id: number, data: Partial<Client>): Promise<Client> {
+    try {
+      // Create SET clause for SQL update
+      const setColumns = Object.entries(data).map(([key, value]) => {
+        if (value === null) {
+          return sql`${sql.identifier([key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)])} = NULL`;
+        }
+        if (key === 'labels' && Array.isArray(value)) {
+          return sql`${sql.identifier([key])} = ${JSON.stringify(value)}::jsonb`;
+        }
+        return sql`${sql.identifier([key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)])} = ${value}`;
+      });
+
+      const result = await db.execute(sql`
+        UPDATE clients
+        SET ${sql.join(setColumns, sql`, `)}
+        WHERE id = ${id}
+        RETURNING 
+          id,
+          first_name as "firstName",
+          last_name as "lastName",
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id as "agentId",
+          created_at as "createdAt"
+      `);
+
+      if (!result.rows[0]) {
+        throw new Error('Client not found');
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt)
+      };
+    } catch (error) {
+      console.error('Error in updateClient:', error);
       throw error;
     }
   }
