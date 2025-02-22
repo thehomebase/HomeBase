@@ -829,10 +829,12 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error increateContact:', error);
       throw error;
-    }    }
+    }
+  }
 
   async updateContact(id: number, data: Partial<Contact>): Promise<Contact> {
-    try {      const result = await db.execute(sql`
+    try {
+      const result = await db.execute(sql`
         UPDATE contacts 
         SET 
           role = COALESCE(${data.role}, role),
@@ -1048,6 +1050,7 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
+
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
       // Clean and prepare data for update
@@ -1058,8 +1061,8 @@ export class DatabaseStorage implements IStorage {
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
           if (key === 'labels') {
-            // Handle labels array properly
-            cleanData[snakeKey] = Array.isArray(value) ? value : [];
+            // Ensure labels is properly formatted as a text array
+            cleanData[snakeKey] = Array.isArray(value) ? sql`ARRAY[${value}]::text[]` : sql`ARRAY[]::text[]`;
           } else if (value === null) {
             cleanData[snakeKey] = null;
           } else {
@@ -1074,8 +1077,7 @@ export class DatabaseStorage implements IStorage {
           return sql`${sql.identifier([key])} = NULL`;
         }
         if (key === 'labels') {
-          // Use ARRAY constructor for labels
-          return sql`${sql.identifier([key])} = ARRAY[${value}]::text[]`;
+          return sql`${sql.identifier([key])} = ${value}`;
         }
         return sql`${sql.identifier([key])} = ${value}`;
       });
@@ -1109,12 +1111,12 @@ export class DatabaseStorage implements IStorage {
         id: Number(row.id),
         firstName: String(row.firstName),
         lastName: String(row.lastName),
-        email: row.email ? String(row.email) : null,
-        phone: row.phone ? String(row.phone) : null,
-        address: row.address ? String(row.address) : null,
-        type: String(row.type),
-        status: String(row.status),
-        notes: row.notes ? String(row.notes) : null,
+        email: row.email,
+        phone: row.phone,
+        address: row.address,
+        type: row.type,
+        status: row.status,
+        notes: row.notes,
         labels: Array.isArray(row.labels) ? row.labels : [],
         agentId: Number(row.agentId),
         createdAt: new Date(row.createdAt),
@@ -1309,6 +1311,7 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
+
 }
 
 export const storage = new DatabaseStorage();
