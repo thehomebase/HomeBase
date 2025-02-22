@@ -1052,31 +1052,22 @@ export class DatabaseStorage implements IStorage {
   }
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      const updates = [];
-      const values = [];
-      let paramCount = 1;
-
-      // Handle each field appropriately
-      for (const [key, value] of Object.entries(data)) {
+      const setColumns = Object.entries(data).map(([key, value]) => {
         const columnName = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-
+        
         if (value === null) {
-          updates.push(`${columnName} = NULL`);
-        } else if (key === 'labels') {
-          updates.push(`${columnName} = $${paramCount}::text[]`);
-          values.push(Array.isArray(value) ? value : []);
-          paramCount++;
-        } else {
-          updates.push(`${columnName} = $${paramCount}`);
-          values.push(value);
-          paramCount++;
+          return sql`${sql.identifier([columnName])} = NULL`;
         }
-      }
+        if (key === 'labels') {
+          return sql`${sql.identifier([columnName])} = ${JSON.stringify(Array.isArray(value) ? value : [])}::text[]`;
+        }
+        return sql`${sql.identifier([columnName])} = ${value}`;
+      });
 
-      const query = `
-        UPDATE clients 
-        SET ${updates.join(', ')}
-        WHERE id = $${paramCount}
+      const result = await db.execute(sql`
+        UPDATE clients
+        SET ${sql.join(setColumns, sql`, `)}
+        WHERE id = ${id}
         RETURNING 
           id,
           first_name as "firstName",
@@ -1089,13 +1080,9 @@ export class DatabaseStorage implements IStorage {
           notes,
           labels,
           agent_id as "agentId",
-          created_at as "createdAt"
-      `;
-
-      const result = await db.execute({
-        text: query,
-        values: [...values, id]
-      });
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+      `);
 
       if (!result.rows[0]) {
         throw new Error('Client not found');
