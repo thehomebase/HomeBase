@@ -1052,6 +1052,10 @@ export class DatabaseStorage implements IStorage {
   }
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
+      if (!id || !data) {
+        throw new Error('Invalid client data provided');
+      }
+
       const updates = [];
       const values: any[] = [];
       let paramCount = 1;
@@ -1097,8 +1101,8 @@ export class DatabaseStorage implements IStorage {
         paramCount++;
       }
       if (data.labels !== undefined) {
-        updates.push(`labels = $${paramCount}`);
-        values.push(Array.isArray(data.labels) ? data.labels : []);
+        updates.push(`labels = $${paramCount}::text[]`);
+        values.push(Array.isArray(data.labels) ? data.labels.filter(l => l && typeof l === 'string') : []);
         paramCount++;
       }
 
