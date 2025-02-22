@@ -827,7 +827,7 @@ export class DatabaseStorage implements IStorage {
         transactionId: result.rows[0].transaction_id
       };
     } catch (error) {
-      console.error('Error in createContact:', error);
+      console.error('Error increateContact:', error);
       throw error;
     }
   }
@@ -1052,47 +1052,57 @@ export class DatabaseStorage implements IStorage {
   }
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      const labels = data.labels ? (Array.isArray(data.labels) ? data.labels : [data.labels]) : undefined;
-      
-      const result = await db.execute(sql`
-        UPDATE clients 
-        SET 
-          first_name = COALESCE(${data.firstName}, first_name),
-          last_name = COALESCE(${data.lastName}, last_name),
-          email = COALESCE(${data.email}, email),
-          phone = COALESCE(${data.phone}, phone),
-          address = COALESCE(${data.address}, address),
-          type = COALESCE(${data.type}, type),
-          status = COALESCE(${data.status}, status),
-          notes = COALESCE(${data.notes}, notes),
-          labels = COALESCE(${labels ? JSON.stringify(labels) : null}::jsonb, labels),
-          updated_at = NOW()
-        WHERE id = ${id}
-        RETURNING *
-      `);
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
 
-      if (!result.rows[0]) {
-        throw new Error('Client not found');
+      // Handle each field appropriately
+      for (const [key, value] of Object.entries(data)) {
+        const columnName = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+        if (value === null) {
+          updates.push(`${columnName} = NULL`);
+        } else if (key === 'labels' && Array.isArray(value)) {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        } else {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        }
       }
 
-      const row = result.rows[0];
-      return {
-        id: Number(row.id),
-        firstName: String(row.first_name),
-        lastName: String(row.last_name),
-        email: row.email ? String(row.email) : null,
-        phone: row.phone ? String(row.phone) : null,
-        address: row.address ? String(row.address) : null,
-        type: String(row.type),
-        status: String(row.status),
-        notes: row.notes ? String(row.notes) : null,
-        labels: Array.isArray(row.labels) ? row.labels : [],
-        agentId: Number(row.agent_id),
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at)
+      if (updates.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      const query = {
+        text: `
+          UPDATE clients 
+          SET ${updates.join(', ')}
+          WHERE id = $${paramCount}
+          RETURNING 
+            id,
+            first_name as "firstName",
+            last_name as "lastName",
+            email,
+            phone,
+            address,
+            type,
+            status,
+            notes,
+            labels,
+            agent_id as "agentId",
+            created_at as "createdAt"
+        `,
+        values: [...values, id]
       };
 
-      if (!result.rows[0]) {
+      console.log('Executing update query:', query);
+      const result = await db.query(query);
+
+      if (!result.rowCount) {
         throw new Error('Client not found');
       }
 
@@ -1109,7 +1119,7 @@ export class DatabaseStorage implements IStorage {
         notes: row.notes ? String(row.notes) : null,
         labels: Array.isArray(row.labels) ? row.labels : [],
         agentId: Number(row.agentId),
-        createdAt: new Date(row.createdAt)
+        createdAt: row.createdAt ? new Date(row.createdAt) : null
       };
     } catch (error) {
       console.error('Error in updateClient:', error);
@@ -1117,6 +1127,2020 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getClientsByAgent(agentId: number): Promise<Client[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          id,
+          first_name as "firstName",
+          last_name as "lastName",
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id as "agentId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM clients 
+        WHERE agent_id = ${agentId}
+        ORDER BY created_at DESC
+      `);
+
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
+      }));
+    } catch (error) {
+      console.error('Error in getClientsByAgent:', error);
+      return [];
+    }
+  }
+
+  async deleteClient(clientId: number): Promise<void> {
+    try {
+      await db.delete(clients).where(sql`id = ${clientId}`);
+    } catch (error) {
+      console.error('Error in deleteClient:', error);
+      throw error;
+    }
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    try {
+      // Ensure labels is always an array
+      const labels = Array.isArray(insertClient.labels) 
+        ? insertClient.labels 
+        : insertClient.labels 
+          ? [insertClient.labels] 
+          : [];
+
+      const [client] = await db
+        .insert(clients)
+        .values({
+          ...insertClient,
+          labels,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      if (!client) {
+        throw new Error('Failed to create client record');
+      }
+
+      return {
+        id: Number(client.id),
+        firstName: String(client.firstName),
+        lastName: String(client.lastName),
+        email: client.email ? String(client.email) : null,
+        phone: client.phone ? String(client.phone) : null,
+        address: client.address ? String(client.address) : null,
+        type: String(client.type),
+        status: String(client.status),
+        notes: client.notes ? String(client.notes) : null,
+        labels: Array.isArray(client.labels) ? client.labels : [],
+        agentId: Number(client.agentId),
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt
+      };
+    } catch (error) {
+      console.error('Error in createClient:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM documents 
+        WHERE transaction_id = ${transactionId}
+        ORDER BY id ASC
+      `);
+
+      return result.rows.map(row => ({
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      }));
+    } catch (error) {
+      console.error('Error in getDocumentsByTransaction:', error);
+      return [];
+    }
+  }
+
+  async createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO documents (name, status, transaction_id)
+        VALUES (${document.name}, ${document.status},${document.transactionId})
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in createDocument:', error);
+      throw error;
+    }
+  }
+
+  async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE documents 
+        SET 
+          status = COALESCE(${data.status}, status),
+          name = COALESCE(${data.name}, name)
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in updateDocument:', error);
+      throw error;
+    }
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM documents 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteDocument:', error);
+      throw error;
+    }
+  }
+  async deleteTransaction(id: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM transactions 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteTransaction:', error);
+      throw error;
+    }
+  }
+  async updateClient(id: number, data: Partial<Client>): Promise<Client> {
+    try {
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
+
+      // Handle each field appropriately
+      for (const [key, value] of Object.entries(data)) {
+        const columnName = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+        if (value === null) {
+          updates.push(`${columnName} = NULL`);
+        } else if (key === 'labels' && Array.isArray(value)) {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        } else {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        }
+      }
+
+      if (updates.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      const query = {
+        text: `
+          UPDATE clients 
+          SET ${updates.join(', ')}
+          WHERE id = $${paramCount}
+          RETURNING 
+            id,
+            first_name as "firstName",
+            last_name as "lastName",
+            email,
+            phone,
+            address,
+            type,
+            status,
+            notes,
+            labels,
+            agent_id as "agentId",
+            created_at as "createdAt"
+        `,
+        values: [...values, id]
+      };
+
+      console.log('Executing update query:', query);
+      const result = await db.query(query);
+
+      if (!result.rowCount) {
+        throw new Error('Client not found');
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: row.createdAt ? new Date(row.createdAt) : null
+      };
+    } catch (error) {
+      console.error('Error in updateClient:', error);
+      throw error;
+    }
+  }
+
+  async getClientsByAgent(agentId: number): Promise<Client[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          id,
+          first_name as "firstName",
+          last_name as "lastName",
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id as "agentId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM clients 
+        WHERE agent_id = ${agentId}
+        ORDER BY created_at DESC
+      `);
+
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
+      }));
+    } catch (error) {
+      console.error('Error in getClientsByAgent:', error);
+      return [];
+    }
+  }
+
+  async deleteClient(clientId: number): Promise<void> {
+    try {
+      await db.delete(clients).where(sql`id = ${clientId}`);
+    } catch (error) {
+      console.error('Error in deleteClient:', error);
+      throw error;
+    }
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    try {
+      // Ensure labels is always an array
+      const labels = Array.isArray(insertClient.labels) 
+        ? insertClient.labels 
+        : insertClient.labels 
+          ? [insertClient.labels] 
+          : [];
+
+      const [client] = await db
+        .insert(clients)
+        .values({
+          ...insertClient,
+          labels,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      if (!client) {
+        throw new Error('Failed to create client record');
+      }
+
+      return {
+        id: Number(client.id),
+        firstName: String(client.firstName),
+        lastName: String(client.lastName),
+        email: client.email ? String(client.email) : null,
+        phone: client.phone ? String(client.phone) : null,
+        address: client.address ? String(client.address) : null,
+        type: String(client.type),
+        status: String(client.status),
+        notes: client.notes ? String(client.notes) : null,
+        labels: Array.isArray(client.labels) ? client.labels : [],
+        agentId: Number(client.agentId),
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt
+      };
+    } catch (error) {
+      console.error('Error in createClient:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM documents 
+        WHERE transaction_id = ${transactionId}
+        ORDER BY id ASC
+      `);
+
+      return result.rows.map(row => ({
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      }));
+    } catch (error) {
+      console.error('Error in getDocumentsByTransaction:', error);
+      return [];
+    }
+  }
+
+  async createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO documents (name, status, transaction_id)
+        VALUES (${document.name}, ${document.status},${document.transactionId})
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in createDocument:', error);
+      throw error;
+    }
+  }
+
+  async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE documents 
+        SET 
+          status = COALESCE(${data.status}, status),
+          name = COALESCE(${data.name}, name)
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in updateDocument:', error);
+      throw error;
+    }
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM documents 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteDocument:', error);
+      throw error;
+    }
+  }
+  async deleteTransaction(id: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM transactions 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteTransaction:', error);
+      throw error;
+    }
+  }
+  async updateClient(id: number, data: Partial<Client>): Promise<Client> {
+    try {
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
+
+      // Handle each field appropriately
+      for (const [key, value] of Object.entries(data)) {
+        const columnName = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+        if (value === null) {
+          updates.push(`${columnName} = NULL`);
+        } else if (key === 'labels' && Array.isArray(value)) {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        } else {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        }
+      }
+
+      if (updates.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      const query = {
+        text: `
+          UPDATE clients 
+          SET ${updates.join(', ')}
+          WHERE id = $${paramCount}
+          RETURNING 
+            id,
+            first_name as "firstName",
+            last_name as "lastName",
+            email,
+            phone,
+            address,
+            type,
+            status,
+            notes,
+            labels,
+            agent_id as "agentId",
+            created_at as "createdAt"
+        `,
+        values: [...values, id]
+      };
+
+      console.log('Executing update query:', query);
+      const result = await db.query(query);
+
+      if (!result.rowCount) {
+        throw new Error('Client not found');
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: row.createdAt ? new Date(row.createdAt) : null
+      };
+    } catch (error) {
+      console.error('Error in updateClient:', error);
+      throw error;
+    }
+  }
+
+  async getClientsByAgent(agentId: number): Promise<Client[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          id,
+          first_name as "firstName",
+          last_name as "lastName",
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id as "agentId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM clients 
+        WHERE agent_id = ${agentId}
+        ORDER BY created_at DESC
+      `);
+
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
+      }));
+    } catch (error) {
+      console.error('Error in getClientsByAgent:', error);
+      return [];
+    }
+  }
+
+  async deleteClient(clientId: number): Promise<void> {
+    try {
+      await db.delete(clients).where(sql`id = ${clientId}`);
+    } catch (error) {
+      console.error('Error in deleteClient:', error);
+      throw error;
+    }
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    try {
+      // Ensure labels is always an array
+      const labels = Array.isArray(insertClient.labels) 
+        ? insertClient.labels 
+        : insertClient.labels 
+          ? [insertClient.labels] 
+          : [];
+
+      const [client] = await db
+        .insert(clients)
+        .values({
+          ...insertClient,
+          labels,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      if (!client) {
+        throw new Error('Failed to create client record');
+      }
+
+      return {
+        id: Number(client.id),
+        firstName: String(client.firstName),
+        lastName: String(client.lastName),
+        email: client.email ? String(client.email) : null,
+        phone: client.phone ? String(client.phone) : null,
+        address: client.address ? String(client.address) : null,
+        type: String(client.type),
+        status: String(client.status),
+        notes: client.notes ? String(client.notes) : null,
+        labels: Array.isArray(client.labels) ? client.labels : [],
+        agentId: Number(client.agentId),
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt
+      };
+    } catch (error) {
+      console.error('Error in createClient:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM documents 
+        WHERE transaction_id = ${transactionId}
+        ORDER BY id ASC
+      `);
+
+      return result.rows.map(row => ({
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      }));
+    } catch (error) {
+      console.error('Error in getDocumentsByTransaction:', error);
+      return [];
+    }
+  }
+
+  async createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO documents (name, status, transaction_id)
+        VALUES (${document.name}, ${document.status},${document.transactionId})
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in createDocument:', error);
+      throw error;
+    }
+  }
+
+  async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE documents 
+        SET 
+          status = COALESCE(${data.status}, status),
+          name = COALESCE(${data.name}, name)
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in updateDocument:', error);
+      throw error;
+    }
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM documents 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteDocument:', error);
+      throw error;
+    }
+  }
+  async deleteTransaction(id: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM transactions 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteTransaction:', error);
+      throw error;
+    }
+  }
+  async updateClient(id: number, data: Partial<Client>): Promise<Client> {
+    try {
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
+
+      // Handle each field appropriately
+      for (const [key, value] of Object.entries(data)) {
+        const columnName = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+        if (value === null) {
+          updates.push(`${columnName} = NULL`);
+        } else if (key === 'labels' && Array.isArray(value)) {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        } else {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        }
+      }
+
+      if (updates.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      const query = {
+        text: `
+          UPDATE clients 
+          SET ${updates.join(', ')}
+          WHERE id = $${paramCount}
+          RETURNING 
+            id,
+            first_name as "firstName",
+            last_name as "lastName",
+            email,
+            phone,
+            address,
+            type,
+            status,
+            notes,
+            labels,
+            agent_id as "agentId",
+            created_at as "createdAt",
+            updated_at as "updatedAt"
+        `,
+        values: [...values, id]
+      };
+
+      console.log('Executing update query:', query);
+      const result = await db.query(query);
+
+      if (!result.rowCount) {
+        throw new Error('Client not found');
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: row.createdAt ? new Date(row.createdAt) : null,
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
+      };
+    } catch (error) {
+      console.error('Error in updateClient:', error);
+      throw error;
+    }
+  }
+
+  async getClientsByAgent(agentId: number): Promise<Client[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          id,
+          first_name as "firstName",
+          last_name as "lastName",
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id as "agentId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM clients 
+        WHERE agent_id = ${agentId}
+        ORDER BY created_at DESC
+      `);
+
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
+      }));
+    } catch (error) {
+      console.error('Error in getClientsByAgent:', error);
+      return [];
+    }
+  }
+
+  async deleteClient(clientId: number): Promise<void> {
+    try {
+      await db.delete(clients).where(sql`id = ${clientId}`);
+    } catch (error) {
+      console.error('Error in deleteClient:', error);
+      throw error;
+    }
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    try {
+      // Ensure labels is always an array
+      const labels = Array.isArray(insertClient.labels) 
+        ? insertClient.labels 
+        : insertClient.labels 
+          ? [insertClient.labels] 
+          : [];
+
+      const [client] = await db
+        .insert(clients)
+        .values({
+          ...insertClient,
+          labels,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      if (!client) {
+        throw new Error('Failed to create client record');
+      }
+
+      return {
+        id: Number(client.id),
+        firstName: String(client.firstName),
+        lastName: String(client.lastName),
+        email: client.email ? String(client.email) : null,
+        phone: client.phone ? String(client.phone) : null,
+        address: client.address ? String(client.address) : null,
+        type: String(client.type),
+        status: String(client.status),
+        notes: client.notes ? String(client.notes) : null,
+        labels: Array.isArray(client.labels) ? client.labels : [],
+        agentId: Number(client.agentId),
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt
+      };
+    } catch (error) {
+      console.error('Error in createClient:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM documents 
+        WHERE transaction_id = ${transactionId}
+        ORDER BY id ASC
+      `);
+
+      return result.rows.map(row => ({
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      }));
+    } catch (error) {
+      console.error('Error in getDocumentsByTransaction:', error);
+      return [];
+    }
+  }
+
+  async createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO documents (name, status, transaction_id)
+        VALUES (${document.name}, ${document.status},${document.transactionId})
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in createDocument:', error);
+      throw error;
+    }
+  }
+
+  async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE documents 
+        SET 
+          status = COALESCE(${data.status}, status),
+          name = COALESCE(${data.name}, name)
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in updateDocument:', error);
+      throw error;
+    }
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM documents 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteDocument:', error);
+      throw error;
+    }
+  }
+  async deleteTransaction(id: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM transactions 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteTransaction:', error);
+      throw error;
+    }
+  }
+  async updateClient(id: number, data: Partial<Client>): Promise<Client> {
+    try {
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
+
+      // Handle each field appropriately
+      for (const [key, value] of Object.entries(data)) {
+        const columnName = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+        if (value === null) {
+          updates.push(`${columnName} = NULL`);
+        } else if (key === 'labels' && Array.isArray(value)) {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        } else {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        }
+      }
+
+      if (updates.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      const query = {
+        text: `
+          UPDATE clients 
+          SET ${updates.join(', ')}
+          WHERE id = $${paramCount}
+          RETURNING 
+            id,
+            first_name as "firstName",
+            last_name as "lastName",
+            email,
+            phone,
+            address,
+            type,
+            status,
+            notes,
+            labels,
+            agent_id as "agentId",
+            created_at as "createdAt",
+            updated_at as "updatedAt"
+        `,
+        values: [...values, id]
+      };
+
+      console.log('Executing update query:', query);
+      const result = await db.query(query);
+
+      if (!result.rowCount) {
+        throw new Error('Client not found');
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: row.createdAt ? new Date(row.createdAt) : null,
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
+      };
+    } catch (error) {
+      console.error('Error in updateClient:', error);
+      throw error;
+    }
+  }
+
+  async getClientsByAgent(agentId: number): Promise<Client[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          id,
+          first_name as "firstName",
+          last_name as "lastName",
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id as "agentId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM clients 
+        WHERE agent_id = ${agentId}
+        ORDER BY created_at DESC
+      `);
+
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
+      }));
+    } catch (error) {
+      console.error('Error in getClientsByAgent:', error);
+      return [];
+    }
+  }
+
+  async deleteClient(clientId: number): Promise<void> {
+    try {
+      await db.delete(clients).where(sql`id = ${clientId}`);
+    } catch (error) {
+      console.error('Error in deleteClient:', error);
+      throw error;
+    }
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    try {
+      // Ensure labels is always an array
+      const labels = Array.isArray(insertClient.labels) 
+        ? insertClient.labels 
+        : insertClient.labels 
+          ? [insertClient.labels] 
+          : [];
+
+      const [client] = await db
+        .insert(clients)
+        .values({
+          ...insertClient,
+          labels,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      if (!client) {
+        throw new Error('Failed to create client record');
+      }
+
+      return {
+        id: Number(client.id),
+        firstName: String(client.firstName),
+        lastName: String(client.lastName),
+        email: client.email ? String(client.email) : null,
+        phone: client.phone ? String(client.phone) : null,
+        address: client.address ? String(client.address) : null,
+        type: String(client.type),
+        status: String(client.status),
+        notes: client.notes ? String(client.notes) : null,
+        labels: Array.isArray(client.labels) ? client.labels : [],
+        agentId: Number(client.agentId),
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt
+      };
+    } catch (error) {
+      console.error('Error in createClient:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM documents 
+        WHERE transaction_id = ${transactionId}
+        ORDER BY id ASC
+      `);
+
+      return result.rows.map(row => ({
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      }));
+    } catch (error) {
+      console.error('Error in getDocumentsByTransaction:', error);
+      return [];
+    }
+  }
+
+  async createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO documents (name, status, transaction_id)
+        VALUES (${document.name}, ${document.status},${document.transactionId})
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in createDocument:', error);
+      throw error;
+    }
+  }
+
+  async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE documents 
+        SET 
+          status = COALESCE(${data.status}, status),
+          name = COALESCE(${data.name}, name)
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in updateDocument:', error);
+      throw error;
+    }
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM documents 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteDocument:', error);
+      throw error;
+    }
+  }
+  async deleteTransaction(id: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM transactions 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteTransaction:', error);
+      throw error;
+    }
+  }
+  async updateClient(id: number, data: Partial<Client>): Promise<Client> {
+    try {
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
+
+      // Handle each field appropriately
+      for (const [key, value] of Object.entries(data)) {
+        const columnName = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+        if (value === null) {
+          updates.push(`${columnName} = NULL`);
+        } else if (key === 'labels' && Array.isArray(value)) {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        } else {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        }
+      }
+
+      if (updates.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      const query = {
+        text: `
+          UPDATE clients 
+          SET ${updates.join(', ')}
+          WHERE id = $${paramCount}
+          RETURNING 
+            id,
+            first_name as "firstName",
+            last_name as "lastName",
+            email,
+            phone,
+            address,
+            type,
+            status,
+            notes,
+            labels,
+            agent_id as "agentId",
+            created_at as "createdAt",
+            updated_at as "updatedAt"
+        `,
+        values: [...values, id]
+      };
+
+      console.log('Executing update query:', query);
+      const result = await db.query(query);
+
+      if (!result.rowCount) {
+        throw new Error('Client not found');
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: row.createdAt ? new Date(row.createdAt) : null,
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
+      };
+    } catch (error) {
+      console.error('Error in updateClient:', error);
+      throw error;
+    }
+  }
+
+  async getClientsByAgent(agentId: number): Promise<Client[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          id,
+          first_name as "firstName",
+          last_name as "lastName",
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id as "agentId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM clients 
+        WHERE agent_id = ${agentId}
+        ORDER BY created_at DESC
+      `);
+
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
+      }));
+    } catch (error) {
+      console.error('Error in getClientsByAgent:', error);
+      return [];
+    }
+  }
+
+  async deleteClient(clientId: number): Promise<void> {
+    try {
+      await db.delete(clients).where(sql`id = ${clientId}`);
+    } catch (error) {
+      console.error('Error in deleteClient:', error);
+      throw error;
+    }
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    try {
+      // Ensure labels is always an array
+      const labels = Array.isArray(insertClient.labels) 
+        ? insertClient.labels 
+        : insertClient.labels 
+          ? [insertClient.labels] 
+          : [];
+
+      const [client] = await db
+        .insert(clients)
+        .values({
+          ...insertClient,
+          labels,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      if (!client) {
+        throw new Error('Failed to create client record');
+      }
+
+      return {
+        id: Number(client.id),
+        firstName: String(client.firstName),
+        lastName: String(client.lastName),
+        email: client.email ? String(client.email) : null,
+        phone: client.phone ? String(client.phone) : null,
+        address: client.address ? String(client.address) : null,
+        type: String(client.type),
+        status: String(client.status),
+        notes: client.notes ? String(client.notes) : null,
+        labels: Array.isArray(client.labels) ? client.labels : [],
+        agentId: Number(client.agentId),
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt
+      };
+    } catch (error) {
+      console.error('Error in createClient:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM documents 
+        WHERE transaction_id = ${transactionId}
+        ORDER BY id ASC
+      `);
+
+      return result.rows.map(row => ({
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      }));
+    } catch (error) {
+      console.error('Error in getDocumentsByTransaction:', error);
+      return [];
+    }
+  }
+
+  async createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO documents (name, status, transaction_id)
+        VALUES (${document.name}, ${document.status},${document.transactionId})
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in createDocument:', error);
+      throw error;
+    }
+  }
+
+  async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE documents 
+        SET 
+          status = COALESCE(${data.status}, status),
+          name = COALESCE(${data.name}, name)
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in updateDocument:', error);
+      throw error;
+    }
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM documents 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteDocument:', error);
+      throw error;
+    }
+  }
+  async deleteTransaction(id: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM transactions 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteTransaction:', error);
+      throw error;
+    }
+  }
+  async updateClient(id: number, data: Partial<Client>): Promise<Client> {
+    try {
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
+
+      // Handle each field appropriately
+      for (const [key, value] of Object.entries(data)) {
+        const columnName = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+        if (value === null) {
+          updates.push(`${columnName} = NULL`);
+        } else if (key === 'labels' && Array.isArray(value)) {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        } else {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        }
+      }
+
+      if (updates.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      const query = {
+        text: `
+          UPDATE clients 
+          SET ${updates.join(', ')}
+          WHERE id = $${paramCount}
+          RETURNING 
+            id,
+            first_name as "firstName",
+            last_name as "lastName",
+            email,
+            phone,
+            address,
+            type,
+            status,
+            notes,
+            labels,
+            agent_id as "agentId",
+            created_at as "createdAt",
+            updated_at as "updatedAt"
+        `,
+        values: [...values, id]
+      };
+
+      console.log('Executing update query:', query);
+      const result = await db.query(query);
+
+      if (!result.rowCount) {
+        throw new Error('Client not found');
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: row.createdAt ? new Date(row.createdAt) : null,
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
+      };
+    } catch (error) {
+      console.error('Error in updateClient:', error);
+      throw error;
+    }
+  }
+
+  async getClientsByAgent(agentId: number): Promise<Client[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          id,
+          first_name as "firstName",
+          last_name as "lastName",
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id as "agentId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM clients 
+        WHERE agent_id = ${agentId}
+        ORDER BY created_at DESC
+      `);
+
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
+      }));
+    } catch (error) {
+      console.error('Error in getClientsByAgent:', error);
+      return [];
+    }
+  }
+
+  async deleteClient(clientId: number): Promise<void> {
+    try {
+      await db.delete(clients).where(sql`id = ${clientId}`);
+    } catch (error) {
+      console.error('Error in deleteClient:', error);
+      throw error;
+    }
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    try {
+      // Ensure labels is always an array
+      const labels = Array.isArray(insertClient.labels) 
+        ? insertClient.labels 
+        : insertClient.labels 
+          ? [insertClient.labels] 
+          : [];
+
+      const [client] = await db
+        .insert(clients)
+        .values({
+          ...insertClient,
+          labels,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      if (!client) {
+        throw new Error('Failed to create client record');
+      }
+
+      return {
+        id: Number(client.id),
+        firstName: String(client.firstName),
+        lastName: String(client.lastName),
+        email: client.email ? String(client.email) : null,
+        phone: client.phone ? String(client.phone) : null,
+        address: client.address ? String(client.address) : null,
+        type: String(client.type),
+        status: String(client.status),
+        notes: client.notes ? String(client.notes) : null,
+        labels: Array.isArray(client.labels) ? client.labels : [],
+        agentId: Number(client.agentId),
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt
+      };
+    } catch (error) {
+      console.error('Error in createClient:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM documents 
+        WHERE transaction_id = ${transactionId}
+        ORDER BY id ASC
+      `);
+
+      return result.rows.map(row => ({
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      }));
+    } catch (error) {
+      console.error('Error in getDocumentsByTransaction:', error);
+      return [];
+    }
+  }
+
+  async createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO documents (name, status, transaction_id)
+        VALUES (${document.name}, ${document.status},${document.transactionId})
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in createDocument:', error);
+      throw error;
+    }
+  }
+
+  async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE documents 
+        SET 
+          status = COALESCE(${data.status}, status),
+          name = COALESCE(${data.name}, name)
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in updateDocument:', error);
+      throw error;
+    }
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM documents 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteDocument:', error);
+      throw error;
+    }
+  }
+  async deleteTransaction(id: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM transactions 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteTransaction:', error);
+      throw error;
+    }
+  }
+  async updateClient(id: number, data: Partial<Client>): Promise<Client> {
+    try {
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
+
+      // Handle each field appropriately
+      for (const [key, value] of Object.entries(data)) {
+        const columnName = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+
+        if (value === null) {
+          updates.push(`${columnName} = NULL`);
+        } else if (key === 'labels' && Array.isArray(value)) {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        } else {
+          updates.push(`${columnName} = $${paramCount}`);
+          values.push(value);
+          paramCount++;
+        }
+      }
+
+      if (updates.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      const query = {
+        text: `
+          UPDATE clients 
+          SET ${updates.join(', ')}
+          WHERE id = $${paramCount}
+          RETURNING 
+            id,
+            first_name as "firstName",
+            last_name as "lastName",
+            email,
+            phone,
+            address,
+            type,
+            status,
+            notes,
+            labels,
+            agent_id as "agentId",
+            created_at as "createdAt",
+            updated_at as "updatedAt"
+        `,
+        values: [...values, id]
+      };
+
+      console.log('Executing update query:', query);
+      const result = await db.query(query);
+
+      if (!result.rowCount) {
+        throw new Error('Client not found');
+      }
+
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: row.createdAt ? new Date(row.createdAt) : null,
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
+      };
+    } catch (error) {
+      console.error('Error in updateClient:', error);
+      throw error;
+    }
+  }
+
+  async getClientsByAgent(agentId: number): Promise<Client[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          id,
+          first_name as "firstName",
+          last_name as "lastName",
+          email,
+          phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id as "agentId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM clients 
+        WHERE agent_id = ${agentId}
+        ORDER BY created_at DESC
+      `);
+
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
+      }));
+    } catch (error) {
+      console.error('Error in getClientsByAgent:', error);
+      return [];
+    }
+  }
+
+  async deleteClient(clientId: number): Promise<void> {
+    try {
+      await db.delete(clients).where(sql`id = ${clientId}`);
+    } catch (error) {
+      console.error('Error in deleteClient:', error);
+      throw error;
+    }
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    try {
+      // Ensure labels is always an array
+      const labels = Array.isArray(insertClient.labels) 
+        ? insertClient.labels 
+        : insertClient.labels 
+          ? [insertClient.labels] 
+          : [];
+
+      const [client] = await db
+        .insert(clients)
+        .values({
+          ...insertClient,
+          labels,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      if (!client) {
+        throw new Error('Failed to create client record');
+      }
+
+      return {
+        id: Number(client.id),
+        firstName: String(client.firstName),
+        lastName: String(client.lastName),
+        email: client.email ? String(client.email) : null,
+        phone: client.phone ? String(client.phone) : null,
+        address: client.address ? String(client.address) : null,
+        type: String(client.type),
+        status: String(client.status),
+        notes: client.notes ? String(client.notes) : null,
+        labels: Array.isArray(client.labels) ? client.labels : [],
+        agentId: Number(client.agentId),
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt
+      };
+    } catch (error) {
+      console.error('Error in createClient:', error);
+      throw error;
+    }
+  }
+
+  async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM documents 
+        WHERE transaction_id = ${transactionId}
+        ORDER BY id ASC
+      `);
+
+      return result.rows.map(row => ({
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      }));
+    } catch (error) {
+      console.error('Error in getDocumentsByTransaction:', error);
+      return [];
+    }
+  }
+
+  async createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO documents (name, status, transaction_id)
+        VALUES (${document.name}, ${document.status},${document.transactionId})
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in createDocument:', error);
+      throw error;
+    }
+  }
+
+  async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE documents 
+        SET 
+          status = COALESCE(${data.status}, status),
+          name = COALESCE(${data.name}, name)
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      const row = result.rows[0];
+      return {
+        id: String(row.id),
+        name: String(row.name),
+        status: String(row.status),
+        transactionId: Number(row.transaction_id)
+      };
+    } catch (error) {
+      console.error('Error in updateDocument:', error);
+      throw error;
+    }
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM documents 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteDocument:', error);
+      throw error;
+    }
+  }
+  async deleteTransaction(id: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM transactions 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteTransaction:', error);
+      throw error;
+    }
+  }
+  
 }
 
 export const storage = new DatabaseStorage();
