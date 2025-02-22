@@ -276,6 +276,16 @@ export default function ClientsPage() {
     return sortConfig.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
   };
 
+  const filterClients = (clients: Client[]) => {
+    return clients.filter(client => 
+      client.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.address?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  };
+
   const sellers = sortData(filterClients(clients.filter(client => client.type === 'seller')), sortConfig);
   const buyers = sortData(filterClients(clients.filter(client => client.type === 'buyer')), sortConfig);
 
