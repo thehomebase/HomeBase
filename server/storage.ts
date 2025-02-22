@@ -1058,7 +1058,8 @@ export class DatabaseStorage implements IStorage {
           return sql`${sql.identifier([key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)])} = NULL`;
         }
         if (key === 'labels' && Array.isArray(value)) {
-          return sql`${sql.identifier([key])} = ${JSON.stringify(value)}::jsonb`;
+          // Cast the array to text[] instead of jsonb
+          return sql`${sql.identifier([key])} = ${value}::text[]`;
         }
         return sql`${sql.identifier([key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)])} = ${value}`;
       });
