@@ -1048,43 +1048,35 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
-
   async updateClient(id: number, data: Partial<Client>): Promise<Client> {
     try {
-      // Clean and prepare data for update
-      const cleanData: Record<string, any> = {};
-      Object.entries(data).forEach(([key, value]) => {
+      console.log('Processing client update request:', { clientId: id, updateData: data });
+
+      // Create SET clause parts
+      const setParts = [];
+      const values = [];
+      let paramCount = 1;
+
+      for (const [key, value] of Object.entries(data)) {
         if (value !== undefined) {
-          // Convert camelCase to snake_case for SQL
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
           if (key === 'labels') {
-            // Handle labels specifically - ensure it's always an array
-            cleanData[snakeKey] = value || [];
-          } else if (value === null) {
-            cleanData[snakeKey] = null;
+            // Special handling for labels array
+            setParts.push(`${snakeKey} = $${paramCount}::text[]`);
+            values.push(value || []);
           } else {
-            cleanData[snakeKey] = value;
+            setParts.push(`${snakeKey} = $${paramCount}`);
+            values.push(value);
           }
+          paramCount++;
         }
-      });
+      }
 
-      // Create SET clause for SQL update
-      const setColumns = Object.entries(cleanData).map(([key, value]) => {
-        if (value === null) {
-          return sql`${sql.identifier([key])} = NULL`;
-        }
-        if (key === 'labels') {
-          // Cast empty array as text[] for PostgreSQL
-          return sql`${sql.identifier([key])} = ${value}::text[]`;
-        }
-        return sql`${sql.identifier([key])} = ${value}`;
-      });
-
-      const result = await db.execute(sql`
-        UPDATE clients
-        SET ${sql.join(setColumns, sql`, `)}
-        WHERE id = ${id}
+      const query = `
+        UPDATE clients 
+        SET ${setParts.join(', ')}
+        WHERE id = $${paramCount}
         RETURNING 
           id,
           first_name as "firstName",
@@ -1099,7 +1091,12 @@ export class DatabaseStorage implements IStorage {
           agent_id as "agentId",
           created_at as "createdAt",
           updated_at as "updatedAt"
-      `);
+      `;
+
+      // Add the id as the last parameter
+      values.push(id);
+
+      const result = await db.execute(sql.raw(query, ...values));
 
       if (!result.rows[0]) {
         throw new Error('Client not found');
@@ -1110,12 +1107,12 @@ export class DatabaseStorage implements IStorage {
         id: Number(row.id),
         firstName: String(row.firstName),
         lastName: String(row.lastName),
-        email: row.email,
-        phone: row.phone,
-        address: row.address,
-        type: row.type,
-        status: row.status,
-        notes: row.notes,
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        address: row.address ? String(row.address) : null,
+        type: String(row.type),
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
         labels: Array.isArray(row.labels) ? row.labels : [],
         agentId: Number(row.agentId),
         createdAt: new Date(row.createdAt),
