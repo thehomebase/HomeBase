@@ -1,0 +1,93 @@
+   Here’s how you can troubleshoot and resolve the problem:
+a. Locate the Update Query
+Check the code in queryClient.ts, clients-page.tsx:1044, and clients-page.tsx:247:7 (as indicated in the stack trace) for where the client update is being performed.
+Look for database queries or API calls that update the clients table, particularly focusing on the updated_at column. This could be in:
+Raw SQL queries (e.g., using pg, mysql2, sqlite3).
+An ORM query (e.g., Prisma, TypeORM, Sequelize).
+An API request payload sent to a backend server.
+b. Inspect the Update Statement
+If you’re using raw SQL, examine the UPDATE query. For example:
+sql
+UPDATE clients 
+SET updated_at = NOW(), 
+    name = 'new name', 
+    updated_at = CURRENT_TIMESTAMP  -- Duplicate assignment here
+WHERE id = 1;
+Remove or consolidate any duplicate assignments to updated_at. The correct version would be:
+sql
+UPDATE clients 
+SET updated_at = NOW(), 
+    name = 'new name'
+WHERE id = 1;
+If using an ORM, check the update method or object being passed. For example, in Prisma:
+typescript
+await prisma.client.update({
+  where: { id: 1 },
+  data: {
+    name: 'new name',
+    updated_at: new Date(),  // Ensure this isn’t set multiple times
+  },
+});
+Ensure updated_at is only assigned once.
+c. Check for Multiple Update Calls
+If your code calls multiple update functions or sends multiple requests for the same record, it might inadvertently try to update updated_at more than once. For example:
+typescript
+await apiRequest('/clients/1', { updated_at: new Date() });
+await apiRequest('/clients/1', { updated_at: new Date() });  // Duplicate update
+Consolidate these into a single update call or ensure updated_at is only set once.
+d. Automate updated_at in the Database
+If updated_at is meant to automatically track the last update time, consider setting it as a default value or trigger in your database instead of manually updating it in code. For example, in PostgreSQL:
+sql
+ALTER TABLE clients 
+ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+Or use an ON UPDATE trigger to automatically set updated_at to the current timestamp whenever the row is updated. This way, you don’t need to include updated_at in your update queries, avoiding accidental duplicates.
+e. Debug the Data Flow
+Add logging or console statements to inspect the update query or payload before it’s executed:
+typescript
+console.log('Update payload:', updateData);
+If updated_at appears multiple times in the payload or query, trace back to where it’s being added and consolidate it.
+f. Handle the Error in queryClient.ts
+Update your error-handling logic to log or handle this specific error more gracefully:
+typescript
+try {
+  const text = (await res.text()) || res.statusText;
+  if (res.status !== 200) {
+    console.error('Response error:', text);
+    throw new Error(`$${res.status}: ${text}`);
+  }
+} catch (error) {
+  console.error('Update client error:', error);
+  throw error;
+}
+This will help you identify if the error originates from the database, ORM, or API.
+4. Example Fix
+If you’re using raw SQL with pg (PostgreSQL), ensure your query looks like this:
+typescript
+const query = `
+  UPDATE clients 
+  SET name = $1, 
+      updated_at = NOW() 
+  WHERE id = $2
+`;
+await pool.query(query, ['new name', clientId]);
+If using Prisma:
+typescript
+await prisma.client.update({
+  where: { id: clientId },
+  data: {
+    name: 'new name',
+    // Don’t explicitly set updated_at if it’s handled by the database
+  },
+});
+If updated_at should be automatic, modify your database schema:
+sql
+ALTER TABLE clients 
+ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP;
+5. Additional Notes
+The error trace points to queryClient.ts:9:11, clients-page.tsx:1044, and clients-page.tsx:247:7. Focus on the handleUpdate or handleClientUpdate functions in these files.
+The sidebar UI (from your earlier images) likely triggers an update when editing client details. Ensure the update logic only sets updated_at once per operation.
+The suggestion to disable the overlay (server.hmr.overlay = false in vite.config.js) is unrelated to the root cause but can help you see the error more clearly in your development environment.
+6. Final Recommendation
+Identify and consolidate any duplicate assignments to the updated_at column in your update queries or code.
+Consider automating updated_at in the database to avoid manual updates and potential errors.
+Test the changes to ensure the sidebar can edit and update client information without errors.
