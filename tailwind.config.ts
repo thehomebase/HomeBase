@@ -19,11 +19,21 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       colors: {
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        background: {
+          DEFAULT: "hsl(var(--background))",
+          dark: "hsl(222.2 84% 4.9%)",
+          light: "hsl(0 0% 100%)"
+        },
+        foreground: {
+          DEFAULT: "hsl(var(--foreground))",
+          dark: "hsl(210 40% 98%)",
+          light: "hsl(222.2 84% 4.9%)"
+        },
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+          dark: "hsl(222.2 84% 4.9%)",
+          light: "hsl(0 0% 100%)"
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
