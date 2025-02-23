@@ -7,18 +7,6 @@
     @apply border-border;
   }
 
-  :root {
-    @apply light;
-  }
-
-  .dark {
-    @apply [--background:theme(colors.background.dark)] [--foreground:theme(colors.foreground.dark)];
-  }
-
-  .light {
-    @apply [--background:theme(colors.background.light)] [--foreground:theme(colors.foreground.light)];
-  }
-
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }

@@ -25,9 +25,6 @@ import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } f
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/hooks/use-theme";
 
-// Log theme on initial render and changes
-console.log('Current theme:', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
-
 
 interface MonthlyData {
   month: string;
