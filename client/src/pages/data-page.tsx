@@ -287,14 +287,14 @@ export default function DataPage() {
                 <Bar
                   yAxisId="left"
                   dataKey="totalVolume"
-                  fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'} // Corrected theme usage
+                  fill={theme.theme === 'dark' ? '#000000' : '#000000'} // Corrected theme usage
                   name="Monthly Volume"
                 />
                 <Line
                   yAxisId="right"
                   type="monotone"
                   dataKey="cumulativeVolume"
-                  stroke="#666666"
+                  stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}  // Conditional stroke
                   strokeWidth={2}
                   dot={false}
                   name="Cumulative Volume"
