@@ -23,6 +23,8 @@ import {
 } from "recharts";
 import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTheme } from 'next-themes'; // Import useTheme
+
 
 interface MonthlyData {
   month: string;
@@ -40,11 +42,11 @@ export default function DataPage() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
-
   const { data: transactions = [], isLoading, error } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     enabled: !!user && user.role === "agent",
   });
+  const theme = useTheme(); // Initialize useTheme
 
   // Get all months in current year
   const currentYear = new Date().getFullYear();
@@ -285,7 +287,7 @@ export default function DataPage() {
                 <Bar
                   yAxisId="left"
                   dataKey="totalVolume"
-                  fill={useTheme().theme === 'dark' ? '#FFFFFF' : '#000000'}
+                  fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'} // Corrected theme usage
                   name="Monthly Volume"
                 />
                 <Line
@@ -347,7 +349,7 @@ export default function DataPage() {
                 <YAxis />
                 <RechartsTooltip />
                 <Legend />
-                <Bar dataKey="meetings" name="Meetings" fill={useTheme().theme === 'dark' ? '#FFFFFF' : '#000000'} />
+                <Bar dataKey="meetings" name="Meetings" fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'} /> {/*Corrected theme usage*/}
                 <Bar dataKey="calls" name="Calls" fill="#666666" />
               </BarChart>
             </ResponsiveContainer>
