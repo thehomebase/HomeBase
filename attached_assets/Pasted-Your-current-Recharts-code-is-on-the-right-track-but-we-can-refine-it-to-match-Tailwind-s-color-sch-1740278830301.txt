@@ -1,0 +1,112 @@
+Your current Recharts code is on the right track, but we can refine it to match Tailwind’s color scheme and ensure it works seamlessly with your theme. Since Tailwind uses CSS variables (like hsl(var(--background))), we’ll need to access the theme values dynamically in your React component. You can use a theme context or a utility function to get the current theme colors.
+Here’s how you can modify your chart code to ensure the bars and lines adapt to dark/light mode using Tailwind’s color definitions:
+1. Use a Theme Context or Hook
+Assuming you’re using a theme management system (like useTheme from a library or a custom context), you’ll need to access the current mode and its colors. If you’re using Tailwind with a class-based dark mode (darkMode: ["class"]), you can check for the dark class on the <html> or <body> element.
+Here’s an example of how you might set up a theme hook to get the current colors:
+jsx
+import { useState, useEffect } from 'react';
+
+// Custom hook to get theme colors
+const useThemeColors = () => {
+  const [colors, setColors] = useState({
+    barFill: '#000000', // Default to black (light mode)
+    lineStroke: '#000000', // Default to black (light mode)
+  });
+
+  useEffect(() => {
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    setColors({
+      barFill: isDarkMode ? '#FFFFFF' : '#000000', // White in dark, black in light
+      lineStroke: isDarkMode ? '#FFFFFF' : '#333333', // White in dark, dark gray in light
+    });
+  }, []);
+
+  return colors;
+};
+2. Update Your Chart Component
+Use the theme colors in your Recharts chart:
+jsx
+import { ResponsiveContainer, ComposedChart, XAxis, YAxis, Bar, Line, RechartsTooltip, Legend } from 'recharts';
+import { useThemeColors } from './path-to-theme-hook'; // Import the hook
+
+function SalesChart({ chartData }) {
+  const { barFill, lineStroke } = useThemeColors();
+
+  const formatCurrency = (value) => `$${value.toLocaleString()}`;
+
+  return (
+    <Card className="p-4">
+      <h3 className="text-lg font-semibold mb-2">Monthly Sales Performance</h3>
+      <div className="h-[300px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={chartData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+            <XAxis
+              dataKey="month"
+              angle={-45}
+              textAnchor="end"
+              height={40}
+            />
+            <YAxis
+              yAxisId="left"
+              tickFormatter={formatCurrency}
+              label={{
+                value: 'Monthly Volume',
+                angle: -90,
+                position: 'insideLeft',
+                offset: 5,
+                dx: -10,
+                dy: 50
+              }}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              tickFormatter={formatCurrency}
+              label={{
+                value: 'Cumulative Volume',
+                angle: 90,
+                position: 'insideRight',
+                offset: -90
+              }}
+            />
+            <RechartsTooltip
+              formatter={(value, name) => {
+                if (name === "transactionCount") return [value, "Transactions"];
+                return [formatCurrency(value), name === "totalVolume" ? "Monthly Volume" : "Cumulative Volume"];
+              }}
+              labelFormatter={(label) => `Month: ${label}`}
+            />
+            <Legend />
+            <Bar
+              yAxisId="left"
+              dataKey="totalVolume"
+              fill={barFill}
+              name="Monthly Volume"
+            />
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="cumulativeVolume"
+              stroke={lineStroke}
+              strokeWidth={2}
+              dot={false}
+              name="Cumulative Volume"
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
+  );
+}
+
+export default SalesChart;
+3. Why Your Current Chart Looks Black in Dark Mode
+Your current chart shows black bars and lines in dark mode because the fill and stroke aren’t dynamically updating based on the theme. The issue likely stems from:
+The theme.theme value not being correctly set or detected as 'dark'.
+No mechanism to listen for Tailwind’s dark class or theme changes.
+By using the useThemeColors hook (or similar), you can dynamically detect whether the dark class is present and adjust the colors accordingly.
+4. Additional Recommendations
+Tailwind Class Detection: If you’re using Tailwind’s class-based dark mode, you can check for the dark class on the <html> or <body> element using JavaScript, as shown in the useThemeColors hook.
+Color Consistency: Use Tailwind’s color variables (e.g., hsl(var(--foreground)) for text colors) if you want to tie the chart colors directly to your theme. However, for Recharts, it’s simpler to use hardcoded HEX/RGB values as shown above, since Recharts doesn’t natively support Tailwind’s HSL variables.
+Testing: Test the chart in both modes by toggling the dark class on your HTML element (e.g., <html class="dark"> for dark mode, or remove it for light mode).
+If you don’t already have a theme management system, I can provide a complete example of a React context for handling dark/light mode with Tailwind. Would you like me to share that as well?
