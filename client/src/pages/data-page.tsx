@@ -316,7 +316,7 @@ export default function DataPage() {
                   labelLine={!isMobile}
                   label={!isMobile ? ({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)` : undefined}
                   outerRadius={100}
-                  fill="#000000"
+                  fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
                   dataKey="value"
                 >
                   {dealStagesData.map((entry, index) => (
@@ -364,7 +364,7 @@ export default function DataPage() {
                 <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
                 <YAxis />
                 <RechartsTooltip />
-                <Bar dataKey="value" fill="#000000">
+                <Bar dataKey="value" fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}>
                   {dealStagesData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
