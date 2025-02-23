@@ -34,7 +34,7 @@ interface MonthlyData {
 }
 
 // Modern dark theme colors
-const COLORS = ['#4ADE80', '#FB7185', '#FDE047', '#38BDF8', '#A78BFA'];
+const COLORS = ['#4ADE80', '#FB7185', '#FDE047', '#38BDF8', '#ffffff'];
 
 export default function DataPage() {
   const { user } = useAuth();
@@ -261,7 +261,7 @@ export default function DataPage() {
                     angle: -90,
                     position: 'insideLeft',
                     offset: 5,
-                    dx: -0,
+                    dx: -10,
                     dy: 50
                   }}
                 />
@@ -287,7 +287,7 @@ export default function DataPage() {
                 <Bar
                   yAxisId="left"
                   dataKey="totalVolume"
-                  fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'} // Corrected theme usage
+                  fill={theme.theme === 'dark' ? '#FFFFFF' : '#ffffff'} // Corrected theme usage
                   name="Monthly Volume"
                 />
                 <Line
