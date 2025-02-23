@@ -397,12 +397,18 @@ export default function DataPage() {
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={activityData}>
-                <XAxis dataKey="month" />
-                <YAxis />
-                <RechartsTooltip />
-                <Legend />
+                <XAxis dataKey="month" stroke="currentColor" tick={{ fill: "currentColor" }} />
+                <YAxis stroke="currentColor" tick={{ fill: "currentColor" }} />
+                <RechartsTooltip 
+                  contentStyle={{
+                    backgroundColor: theme.theme === 'dark' ? '#1a1a1a' : '#ffffff',
+                    border: '1px solid #666',
+                    color: theme.theme === 'dark' ? '#ffffff' : '#000000'
+                  }}
+                />
+                <Legend formatter={(value) => <span className="text-foreground">{value}</span>} />
                 <Bar dataKey="meetings" name="Meetings" fill="#4ADE80" />
-                <Bar dataKey="calls" name="Calls" fill="#FB7185" />
+                <Bar dataKey="calls" name="Calls" fill={theme.theme === 'dark' ? '#ffffff' : '#FB7185'} />
               </BarChart>
             </ResponsiveContainer>
           </div>
