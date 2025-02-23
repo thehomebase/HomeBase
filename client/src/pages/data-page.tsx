@@ -23,7 +23,7 @@ import {
 } from "recharts";
 import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useTheme } from "@/hooks/use-theme"; // Import useTheme
+import { useTheme } from "@/hooks/use-theme";
 
 
 interface MonthlyData {
@@ -33,8 +33,11 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-// Modern dark theme colors
-const COLORS = ['#4ADE80', '#FB7185', '#FDE047', '#38BDF8', '#ffffff'];
+// Theme-aware colors
+const COLORS = {
+  light: ['#4ADE80', '#FB7185', '#FDE047', '#38BDF8', '#ffffff'],
+  dark: ['#22C55E', '#E14D62', '#FFD700', '#2196F3', '#ffffff'],
+};
 
 export default function DataPage() {
   const { user } = useAuth();
@@ -46,7 +49,7 @@ export default function DataPage() {
     queryKey: ["/api/transactions"],
     enabled: !!user && user.role === "agent",
   });
-  const theme = useTheme(); // Initialize useTheme
+  const theme = useTheme();
 
   // Get all months in current year
   const currentYear = new Date().getFullYear();
@@ -342,7 +345,7 @@ export default function DataPage() {
                   dataKey="value"
                 >
                   {dealStagesData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={COLORS[theme.theme][index % COLORS[theme.theme].length]} />
                   ))}
                 </Pie>
                 <Legend
@@ -388,7 +391,7 @@ export default function DataPage() {
                 <RechartsTooltip />
                 <Bar dataKey="value" fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}>
                   {dealStagesData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={COLORS[theme.theme][index % COLORS[theme.theme].length]} />
                   ))}
                 </Bar>
               </BarChart>
