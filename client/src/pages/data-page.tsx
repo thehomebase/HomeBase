@@ -31,14 +31,7 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-// Update color scheme for dark mode visibility
-const darkModeColors = {
-  text: 'text-white',
-  line: 'rgba(255, 255, 255, 0.9)',
-  grid: 'rgba(255, 255, 255, 0.1)',
-  background: 'rgb(30, 30, 30)',
-  accent: '#E5E7EB'
-};
+// Update color scheme to black and white theme
 const COLORS = ['#000000', '#333333', '#666666', '#999999', '#CCCCCC'];
 
 export default function DataPage() {
