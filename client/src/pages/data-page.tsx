@@ -253,11 +253,13 @@ export default function DataPage() {
                   textAnchor="end"
                   height={40}
                   stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
+                  tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}
                 />
                 <YAxis
                   yAxisId="left"
                   tickFormatter={formatCurrency}
                   stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
+                  tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}
                   label={{
                     value: 'Monthly Volume',
                     angle: -90,
@@ -273,6 +275,7 @@ export default function DataPage() {
                   orientation="right"
                   tickFormatter={formatCurrency}
                   stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
+                  tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}
                   label={{
                     value: 'Cumulative Volume',
                     angle: 90,
@@ -297,6 +300,11 @@ export default function DataPage() {
                   wrapperStyle={{
                     color: theme.theme === 'dark' ? '#FFFFFF' : '#000000'
                   }}
+                  formatter={(value, entry) => (
+                    <span style={{ color: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}>
+                      {value}
+                    </span>
+                  )}
                 />
                 <Bar
                   yAxisId="left"
