@@ -26,18 +26,13 @@ app.get('/health', (_req, res) => {
 
 // Simplified server startup function with port fallback
 async function startServer(server: HttpServer): Promise<void> {
-  const startPort = Number(process.env.PORT) || 5000;
+  const port = process.env.PORT || 3000;
   const host = '0.0.0.0';
-  const maxRetries = 10;
-  let currentPort = startPort;
-  let started = false;
-
-  for (let attempt = 0; attempt < maxRetries && !started; attempt++) {
-    try {
-      log(`Attempting to start server on port ${currentPort} (attempt ${attempt + 1}/${maxRetries})`);
-
-      await new Promise<void>((resolve, reject) => {
-        server.listen(currentPort, host)
+  
+  try {
+    log(`Starting server on port ${port}`);
+    await new Promise<void>((resolve, reject) => {
+      server.listen(port, host)
           .once('listening', () => {
             log(`Server successfully started and listening on ${host}:${currentPort}`);
             // Update PORT environment variable to match actual port
