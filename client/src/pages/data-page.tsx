@@ -31,8 +31,8 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-// Update color scheme to black and white theme
-const COLORS = ['#FFFFFF', '#E5E7EB', '#D1D5DB', '#9CA3AF', '#6B7280'];
+// Modern dark theme colors
+const COLORS = ['#4F46E5', '#22C55E', '#3B82F6', '#EC4899', '#10B981'];
 
 export default function DataPage() {
   const { user } = useAuth();
