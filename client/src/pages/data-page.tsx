@@ -32,7 +32,7 @@ interface MonthlyData {
 }
 
 // Update color scheme to black and white theme
-const COLORS = ['#000000', '#333333', '#666666', '#999999', '#CCCCCC'];
+const COLORS = ['#FFFFFF', '#E5E7EB', '#D1D5DB', '#9CA3AF', '#6B7280'];
 
 export default function DataPage() {
   const { user } = useAuth();
