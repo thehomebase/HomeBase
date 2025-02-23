@@ -272,14 +272,18 @@ export default function DataPage() {
           <h3 className="text-lg font-semibold mb-2">Monthly Sales Performance</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+              <ComposedChart 
+                data={chartData} 
+                margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                className="[&_.recharts-text]:fill-foreground [&_.recharts-cartesian-axis-tick-value]:fill-foreground [&_.recharts-legend-item-text]:fill-foreground"
+              >
                 <XAxis
                   dataKey="month"
                   angle={-45}
                   textAnchor="end"
                   height={40}
-                  stroke={CHART_COLORS[theme.theme].text}
-                  tick={{ fill: CHART_COLORS[theme.theme].text }}
+                  stroke="currentColor"
+                  tick={{ fill: "currentColor" }}
                 />
                 <YAxis
                   yAxisId="left"
