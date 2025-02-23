@@ -35,8 +35,8 @@ app.get('/test', (_req, res) => {
 
 // Simplified server startup function with proper port handling
 async function startServer(server: HttpServer): Promise<void> {
-  // In production (Replit deployment), use port 80, otherwise fallback to 3000
-  const port = environment === 'production' ? 80 : (Number(process.env.PORT) || 3000);
+  // ALWAYS serve the app on port 5000
+  const port = 5000;
   const host = '0.0.0.0';
 
   log(`Environment: ${environment}`);
