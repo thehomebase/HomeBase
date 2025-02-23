@@ -3,6 +3,12 @@ import type { Config } from "tailwindcss";
 export default {
   darkMode: ["class"],
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
+  variants: {
+    extend: {
+      textColor: ['dark'],
+      backgroundColor: ['dark'],
+    },
+  },
   theme: {
     screens: {
       'xs': '375px',
