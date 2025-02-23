@@ -26,8 +26,7 @@ app.get('/health', (_req, res) => {
 
 // Simplified server startup function with port fallback
 async function startServer(server: HttpServer): Promise<void> {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const port = isProduction ? 80 : (Number(process.env.PORT) || 5000);
+  const port = Number(process.env.PORT) || 5000;
   const host = '0.0.0.0';
 
   try {
