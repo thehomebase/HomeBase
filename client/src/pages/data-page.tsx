@@ -7,12 +7,12 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon } from "lucide-react";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip as RechartsTooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   Line,
   ComposedChart,
@@ -22,7 +22,7 @@ import {
   Cell
 } from "recharts";
 import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } from "date-fns";
-import { useIsMobile } from "@/hooks/use-mobile"; // Added import
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MonthlyData {
   month: string;
@@ -31,11 +31,12 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+// Update color scheme to black and white theme
+const COLORS = ['#000000', '#333333', '#666666', '#999999', '#CCCCCC'];
 
 export default function DataPage() {
   const { user } = useAuth();
-  const isMobile = useIsMobile(); // Added useIsMobile hook usage
+  const isMobile = useIsMobile();
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
@@ -71,10 +72,10 @@ export default function DataPage() {
       const matchesStatus = !selectedStatus || t.status === selectedStatus;
       const matchesStartDate = !startDate || closeDate >= new Date(startDate);
       const matchesEndDate = !endDate || closeDate <= new Date(endDate);
-      return t.status === "closed" && 
-             getYear(closeDate) === currentYear && 
-             matchesStatus && 
-             matchesStartDate && 
+      return t.status === "closed" &&
+             getYear(closeDate) === currentYear &&
+             matchesStatus &&
+             matchesStartDate &&
              matchesEndDate;
     })
     .reduce((acc, transaction) => {
@@ -244,36 +245,36 @@ export default function DataPage() {
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-                <XAxis 
-                  dataKey="month" 
-                  angle={-45} 
-                  textAnchor="end" 
+                <XAxis
+                  dataKey="month"
+                  angle={-45}
+                  textAnchor="end"
                   height={40}
                 />
-                <YAxis 
+                <YAxis
                   yAxisId="left"
                   tickFormatter={formatCurrency}
-                  label={{ 
-                    value: 'Monthly Volume', 
-                    angle: -90, 
+                  label={{
+                    value: 'Monthly Volume',
+                    angle: -90,
                     position: 'insideLeft',
-                    offset: 5,        // Adjust this value (positive or negative)
-                      dx: -0,        // Moves left/right (negative = left)
-                      dy: 50          // Moves up/down (positive = down)
+                    offset: 5,
+                    dx: -0,
+                    dy: 50
                   }}
                 />
-                <YAxis 
+                <YAxis
                   yAxisId="right"
                   orientation="right"
                   tickFormatter={formatCurrency}
-                  label={{ 
-                    value: 'Cumulative Volume', 
-                    angle: 90, 
+                  label={{
+                    value: 'Cumulative Volume',
+                    angle: 90,
                     position: 'insideRight',
                     offset: -90
                   }}
                 />
-                <RechartsTooltip 
+                <RechartsTooltip
                   formatter={(value: number, name: string) => {
                     if (name === "transactionCount") return [value, "Transactions"];
                     return [formatCurrency(value), name === "totalVolume" ? "Monthly Volume" : "Cumulative Volume"];
@@ -281,17 +282,17 @@ export default function DataPage() {
                   labelFormatter={(label) => `Month: ${label}`}
                 />
                 <Legend />
-                <Bar 
+                <Bar
                   yAxisId="left"
-                  dataKey="totalVolume" 
-                  fill="hsl(var(--primary))" 
+                  dataKey="totalVolume"
+                  fill="#000000"
                   name="Monthly Volume"
                 />
                 <Line
                   yAxisId="right"
                   type="monotone"
                   dataKey="cumulativeVolume"
-                  stroke="#16a34a"
+                  stroke="#666666"
                   strokeWidth={2}
                   dot={false}
                   name="Cumulative Volume"
@@ -310,10 +311,10 @@ export default function DataPage() {
                   data={dealStagesData}
                   cx="50%"
                   cy="50%"
-                  labelLine={!isMobile} // Conditional rendering of labelLine
-                  label={!isMobile ? ({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)` : undefined} // Conditional rendering of label
+                  labelLine={!isMobile}
+                  label={!isMobile ? ({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)` : undefined}
                   outerRadius={100}
-                  fill="#8884d8"
+                  fill="#000000"
                   dataKey="value"
                 >
                   {dealStagesData.map((entry, index) => (
@@ -346,8 +347,8 @@ export default function DataPage() {
                 <YAxis />
                 <RechartsTooltip />
                 <Legend />
-                <Bar dataKey="meetings" name="Meetings" fill="#8884d8" />
-                <Bar dataKey="calls" name="Calls" fill="#82ca9d" />
+                <Bar dataKey="meetings" name="Meetings" fill="#000000" />
+                <Bar dataKey="calls" name="Calls" fill="#666666" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -361,7 +362,7 @@ export default function DataPage() {
                 <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
                 <YAxis />
                 <RechartsTooltip />
-                <Bar dataKey="value" fill="hsl(var(--primary))">
+                <Bar dataKey="value" fill="#000000">
                   {dealStagesData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
