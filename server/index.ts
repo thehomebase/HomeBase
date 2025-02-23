@@ -1,3 +1,4 @@
+
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
@@ -42,17 +43,10 @@ async function startServer(server: HttpServer): Promise<void> {
           reject(err);
         });
     });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log(`Error on port ${currentPort}: ${errorMessage}`);
-      if (attempt === maxRetries - 1) {
-        throw new Error(`Failed to start server after ${maxRetries} attempts`);
-      }
-    }
-  }
-
-  if (!started) {
-    throw new Error(`Could not find an available port after ${maxRetries} attempts`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log(`Error starting server: ${errorMessage}`);
+    throw error;
   }
 }
 
