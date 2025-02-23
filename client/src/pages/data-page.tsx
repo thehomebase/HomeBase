@@ -275,7 +275,7 @@ export default function DataPage() {
               <ComposedChart 
                 data={chartData} 
                 margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                className="[&_.recharts-text]:fill-foreground [&_.recharts-cartesian-axis-tick-value]:fill-foreground [&_.recharts-legend-item-text]:fill-foreground"
+                className="[&_.recharts-text]:fill-foreground [&_.recharts-cartesian-axis-tick-value]:fill-foreground dark:[&_.recharts-legend-item-text]:fill-white [&_.recharts-legend-item-text]:fill-black"
               >
                 <XAxis
                   dataKey="month"
