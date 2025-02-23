@@ -34,7 +34,7 @@ interface MonthlyData {
 }
 
 // Modern dark theme colors
-const COLORS = ['#4F46E5', '#22C55E', '#3B82F6', '#EC4899', '#10B981'];
+const COLORS = ['#4ADE80', '#FB7185', '#FDE047', '#38BDF8', '#A78BFA'];
 
 export default function DataPage() {
   const { user } = useAuth();
@@ -349,8 +349,8 @@ export default function DataPage() {
                 <YAxis />
                 <RechartsTooltip />
                 <Legend />
-                <Bar dataKey="meetings" name="Meetings" fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'} /> {/*Corrected theme usage*/}
-                <Bar dataKey="calls" name="Calls" fill="#666666" />
+                <Bar dataKey="meetings" name="Meetings" fill="#4ADE80" />
+                <Bar dataKey="calls" name="Calls" fill="#FB7185" />
               </BarChart>
             </ResponsiveContainer>
           </div>
