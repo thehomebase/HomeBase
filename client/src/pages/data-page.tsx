@@ -33,7 +33,30 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-// Theme-aware colors
+// Theme-aware chart colors
+const CHART_COLORS = {
+  light: {
+    bar: '#4ADE80',
+    line: '#3B82F6',
+    text: '#000000',
+    background: '#ffffff',
+    tooltip: {
+      background: '#ffffff',
+      text: '#000000'
+    }
+  },
+  dark: {
+    bar: '#22C55E',
+    line: '#60A5FA', 
+    text: '#FFFFFF',
+    background: '#1a1a1a',
+    tooltip: {
+      background: '#1a1a1a',
+      text: '#FFFFFF'
+    }
+  }
+};
+
 const COLORS = {
   light: ['#4ADE80', '#FB7185', '#FDE047', '#38BDF8', '#ffffff'],
   dark: ['#22C55E', '#E14D62', '#FFD700', '#2196F3', '#ffffff'],
@@ -255,14 +278,14 @@ export default function DataPage() {
                   angle={-45}
                   textAnchor="end"
                   height={40}
-                  stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
-                  tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}
+                  stroke={CHART_COLORS[theme.theme].text}
+                  tick={{ fill: CHART_COLORS[theme.theme].text }}
                 />
                 <YAxis
                   yAxisId="left"
                   tickFormatter={formatCurrency}
-                  stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
-                  tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}
+                  stroke={CHART_COLORS[theme.theme].text}
+                  tick={{ fill: CHART_COLORS[theme.theme].text }}
                   label={{
                     value: 'Monthly Volume',
                     angle: -90,
@@ -270,28 +293,28 @@ export default function DataPage() {
                     offset: 5,
                     dx: -10,
                     dy: 50,
-                    style: { fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }
+                    style: { fill: CHART_COLORS[theme.theme].text }
                   }}
                 />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
                   tickFormatter={formatCurrency}
-                  stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
-                  tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}
+                  stroke={CHART_COLORS[theme.theme].text}
+                  tick={{ fill: CHART_COLORS[theme.theme].text }}
                   label={{
                     value: 'Cumulative Volume',
                     angle: 90,
                     position: 'insideRight',
                     offset: -90,
-                    style: { fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }
+                    style: { fill: CHART_COLORS[theme.theme].text }
                   }}
                 />
                 <RechartsTooltip
                   contentStyle={{
-                    backgroundColor: theme.theme === 'dark' ? '#1a1a1a' : '#ffffff',
+                    backgroundColor: CHART_COLORS[theme.theme].tooltip.background,
                     border: '1px solid #666',
-                    color: theme.theme === 'dark' ? '#ffffff' : '#000000'
+                    color: CHART_COLORS[theme.theme].tooltip.text
                   }}
                   formatter={(value: number, name: string) => {
                     if (name === "transactionCount") return [value, "Transactions"];
@@ -301,10 +324,10 @@ export default function DataPage() {
                 />
                 <Legend 
                   wrapperStyle={{
-                    color: theme.theme === 'dark' ? '#FFFFFF' : '#000000'
+                    color: CHART_COLORS[theme.theme].text
                   }}
                   formatter={(value, entry) => (
-                    <span style={{ color: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}>
+                    <span style={{ color: CHART_COLORS[theme.theme].text }}>
                       {value}
                     </span>
                   )}
@@ -312,14 +335,14 @@ export default function DataPage() {
                 <Bar
                   yAxisId="left"
                   dataKey="totalVolume"
-                  fill={theme.theme === 'dark' ? '#4ADE80' : '#22C55E'}
+                  fill={CHART_COLORS[theme.theme].bar}
                   name="Monthly Volume"
                 />
                 <Line
                   yAxisId="right"
                   type="monotone"
                   dataKey="cumulativeVolume"
-                  stroke={theme.theme === 'dark' ? '#60A5FA' : '#3B82F6'}
+                  stroke={CHART_COLORS[theme.theme].line}
                   strokeWidth={2}
                   dot={false}
                   name="Cumulative Volume"
