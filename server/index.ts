@@ -33,24 +33,15 @@ async function startServer(server: HttpServer): Promise<void> {
     log(`Starting server on port ${port}`);
     await new Promise<void>((resolve, reject) => {
       server.listen(port, host)
-          .once('listening', () => {
-            log(`Server successfully started and listening on ${host}:${currentPort}`);
-            // Update PORT environment variable to match actual port
-            process.env.PORT = String(currentPort);
-            started = true;
-            resolve();
-          })
-          .once('error', (err: NodeJS.ErrnoException) => {
-            if (err.code === 'EADDRINUSE') {
-              log(`Port ${currentPort} is in use, trying next port`);
-              currentPort++;
-              server.close();
-              resolve(); // Resolve to try next port
-            } else {
-              reject(err);
-            }
-          });
-      });
+        .once('listening', () => {
+          log(`Server successfully started and listening on ${host}:${port}`);
+          process.env.PORT = String(port);
+          resolve();
+        })
+        .once('error', (err: NodeJS.ErrnoException) => {
+          reject(err);
+        });
+    });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       log(`Error on port ${currentPort}: ${errorMessage}`);
