@@ -4,8 +4,9 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { Server as HttpServer } from "http";
 
-// Log environment details
-log(`Node environment: ${process.env.NODE_ENV}`);
+// Enhanced environment logging
+const environment = process.env.NODE_ENV || 'development';
+log(`Starting application in ${environment} environment`);
 log(`Initial PORT environment variable: ${process.env.PORT}`);
 
 const app = express();
@@ -15,20 +16,31 @@ app.use(express.urlencoded({ extended: false }));
 // Health check endpoint - BEFORE auth middleware
 app.get('/health', (_req, res) => {
   log('Health check accessed');
-  res.json({ status: 'ok', port: process.env.PORT });
+  res.json({ 
+    status: 'ok', 
+    environment,
+    port: process.env.PORT 
+  });
 });
 
 // Basic test route - BEFORE auth middleware
 app.get('/test', (_req, res) => {
   log('Test route accessed');
-  res.json({ message: 'Server is running', port: process.env.PORT });
+  res.json({ 
+    message: 'Server is running', 
+    environment,
+    port: process.env.PORT 
+  });
 });
 
 // Simplified server startup function with proper port handling
 async function startServer(server: HttpServer): Promise<void> {
   // In production (Replit deployment), use port 80, otherwise fallback to 3000
-  const port = process.env.NODE_ENV === 'production' ? 80 : (Number(process.env.PORT) || 3000);
+  const port = environment === 'production' ? 80 : (Number(process.env.PORT) || 3000);
   const host = '0.0.0.0';
+
+  log(`Environment: ${environment}`);
+  log(`Selected port: ${port}`);
 
   try {
     log(`Starting server on ${host}:${port}`);
@@ -85,10 +97,16 @@ async function startServer(server: HttpServer): Promise<void> {
     // Then gradually add middleware
     log(`Adding Vite middleware...`);
     try {
-      await setupVite(app, server);
-      log(`Vite middleware setup complete`);
+      if (environment === 'development') {
+        await setupVite(app, server);
+        log(`Vite middleware setup complete`);
+      } else {
+        log(`Running in production mode, using static file serving`);
+        serveStatic(app);
+      }
     } catch (err) {
-      log(`Failed to start in development mode, trying production: ${err}`);
+      log(`Failed to setup middleware: ${err}`);
+      log(`Falling back to static file serving`);
       serveStatic(app);
     }
 
@@ -105,7 +123,7 @@ async function startServer(server: HttpServer): Promise<void> {
     process.on('SIGINT', shutdown);
 
   } catch (error) {
-    log('Fatal error during application startup:', error);
+    log(`Fatal error during application startup: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 })();
