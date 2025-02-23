@@ -23,7 +23,7 @@ import {
 } from "recharts";
 import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useTheme } from 'next-themes'; // Import useTheme
+import { useTheme } from "@/hooks/use-theme"; // Import useTheme
 
 
 interface MonthlyData {
