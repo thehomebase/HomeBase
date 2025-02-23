@@ -285,7 +285,7 @@ export default function DataPage() {
                 <Bar
                   yAxisId="left"
                   dataKey="totalVolume"
-                  fill="#000000"
+                  fill="#FFFFFF"
                   name="Monthly Volume"
                 />
                 <Line
@@ -347,7 +347,7 @@ export default function DataPage() {
                 <YAxis />
                 <RechartsTooltip />
                 <Legend />
-                <Bar dataKey="meetings" name="Meetings" fill="#000000" />
+                <Bar dataKey="meetings" name="Meetings" fill="#FFFFFF" />
                 <Bar dataKey="calls" name="Calls" fill="#666666" />
               </BarChart>
             </ResponsiveContainer>
