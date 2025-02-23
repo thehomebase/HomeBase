@@ -27,47 +27,26 @@ app.get('/health', (_req, res) => {
 // Simplified server startup function with port fallback
 async function startServer(server: HttpServer): Promise<void> {
   const isProduction = process.env.NODE_ENV === 'production';
-  const startPort = isProduction ? 80 : (Number(process.env.PORT) || 5000);
+  const port = isProduction ? 80 : (Number(process.env.PORT) || 5000);
   const host = '0.0.0.0';
-  const maxRetries = isProduction ? 1 : 10; // In production, don't retry ports
-  let currentPort = startPort;
-  let started = false;
 
-  for (let attempt = 0; attempt < maxRetries && !started; attempt++) {
-    try {
-      log(`Attempting to start server on port ${currentPort} (attempt ${attempt + 1}/${maxRetries})`);
-
-      await new Promise<void>((resolve, reject) => {
-        server.listen(currentPort, host)
-          .once('listening', () => {
-            log(`Server successfully started and listening on ${host}:${currentPort}`);
-            // Update PORT environment variable to match actual port
-            process.env.PORT = String(currentPort);
-            started = true;
-            resolve();
-          })
-          .once('error', (err: NodeJS.ErrnoException) => {
-            if (err.code === 'EADDRINUSE') {
-              log(`Port ${currentPort} is in use, trying next port`);
-              currentPort++;
-              server.close();
-              resolve(); // Resolve to try next port
-            } else {
-              reject(err);
-            }
-          });
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log(`Error on port ${currentPort}: ${errorMessage}`);
-      if (attempt === maxRetries - 1) {
-        throw new Error(`Failed to start server after ${maxRetries} attempts`);
-      }
-    }
-  }
-
-  if (!started) {
-    throw new Error(`Could not find an available port after ${maxRetries} attempts`);
+  try {
+    log(`Starting server on ${host}:${port}`);
+    await new Promise<void>((resolve, reject) => {
+      server.listen(port, host)
+        .once('listening', () => {
+          log(`Server successfully started and listening on ${host}:${port}`);
+          process.env.PORT = String(port);
+          resolve();
+        })
+        .once('error', (err: NodeJS.ErrnoException) => {
+          reject(err);
+        });
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log(`Failed to start server: ${errorMessage}`);
+    throw error;
   }
 }
 
