@@ -26,9 +26,10 @@ app.get('/health', (_req, res) => {
 
 // Simplified server startup function with port fallback
 async function startServer(server: HttpServer): Promise<void> {
-  const startPort = Number(process.env.PORT) || 5000;
+  const isProduction = process.env.NODE_ENV === 'production';
+  const startPort = isProduction ? 80 : (Number(process.env.PORT) || 5000);
   const host = '0.0.0.0';
-  const maxRetries = 10;
+  const maxRetries = isProduction ? 1 : 10; // In production, don't retry ports
   let currentPort = startPort;
   let started = false;
 
