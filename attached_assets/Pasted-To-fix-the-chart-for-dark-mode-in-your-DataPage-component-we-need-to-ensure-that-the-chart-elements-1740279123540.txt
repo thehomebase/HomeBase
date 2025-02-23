@@ -1,0 +1,228 @@
+To fix the chart for dark mode in your DataPage component, we need to ensure that the chart elements (bars, lines, axes, labels, legends, and tooltips) are visible and appropriately colored in both dark and light modes, matching your Tailwind theme configuration. Your current implementation uses theme.theme to conditionally set colors, but there might be issues with how the theme is detected or applied, or the color choices might not provide sufficient contrast in dark mode.
+Here’s how we can fix and optimize the Monthly Sales Performance chart (the ComposedChart) and other charts in your component for dark mode, based on your Tailwind configuration and the desired behavior (white in dark mode, black in light mode):
+1. Verify useTheme Hook
+First, ensure your useTheme hook (import { useTheme } from "@/hooks/use-theme") correctly returns the current theme mode ('dark' or 'light'). You can log the theme to debug:
+jsx
+const theme = useTheme();
+console.log('Current theme:', theme.theme);
+If theme.theme isn’t returning 'dark' in dark mode, there might be an issue with how your theme management is implemented. Based on your Tailwind config (darkMode: ["class"]), the theme is likely toggled by adding/removing the dark class on the <html> or <body> element. Ensure your useTheme hook checks for this class or integrates with your theme provider correctly.
+2. Update the Monthly Sales Performance Chart
+Here’s how to modify the ComposedChart to ensure it displays correctly in dark mode (white elements) and light mode (black or dark gray elements), with good contrast:
+jsx
+<Card className="p-4">
+  <h3 className="text-lg font-semibold mb-2">Monthly Sales Performance</h3>
+  <div className="h-[300px] w-full">
+    <ResponsiveContainer width="100%" height="100%">
+      <ComposedChart data={chartData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+        <XAxis
+          dataKey="month"
+          angle={-45}
+          textAnchor="end"
+          height={40}
+          stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}  // Axis line color
+          tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}  // Tick labels
+        />
+        <YAxis
+          yAxisId="left"
+          tickFormatter={formatCurrency}
+          stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}  // Axis line color
+          tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}  // Tick labels
+          label={{
+            value: 'Monthly Volume',
+            angle: -90,
+            position: 'insideLeft',
+            offset: 5,
+            dx: -10,
+            dy: 50,
+            style: { fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }  // Label color
+          }}
+        />
+        <YAxis
+          yAxisId="right"
+          orientation="right"
+          tickFormatter={formatCurrency}
+          stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}  // Axis line color
+          tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}  // Tick labels
+          label={{
+            value: 'Cumulative Volume',
+            angle: 90,
+            position: 'insideRight',
+            offset: -90,
+            style: { fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }  // Label color
+          }}
+        />
+        <RechartsTooltip
+          contentStyle={{
+            backgroundColor: theme.theme === 'dark' ? '#1a1a1a' : '#ffffff',  // Darker background for contrast in dark mode
+            border: '1px solid #666',
+            color: theme.theme === 'dark' ? '#FFFFFF' : '#000000'  // Tooltip text color
+          }}
+          formatter={(value: number, name: string) => {
+            if (name === "transactionCount") return [value, "Transactions"];
+            return [formatCurrency(value), name === "totalVolume" ? "Monthly Volume" : "Cumulative Volume"];
+          }}
+          labelFormatter={(label) => `Month: ${label}`}
+        />
+        <Legend 
+          wrapperStyle={{
+            color: theme.theme === 'dark' ? '#FFFFFF' : '#000000'  // Legend text color
+          }}
+          formatter={(value, entry) => (
+            <span style={{ color: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}>
+              {value}
+            </span>
+          )}
+        />
+        <Bar
+          yAxisId="left"
+          dataKey="totalVolume"
+          fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}  // White bars in dark, black in light
+          name="Monthly Volume"
+        />
+        <Line
+          yAxisId="right"
+          type="monotone"
+          dataKey="cumulativeVolume"
+          stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}  // White line in dark, black in light
+          strokeWidth={2}
+          dot={false}
+          name="Cumulative Volume"
+        />
+      </ComposedChart>
+    </ResponsiveContainer>
+  </div>
+</Card>
+Key Changes:
+Bars and Lines: Changed fill for Bar and stroke for Line to be #FFFFFF in dark mode and #000000 in light mode, ensuring high contrast with the background (dark gray in dark mode, white in light mode).
+Axes and Labels: Ensured all axis lines (stroke), tick labels (tick.fill), and axis labels (style.fill) follow the same dark/light mode logic.
+Tooltip and Legend: Updated the tooltip background and text color, and legend text color, to match the theme for better readability.
+Removed the specific color values like #4ADE80 and #22C55E for bars and #60A5FA and #3B82F6 for lines, replacing them with the generic white/black scheme to match your request.
+3. Fix Other Charts in the Component
+You’ll need to apply similar logic to the PieChart, BarChart for "Activities Completed," and "Deal Progress" charts to ensure they work in both modes. Here’s how:
+PieChart (Deal Stages)
+Update the Pie and Legend to use theme-aware colors:
+jsx
+<Card className="p-6">
+  <h3 className="text-lg font-semibold mb-4">Deal Stages</h3>
+  <div className="h-[350px] w-full">
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart>
+        <Pie
+          data={dealStagesData}
+          cx="50%"
+          cy="50%"
+          labelLine={!isMobile}
+          label={!isMobile ? ({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)` : undefined}
+          outerRadius={100}
+          fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}  // Pie fill color (outline)
+          dataKey="value"
+        >
+          {dealStagesData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[theme.theme][index % COLORS[theme.theme].length]} />
+          ))}
+        </Pie>
+        <Legend
+          layout="horizontal"
+          verticalAlign="bottom"
+          formatter={(value, entry) => {
+            const item = dealStagesData.find(d => d.name === value);
+            const percent = item ? (item.value / dealStagesData.reduce((acc, curr) => acc + curr.value, 0) * 100).toFixed(0) : 0;
+            return isMobile ? `${value} (${percent}%)` : value;
+          }}
+          wrapperStyle={{
+            color: theme.theme === 'dark' ? '#FFFFFF' : '#000000'  // Legend text color
+          }}
+        />
+        <RechartsTooltip
+          contentStyle={{
+            backgroundColor: theme.theme === 'dark' ? '#1a1a1a' : '#ffffff',
+            border: '1px solid #666',
+            color: theme.theme === 'dark' ? '#FFFFFF' : '#000000'
+          }}
+        />
+      </PieChart>
+    </ResponsiveContainer>
+  </div>
+</Card>
+BarChart (Activities Completed)
+Update the BarChart to use theme-aware colors for axes, bars, and labels:
+jsx
+<Card className="p-6">
+  <h3 className="text-lg font-semibold mb-4">Activities Completed</h3>
+  <div className="h-[300px] w-full">
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={activityData}>
+        <XAxis 
+          dataKey="month" 
+          stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
+          tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}
+        />
+        <YAxis 
+          stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
+          tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}
+        />
+        <RechartsTooltip
+          contentStyle={{
+            backgroundColor: theme.theme === 'dark' ? '#1a1a1a' : '#ffffff',
+            border: '1px solid #666',
+            color: theme.theme === 'dark' ? '#FFFFFF' : '#000000'
+          }}
+        />
+        <Legend
+          wrapperStyle={{
+            color: theme.theme === 'dark' ? '#FFFFFF' : '#000000'
+          }}
+        />
+        <Bar dataKey="meetings" name="Meetings" fill={theme.theme === 'dark' ? '#FFFFFF' : '#4ADE80'} />
+        <Bar dataKey="calls" name="Calls" fill={theme.theme === 'dark' ? '#FFFFFF' : '#FB7185'} />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</Card>
+BarChart (Deal Progress)
+Update the BarChart for "Deal Progress" similarly:
+jsx
+<Card className="p-6">
+  <h3 className="text-lg font-semibold mb-4">Deal Progress</h3>
+  <div className="h-[300px] w-full">
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={dealStagesData}>
+        <XAxis 
+          dataKey="name" 
+          angle={-45} 
+          textAnchor="end" 
+          height={100}
+          stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
+          tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}
+        />
+        <YAxis 
+          stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
+          tick={{ fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }}
+        />
+        <RechartsTooltip
+          contentStyle={{
+            backgroundColor: theme.theme === 'dark' ? '#1a1a1a' : '#ffffff',
+            border: '1px solid #666',
+            color: theme.theme === 'dark' ? '#FFFFFF' : '#000000'
+          }}
+        />
+        <Bar dataKey="value" fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}>
+          {dealStagesData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[theme.theme][index % COLORS[theme.theme].length]} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</Card>
+4. Key Improvements
+Consistent Coloring: Ensured all chart elements (axes, ticks, labels, bars, lines, legends, tooltips) use #FFFFFF in dark mode and #000000 or a dark gray (e.g., #333333) in light mode for high contrast.
+Theme Detection: Relies on theme.theme from useTheme. If this isn’t working, we may need to adjust how useTheme detects the dark class or integrates with Tailwind.
+Contrast: Used a slightly darker background (#1a1a1a) for tooltips in dark mode to ensure readability against white text, and white/light backgrounds in light mode with black text.
+Preserved Your Colors: Kept your COLORS object for pie and bar fills where appropriate, but switched to white/black for the main chart elements as requested.
+5. Troubleshooting
+If the charts still appear black in dark mode:
+Check if theme.theme is correctly returning 'dark' in dark mode. Add console.log(theme.theme) to verify.
+Ensure the dark class is being applied to <html> or <body> when switching to dark mode (you can inspect the DOM in your browser’s developer tools).
+If useTheme isn’t working as expected, you can fall back to checking the dark class directly using JavaScript, as shown in my earlier useThemeColors hook example.
+Would you like me to provide a complete useTheme hook implementation or help debug why theme.theme isn’t detecting dark mode correctly? I can also suggest testing steps to confirm the theme is applied properly.
