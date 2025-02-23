@@ -274,3 +274,13 @@ function App() {
 }
 
 export default App;
+import { Router } from 'wouter'
+import ClientsPage from './pages/clients-page'
+
+export default function App() {
+  return (
+    <Router>
+      <ClientsPage />
+    </Router>
+  )
+}
