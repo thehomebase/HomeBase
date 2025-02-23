@@ -1,4 +1,4 @@
-import { SidebarProvider } from '@/components/sidebar-provider';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { Router } from 'wouter';
 import ClientsPage from './pages/clients-page';
 
