@@ -73,6 +73,7 @@ export default function DataPage() {
     enabled: !!user && user.role === "agent",
   });
   const theme = useTheme();
+  console.log('Current theme:', theme.theme);
 
   // Get all months in current year
   const currentYear = new Date().getFullYear();
@@ -368,11 +369,15 @@ export default function DataPage() {
                   labelLine={!isMobile}
                   label={!isMobile ? ({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)` : undefined}
                   outerRadius={100}
-                  fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
+                  fill="currentColor"
                   dataKey="value"
                 >
                   {dealStagesData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[theme.theme][index % COLORS[theme.theme].length]} />
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={COLORS[theme.theme][index % COLORS[theme.theme].length]} 
+                      className="dark:opacity-90"
+                    />
                   ))}
                 </Pie>
                 <Legend
