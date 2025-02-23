@@ -252,49 +252,63 @@ export default function DataPage() {
                   angle={-45}
                   textAnchor="end"
                   height={40}
+                  stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
                 />
                 <YAxis
                   yAxisId="left"
                   tickFormatter={formatCurrency}
+                  stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
                   label={{
                     value: 'Monthly Volume',
                     angle: -90,
                     position: 'insideLeft',
                     offset: 5,
                     dx: -10,
-                    dy: 50
+                    dy: 50,
+                    style: { fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }
                   }}
                 />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
                   tickFormatter={formatCurrency}
+                  stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}
                   label={{
                     value: 'Cumulative Volume',
                     angle: 90,
                     position: 'insideRight',
-                    offset: -90
+                    offset: -90,
+                    style: { fill: theme.theme === 'dark' ? '#FFFFFF' : '#000000' }
                   }}
                 />
                 <RechartsTooltip
+                  contentStyle={{
+                    backgroundColor: theme.theme === 'dark' ? '#1a1a1a' : '#ffffff',
+                    border: '1px solid #666',
+                    color: theme.theme === 'dark' ? '#ffffff' : '#000000'
+                  }}
                   formatter={(value: number, name: string) => {
                     if (name === "transactionCount") return [value, "Transactions"];
                     return [formatCurrency(value), name === "totalVolume" ? "Monthly Volume" : "Cumulative Volume"];
                   }}
                   labelFormatter={(label) => `Month: ${label}`}
                 />
-                <Legend />
+                <Legend 
+                  wrapperStyle={{
+                    color: theme.theme === 'dark' ? '#FFFFFF' : '#000000'
+                  }}
+                />
                 <Bar
                   yAxisId="left"
                   dataKey="totalVolume"
-                  fill={theme.theme === 'dark' ? '#000000' : '#000000'} // Corrected theme usage
+                  fill={theme.theme === 'dark' ? '#4ADE80' : '#22C55E'}
                   name="Monthly Volume"
                 />
                 <Line
                   yAxisId="right"
                   type="monotone"
                   dataKey="cumulativeVolume"
-                  stroke={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}  // Conditional stroke
+                  stroke={theme.theme === 'dark' ? '#60A5FA' : '#3B82F6'}
                   strokeWidth={2}
                   dot={false}
                   name="Cumulative Volume"
