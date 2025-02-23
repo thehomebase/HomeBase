@@ -326,12 +326,10 @@ export default function DataPage() {
                   }}
                   labelFormatter={(label) => `Month: ${label}`}
                 />
-                <Legend 
-                  wrapperStyle={{
-                    color: CHART_COLORS[theme.theme].text
-                  }}
-                  formatter={(value, entry) => (
-                    <span style={{ color: CHART_COLORS[theme.theme].text }}>
+                <Legend
+                  wrapperStyle={{ padding: '10px 0' }}
+                  formatter={(value) => (
+                    <span className="text-foreground">
                       {value}
                     </span>
                   )}
