@@ -58,7 +58,7 @@ const CHART_COLORS = {
 };
 
 const COLORS = {
-  light: ['#4ADE80', '#FB7185', '#FDE047', '#38BDF8', '#ffffff'],
+  light: ['#FB7185', '#4ADE80', '#FDE047', '#38BDF8', '#000000'],
   dark: ['#22C55E', '#E14D62', '#FFD700', '#2196F3', '#ffffff'],
 };
 
