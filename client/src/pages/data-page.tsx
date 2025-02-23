@@ -288,8 +288,9 @@ export default function DataPage() {
                 <YAxis
                   yAxisId="left"
                   tickFormatter={formatCurrency}
-                  stroke={CHART_COLORS[theme.theme].text}
-                  tick={{ fill: CHART_COLORS[theme.theme].text }}
+                  stroke="currentColor"
+                  tick={{ fill: "currentColor" }}
+                  
                   label={{
                     value: 'Monthly Volume',
                     angle: -90,
@@ -297,15 +298,15 @@ export default function DataPage() {
                     offset: 5,
                     dx: -10,
                     dy: 50,
-                    style: { fill: CHART_COLORS[theme.theme].text }
+                    style: { fill: "currentColor" }
                   }}
                 />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
                   tickFormatter={formatCurrency}
-                  stroke={CHART_COLORS[theme.theme].text}
-                  tick={{ fill: CHART_COLORS[theme.theme].text }}
+                  stroke="currentColor"
+                  tick={{ fill: "currentColor" }}
                   label={{
                     value: 'Cumulative Volume',
                     angle: 90,
@@ -344,7 +345,8 @@ export default function DataPage() {
                   yAxisId="right"
                   type="monotone"
                   dataKey="cumulativeVolume"
-                  stroke={CHART_COLORS[theme.theme].line}
+                  stroke="currentColor"
+                  tick={{ fill: "currentColor" }}
                   strokeWidth={2}
                   dot={false}
                   name="Cumulative Volume"
