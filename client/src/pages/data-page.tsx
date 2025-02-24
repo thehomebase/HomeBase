@@ -33,26 +33,26 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-// Theme-aware chart colors
+// Theme-aware chart colors (using CSS variables instead)
 const CHART_COLORS = {
   light: {
-    bar: '#4ADE80',
-    line: '#3B82F6',
-    text: '#000000',
-    background: '#ffffff',
+    bar: 'var(--chart-bar-light)',
+    line: 'var(--chart-line-light)',
+    text: 'var(--chart-text-light)',
+    background: 'var(--chart-background-light)',
     tooltip: {
-      background: '#ffffff',
-      text: '#000000'
+      background: 'var(--chart-background-light)',
+      text: 'var(--chart-text-light)'
     }
   },
   dark: {
-    bar: '#22C55E',
-    line: '#60A5FA', 
-    text: '#FFFFFF',
-    background: '#1a1a1a',
+    bar: 'var(--chart-bar-dark)',
+    line: 'var(--chart-line-dark)',
+    text: 'var(--chart-text-dark)',
+    background: 'var(--chart-background-dark)',
     tooltip: {
-      background: '#1a1a1a',
-      text: '#FFFFFF'
+      background: 'var(--chart-background-dark)',
+      text: 'var(--chart-text-dark)'
     }
   }
 };
@@ -291,7 +291,7 @@ export default function DataPage() {
                   tickFormatter={formatCurrency}
                   stroke="currentColor"
                   tick={{ fill: "currentColor" }}
-                  
+
                   label={{
                     value: 'Monthly Volume',
                     angle: -90,
@@ -371,8 +371,8 @@ export default function DataPage() {
                   {dealStagesData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
-                      fill={COLORS[theme.theme][index % COLORS[theme.theme].length]} 
-                      className="dark:opacity-90"
+                      className={`fill-chart-${(index % 5) + 1}`} 
+                      
                     />
                   ))}
                 </Pie>
@@ -425,7 +425,7 @@ export default function DataPage() {
                   angle={-90}
                   textAnchor="end"
                   stroke="currentColor"
-                  height={100}          // Increased height for multiple lines
+                  height={100}          
                   tickFormatter={(value) => {
                     const words = value.split(' ');
                     return words.length > 1 
@@ -434,22 +434,22 @@ export default function DataPage() {
                   }}
                   tick={{
                     fontSize: 14,
-                    whiteSpace: 'pre-wrap',  // Enables line breaks
-                    lineHeight: '1.2em'      // Adjusts spacing between lines
+                    whiteSpace: 'pre-wrap',  
+                    lineHeight: '1.2em'      
                   }}
                 />
                 <YAxis />
-                
+
                 <RechartsTooltip />
-                <Bar dataKey="value" fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}>
+                <Bar dataKey="value" className="fill-foreground">
                   {dealStagesData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[theme.theme][index % COLORS[theme.theme].length]} />
+                    <Cell key={`cell-${index}`} className={`fill-chart-${(index % 5) + 1}`} />
                   ))}
                 </Bar>
-                
+
               </BarChart>
 
-              
+
             </ResponsiveContainer>
           </div>
         </Card>
