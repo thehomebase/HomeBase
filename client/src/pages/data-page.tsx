@@ -36,23 +36,31 @@ interface MonthlyData {
 // Theme-aware chart colors
 const CHART_COLORS = {
   light: {
-    bar: '#4ADE80',
-    line: '#3B82F6',
+    prospect: '#f87171',
+    active: '#4ade80',
+    live: '#facc15',
+    mutual: '#60a5fa',
+    closing: '#000000',
     text: '#000000',
     background: '#ffffff',
+    grid: '#e5e7eb',
     tooltip: {
       background: '#ffffff',
       text: '#000000'
     }
   },
   dark: {
-    bar: '#22C55E',
-    line: '#60A5FA', 
-    text: '#FFFFFF',
+    prospect: '#ef4444',
+    active: '#22c55e',
+    live: '#eab308',
+    mutual: '#3b82f6', 
+    closing: '#ffffff',
+    text: '#ffffff',
     background: '#1a1a1a',
+    grid: '#374151',
     tooltip: {
       background: '#1a1a1a',
-      text: '#FFFFFF'
+      text: '#ffffff'
     }
   }
 };
