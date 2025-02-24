@@ -59,7 +59,7 @@ const CHART_COLORS = {
 
 const COLORS = {
   light: ['#FB7185', '#4ADE80', '#FDE047', '#38BDF8', '#000000'],
-  dark: ['#22C55E', '#E14D62', '#FFD700', '#2196F3', '#ffffff'],
+  dark: ['#22C55E', '#E14D62', '#FFD700', '#2196F3', '#FFFFFF'],
 };
 
 export default function DataPage() {
@@ -271,11 +271,11 @@ export default function DataPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
         <Card className="p-4">
           <h3 className="text-lg font-semibold mb-2">Monthly Sales Performance</h3>
-          <div className="h-[300px] w-full">
+          <div className="h-[300px] sm:mx-3 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart 
                 data={chartData} 
-                margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                margin={{ top: 10, right: 10, bottom: isMobile ? 10 : -50, left: 10 }}
                 className="[&_.recharts-text]:fill-foreground [&_.recharts-cartesian-axis-tick-value]:fill-foreground [&_.recharts-legend-item-text]:text-foreground"
               >
                 <XAxis
@@ -357,7 +357,7 @@ export default function DataPage() {
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-4">
           <h3 className="text-lg font-semibold mb-4">Deal Stages</h3>
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -367,10 +367,6 @@ export default function DataPage() {
                   cx="50%"
                   cy="50%"
                   labelLine={!isMobile}
-                  label={!isMobile ? ({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)` : undefined}
-                  outerRadius={100}
-                  fill="currentColor"
-                  dataKey="value"
                 >
                   {dealStagesData.map((entry, index) => (
                     <Cell 
@@ -397,7 +393,7 @@ export default function DataPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="p-6">
+        <Card className="p-4">
           <h3 className="text-lg font-semibold mb-4">Activities Completed</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -419,20 +415,41 @@ export default function DataPage() {
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-4">
           <h3 className="text-lg font-semibold mb-4">Deal Progress</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dealStagesData}>
-                <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                <XAxis
+                  dataKey="name"
+                  angle={-90}
+                  textAnchor="end"
+                  stroke="currentColor"
+                  height={100}          // Increased height for multiple lines
+                  tickFormatter={(value) => {
+                    const words = value.split(' ');
+                    return words.length > 1 
+                      ? `${words.slice(0, Math.ceil(words.length / 2)).join(' ')}\n${words.slice(Math.ceil(words.length / 2)).join(' ')}`
+                      : value;
+                  }}
+                  tick={{
+                    fontSize: 14,
+                    whiteSpace: 'pre-wrap',  // Enables line breaks
+                    lineHeight: '1.2em'      // Adjusts spacing between lines
+                  }}
+                />
                 <YAxis />
+                
                 <RechartsTooltip />
                 <Bar dataKey="value" fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}>
                   {dealStagesData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[theme.theme][index % COLORS[theme.theme].length]} />
                   ))}
                 </Bar>
+                
               </BarChart>
+
+              
             </ResponsiveContainer>
           </div>
         </Card>
