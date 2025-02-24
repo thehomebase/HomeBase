@@ -441,9 +441,12 @@ export default function DataPage() {
                 <YAxis />
                 
                 <RechartsTooltip />
-                <Bar dataKey="value" fill={theme.theme === 'dark' ? '#FFFFFF' : '#000000'}>
+                <Bar dataKey="value" className="fill-foreground">
                   {dealStagesData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[theme.theme][index % COLORS[theme.theme].length]} />
+                    <Cell 
+                      key={`cell-${index}`} 
+                      className={`fill-chart-${(index % 5) + 1}`}
+                    />
                   ))}
                 </Bar>
                 
