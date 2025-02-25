@@ -817,8 +817,8 @@ export class DatabaseStorage implements IStorage {
         throw new Error('Missing required fields');
       }
 
-      const transactionExists = awaitdb.execute(sql`
-        SELECT EXISTS(SELECT 1 FROM transactions WHERE id =${data.transactionId})
+      const transactionExists = await db.execute(sql`
+        SELECT EXISTS(SELECT 1 FROM transactions WHERE id=${data.transactionId})
       `);
 
       if (!transactionExists.rows[0].exists) {
@@ -1098,10 +1098,10 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(sql`
         UPDATE documents
         SET 
-          status = COALESCE(${data.status}, status),
-          notes = COALESCE(${data.notes}, notes),
-          deadline = COALESCE(${data.deadline}::date, deadline),
-          deadline_time = COALESCE(${data.deadlineTime}::time, deadline_time),
+          status = CASE WHEN ${data.status} IS NULL THEN status ELSE ${data.status} END,
+          notes = CASE WHEN ${data.notes} IS NULL THEN notes ELSE ${data.notes} END,
+          deadline = CASE WHEN ${data.deadline} IS NULL THEN deadline ELSE ${data.deadline}::date END,
+          deadline_time = CASE WHEN ${data.deadlineTime} IS NULL THEN deadline_time ELSE ${data.deadlineTime}::time END,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
@@ -1460,10 +1460,10 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(sql`
         UPDATE documents
         SET 
-          status = COALESCE(${data.status}, status),
-          notes = COALESCE(${data.notes}, notes),
-          deadline = COALESCE(${data.deadline}::date, deadline),
-          deadline_time = COALESCE(${data.deadlineTime}::time, deadline_time),
+          status = CASE WHEN ${data.status} IS NULL THEN status ELSE ${data.status} END,
+          notes = CASE WHEN ${data.notes} IS NULL THEN notes ELSE ${data.notes} END,
+          deadline = CASE WHEN ${data.deadline} IS NULL THEN deadline ELSE ${data.deadline}::date END,
+          deadline_time = CASE WHEN ${data.deadlineTime} IS NULL THEN deadline_time ELSE ${data.deadlineTime}::time END,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
