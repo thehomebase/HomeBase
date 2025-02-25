@@ -5,14 +5,26 @@ import { apiRequest } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
-import { DndContext, DragOverlay, closestCenter, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
-import { SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
-import { useSortable } from "@dnd-kit/sortable";
+import { 
+  DndContext, 
+  DragOverlay,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent
+} from "@dnd-kit/core";
+import { 
+  SortableContext, 
+  verticalListSortingStrategy,
+  useSortable 
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 import { Input } from "./ui/input";
-
 
 const statusColumns = [
   { key: 'not_applicable', label: 'Not Applicable' },
@@ -37,16 +49,19 @@ const defaultDocuments = [
 interface Document {
   id: string;
   name: string;
-  status: 'not_applicable' | 'waiting_signatures' | 'signed' | 'waiting_others' | 'complete';
+  status: typeof statusColumns[number]['key'];
   transactionId: number;
 }
 
-function SortableDocumentCard({ document }: { document: Document }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: document.id });
+function DocumentCard({ document, isDragging }: { document: Document; isDragging?: boolean }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id: document.id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    opacity: isDragging ? 0.5 : undefined,
   };
 
   return (
@@ -55,9 +70,35 @@ function SortableDocumentCard({ document }: { document: Document }) {
       style={style}
       {...attributes}
       {...listeners}
-      className="bg-background border rounded-md p-2 cursor-grab active:cursor-grabbing"
+      className={`bg-background border rounded-md p-2 cursor-move hover:bg-accent/50 ${isDragging ? 'opacity-50' : ''}`}
     >
       <div className="text-sm">{document.name}</div>
+    </div>
+  );
+}
+
+function DroppableColumn({ 
+  status, 
+  documents,
+  title 
+}: { 
+  status: typeof statusColumns[number]['key'];
+  documents: Document[];
+  title: string;
+}) {
+  return (
+    <div className="space-y-4">
+      <h3 className="font-medium text-sm">{title}</h3>
+      <div
+        data-status={status}
+        className="space-y-2 min-h-[100px] p-2 rounded-md bg-muted/50 transition-colors"
+      >
+        <SortableContext items={documents.map(d => d.id)} strategy={verticalListSortingStrategy}>
+          {documents.map((doc) => (
+            <DocumentCard key={doc.id} document={doc} />
+          ))}
+        </SortableContext>
+      </div>
     </div>
   );
 }
@@ -74,38 +115,13 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       activationConstraint: {
         distance: 8,
       },
-    })
+    }),
+    useSensor(KeyboardSensor)
   );
 
-  const { data: documents, isLoading, isError } = useQuery({
+  const { data: documents = [], isLoading, isError } = useQuery({
     queryKey: ["/api/documents", transactionId],
-    queryFn: async () => {
-      try {
-        const response = await apiRequest("GET", `/api/documents/${transactionId}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch documents");
-        }
-        const existingDocs = await response.json();
-
-        if (!existingDocs || existingDocs.length === 0) {
-          const initResponse = await apiRequest("POST", `/api/documents/${transactionId}/initialize`, {
-            documents: defaultDocuments.map(doc => ({
-              ...doc,
-              transactionId
-            }))
-          });
-          if (!initResponse.ok) {
-            throw new Error("Failed to initialize documents");
-          }
-          return initResponse.json();
-        }
-        return existingDocs;
-      } catch (error) {
-        console.error('Error fetching documents:', error);
-        return [];
-      }
-    },
-    defaultData: []
+    initialData: []
   });
 
   const updateDocumentMutation = useMutation({
@@ -134,8 +150,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         status: 'not_applicable' as const
       });
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to add document");
+        throw new Error("Failed to add document");
       }
       return response.json();
     },
@@ -149,48 +164,32 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     },
   });
 
-  const removeDocumentMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await apiRequest("DELETE", `/api/documents/${transactionId}/${id}`);
-      if (!response.ok) {
-        throw new Error("Failed to remove document");
-      }
-    },
-    onSuccess: (_, deletedId) => {
-      queryClient.setQueryData(["/api/documents", transactionId], (oldData: Document[] = []) =>
-        oldData.filter(doc => doc.id !== deletedId)
-      );
-      toast({
-        title: "Success",
-        description: "Document removed successfully",
-      });
-    },
-  });
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
 
-
-  function handleDragEnd(event: any) {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
-    if (!over?.id || !active?.id) return;
-
-    // The column id is directly the status
-    const status = over.id as Document['status'];
-    
-    if (status) {
-      updateDocumentMutation.mutate({
-        id: active.id,
-        status: status
-      });
-    }
-
     setActiveId(null);
-  }
 
-  const handleAddDocument = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newDocument.trim()) {
-      addDocumentMutation.mutate(newDocument.trim());
-    }
+    if (!over) return;
+
+    const container = over.data.current?.sortable?.containerId || 
+                     (over.data.current as any)?.status ||
+                     over.id;
+
+    if (!container || typeof container !== 'string') return;
+
+    const status = container as Document['status'];
+    const documentId = active.id as string;
+
+    const activeDocument = documents.find(doc => doc.id === documentId);
+    if (!activeDocument || activeDocument.status === status) return;
+
+    updateDocumentMutation.mutate({
+      id: documentId,
+      status
+    });
   };
 
   if (isLoading) {
@@ -210,8 +209,10 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     );
   }
 
-  const completedDocs = documents?.filter(doc => doc.status === 'complete')?.length ?? 0;
-  const progress = documents?.length ? Math.round((completedDocs / documents.length) * 100) : 0;
+  const completedDocs = documents.filter(doc => doc.status === 'complete').length;
+  const progress = documents.length ? Math.round((completedDocs / documents.length) * 100) : 0;
+
+  const activeDocument = activeId ? documents.find(doc => doc.id === activeId) : null;
 
   return (
     <Card>
@@ -224,40 +225,34 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onDragStart={(event) => setActiveId(event.active.id as string)}
         >
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {statusColumns.map(column => (
-              <div key={column.key} className="space-y-4">
-                <h3 className="font-medium text-sm">{column.label}</h3>
-                <div
-                  id={column.key}
-                  className="space-y-2 min-h-[100px] p-2 rounded-md bg-muted/50"
-                >
-                  <SortableContext items={documents.filter(doc => doc.status === column.key).map(d => d.id)}>
-                    {documents
-                      .filter(doc => doc.status === column.key)
-                      .map((doc) => (
-                        <SortableDocumentCard key={doc.id} document={doc} />
-                      ))}
-                  </SortableContext>
-                </div>
-              </div>
+              <DroppableColumn
+                key={column.key}
+                status={column.key}
+                title={column.label}
+                documents={documents.filter(doc => doc.status === column.key)}
+              />
             ))}
           </div>
           <DragOverlay>
-            {activeId && documents.find(d => d.id === activeId) ? (
+            {activeDocument && (
               <div className="bg-background border rounded-md p-2 shadow-lg">
-                <div className="text-sm">
-                  {documents.find(d => d.id === activeId)?.name}
-                </div>
+                <div className="text-sm">{activeDocument.name}</div>
               </div>
-            ) : null}
+            )}
           </DragOverlay>
         </DndContext>
         {user?.role === 'agent' && (
-          <form onSubmit={handleAddDocument} className="flex flex-col sm:flex-row gap-2 pt-6 mt-6 border-t">
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (newDocument.trim()) {
+              addDocumentMutation.mutate(newDocument.trim());
+            }
+          }} className="flex flex-col sm:flex-row gap-2 pt-6 mt-6 border-t">
             <Input
               placeholder="New document name..."
               value={newDocument}
