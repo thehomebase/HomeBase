@@ -1,0 +1,188 @@
+Updated Steps to Fix the Issue
+Here’s how you can modify your setup to ensure the chart colors (e.g., chart1 to chart5) update correctly in dark mode:
+1. Ensure Theme Switching Logic
+You need a mechanism to detect or switch between light and dark modes and update the ChartConfig or chart components accordingly. If you’re using your CHART_COLORS object (from the screenshot), integrate it into your ChartConfig. Here’s an example:
+typescript
+// Define your CHART_COLORS as a constant (similar to your screenshot)
+const CHART_COLORS = {
+  light: {
+    chart1: "#FB7218", // red
+    chart2: "#4ADE80", // green
+    chart3: "#FDBE47", // yellow
+    chart4: "#38BDF8", // blue
+    chart5: "#000000", // black
+  },
+  dark: {
+    chart1: "#E14D62", // dark red
+    chart2: "#22C55E", // dark green
+    chart3: "#F7D700", // dark yellow
+    chart4: "#2196F3", // dark blue
+    chart5: "#7C3AED", // dark purple
+  },
+}
+
+// Create a ChartConfig based on the current theme
+type ChartConfig = {
+  [key in keyof typeof CHART_COLORS.light]: {
+    label?: React.ReactNode
+    icon?: React.ComponentType
+    theme: Record<keyof typeof THEMES, string>
+  }
+}
+
+const generateChartConfig = (theme: keyof typeof THEMES): ChartConfig => {
+  return {
+    chart1: {
+      theme: {
+        light: CHART_COLORS.light.chart1,
+        dark: CHART_COLORS.dark.chart1,
+      },
+    },
+    chart2: {
+      theme: {
+        light: CHART_COLORS.light.chart2,
+        dark: CHART_COLORS.dark.chart2,
+      },
+    },
+    chart3: {
+      theme: {
+        light: CHART_COLORS.light.chart3,
+        dark: CHART_COLORS.dark.chart3,
+      },
+    },
+    chart4: {
+      theme: {
+        light: CHART_COLORS.light.chart4,
+        dark: CHART_COLORS.dark.chart4,
+      },
+    },
+    chart5: {
+      theme: {
+        light: CHART_COLORS.light.chart5,
+        dark: CHART_COLORS.dark.chart5,
+      },
+    },
+  }
+}
+2. Update ChartContainer to Use Dynamic Theme
+Modify ChartContainer to accept a theme prop or detect the current theme (e.g., via prefers-color-scheme or a Zustand store like useTheme). Update the config based on the theme:
+typescript
+import { useTheme } from './theme-store' // If using your Zustand theme store
+
+const ChartContainer = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div"> & {
+    config: ChartConfig
+    children: React.ComponentProps<
+      typeof RechartsPrimitive.ResponsiveContainer
+    >["children"]
+    theme?: keyof typeof THEMES // Optional theme prop
+  }
+>(({ id, className, children, config: initialConfig, theme, ...props }, ref) => {
+  const uniqueId = React.useId()
+  const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
+  const { theme: contextTheme } = useTheme() // Use Zustand store if available
+
+  // Determine the current theme (from prop, store, or system)
+  const currentTheme = theme || contextTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+
+  // Generate config based on the current theme
+  const finalConfig = React.useMemo(() => generateChartConfig(currentTheme), [currentTheme])
+
+  return (
+    <ChartContext.Provider value={{ config: finalConfig }}>
+      <div
+        data-chart={chartId}
+        ref={ref}
+        className={cn(
+          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
+          className
+        )}
+        {...props}
+      >
+        <ChartStyle id={chartId} config={finalConfig} />
+        <RechartsPrimitive.ResponsiveContainer>
+          {children}
+        </RechartsPrimitive.ResponsiveContainer>
+      </div>
+    </ChartContext.Provider>
+  )
+})
+ChartContainer.displayName = "Chart"
+3. Update Recharts Components to Use Theme Colors
+Recharts components like Pie, Bar, Line, etc., need to use the colors from ChartConfig via CSS variables or props. Modify your chart components to reference the ChartContext and apply the correct colors:
+typescript
+import { ChartContainer, ChartTooltipContent, ChartLegendContent } from './your-chart-file'
+
+function DealStagesChart() {
+  const data = [
+    { name: 'Prospect', value: 20 },
+    { name: 'Active Listing', value: 30 },
+    { name: 'Live Listing', value: 15 },
+    { name: 'Mutual Acceptance', value: 10 },
+    { name: 'Closing in 1 Week', value: 25 },
+  ]
+
+  const chartConfig = {
+    Prospect: { theme: { light: '#FB7218', dark: '#E14D62' } }, // chart1
+    'Active Listing': { theme: { light: '#4ADE80', dark: '#22C55E' } }, // chart2
+    'Live Listing': { theme: { light: '#FDBE47', dark: '#F7D700' } }, // chart3
+    'Mutual Acceptance': { theme: { light: '#38BDF8', dark: '#2196F3' } }, // chart4
+    'Closing in 1 Week': { theme: { light: '#000000', dark: '#7C3AED' } }, // chart5
+  }
+
+  return (
+    <ChartContainer config={chartConfig}>
+      <RechartsPrimitive.Pie
+        data={data}
+        dataKey="value"
+        nameKey="name"
+        cx="50%"
+        cy="50%"
+        outerRadius={80}
+      >
+        <RechartsPrimitive.Cell fill="var(--color-Prospect)" />
+        <RechartsPrimitive.Cell fill="var(--color-Active Listing)" />
+        <RechartsPrimitive.Cell fill="var(--color-Live Listing)" />
+        <RechartsPrimitive.Cell fill="var(--color-Mutual Acceptance)" />
+        <RechartsPrimitive.Cell fill="var(--color-Closing in 1 Week)" />
+      </RechartsPrimitive.Pie>
+      <ChartTooltipContent />
+      <ChartLegendContent />
+    </ChartContainer>
+  )
+}
+
+export default DealStagesChart
+4. Ensure CSS Variables Are Applied
+The ChartStyle component generates CSS variables like --color-[key] based on the theme. Ensure your Recharts components reference these variables via fill or stroke attributes (as shown above with fill="var(--color-[key])"). The ChartStyle already handles applying these variables in light or dark mode, but the chart needs to re-render when the theme changes.
+5. Handle Theme Changes
+If you’re using a theme toggle (e.g., via a button, Zustand store, or system preference), ensure the ChartContainer or chart components re-render when the theme updates. Use the useEffect or a state update to trigger a re-render:
+typescript
+import { useTheme } from './theme-store' // If using Zustand
+
+function App() {
+  const { theme, setTheme } = useTheme()
+
+  return (
+    <div className={theme}>
+      <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+        Toggle Theme
+      </button>
+      <DealStagesChart theme={theme} />
+    </div>
+  )
+}
+6. Debugging
+Check CSS Variables: Open the browser’s developer tools (in Replit’s preview pane) and inspect the <svg> or <path> elements in the chart. Verify that the fill or stroke values are using the correct CSS variables (var(--color-[key])) and that the variables are set to the dark mode colors in .dark mode.
+Log Theme and Config: Add console.log(theme, chartConfig) in ChartContainer or DealStagesChart to ensure the theme and config are updating correctly.
+Test Theme Switch: Manually toggle the theme (e.g., via the button or system preference) and check if the chart re-renders with the new colors.
+Key Differences from Previous Steps
+Recharts vs. Chart.js: Recharts uses SVG-based rendering and CSS variables, so we need to use fill="var(--color-[key])" instead of directly setting backgroundColor. The ChartStyle component handles dynamic CSS, but you must ensure the chart re-renders when the theme changes.
+Theme Integration: Your setup uses THEMES and ChartConfig with theme-aware colors, so we need to integrate CHART_COLORS or a similar object into the ChartConfig and update it dynamically.
+Re-rendering: Recharts charts don’t automatically update with CSS changes unless the component re-renders or props/data change, so we need to ensure the ChartContainer or chart components re-render on theme changes.
+Final Notes
+The steps above should resolve the issue by ensuring your Recharts charts update their colors for dark mode. If the colors still don’t change, share:
+How you’re switching themes (e.g., button, Zustand store, or system preference).
+The full component where you render the DealStagesChart or other charts.
+Any error messages or unexpected behavior in the console or UI.
