@@ -157,12 +157,13 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                         id={`doc-${doc.id}`}
                         checked={doc.status === 'complete'}
                         onCheckedChange={(checked) => {
-                          updateDocumentMutation.mutate({
-                            id: doc.id,
-                            status: checked ? 'complete' : 'not_applicable'
-                          });
+                          if (typeof checked === 'boolean') {
+                            updateDocumentMutation.mutate({
+                              id: doc.id,
+                              status: checked ? 'complete' : 'not_applicable'
+                            });
+                          }
                         }}
-                        disabled={user?.role !== 'agent'}
                       />
                       <div className="flex-1 min-w-0">
                         <label
