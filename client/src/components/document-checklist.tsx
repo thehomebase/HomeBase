@@ -130,17 +130,17 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div className="grid grid-cols-[1fr,200px,40px] gap-4 items-center font-medium text-sm text-muted-foreground">
+          <div className="hidden md:grid md:grid-cols-[1fr,200px,40px] gap-4 items-center font-medium text-sm text-muted-foreground">
         <div>Document</div>
         <div>Status</div>
         <div></div>
       </div>
 
       {documents.map((doc: Document) => (
-        <div key={doc.id} className="grid grid-cols-[1fr,200px,40px] gap-4 items-center">
-          <div>{doc.name}</div>
+        <div key={doc.id} className="flex flex-col md:grid md:grid-cols-[1fr,200px,40px] gap-2 md:gap-4 md:items-center py-2 border-b last:border-b-0">
+          <div className="font-medium">{doc.name}</div>
           <select
-            className="w-full px-3 py-2 border rounded-md"
+            className="w-full px-3 py-2 border rounded-md mt-1 md:mt-0"
             value={doc.status}
             onChange={(e) => updateDocumentMutation.mutate({ id: doc.id, status: e.target.value })}
             disabled={user?.role !== 'agent'}
