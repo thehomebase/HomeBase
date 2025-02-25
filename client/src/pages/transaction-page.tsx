@@ -4,17 +4,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, X } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { useToast } from "@/hooks/use-toast";
 import { ProgressChecklist } from "@/components/progress-checklist";
 import { DocumentChecklist } from "@/components/document-checklist";
 import { TransactionContacts } from "@/components/transaction-contacts";
+import { ArrowLeft, Pencil, X } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { useToast } from "@/hooks/use-toast";
+
 
 interface ChecklistItem {
   id: string;
@@ -25,6 +23,10 @@ interface ChecklistItem {
 
 interface Transaction {
   id: number;
+  streetName?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
   address: string;
   status: string;
   contractPrice?: number;
@@ -42,14 +44,20 @@ interface Transaction {
   client?: {
     firstName: string;
     lastName: string;
+    id: number;
   };
   secondaryClient?: {
     firstName: string;
     lastName: string;
   };
+  accessCode?: string;
 }
 
 interface TransactionFormData {
+  streetName?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
   address?: string;
   contractPrice?: number;
   optionPeriodExpiration?: string;
@@ -62,6 +70,7 @@ interface TransactionFormData {
   mlsNumber?: string;
   financing?: string;
   status?: string;
+  clientId?: number;
 }
 
 export default function TransactionPage() {
@@ -96,7 +105,6 @@ export default function TransactionPage() {
         throw new Error("Invalid transaction ID");
       }
 
-      // Format dates properly for API submission
       const formatDateForAPI = (dateStr: string | undefined) => {
         if (!dateStr) return null;
         try {
@@ -110,6 +118,10 @@ export default function TransactionPage() {
       };
 
       const formattedData = {
+        streetName: data.streetName?.trim(),
+        city: data.city?.trim(),
+        state: data.state?.trim(),
+        zipCode: data.zipCode?.trim(),
         address: data.address?.trim(),
         contractPrice: data.contractPrice ? Number(data.contractPrice) : null,
         optionPeriodExpiration: formatDateForAPI(data.optionPeriodExpiration),
@@ -125,12 +137,9 @@ export default function TransactionPage() {
         clientId: data.clientId || null
       };
 
-      // Remove undefined values but keep null values
       const cleanData = Object.fromEntries(
         Object.entries(formattedData).filter(([_, value]) => value !== undefined)
       );
-
-      console.log('Submitting transaction update:', cleanData);
 
       const response = await apiRequest("PATCH", `/api/transactions/${parsedId}`, cleanData);
       if (!response.ok) {
@@ -140,9 +149,7 @@ export default function TransactionPage() {
       return response.json();
     },
     onSuccess: (updatedData) => {
-      // Update the cache immediately with the new data
       queryClient.setQueryData(["/api/transactions", parsedId], updatedData);
-      // Invalidate both the individual transaction and the transactions list
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
       console.log("Transaction updated successfully:", updatedData);
@@ -164,7 +171,6 @@ export default function TransactionPage() {
 
   React.useEffect(() => {
     if (transaction) {
-      // Format dates to local date string for form display
       const formatDateForInput = (dateString: string | null | undefined) => {
         if (!dateString) return '';
         const date = new Date(dateString);
@@ -173,6 +179,10 @@ export default function TransactionPage() {
       };
 
       form.reset({
+        streetName: transaction.streetName,
+        city: transaction.city,
+        state: transaction.state,
+        zipCode: transaction.zipCode,
         address: transaction.address,
         contractPrice: transaction.contractPrice,
         optionPeriodExpiration: formatDateForInput(transaction.optionPeriodExpiration),
@@ -184,7 +194,8 @@ export default function TransactionPage() {
         contractExecutionDate: formatDateForInput(transaction.contractExecutionDate),
         mlsNumber: transaction.mlsNumber,
         financing: transaction.financing,
-        status: transaction.status
+        status: transaction.status,
+        clientId: transaction.client?.id
       });
     }
   }, [transaction, form]);
@@ -192,12 +203,10 @@ export default function TransactionPage() {
   if (!user) {
     return (
       <div className="container mx-auto p-6">
-        <div className="text-center">
-          <p className="text-xl text-destructive">Please log in to access this page.</p>
-          <Link href="/transactions">
-            <Button variant="outline" className="mt-4">Back to Transactions</Button>
-          </Link>
-        </div>
+        <p className="text-xl text-destructive">Please log in to access this page.</p>
+        <Link href="/transactions">
+          <Button variant="outline" className="mt-4">Back to Transactions</Button>
+        </Link>
       </div>
     );
   }
@@ -205,75 +214,33 @@ export default function TransactionPage() {
   if (!parsedId || isNaN(parsedId)) {
     return (
       <div className="container mx-auto p-6">
-        <div className="text-center">
-          <p className="text-xl text-destructive">Invalid transaction ID</p>
-          <Link href="/transactions">
-            <Button variant="outline" className="mt-4">Back to Transactions</Button>
-          </Link>
-        </div>
+        <p className="text-xl text-destructive">Invalid transaction ID</p>
+        <Link href="/transactions">
+          <Button variant="outline" className="mt-4">Back to Transactions</Button>
+        </Link>
       </div>
     );
   }
 
   if (isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex justify-center">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
-      </div>
-    );
+    return <div>Loading...</div>;
   }
 
   if (isError || !transaction) {
     return (
       <div className="container mx-auto p-6">
-        <div className="text-center">
-          <p className="text-xl text-destructive">Error loading transaction</p>
-          <Link href="/transactions">
-            <Button variant="outline" className="mt-4">Back to Transactions</Button>
-          </Link>
-        </div>
+        <p className="text-xl text-destructive">Error loading transaction</p>
+        <Link href="/transactions">
+          <Button variant="outline" className="mt-4">Back to Transactions</Button>
+        </Link>
       </div>
     );
   }
 
-  const transactionType = transaction.type;
-  const checklist = transaction.checklist || [];
-
-  // Get all unique phases in order
-  const phases = Array.from(new Set(checklist.map(item => item.phase)));
-
-  // Find current phase (first phase with incomplete items)
-  const currentPhase = phases.find(phase =>
-    checklist.some(item => item.phase === phase && !item.completed)
-  ) || phases[phases.length - 1];
-
-  // Calculate progress
-  const completedTasks = checklist.filter(item => item.completed).length;
-  const totalTasks = checklist.length || 1;
-  const progress = Math.round((completedTasks / totalTasks) * 100);
-
-  // Ensure consistent progress display
-  const displayProgress = `${progress}% Complete`;
-
-  // Form submission handler
-  const handleSubmit = async (data: TransactionFormData) => {
-    try {
-      await updateTransaction.mutateAsync(data);
-    } catch (error) {
-      console.error('Error updating transaction:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update transaction. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
+  const fullAddress = `${transaction.streetName || ''}, ${transaction.city || ''}, ${transaction.state || ''} ${transaction.zipCode || ''}`;
 
   return (
-    <div>
+    <div className="container mx-auto p-4">
       <header className="">
         <div className="w-full px-3 sm:px-6 py-2 sm:py-4">
           <div className="flex items-center gap-4">
@@ -314,7 +281,7 @@ export default function TransactionPage() {
                   </div>
                 </div>
               ) : (
-                <h1 className="text-2xl font-bold">{transaction.address}</h1>
+                <h1 className="text-2xl font-bold">{fullAddress}</h1>
               )}
               <p className="text-muted-foreground">Transaction ID: {parsedId}</p>
               <div className="text-muted-foreground">
@@ -326,238 +293,88 @@ export default function TransactionPage() {
                 ) : null}
               </div>
             </div>
+            {user.role === 'agent' && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditing(!isEditing)}
+              >
+                {isEditing ? (
+                  <>
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit Details
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </header>
 
       <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] pr-24 max-w-full">
-        <Card className="overflow-x-hidden w-full">
-          <CardContent className="p-3 sm:p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Transaction Summary</h3>
-              {user.role === 'agent' && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsEditing(!isEditing)}
-                >
-                  {isEditing ? (
-                    <>
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </>
-                  ) : (
-                    <>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit Details
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Transaction Type</p>
-                  <p className="font-medium capitalize">
-                    {transaction.type === 'buy' ? 'Purchase' : 'Sale'}
-                  </p>
-                </div>
-                {transaction.client && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Transaction Details</CardTitle>
+              <CardDescription>Key information about this transaction</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {isEditing ? (
+                <>
                   <div>
-                    <p className="text-sm text-muted-foreground">Primary Client</p>
-                    <p className="font-medium">
-                      {transaction.client.firstName} {transaction.client.lastName}
-                    </p>
+                    <Label htmlFor="contractPrice">Contract Price</Label>
+                    <Input type="number" {...form.register("contractPrice")} />
                   </div>
-                )}
-                {transaction.secondaryClient && (
                   <div>
-                    <p className="text-sm text-muted-foreground">Secondary Client</p>
-                    <p className="font-medium">
-                      {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}
-                    </p>
+                    <Label htmlFor="optionPeriodExpiration">Option Expiration Date</Label>
+                    <Input type="date" {...form.register("optionPeriodExpiration")} />
                   </div>
-                )}
-                <div>
-                  <p className="text-sm text-muted-foreground">Contract Price</p>
-                  {isEditing ? (
-                    <Input
-                      type="number"
-                      {...form.register("contractPrice")}
-                      placeholder="Enter contract price"
-                      className="w-full h-9 px-3 rounded-md border"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.contractPrice
-                        ? `$${transaction.contractPrice.toLocaleString()}`
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Option Expiration Date</p>
-                  {isEditing ? (
-                    <Input
-                      type="date"
-                      {...form.register("optionPeriodExpiration")}
-                      className="w-full h-9 px-3 rounded-md border"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.optionPeriodExpiration
-                        ? new Date(transaction.optionPeriodExpiration).toLocaleDateString('en-US')
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Option Fee</p>
-                  {isEditing ? (
-                    <Input
-                      type="number"
-                      {...form.register("optionFee")}
-                      placeholder="Enter option fee"
-                      className="w-full h-9 px-3 rounded-md border"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.optionFee
-                        ? `$${transaction.optionFee.toLocaleString()}`
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Earnest Money</p>
-                  {isEditing ? (
-                    <Input
-                      type="number"
-                      {...form.register("earnestMoney")}
-                      placeholder="Enter earnest money"
-                      className="w-full h-9 px-3 rounded-md border"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.earnestMoney
-                        ? `$${transaction.earnestMoney.toLocaleString()}`
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Down Payment</p>
-                  {isEditing ? (
-                    <Input
-                      type="number"
-                      {...form.register("downPayment")}
-                      placeholder="Enter down payment"
-                      className="w-full h-9 px-3 rounded-md border"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.downPayment
-                        ? `$${transaction.downPayment.toLocaleString()}`
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Seller Concessions</p>
-                  {isEditing ? (
-                    <Input
-                      type="number"
-                      {...form.register("sellerConcessions")}
-                      placeholder="Enter seller concessions"
-                      className="w-full h-9 px-3 rounded-md border"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.sellerConcessions
-                        ? `$${transaction.sellerConcessions.toLocaleString()}`
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Closing Date</p>
-                  {isEditing ? (
-                    <Input
-                      type="date"
-                      {...form.register("closingDate")}
-                      className="w-full h-9 px-3 rounded-md border"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.closingDate
-                        ? new Date(transaction.closingDate).toLocaleDateString('en-US')
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Contract Execution Date</p>
-                  {isEditing ? (
-                    <Input
-                      type="date"
-                      {...form.register("contractExecutionDate")}
-                      className="w-full h-9 px-3 rounded-md border"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.contractExecutionDate
-                        ? new Date(transaction.contractExecutionDate).toLocaleDateString('en-US')
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">MLS No.</p>
-                  {isEditing ? (
-                    <Input
-                      type="text"
-                      {...form.register("mlsNumber")}
-                      placeholder="Enter MLS number"
-                      className="w-full h-9 px-3 rounded-md border"
-                    />
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.mlsNumber || 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Financing</p>
-                  {isEditing ? (
-                    <select
-                      className="w-full h-9 px-3 rounded-md border"
-                      {...form.register("financing")}
-                    >
+                  <div>
+                    <Label htmlFor="optionFee">Option Fee</Label>
+                    <Input type="number" {...form.register("optionFee")} />
+                  </div>
+                  <div>
+                    <Label htmlFor="earnestMoney">Earnest Money</Label>
+                    <Input type="number" {...form.register("earnestMoney")} />
+                  </div>
+                  <div>
+                    <Label htmlFor="downPayment">Down Payment</Label>
+                    <Input type="number" {...form.register("downPayment")} />
+                  </div>
+                  <div>
+                    <Label htmlFor="sellerConcessions">Seller Concessions</Label>
+                    <Input type="number" {...form.register("sellerConcessions")} />
+                  </div>
+                  <div>
+                    <Label htmlFor="closingDate">Closing Date</Label>
+                    <Input type="date" {...form.register("closingDate")} />
+                  </div>
+                  <div>
+                    <Label htmlFor="contractExecutionDate">Contract Execution Date</Label>
+                    <Input type="date" {...form.register("contractExecutionDate")} />
+                  </div>
+                  <div>
+                    <Label htmlFor="mlsNumber">MLS No.</Label>
+                    <Input type="text" {...form.register("mlsNumber")} />
+                  </div>
+                  <div>
+                    <Label htmlFor="financing">Financing</Label>
+                    <select {...form.register("financing")}>
                       <option value="">Select financing type</option>
                       <option value="FHA">FHA</option>
                       <option value="VA">VA</option>
                       <option value="Conventional">Conventional</option>
                       <option value="Cash">Cash</option>
                     </select>
-                  ) : (
-                    <p className="font-medium">
-                      {transaction.financing || 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Primary Client</p>
-                  {isEditing ? (
-                    <select
-                      className="w-full h-9 px-3 rounded-md border bg-background"
-                      value={form.getValues("clientId") || ""}
-                      onChange={(e) => {
-                        const value = e.target.value ? Number(e.target.value) : null;
-                        form.setValue("clientId", value);
-                        handleSubmit(form.getValues());
-                      }}
-                    >
+                  </div>
+                  <div>
+                    <Label htmlFor="clientId">Primary Client</Label>
+                    <select {...form.register("clientId")}>
                       <option value="">Select client</option>
                       {clients.map((client) => (
                         <option key={client.id} value={client.id}>
@@ -565,21 +382,10 @@ export default function TransactionPage() {
                         </option>
                       ))}
                     </select>
-                  ) : (
-                    <p className="font-medium">
-                      {clients?.find(c => c.id === transaction.clientId)
-                        ? `${clients.find(c => c.id === transaction.clientId)?.firstName} ${clients.find(c => c.id === transaction.clientId)?.lastName}`
-                        : 'Not set'}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  {isEditing ? (
-                    <select
-                      className="w-full h-9 px-3 rounded-md border"
-                      {...form.register("status")}
-                    >
+                  </div>
+                  <div>
+                    <Label htmlFor="status">Status</Label>
+                    <select {...form.register("status")}>
                       <option value="coming_soon">Coming Soon</option>
                       <option value="active">Active</option>
                       <option value="active_option">Active Option Contract</option>
@@ -588,67 +394,67 @@ export default function TransactionPage() {
                       <option value="withdrawn">Withdrawn</option>
                       <option value="canceled">Canceled</option>
                     </select>
-                  ) : (
-                    <p className="font-medium capitalize">
-                      {transaction.status === 'active_option'
-                        ? 'Active Option Contract'
-                        : transaction.status?.replace('_', ' ')}
-                    </p>
+                  </div>
+                  <Button type="button" onClick={form.handleSubmit(handleSubmit)}>Save Changes</Button>
+
+                </>
+              ) : (
+                <>
+                  <div>
+                    <strong>Status:</strong> {transaction.status}
+                  </div>
+                  <div>
+                    <strong>Contract Price:</strong>
+                    {transaction.contractPrice
+                      ? new Intl.NumberFormat("en-US", {
+                        style: "currency",
+                        currency: "USD",
+                      }).format(transaction.contractPrice)
+                      : "Not set"}
+                  </div>
+                  <div>
+                    <strong>Access Code:</strong> {transaction.accessCode}
+                  </div>
+                  {transaction.closingDate && (
+                    <div>
+                      <strong>Closing Date:</strong>
+                      {new Date(transaction.closingDate).toLocaleDateString()}
+                    </div>
                   )}
-                </div>
-              </div>
-
-              {isEditing && (
-                <div className="flex justify-end mt-4">
-                  <Button
-                    type="button"
-                    onClick={form.handleSubmit(handleSubmit)}
-                    disabled={updateTransaction.isPending}
-                  >
-                    Save Changes
-                  </Button>
-                </div>
+                  {transaction.mlsNumber && (
+                    <div>
+                      <strong>MLS Number:</strong> {transaction.mlsNumber}
+                    </div>
+                  )}
+                </>
               )}
-            </div>
+            </CardContent>
+          </Card>
 
-          </CardContent>
-        </Card>
+          <TransactionContacts transaction={transaction} />
 
-        <Card className="mt-6">
-          <CardContent className="p-6">
-            <Tabs defaultValue="progress">
-              <TabsList className="flex w-full flex-wrap sm:flex-nowrap gap-1 p-1 max-w-[100vw]">
-                <TabsTrigger className="flex-1 min-w-20" value="progress">
-                  <ClipboardCheck className="h-4 w-4 mr-2" />
-                  Progress
-                </TabsTrigger>
-                <TabsTrigger className="flex-1 min-w-20" value="contacts">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Contacts
-                </TabsTrigger>
-                <TabsTrigger className="flex-1 min-w-20" value="documents">
-                  <FileText className="h-4 w-4 mr-2" />
-                  Documents
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="progress" className="mt-6">
-                <ProgressChecklist
-                  transactionId={parsedId}
-                  userRole={user.role || ""}
-                  transactionType={transaction.type}
-                />
-              </TabsContent>
-              <TabsContent value="contacts" className="mt-6">
-                <TransactionContacts transactionId={parsedId} />
-              </TabsContent>
-              <TabsContent value="documents" className="mt-6">
-                <DocumentChecklist transactionId={parsedId} />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Progress Checklist</CardTitle>
+                <CardDescription>Track transaction milestones</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ProgressChecklist transactionId={transaction.id} />
+              </CardContent>
+            </Card>
 
-
+            <Card>
+              <CardHeader>
+                <CardTitle>Documents</CardTitle>
+                <CardDescription>Manage transaction documents</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DocumentChecklist transactionId={transaction.id} />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </main>
     </div>
   );

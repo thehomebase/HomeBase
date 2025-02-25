@@ -313,7 +313,10 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(sql`
         SELECT 
           id,
-          address,
+          street_name as "streetName",
+          city,
+          state,
+          zip_code as "zipCode",
           access_code as "accessCode",
           status,
           type,
@@ -329,7 +332,8 @@ export class DatabaseStorage implements IStorage {
           closing_date as "closingDate",
           contract_execution_date as "contractExecutionDate",
           mls_number as "mlsNumber",
-          financing
+          financing,
+          updated_at as "updatedAt"
         FROM transactions 
         WHERE id = ${id}
       `);
@@ -344,7 +348,10 @@ export class DatabaseStorage implements IStorage {
       const row = result.rows[0];
       const transaction: Transaction = {
         id: Number(row.id),
-        address: String(row.address),
+        streetName: String(row.streetName),
+        city: String(row.city),
+        state: String(row.state),
+        zipCode: String(row.zipCode),
         accessCode: String(row.accessCode),
         status: String(row.status),
         type: String(row.type),
@@ -352,15 +359,16 @@ export class DatabaseStorage implements IStorage {
         clientId: row.clientId ? Number(row.clientId) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
         contractPrice: row.contractPrice ? Number(row.contractPrice) : null,
-        optionPeriodExpiration: row.optionPeriodExpiration ? new Date(row.optionPeriodExpiration).toISOString() : null,
+        optionPeriodExpiration: row.optionPeriodExpiration ? new Date(row.optionPeriodExpiration) : null,
         optionFee: row.optionFee ? Number(row.optionFee) : null,
         earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
         downPayment: row.downPayment ? Number(row.downPayment) : null,
         sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
-        closingDate: row.closingDate ? new Date(row.closingDate).toISOString() : null,
-        contractExecutionDate: row.contractExecutionDate ? new Date(row.contractExecutionDate).toISOString() : null,
+        closingDate: row.closingDate ? new Date(row.closingDate) : null,
+        contractExecutionDate: row.contractExecutionDate ? new Date(row.contractExecutionDate) : null,
         mlsNumber: row.mlsNumber || null,
-        financing: row.financing || null
+        financing: row.financing || null,
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
       };
 
       console.log('Processed transaction:', transaction);
@@ -811,7 +819,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error('Transaction not found');
       }
 
-      const result = await db.execute(sql`
+            const result = await db.execute(sql`
         INSERT INTO contacts (
           role,
           first_name,
