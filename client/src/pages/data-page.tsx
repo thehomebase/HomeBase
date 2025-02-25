@@ -57,10 +57,13 @@ const CustomLegend = () => {
         <li key={stage.type} className="flex items-center gap-2">
           <div
             style={{ 
-              backgroundColor: isDark ? stage.darkColor : stage.lightColor,
+              backgroundColor: stage.type === 'closing' ? 'var(--closing-color)' : (isDark ? stage.darkColor : stage.lightColor),
               transition: 'background-color 0.2s'
             }}
-            className="w-3 h-3 rounded-sm"
+            className={cn(
+              "w-3 h-3 rounded-sm",
+              stage.type === 'closing' && "dark:[--closing-color:white] [--closing-color:black]"
+            )}
           />
           <span className="text-sm text-foreground transition-colors duration-200">
             {stage.name}
