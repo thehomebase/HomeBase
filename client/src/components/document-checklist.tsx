@@ -14,7 +14,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-  DragStartEvent
+  DragStartEvent,
+  useDroppable
 } from "@dnd-kit/core";
 import { 
   SortableContext, 
@@ -23,7 +24,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Input } from "./ui/input";
 
 const statusColumns = [
@@ -86,10 +87,15 @@ function DroppableColumn({
   documents: Document[];
   title: string;
 }) {
+  const { setNodeRef } = useDroppable({
+    id: status,
+  });
+
   return (
     <div className="space-y-4">
       <h3 className="font-medium text-sm">{title}</h3>
       <div
+        ref={setNodeRef}
         data-status={status}
         className="space-y-2 min-h-[100px] p-2 rounded-md bg-muted/50 transition-colors"
       >
@@ -121,7 +127,27 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
 
   const { data: documents = [], isLoading, isError } = useQuery({
     queryKey: ["/api/documents", transactionId],
-    initialData: []
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/documents/${transactionId}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Initialize documents if none exist
+          const initResponse = await apiRequest("POST", `/api/documents/${transactionId}/initialize`, {
+            documents: defaultDocuments.map(doc => ({
+              ...doc,
+              transactionId
+            }))
+          });
+          if (!initResponse.ok) {
+            throw new Error("Failed to initialize documents");
+          }
+          return initResponse.json();
+        }
+        throw new Error("Failed to fetch documents");
+      }
+      const docs = await response.json();
+      return docs.length ? docs : [];
+    }
   });
 
   const updateDocumentMutation = useMutation({
@@ -141,6 +167,15 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         description: "Document status updated successfully",
       });
     },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update document status",
+        variant: "destructive"
+      });
+      // Refetch to ensure UI is in sync
+      queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
+    }
   });
 
   const addDocumentMutation = useMutation({
@@ -155,7 +190,9 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       return response.json();
     },
     onSuccess: (newDoc) => {
-      queryClient.setQueryData(["/api/documents", transactionId], (oldData: Document[] = []) => [...oldData, newDoc]);
+      queryClient.setQueryData(["/api/documents", transactionId], (oldData: Document[] = []) => 
+        [...oldData, newDoc]
+      );
       setNewDocument("");
       toast({
         title: "Success",
@@ -174,14 +211,10 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
 
     if (!over) return;
 
-    const container = over.data.current?.sortable?.containerId || 
-                     (over.data.current as any)?.status ||
-                     over.id;
-
-    if (!container || typeof container !== 'string') return;
-
-    const status = container as Document['status'];
+    const status = over.id as Document['status'];
     const documentId = active.id as string;
+
+    if (!status || !documentId) return;
 
     const activeDocument = documents.find(doc => doc.id === documentId);
     if (!activeDocument || activeDocument.status === status) return;
