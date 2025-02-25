@@ -16,22 +16,15 @@ import {
   ResponsiveContainer,
   Line,
   ComposedChart,
-  Legend,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  Legend
 } from "recharts";
 import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
-
-interface MonthlyData {
-  month: string;
-  totalVolume: number;
-  cumulativeVolume: number;
-  transactionCount: number;
-}
 
 // Define stage types and colors
 type StageType = 'prospect' | 'activeListing' | 'liveListing' | 'mutualAcceptance' | 'closing';
@@ -40,16 +33,38 @@ interface StageConfig {
   name: string;
   value: number;
   type: StageType;
-  className: string;
+  colorClass: string;
 }
 
+// Configure stages with Tailwind classes
 const dealStagesData: StageConfig[] = [
-  { name: 'Prospect', value: 4, type: 'prospect', className: 'fill-[#FB7185] dark:fill-[#E14D62]' },
-  { name: 'Active Listing', value: 6, type: 'activeListing', className: 'fill-[#4ADE80] dark:fill-[#22C55E]' },
-  { name: 'Live Listing', value: 3, type: 'liveListing', className: 'fill-[#FDE047] dark:fill-[#FFD700]' },
-  { name: 'Mutual Acceptance', value: 2, type: 'mutualAcceptance', className: 'fill-[#38BDF8] dark:fill-[#2196F3]' },
-  { name: 'Closing in 1 Week', value: 1, type: 'closing', className: 'fill-black dark:fill-white' }
+  { name: 'Prospect', value: 4, type: 'prospect', colorClass: 'bg-[#FB7185] dark:bg-[#E14D62]' },
+  { name: 'Active Listing', value: 6, type: 'activeListing', colorClass: 'bg-[#4ADE80] dark:bg-[#22C55E]' },
+  { name: 'Live Listing', value: 3, type: 'liveListing', colorClass: 'bg-[#FDE047] dark:bg-[#FFD700]' },
+  { name: 'Mutual Acceptance', value: 2, type: 'mutualAcceptance', colorClass: 'bg-[#38BDF8] dark:bg-[#2196F3]' },
+  { name: 'Closing in 1 Week', value: 1, type: 'closing', colorClass: 'bg-black dark:bg-white' }
 ];
+
+// Custom legend component
+const CustomLegend = () => {
+  return (
+    <ul className="flex flex-wrap justify-center gap-4 mt-4">
+      {dealStagesData.map((stage) => (
+        <li key={stage.type} className="flex items-center gap-2">
+          <div
+            className={cn(
+              "w-3 h-3 rounded-sm transition-colors duration-200",
+              stage.colorClass
+            )}
+          />
+          <span className="text-sm text-foreground transition-colors duration-200">
+            {stage.name}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+};
 
 // Activity data remains unchanged
 const activityData = [
@@ -57,6 +72,15 @@ const activityData = [
   { month: 'Mar', meetings: 1, calls: 0 },
   { month: 'Apr', meetings: 0, calls: 0 }
 ];
+
+
+interface MonthlyData {
+  month: string;
+  totalVolume: number;
+  cumulativeVolume: number;
+  transactionCount: number;
+}
+
 
 export default function DataPage() {
   const { user } = useAuth();
@@ -326,20 +350,16 @@ export default function DataPage() {
                   labelLine={!isMobile}
                 >
                   {dealStagesData.map((entry) => (
-                    <Cell 
+                    <Cell
                       key={`cell-${entry.type}`}
                       className={cn(
-                        entry.className,
-                        "transition-colors duration-200"
+                        "transition-colors duration-200",
+                        entry.colorClass.replace(/bg-/g, "fill-")
                       )}
                     />
                   ))}
                 </Pie>
-                <Legend
-                  layout="horizontal"
-                  verticalAlign="bottom"
-                  formatter={(value) => value}
-                />
+                <Legend content={<CustomLegend />} />
                 <RechartsTooltip
                   contentStyle={{
                     backgroundColor: 'var(--background)',
@@ -380,7 +400,7 @@ export default function DataPage() {
           <h3 className="text-lg font-semibold mb-4">Deal Progress</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
+              <BarChart
                 data={dealStagesData}
                 className="[&_path]:transition-colors [&_path]:duration-200"
               >
@@ -402,11 +422,11 @@ export default function DataPage() {
                 />
                 <Bar dataKey="value">
                   {dealStagesData.map((entry) => (
-                    <Cell 
+                    <Cell
                       key={`cell-${entry.type}`}
                       className={cn(
-                        entry.className,
-                        "transition-colors duration-200"
+                        "transition-colors duration-200",
+                        entry.colorClass.replace(/bg-/g, "fill-")
                       )}
                     />
                   ))}
