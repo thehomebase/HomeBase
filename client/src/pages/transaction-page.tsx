@@ -12,6 +12,8 @@ import { TransactionContacts } from "@/components/transaction-contacts";
 import { ArrowLeft, Pencil, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ClipboardCheck, UserPlus, FileText } from "lucide-react";
 
 
 interface ChecklistItem {
@@ -237,7 +239,6 @@ export default function TransactionPage() {
     );
   }
 
-  const fullAddress = `${transaction.streetName || ''}, ${transaction.city || ''}, ${transaction.state || ''} ${transaction.zipCode || ''}`;
 
   return (
     <div className="container mx-auto p-4">
@@ -281,7 +282,12 @@ export default function TransactionPage() {
                   </div>
                 </div>
               ) : (
-                <h1 className="text-2xl font-bold">{fullAddress}</h1>
+                <>
+                  <h1 className="text-2xl font-bold">{transaction.streetName}</h1>
+                  <p className="text-muted-foreground">
+                    {transaction.city}, {transaction.state} {transaction.zipCode}
+                  </p>
+                </>
               )}
               <p className="text-muted-foreground">Transaction ID: {parsedId}</p>
               <div className="text-muted-foreground">
@@ -317,144 +323,151 @@ export default function TransactionPage() {
       </header>
 
       <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] pr-24 max-w-full">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Transaction Details</CardTitle>
-              <CardDescription>Key information about this transaction</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {isEditing ? (
-                <>
-                  <div>
-                    <Label htmlFor="contractPrice">Contract Price</Label>
-                    <Input type="number" {...form.register("contractPrice")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="optionPeriodExpiration">Option Expiration Date</Label>
-                    <Input type="date" {...form.register("optionPeriodExpiration")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="optionFee">Option Fee</Label>
-                    <Input type="number" {...form.register("optionFee")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="earnestMoney">Earnest Money</Label>
-                    <Input type="number" {...form.register("earnestMoney")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="downPayment">Down Payment</Label>
-                    <Input type="number" {...form.register("downPayment")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="sellerConcessions">Seller Concessions</Label>
-                    <Input type="number" {...form.register("sellerConcessions")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="closingDate">Closing Date</Label>
-                    <Input type="date" {...form.register("closingDate")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="contractExecutionDate">Contract Execution Date</Label>
-                    <Input type="date" {...form.register("contractExecutionDate")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="mlsNumber">MLS No.</Label>
-                    <Input type="text" {...form.register("mlsNumber")} />
-                  </div>
-                  <div>
-                    <Label htmlFor="financing">Financing</Label>
-                    <select {...form.register("financing")}>
-                      <option value="">Select financing type</option>
-                      <option value="FHA">FHA</option>
-                      <option value="VA">VA</option>
-                      <option value="Conventional">Conventional</option>
-                      <option value="Cash">Cash</option>
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="clientId">Primary Client</Label>
-                    <select {...form.register("clientId")}>
-                      <option value="">Select client</option>
-                      {clients.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {client.firstName} {client.lastName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="status">Status</Label>
-                    <select {...form.register("status")}>
-                      <option value="coming_soon">Coming Soon</option>
-                      <option value="active">Active</option>
-                      <option value="active_option">Active Option Contract</option>
-                      <option value="pending">Pending</option>
-                      <option value="closed">Closed</option>
-                      <option value="withdrawn">Withdrawn</option>
-                      <option value="canceled">Canceled</option>
-                    </select>
-                  </div>
-                  <Button type="button" onClick={form.handleSubmit(handleSubmit)}>Save Changes</Button>
+        <Card className="overflow-x-hidden w-full">
+          <CardContent className="p-3 sm:p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Transaction Summary</h3>
+            </div>
+            {isEditing ? (
+              <>
+                <div>
+                  <Label htmlFor="contractPrice">Contract Price</Label>
+                  <Input type="number" {...form.register("contractPrice")} />
+                </div>
+                <div>
+                  <Label htmlFor="optionPeriodExpiration">Option Expiration Date</Label>
+                  <Input type="date" {...form.register("optionPeriodExpiration")} />
+                </div>
+                <div>
+                  <Label htmlFor="optionFee">Option Fee</Label>
+                  <Input type="number" {...form.register("optionFee")} />
+                </div>
+                <div>
+                  <Label htmlFor="earnestMoney">Earnest Money</Label>
+                  <Input type="number" {...form.register("earnestMoney")} />
+                </div>
+                <div>
+                  <Label htmlFor="downPayment">Down Payment</Label>
+                  <Input type="number" {...form.register("downPayment")} />
+                </div>
+                <div>
+                  <Label htmlFor="sellerConcessions">Seller Concessions</Label>
+                  <Input type="number" {...form.register("sellerConcessions")} />
+                </div>
+                <div>
+                  <Label htmlFor="closingDate">Closing Date</Label>
+                  <Input type="date" {...form.register("closingDate")} />
+                </div>
+                <div>
+                  <Label htmlFor="contractExecutionDate">Contract Execution Date</Label>
+                  <Input type="date" {...form.register("contractExecutionDate")} />
+                </div>
+                <div>
+                  <Label htmlFor="mlsNumber">MLS No.</Label>
+                  <Input type="text" {...form.register("mlsNumber")} />
+                </div>
+                <div>
+                  <Label htmlFor="financing">Financing</Label>
+                  <select {...form.register("financing")}>
+                    <option value="">Select financing type</option>
+                    <option value="FHA">FHA</option>
+                    <option value="VA">VA</option>
+                    <option value="Conventional">Conventional</option>
+                    <option value="Cash">Cash</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="clientId">Primary Client</Label>
+                  <select {...form.register("clientId")}>
+                    <option value="">Select client</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.firstName} {client.lastName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <select {...form.register("status")}>
+                    <option value="coming_soon">Coming Soon</option>
+                    <option value="active">Active</option>
+                    <option value="active_option">Active Option Contract</option>
+                    <option value="pending">Pending</option>
+                    <option value="closed">Closed</option>
+                    <option value="withdrawn">Withdrawn</option>
+                    <option value="canceled">Canceled</option>
+                  </select>
+                </div>
+                <Button type="button" onClick={form.handleSubmit(handleSubmit)}>Save Changes</Button>
 
-                </>
-              ) : (
-                <>
+              </>
+            ) : (
+              <>
+                <div>
+                  <strong>Status:</strong> {transaction.status}
+                </div>
+                <div>
+                  <strong>Contract Price:</strong>
+                  {transaction.contractPrice
+                    ? new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                    }).format(transaction.contractPrice)
+                    : "Not set"}
+                </div>
+                <div>
+                  <strong>Access Code:</strong> {transaction.accessCode}
+                </div>
+                {transaction.closingDate && (
                   <div>
-                    <strong>Status:</strong> {transaction.status}
+                    <strong>Closing Date:</strong>
+                    {new Date(transaction.closingDate).toLocaleDateString()}
                   </div>
+                )}
+                {transaction.mlsNumber && (
                   <div>
-                    <strong>Contract Price:</strong>
-                    {transaction.contractPrice
-                      ? new Intl.NumberFormat("en-US", {
-                        style: "currency",
-                        currency: "USD",
-                      }).format(transaction.contractPrice)
-                      : "Not set"}
+                    <strong>MLS Number:</strong> {transaction.mlsNumber}
                   </div>
-                  <div>
-                    <strong>Access Code:</strong> {transaction.accessCode}
-                  </div>
-                  {transaction.closingDate && (
-                    <div>
-                      <strong>Closing Date:</strong>
-                      {new Date(transaction.closingDate).toLocaleDateString()}
-                    </div>
-                  )}
-                  {transaction.mlsNumber && (
-                    <div>
-                      <strong>MLS Number:</strong> {transaction.mlsNumber}
-                    </div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
 
-          <TransactionContacts transaction={transaction} />
-
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Progress Checklist</CardTitle>
-                <CardDescription>Track transaction milestones</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ProgressChecklist transactionId={transaction.id} />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Documents</CardTitle>
-                <CardDescription>Manage transaction documents</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DocumentChecklist transactionId={transaction.id} />
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        <Card className="mt-6">
+          <CardContent className="p-6">
+            <Tabs defaultValue="progress">
+              <TabsList className="flex w-full flex-wrap sm:flex-nowrap gap-1 p-1 max-w-[100vw]">
+                <TabsTrigger className="flex-1 min-w-20" value="progress">
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  Progress
+                </TabsTrigger>
+                <TabsTrigger className="flex-1 min-w-20" value="contacts">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Contacts
+                </TabsTrigger>
+                <TabsTrigger className="flex-1 min-w-20" value="documents">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Documents
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="progress" className="mt-6">
+                <ProgressChecklist
+                  transactionId={parsedId}
+                  userRole={user.role || ""}
+                  transactionType={transaction.type}
+                />
+              </TabsContent>
+              <TabsContent value="contacts" className="mt-6">
+                <TransactionContacts transactionId={parsedId} />
+              </TabsContent>
+              <TabsContent value="documents" className="mt-6">
+                <DocumentChecklist transactionId={parsedId} />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
