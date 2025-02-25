@@ -14,10 +14,9 @@ import {
   useDraggable
 } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 
@@ -65,7 +64,7 @@ function DraggableCard({
   clients
 }: { 
   transaction: Transaction; 
-  onDelete: (id: number) => Promise<void>;
+  onDelete: (id: number) => void;
   onClick: () => void;
   clients: Client[];
 }) {
@@ -83,7 +82,7 @@ function DraggableCard({
     <Card
       ref={setNodeRef}
       style={style}
-      className="p-3  w-full cursor-move hover:shadow-md transition-shadow relative group dark:bg-gray-700"
+      className="p-3 w-full cursor-move hover:shadow-md transition-shadow relative group dark:bg-gray-700"
       {...attributes}
       {...listeners}
     >
@@ -177,15 +176,10 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionClick, clients }: KanbanBoardProps) {
   const isMobile = useIsMobile();
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<number | null>(null);
   const [localTransactions, setLocalTransactions] = useState<Transaction[]>(transactions);
-
-  const { data: clientsData = [] } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
-  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -249,7 +243,6 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
     updateTransactionStatusMutation.mutate({ id: draggedId, status: newStatus });
   };
 
-  // Update local transactions when props change
   useEffect(() => {
     setLocalTransactions(transactions);
   }, [transactions]);
@@ -272,21 +265,21 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
               title={column.title} 
               transactions={localTransactions.filter((t) => t.status === column.id)}
               onDelete={onDeleteTransaction}
-              onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
-              clients={clientsData}
+              onTransactionClick={onTransactionClick}
+              clients={clients}
             />
           ))}
         </div>
       </div>
 
       <DragOverlay>
-        {activeId && activeTransaction && activeTransaction.client ? (
+        {activeId && activeTransaction ? (
           <Card className="p-3 w-[180px] shadow-lg cursor-grabbing dark:bg-gray-700">
             <div className="font-medium text-sm truncate dark:text-white">
               {activeTransaction.streetName}
             </div>
             <div className="text-sm text-primary dark:text-primary-foreground">
-              {activeTransaction.client.firstName} {activeTransaction.client.lastName}
+              {activeTransaction.client?.firstName} {activeTransaction.client?.lastName}
             </div>
             <div className="text-xs text-muted-foreground dark:text-gray-300">
               {activeTransaction.type === "buy" ? "Purchase" : "Sale"}
