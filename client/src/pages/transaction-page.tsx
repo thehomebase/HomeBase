@@ -284,12 +284,35 @@ export default function TransactionPage() {
             </Link>
             <div>
               {isEditing ? (
-                <Input
-                  type="text"
-                  {...form.register("address")}
-                  defaultValue={transaction.address}
-                  className="text-2xl font-bold mb-1 w-full"
-                />
+                <div className="grid gap-2">
+                  <Input
+                    type="text"
+                    {...form.register("streetName")}
+                    defaultValue={transaction.streetName}
+                    placeholder="Street Name"
+                    className="text-xl font-bold mb-1 w-full"
+                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input
+                      type="text"
+                      {...form.register("city")}
+                      defaultValue={transaction.city}
+                      placeholder="City"
+                    />
+                    <Input
+                      type="text"
+                      {...form.register("state")}
+                      defaultValue={transaction.state}
+                      placeholder="State"
+                    />
+                    <Input
+                      type="text"
+                      {...form.register("zipCode")}
+                      defaultValue={transaction.zipCode}
+                      placeholder="Zip Code"
+                    />
+                  </div>
+                </div>
               ) : (
                 <h1 className="text-2xl font-bold">{transaction.address}</h1>
               )}

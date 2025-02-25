@@ -41,7 +41,10 @@ export const clients = pgTable("clients", {
 
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
-  address: text("address").notNull(),
+  streetName: text("street_name").notNull(),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  zipCode: text("zip_code").notNull(),
   accessCode: text("access_code").notNull(),
   status: text("status").notNull(),
   type: text("type").notNull().default('buy'), // 'buy' or 'sell'
