@@ -32,42 +32,31 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-// Define chart colors with strict types
-type ChartTheme = 'light' | 'dark';
-type StageKey = keyof typeof DEAL_STAGES;
+const DEAL_STAGES = [
+  { name: 'Prospect', value: 4 },
+  { name: 'Active Listing', value: 6 },
+  { name: 'Live Listing', value: 3 },
+  { name: 'Mutual Acceptance', value: 2 },
+  { name: 'Closing in 1 Week', value: 1 }
+];
 
-const DEAL_STAGES = {
-  prospect: 'Prospect',
-  activeListing: 'Active Listing',
-  liveListing: 'Live Listing',
-  mutualAcceptance: 'Mutual Acceptance',
-  closing: 'Closing in 1 Week'
-} as const;
-
-const CHART_COLORS = {
+// Colors for light and dark themes
+const themeColors = {
   light: {
-    prospect: '#FB7185',        // red
-    activeListing: '#4ADE80',   // green
-    liveListing: '#FDE047',     // yellow
-    mutualAcceptance: '#38BDF8',// blue
-    closing: '#000000'          // black
+    prospect: '#FB7185',
+    activeListing: '#4ADE80', 
+    liveListing: '#FDE047',
+    mutualAcceptance: '#38BDF8',
+    closing: '#000000'
   },
   dark: {
-    prospect: '#E14D62',        // red
-    activeListing: '#22C55E',   // green
-    liveListing: '#FFD700',     // yellow
-    mutualAcceptance: '#2196F3',// blue
-    closing: '#FFFFFF'          // white
+    prospect: '#E14D62',
+    activeListing: '#22C55E',
+    liveListing: '#FFD700',
+    mutualAcceptance: '#2196F3',
+    closing: '#FFFFFF'
   }
-} as const;
-
-const getStageData = () => [
-  { name: DEAL_STAGES.prospect, value: 4, key: 'prospect' },
-  { name: DEAL_STAGES.activeListing, value: 6, key: 'activeListing' },
-  { name: DEAL_STAGES.liveListing, value: 3, key: 'liveListing' },
-  { name: DEAL_STAGES.mutualAcceptance, value: 2, key: 'mutualAcceptance' },
-  { name: DEAL_STAGES.closing, value: 1, key: 'closing' }
-];
+};
 
 export default function DataPage() {
   const { user } = useAuth();
@@ -75,14 +64,34 @@ export default function DataPage() {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const { theme } = useTheme();
+  const [isDarkMode, setIsDarkMode] = useState(theme === 'dark');
+
+  // Add back the transactions query
   const { data: transactions = [], isLoading, error } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     enabled: !!user && user.role === "agent",
   });
-  const { theme } = useTheme();
 
-  // Ensure theme is strictly typed
-  const currentTheme: ChartTheme = theme === 'dark' ? 'dark' : 'light';
+  // Effect to track theme changes
+  useEffect(() => {
+    const isDark = theme === 'dark';
+    setIsDarkMode(isDark);
+    console.log('Theme changed:', { theme, isDark });
+  }, [theme]);
+
+  // Get color based on theme and stage index
+  const getStageColor = (index: number) => {
+    const colors = isDarkMode ? themeColors.dark : themeColors.light;
+    switch(index) {
+      case 0: return colors.prospect;
+      case 1: return colors.activeListing;
+      case 2: return colors.liveListing;
+      case 3: return colors.mutualAcceptance;
+      case 4: return colors.closing;
+      default: return isDarkMode ? '#FFFFFF' : '#000000';
+    }
+  };
 
   const currentYear = new Date().getFullYear();
   const yearStart = startOfYear(new Date(currentYear, 0));
@@ -140,19 +149,6 @@ export default function DataPage() {
         transactionCount: data.transactionCount
       };
     });
-
-  const dealStagesData = getStageData();
-
-  useEffect(() => {
-    // Log theme changes for debugging
-    console.log('Theme changed:', { theme, currentTheme });
-  }, [theme, currentTheme]);
-
-  const activityData = [
-    { month: 'Feb', meetings: 2, calls: 2 },
-    { month: 'Mar', meetings: 1, calls: 0 },
-    { month: 'Apr', meetings: 0, calls: 0 }
-  ];
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -357,16 +353,16 @@ export default function DataPage() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={dealStagesData}
+                  data={DEAL_STAGES}
                   dataKey="value"
                   nameKey="name"
                   cx="50%"
                   cy="50%"
                   labelLine={!isMobile}
                 >
-                  {dealStagesData.map((entry) => {
-                    const color = CHART_COLORS[currentTheme][entry.key as StageKey];
-                    console.log(`Pie chart color for ${entry.name}:`, color);
+                  {DEAL_STAGES.map((entry, index) => {
+                    const color = getStageColor(index);
+                    console.log(`Pie chart color for ${entry.name}:`, { isDarkMode, color });
                     return (
                       <Cell
                         key={`cell-${entry.name}`}
@@ -413,7 +409,7 @@ export default function DataPage() {
           <h3 className="text-lg font-semibold mb-4">Deal Progress</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dealStagesData}>
+              <BarChart data={DEAL_STAGES}>
                 <XAxis
                   dataKey="name"
                   angle={-45}
@@ -437,9 +433,9 @@ export default function DataPage() {
                   }}
                 />
                 <Bar dataKey="value">
-                  {dealStagesData.map((entry) => {
-                    const color = CHART_COLORS[currentTheme][entry.key as StageKey];
-                    console.log(`Bar chart color for ${entry.name}:`, color);
+                  {DEAL_STAGES.map((entry, index) => {
+                    const color = getStageColor(index);
+                    console.log(`Bar chart color for ${entry.name}:`, { isDarkMode, color });
                     return (
                       <Cell
                         key={`cell-${entry.name}`}
@@ -456,3 +452,9 @@ export default function DataPage() {
     </main>
   );
 }
+
+const activityData = [
+  { month: 'Feb', meetings: 2, calls: 2 },
+  { month: 'Mar', meetings: 1, calls: 0 },
+  { month: 'Apr', meetings: 0, calls: 0 }
+];
