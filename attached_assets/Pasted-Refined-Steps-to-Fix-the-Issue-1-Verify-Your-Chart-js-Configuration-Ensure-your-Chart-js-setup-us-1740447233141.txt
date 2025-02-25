@@ -1,0 +1,154 @@
+Refined Steps to Fix the Issue
+1. Verify Your Chart.js Configuration
+Ensure your Chart.js setup uses the CHART_COLORS object dynamically based on the theme. Here’s how you might set up your pie chart:
+javascript
+const ctx = document.getElementById('dealStagesChart').getContext('2d');
+const chart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+        labels: ['Prospect', 'Active Listing', 'Live Listing', 'Mutual Acceptance', 'Closing in 1 Week'],
+        datasets: [{
+            data: [20, 30, 15, 10, 25], // Example data
+            backgroundColor: [
+                CHART_COLORS.light.chart1, // Prospect (red in light mode)
+                CHART_COLORS.light.chart2, // Active Listing (green in light mode)
+                CHART_COLORS.light.chart3, // Live Listing (yellow in light mode)
+                CHART_COLORS.light.chart4, // Mutual Acceptance (blue in light mode)
+                CHART_COLORS.light.chart5  // Closing in 1 Week (black in light mode)
+            ]
+        }]
+    }
+});
+2. Implement Theme Switching
+You need to update the chart colors based on whether the app is in light or dark mode. If you’re using a theme toggle (e.g., a button or system preference), update the chart accordingly. Here’s an example using a simple theme state:
+javascript
+// Assume you have a theme state (e.g., from Zustand, localStorage, or a variable)
+let currentTheme = 'light'; // Default to light mode
+
+// Function to update chart colors based on theme
+function updateChartColors(theme) {
+    chart.data.datasets[0].backgroundColor = [
+        CHART_COLORS[theme].chart1, // Prospect
+        CHART_COLORS[theme].chart2, // Active Listing
+        CHART_COLORS[theme].chart3, // Live Listing
+        CHART_COLORS[theme].chart4, // Mutual Acceptance
+        CHART_COLORS[theme].chart5  // Closing in 1 Week
+    ];
+    chart.update(); // Re-render the chart
+}
+
+// Initial setup
+updateChartColors(currentTheme);
+
+// Example: Toggle theme (e.g., via a button or system preference)
+function toggleTheme() {
+    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+    updateChartColors(currentTheme);
+    // Optionally update the UI (e.g., body class, CSS variables)
+    document.body.className = currentTheme;
+}
+
+// Detect system theme changes (optional)
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    currentTheme = e.matches ? 'dark' : 'light';
+    updateChartColors(currentTheme);
+});
+If you’re using React and the useTheme store from your previous Zustand example, integrate it like this:
+javascript
+import { useTheme } from './theme-store'; // Adjust import path
+
+function ChartComponent() {
+    const { theme } = useTheme();
+    const chartRef = useRef(null);
+    const chartInstance = useRef(null);
+
+    useEffect(() => {
+        if (chartRef.current) {
+            if (chartInstance.current) {
+                chartInstance.current.destroy();
+            }
+
+            const ctx = chartRef.current.getContext('2d');
+            chartInstance.current = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Prospect', 'Active Listing', 'Live Listing', 'Mutual Acceptance', 'Closing in 1 Week'],
+                    datasets: [{
+                        data: [20, 30, 15, 10, 25],
+                        backgroundColor: [
+                            CHART_COLORS[theme].chart1,
+                            CHART_COLORS[theme].chart2,
+                            CHART_COLORS[theme].chart3,
+                            CHART_COLORS[theme].chart4,
+                            CHART_COLORS[theme].chart5
+                        ]
+                    }]
+                }
+            });
+        }
+
+        return () => {
+            if (chartInstance.current) {
+                chartInstance.current.destroy();
+            }
+        };
+    }, [theme]); // Re-run when theme changes
+
+    return <canvas ref={chartRef} id="dealStagesChart" />;
+}
+
+export default ChartComponent;
+3. Map Labels to chart1–chart5
+Ensure the order of your chart labels matches the order of chart1 to chart5 in CHART_COLORS. Based on your pie chart:
+“Prospect” → chart1 (red/pink)
+“Active Listing” → chart2 (green)
+“Live Listing” → chart3 (yellow)
+“Mutual Acceptance” → chart4 (blue)
+“Closing in 1 Week” → chart5 (black/purple)
+If the mapping is incorrect, the colors won’t align with the segments.
+4. Debugging
+Log CHART_COLORS and Theme: Add console.log(CHART_COLORS[currentTheme], currentTheme) to verify the theme and colors are correct.
+Check Chart Instance: Ensure chart or chartInstance.current is the correct reference to your pie chart. If you have multiple charts, make sure you’re updating the right one.
+Inspect the Canvas: Use browser developer tools to inspect the <canvas> element and check if the colors are being applied (right-click the chart > Inspect).
+Test Theme Switch: Manually toggle the theme (e.g., by calling toggleTheme() or changing currentTheme) and verify if the chart updates.
+5. Line Chart Consideration
+The line chart (“Monthly Sales Performance”) also needs to use CHART_COLORS. Update its borderColor and backgroundColor (for the area) similarly:
+javascript
+const lineChartCtx = document.getElementById('salesPerformanceChart').getContext('2d');
+const lineChart = new Chart(lineChartCtx, {
+    type: 'line',
+    data: {
+        labels: ['Mar', 'Jun', 'Sep', 'Dec'],
+        datasets: [{
+            label: 'Monthly Volume',
+            data: [150000, 300000, 450000, 600000],
+            borderColor: CHART_COLORS.light.chart2, // Green line (e.g., chart2)
+            backgroundColor: 'rgba(75, 192, 192, 0.2)', // Light green area
+            fill: true
+        }]
+    }
+});
+
+// Update line chart colors for dark mode
+function updateLineChartColors(theme) {
+    lineChart.data.datasets[0].borderColor = CHART_COLORS[theme].chart2; // Dark green in dark mode
+    lineChart.data.datasets[0].backgroundColor = 'rgba(34, 197, 94, 0.2)'; // Dark green area in dark mode
+    lineChart.update();
+}
+
+// Sync with theme changes
+updateLineChartColors(currentTheme);
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    currentTheme = e.matches ? 'dark' : 'light';
+    updateChartColors(currentTheme);
+    updateLineChartColors(currentTheme);
+});
+6. Replit-Specific Notes
+Ensure your Replit project is set up with the correct dependencies (e.g., Chart.js via npm install chart.js or a CDN).
+Test in the Replit preview pane or a live browser tab, as the editor’s theme might not reflect the chart’s output.
+If you’re using React, ensure your component re-renders when the theme changes (as shown in the React example above).
+Why the Colors Aren’t Changing
+The most likely reason is that your chart isn’t being updated when the theme changes. You need to:
+Ensure CHART_COLORS is being used in your Chart.js configuration.
+Call chart.update() after changing the colors.
+Trigger the color update when the theme switches (e.g., via a theme store, button, or system preference).

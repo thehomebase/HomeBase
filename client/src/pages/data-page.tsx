@@ -44,7 +44,7 @@ const CHART_COLORS = {
     chart2: '#4ADE80', // green
     chart3: '#FDE047', // yellow
     chart4: '#38BDF8', // blue
-    chart5: '#A78BFA', // purple
+    chart5: '#000000', // purple
     tooltip: {
       background: '#ffffff',
       text: '#000000'
