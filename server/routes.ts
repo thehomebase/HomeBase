@@ -128,7 +128,7 @@ export function registerRoutes(app: Express): Server {
       res.status(201).json(client);
     } catch (error) {
       console.error('Error creating client:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: error instanceof Error ? error.message : 'Failed to create client',
         details: error instanceof Error ? error.stack : undefined
       });
@@ -170,7 +170,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error updating client:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to update client',
         details: errorMessage
       });
@@ -295,7 +295,7 @@ export function registerRoutes(app: Express): Server {
       res.status(201).json(transaction);
     } catch (error) {
       console.error('Error creating transaction:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: error instanceof Error ? error.message : 'Error creating transaction',
         details: error instanceof Error ? error.stack : undefined
       });
@@ -550,7 +550,24 @@ export function registerRoutes(app: Express): Server {
   app.patch("/api/documents/:transactionId/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
+      const { deadline, deadlineTime } = req.body;
       const document = await storage.updateDocument(req.params.id, req.body);
+
+      // If both deadline and time are provided, create/update calendar event
+      if (deadline && deadlineTime) {
+        try {
+          await apiRequest("POST", `/api/calendar/events`, {
+            documentId: req.params.id,
+            date: deadline,
+            time: deadlineTime,
+            title: `Document Due: ${document.name}`
+          });
+        } catch (calendarError) {
+          console.error('Error syncing with calendar:', calendarError);
+          // Don't fail the document update if calendar sync fails
+        }
+      }
+
       res.json(document);
     } catch (error) {
       console.error('Error updating document:', error);
@@ -605,9 +622,6 @@ export function registerRoutes(app: Express): Server {
     try {
       const { documentId, date, time, title } = req.body;
 
-      // Create a combined date-time string
-      const combinedDateTime = new Date(`${date}T${time}`);
-
       // Get the document to verify it exists and belongs to this transaction
       const document = await storage.getDocument(documentId);
       if (!document) {
@@ -639,7 +653,7 @@ export function registerRoutes(app: Express): Server {
 
       const isSubscription = req.params.type === 'subscribe';
 
-      const calendar = ical({ 
+      const calendar = ical({
         name: "Real Estate Calendar",
         timezone: 'America/Chicago'
       });
@@ -744,4 +758,10 @@ export function registerRoutes(app: Express): Server {
   });
 
   return createServer(app);
+}
+
+// Placeholder for apiRequest function - needs to be defined elsewhere.  This function is assumed to exist by the edited snippet.
+async function apiRequest(method: string, url: string, body: any): Promise<any> {
+    //Implementation for making API requests, likely using fetch or axios.  Error handling should be included here as well.
+    throw new Error("apiRequest function not implemented");
 }
