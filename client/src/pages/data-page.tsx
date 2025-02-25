@@ -471,10 +471,14 @@ export default function DataPage() {
                   tick={{
                     fontSize: 14,
                     whiteSpace: 'pre-wrap',
-                    lineHeight: '1.2em'
+                    lineHeight: '1.2em',
+                    fill: "currentColor"
                   }}
                 />
-                <YAxis stroke="currentColor" />
+                <YAxis 
+                  stroke="currentColor" 
+                  tick={{ fill: "currentColor" }}
+                />
                 <RechartsTooltip 
                   contentStyle={{
                     backgroundColor: CHART_COLORS[theme.theme].tooltip.background,
@@ -483,10 +487,10 @@ export default function DataPage() {
                   }}
                 />
                 <Bar dataKey="value">
-                  {dealStagesData.map((entry, index) => (
+                  {dealStagesData.map((entry) => (
                     <Cell 
-                      key={`cell-${index}`} 
-                      fill={CHART_COLORS[theme.theme][`chart${index + 1}`]}
+                      key={`cell-${entry.name}`}
+                      fill={CHART_COLORS[theme.theme][`chart${Object.keys(DEAL_STAGES).indexOf(entry.name) + 1}`]}
                     />
                   ))}
                 </Bar>
