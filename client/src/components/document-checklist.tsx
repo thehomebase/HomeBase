@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -64,7 +63,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       return response.json();
     },
     onSuccess: (updatedDoc) => {
-      queryClient.setQueryData(["/api/documents", transactionId], (oldData: Document[] = []) => 
+      queryClient.setQueryData(["/api/documents", transactionId], (oldData: Document[] = []) =>
         oldData.map(doc => doc.id === updatedDoc.id ? updatedDoc : doc)
       );
       toast({
@@ -111,7 +110,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       }
     },
     onSuccess: (_, deletedId) => {
-      queryClient.setQueryData(["/api/documents", transactionId], (oldData: Document[] = []) => 
+      queryClient.setQueryData(["/api/documents", transactionId], (oldData: Document[] = []) =>
         oldData.filter(doc => doc.id !== deletedId)
       );
       toast({
@@ -155,12 +154,13 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                     <div key={doc.id} className="flex items-center gap-2 group">
                       <Checkbox
                         id={`doc-${doc.id}`}
-                        checked={column.key === doc.status}
+                        checked={doc.status === column.key}
                         onCheckedChange={(checked) => {
-                          if (checked) {
+                          if (typeof checked === 'boolean') {
+                            const newStatus = checked ? column.key : 'not_applicable';
                             updateDocumentMutation.mutate({
                               id: doc.id,
-                              status: column.key
+                              status: newStatus
                             });
                           }
                         }}
