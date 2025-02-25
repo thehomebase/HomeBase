@@ -71,6 +71,7 @@ const CustomLegend = () => {
   );
 };
 
+
 // Activity data remains unchanged
 const activityData = [
   { month: 'Feb', meetings: 2, calls: 2 },
@@ -192,14 +193,6 @@ export default function DataPage() {
       </main>
     );
   }
-
-  // Inside DataPage component, add this function
-  const getEntryColor = (entry: StageConfig, isDark: boolean) => {
-    if (entry.type === 'closing' && isDark) {
-      return '#FFFFFF';
-    }
-    return isDark ? entry.darkColor : entry.lightColor;
-  };
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -365,8 +358,11 @@ export default function DataPage() {
                   {dealStagesData.map((entry) => (
                     <Cell
                       key={`cell-${entry.type}`}
-                      fill={getEntryColor(entry, isDark)}
-                      className="transition-colors duration-200"
+                      fill={entry.type === 'closing' ? 'var(--closing-color)' : (isDark ? entry.darkColor : entry.lightColor)}
+                      className={cn(
+                        "transition-colors duration-200",
+                        entry.type === 'closing' && "dark:[--closing-color:white] [--closing-color:black]"
+                      )}
                     />
                   ))}
                 </Pie>
@@ -435,8 +431,11 @@ export default function DataPage() {
                   {dealStagesData.map((entry) => (
                     <Cell
                       key={`cell-${entry.type}`}
-                      fill={getEntryColor(entry, isDark)}
-                      className="transition-colors duration-200"
+                      fill={entry.type === 'closing' ? 'var(--closing-color)' : (isDark ? entry.darkColor : entry.lightColor)}
+                      className={cn(
+                        "transition-colors duration-200",
+                        entry.type === 'closing' && "dark:[--closing-color:white] [--closing-color:black]"
+                      )}
                     />
                   ))}
                 </Bar>
