@@ -10,18 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 
-const defaultDocuments = [
-  { id: "iabs", name: "IABS", status: "not_applicable" },
-  { id: "buyer_rep", name: "Buyer Rep Agreement", status: "not_applicable" },
-  { id: "listing_agreement", name: "Listing Agreement", status: "not_applicable" },
-  { id: "seller_disclosure", name: "Seller's Disclosure", status: "not_applicable" },
-  { id: "property_survey", name: "Property Survey", status: "not_applicable" },
-  { id: "lead_paint", name: "Lead-Based Paint Disclosure", status: "not_applicable" },
-  { id: "purchase_agreement", name: "Purchase Agreement", status: "not_applicable" },
-  { id: "hoa_addendum", name: "HOA Addendum", status: "not_applicable" },
-  { id: "inspection", name: "Home Inspection Report", status: "not_applicable" }
-];
-
 interface Document {
   id: string;
   name: string;
@@ -42,20 +30,19 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   const { toast } = useToast();
   const [newDocument, setNewDocument] = useState("");
 
-  const { data: documents = defaultDocuments, isLoading } = useQuery({
+  const { data: documents = [], isLoading } = useQuery({
     queryKey: ["/api/documents", transactionId],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/documents/${transactionId}`);
       if (!response.ok) {
         throw new Error("Failed to fetch documents");
       }
-      const existingDocs = await response.json();
-      return existingDocs.length ? existingDocs : defaultDocuments;
+      return response.json();
     },
   });
 
   const updateDocumentMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({ id, status }: { id: string; status: Document['status'] }) => {
       const response = await apiRequest("PATCH", `/api/documents/${transactionId}/${id}`, { status });
       if (!response.ok) {
         throw new Error("Failed to update document status");
@@ -77,7 +64,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     mutationFn: async (name: string) => {
       const response = await apiRequest("POST", `/api/documents/${transactionId}`, {
         name,
-        status: 'not_applicable'
+        status: 'not_applicable' as const
       });
       if (!response.ok) {
         const error = await response.json();
@@ -91,13 +78,6 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       toast({
         title: "Success",
         description: "Document added successfully",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add document",
-        variant: "destructive",
       });
     },
   });
@@ -120,10 +100,6 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     },
   });
 
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
   const handleAddDocument = (e: React.FormEvent) => {
     e.preventDefault();
     if (newDocument.trim()) {
@@ -131,9 +107,13 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     }
   };
 
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
   // Calculate progress
   const completedDocs = documents.filter(doc => doc.status === 'complete').length;
-  const progress = Math.round((completedDocs / documents.length) * 100);
+  const progress = documents.length > 0 ? Math.round((completedDocs / documents.length) * 100) : 0;
 
   return (
     <Card>
@@ -151,28 +131,25 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                 {documents
                   .filter(doc => doc.status === column.key)
                   .map((doc) => (
-                    <div key={doc.id} className="flex items-center gap-2 group">
+                    <div key={`${doc.id}-${column.key}`} className="flex items-center gap-2 group">
                       <Checkbox
-                        id={`doc-${doc.id}`}
-                        checked={doc.status === column.key}
+                        id={`doc-${doc.id}-${column.key}`}
+                        checked={true}
                         onCheckedChange={(checked) => {
-                          if (typeof checked === 'boolean') {
-                            const newStatus = checked ? column.key : 'not_applicable';
+                          if (checked === false) {
                             updateDocumentMutation.mutate({
                               id: doc.id,
-                              status: newStatus
+                              status: 'not_applicable'
                             });
                           }
                         }}
                       />
-                      <div className="flex-1 min-w-0">
-                        <label
-                          htmlFor={`doc-${doc.id}`}
-                          className={`text-sm block truncate ${doc.status === 'complete' ? "line-through text-muted-foreground" : ""}`}
-                        >
-                          {doc.name}
-                        </label>
-                      </div>
+                      <label
+                        htmlFor={`doc-${doc.id}-${column.key}`}
+                        className="text-sm flex-1 cursor-pointer"
+                      >
+                        {doc.name}
+                      </label>
                       {user?.role === 'agent' && (
                         <Button
                           variant="ghost"
