@@ -33,72 +33,21 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-// Theme-aware chart colors
-const CHART_COLORS = {
-  light: {
-    bar: '#4ADE80',
-    line: '#3B82F6',
-    text: '#000000',
-    background: '#ffffff',
-    chart1: '#FB7185', // red/prospect
-    chart2: '#4ADE80', // green/active listing
-    chart3: '#FDE047', // yellow/live listing
-    chart4: '#38BDF8', // blue/mutual acceptance
-    chart5: '#000000', // black for light mode (was purple)
-    tooltip: {
-      background: '#ffffff',
-      text: '#000000'
-    }
-  },
-  dark: {
-    bar: '#22C55E',
-    line: '#60A5FA',
-    text: '#FFFFFF',
-    background: '#1a1a1a',
-    chart1: '#E14D62', // dark red/prospect
-    chart2: '#22C55E', // dark green/active listing
-    chart3: '#FFD700', // dark yellow/live listing
-    chart4: '#2196F3', // dark blue/mutual acceptance
-    chart5: '#FFFFFF', // white for dark mode (was purple)
-    tooltip: {
-      background: '#1a1a1a',
-      text: '#FFFFFF'
-    }
-  }
-} as const;
+const getChartColors = (theme: 'light' | 'dark') => ({
+  prospect: theme === 'light' ? '#FB7185' : '#E14D62', // red
+  activeListing: theme === 'light' ? '#4ADE80' : '#22C55E', // green
+  liveListing: theme === 'light' ? '#FDE047' : '#FFD700', // yellow
+  mutualAcceptance: theme === 'light' ? '#38BDF8' : '#2196F3', // blue
+  closing: theme === 'light' ? '#000000' : '#FFFFFF', // black/white
+});
 
-const DEAL_STAGES = {
-  'Prospect': 'prospect',
-  'Active Listing': 'activeListing',
-  'Live Listing': 'liveListing',
-  'Mutual Acceptance': 'mutualAcceptance',
-  'Closing in 1 Week': 'closing'
-} as const;
-
-type ThemeType = 'light' | 'dark';
-type ChartColorKey = keyof typeof CHART_COLORS.light & keyof typeof CHART_COLORS.dark;
-
-const getChartColor = (name: string, theme: ThemeType): string => {
-  const stageKey = DEAL_STAGES[name as keyof typeof DEAL_STAGES];
-  return `hsl(var(--chart-${stageKey}-${theme}))`;
-};
-
-const COLORS = {
-  light: [
-    '#4ADE80', // green
-    '#3B82F6', // blue
-    '#F472B6', // pink
-    '#FB923C', // orange
-    '#A78BFA'  // purple
-  ],
-  dark: [
-    '#22C55E', // dark green
-    '#60A5FA', // dark blue
-    '#EC4899', // dark pink
-    '#F97316', // dark orange
-    '#8B5CF6'  // dark purple
-  ]
-};
+const DEAL_STAGES = [
+  { name: 'Prospect', key: 'prospect' },
+  { name: 'Active Listing', key: 'activeListing' },
+  { name: 'Live Listing', key: 'liveListing' },
+  { name: 'Mutual Acceptance', key: 'mutualAcceptance' },
+  { name: 'Closing in 1 Week', key: 'closing' }
+] as const;
 
 export default function DataPage() {
   const { user } = useAuth();
@@ -113,7 +62,6 @@ export default function DataPage() {
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    // Listen for system theme changes
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
       setTheme(e.matches ? 'dark' : 'light');
@@ -125,13 +73,11 @@ export default function DataPage() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme, setTheme]);
 
-  // Get all months in current year
   const currentYear = new Date().getFullYear();
   const yearStart = startOfYear(new Date(currentYear, 0));
   const yearEnd = endOfYear(new Date(currentYear, 0));
   const allMonths = eachMonthOfInterval({ start: yearStart, end: yearEnd });
 
-  // Initialize data for all months
   const initialMonthlyData = allMonths.reduce<Record<string, MonthlyData>>((acc, date) => {
     const monthKey = format(date, 'MMM');
     acc[monthKey] = {
@@ -143,7 +89,6 @@ export default function DataPage() {
     return acc;
   }, {});
 
-  // Process transactions to get monthly totals
   const monthlyData = transactions
     .filter(t => {
       if (!t.closingDate || !t.contractPrice) return false;
@@ -168,7 +113,6 @@ export default function DataPage() {
       return acc;
     }, initialMonthlyData);
 
-  // Calculate cumulative totals and create sorted chart data
   let runningTotal = 0;
   const chartData = Object.entries(monthlyData)
     .sort((a, b) => {
@@ -186,7 +130,6 @@ export default function DataPage() {
       };
     });
 
-  // Example data for deal stages (you would need to calculate this from your transactions)
   const dealStagesData = [
     { name: 'Prospect', value: 4 },
     { name: 'Active Listing', value: 6 },
@@ -195,7 +138,6 @@ export default function DataPage() {
     { name: 'Closing in 1 Week', value: 1 }
   ];
 
-  // Calculate activity data (you would need to adjust this based on your actual data)
   const activityData = [
     { month: 'Feb', meetings: 2, calls: 2 },
     { month: 'Mar', meetings: 1, calls: 0 },
@@ -214,7 +156,7 @@ export default function DataPage() {
   const totalTransactions = chartData.reduce((sum, data) => sum + data.transactionCount, 0);
   const totalVolume = chartData.reduce((sum, data) => sum + data.totalVolume, 0);
   const averageDealSize = totalTransactions > 0 ? totalVolume / totalTransactions : 0;
-  const winRate = 65; // Example win rate - calculate from actual data
+  const winRate = 65;
 
   if (!user || user.role !== "agent") {
     return (
@@ -387,7 +329,7 @@ export default function DataPage() {
                 <Bar
                   yAxisId="left"
                   dataKey="totalVolume"
-                  fill={theme === 'dark' ? CHART_COLORS.dark.bar : CHART_COLORS.light.bar}
+                  fill="currentColor"
                   name="Monthly Volume"
                 />
                 <Line
@@ -418,12 +360,16 @@ export default function DataPage() {
                   cy="50%"
                   labelLine={!isMobile}
                 >
-                  {dealStagesData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${entry.name}`}
-                      fill={CHART_COLORS[theme as ThemeType][`chart${index + 1}` as ChartColorKey]}
-                    />
-                  ))}
+                  {dealStagesData.map((entry, index) => {
+                    const colors = getChartColors(theme as 'light' | 'dark');
+                    const stageKey = DEAL_STAGES[index].key;
+                    return (
+                      <Cell
+                        key={`cell-${entry.name}`}
+                        fill={colors[stageKey]}
+                      />
+                    );
+                  })}
                 </Pie>
                 <Legend
                   layout="horizontal"
@@ -471,21 +417,13 @@ export default function DataPage() {
               <BarChart data={dealStagesData}>
                 <XAxis
                   dataKey="name"
-                  angle={-90}
+                  angle={-45}
                   textAnchor="end"
                   stroke="currentColor"
                   height={100}
-                  tickFormatter={(value) => {
-                    const words = value.split(' ');
-                    return words.length > 1
-                      ? `${words.slice(0, Math.ceil(words.length / 2)).join(' ')}\n${words.slice(Math.ceil(words.length / 2)).join(' ')}`
-                      : value;
-                  }}
                   tick={{
-                    fontSize: 14,
-                    whiteSpace: 'pre-wrap',
-                    lineHeight: '1.2em',
-                    fill: "currentColor"
+                    fill: "currentColor",
+                    fontSize: 14
                   }}
                 />
                 <YAxis
@@ -500,12 +438,16 @@ export default function DataPage() {
                   }}
                 />
                 <Bar dataKey="value">
-                  {dealStagesData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${entry.name}`}
-                      fill={CHART_COLORS[theme as ThemeType][`chart${index + 1}` as ChartColorKey]}
-                    />
-                  ))}
+                  {dealStagesData.map((entry, index) => {
+                    const colors = getChartColors(theme as 'light' | 'dark');
+                    const stageKey = DEAL_STAGES[index].key;
+                    return (
+                      <Cell
+                        key={`cell-${entry.name}`}
+                        fill={colors[stageKey]}
+                      />
+                    );
+                  })}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
