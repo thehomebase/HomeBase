@@ -158,10 +158,25 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                         checked={doc.status === column.key}
                         onCheckedChange={(checked) => {
                           if (checked) {
-                            updateDocumentMutation.mutate({
-                              id: doc.id,
-                              status: column.key
-                            });
+                            // Find current status index
+                            const currentStatusIndex = statusColumns.findIndex(col => col.key === doc.status);
+                            // Find clicked column index
+                            const clickedColumnIndex = statusColumns.findIndex(col => col.key === column.key);
+                            
+                            // If clicking a column to the right, move forward
+                            if (clickedColumnIndex > currentStatusIndex) {
+                              updateDocumentMutation.mutate({
+                                id: doc.id,
+                                status: column.key
+                              });
+                            } 
+                            // If clicking a column to the left, move backward
+                            else if (clickedColumnIndex < currentStatusIndex) {
+                              updateDocumentMutation.mutate({
+                                id: doc.id,
+                                status: column.key
+                              });
+                            }
                           }
                         }}
                       />
