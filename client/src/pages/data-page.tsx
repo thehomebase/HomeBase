@@ -110,17 +110,17 @@ export default function DataPage() {
     enabled: !!user && user.role === "agent",
   });
   const { theme, setTheme } = useTheme();
-  
+
   useEffect(() => {
     // Listen for system theme changes
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
       setTheme(e.matches ? 'dark' : 'light');
     };
-    
+
     mediaQuery.addEventListener('change', handleChange);
     console.log('Theme updated:', theme);
-    
+
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme, setTheme]);
 
@@ -340,7 +340,7 @@ export default function DataPage() {
                   tickFormatter={formatCurrency}
                   stroke="currentColor"
                   tick={{ fill: "currentColor" }}
-                  
+
                   label={{
                     value: 'Monthly Volume',
                     angle: -90,
@@ -367,9 +367,9 @@ export default function DataPage() {
                 />
                 <RechartsTooltip
                   contentStyle={{
-                    backgroundColor: CHART_COLORS[theme.theme].tooltip.background,
-                    border: '1px solid #666',
-                    color: CHART_COLORS[theme.theme].tooltip.text
+                    backgroundColor: 'var(--background)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--foreground)'
                   }}
                   formatter={(value: number, name: string) => {
                     if (name === "transactionCount") return [value, "Transactions"];
@@ -494,9 +494,9 @@ export default function DataPage() {
                 />
                 <RechartsTooltip 
                   contentStyle={{
-                    backgroundColor: CHART_COLORS[theme.theme].tooltip.background,
-                    border: '1px solid #666',
-                    color: CHART_COLORS[theme.theme].tooltip.text
+                    backgroundColor: 'var(--background)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--foreground)'
                   }}
                 />
                 <Bar dataKey="value">
@@ -509,7 +509,7 @@ export default function DataPage() {
                 </Bar>
               </BarChart>
 
-              
+
             </ResponsiveContainer>
           </div>
         </Card>
