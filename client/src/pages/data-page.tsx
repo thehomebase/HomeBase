@@ -193,6 +193,14 @@ export default function DataPage() {
     );
   }
 
+  // Inside DataPage component, add this function
+  const getEntryColor = (entry: StageConfig, isDark: boolean) => {
+    if (entry.type === 'closing' && isDark) {
+      return '#FFFFFF';
+    }
+    return isDark ? entry.darkColor : entry.lightColor;
+  };
+
   return (
     <main className="container mx-auto px-4 py-8">
       <div className="flex flex-col gap-4 mb-8">
@@ -357,7 +365,7 @@ export default function DataPage() {
                   {dealStagesData.map((entry) => (
                     <Cell
                       key={`cell-${entry.type}`}
-                      fill={isDark ? entry.darkColor : entry.lightColor}
+                      fill={getEntryColor(entry, isDark)}
                       className="transition-colors duration-200"
                     />
                   ))}
@@ -427,7 +435,7 @@ export default function DataPage() {
                   {dealStagesData.map((entry) => (
                     <Cell
                       key={`cell-${entry.type}`}
-                      fill={isDark ? entry.darkColor : entry.lightColor}
+                      fill={getEntryColor(entry, isDark)}
                       className="transition-colors duration-200"
                     />
                   ))}
