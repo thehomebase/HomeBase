@@ -33,21 +33,25 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-// Define deal stages with consistent keys and colors
-const dealStagesConfig = {
-  prospect: { name: 'Prospect', value: 4, lightColor: '#FB7185', darkColor: '#E14D62' },
-  activeListing: { name: 'Active Listing', value: 6, lightColor: '#4ADE80', darkColor: '#22C55E' },
-  liveListing: { name: 'Live Listing', value: 3, lightColor: '#FDE047', darkColor: '#FFD700' },
-  mutualAcceptance: { name: 'Mutual Acceptance', value: 2, lightColor: '#38BDF8', darkColor: '#2196F3' },
-  closing: { name: 'Closing in 1 Week', value: 1, lightColor: '#000000', darkColor: '#FFFFFF' }
-};
+// Define stage types and colors
+type StageType = 'prospect' | 'activeListing' | 'liveListing' | 'mutualAcceptance' | 'closing';
 
-const dealStagesData = Object.entries(dealStagesConfig).map(([key, config]) => ({
-  ...config,
-  key
-}));
+interface StageConfig {
+  name: string;
+  value: number;
+  type: StageType;
+  className: string;
+}
 
-// Define activity data
+const dealStagesData: StageConfig[] = [
+  { name: 'Prospect', value: 4, type: 'prospect', className: 'fill-[#FB7185] dark:fill-[#E14D62]' },
+  { name: 'Active Listing', value: 6, type: 'activeListing', className: 'fill-[#4ADE80] dark:fill-[#22C55E]' },
+  { name: 'Live Listing', value: 3, type: 'liveListing', className: 'fill-[#FDE047] dark:fill-[#FFD700]' },
+  { name: 'Mutual Acceptance', value: 2, type: 'mutualAcceptance', className: 'fill-[#38BDF8] dark:fill-[#2196F3]' },
+  { name: 'Closing in 1 Week', value: 1, type: 'closing', className: 'fill-black dark:fill-white' }
+];
+
+// Activity data remains unchanged
 const activityData = [
   { month: 'Feb', meetings: 2, calls: 2 },
   { month: 'Mar', meetings: 1, calls: 0 },
@@ -62,12 +66,6 @@ export default function DataPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-
-  // Get color based on theme and stage configuration
-  const getStageColor = (stageKey: string): string => {
-    const config = dealStagesConfig[stageKey as keyof typeof dealStagesConfig];
-    return isDark ? config.darkColor : config.lightColor;
-  };
 
   // Query transactions data
   const { data: transactions = [], isLoading, error } = useQuery<Transaction[]>({
@@ -161,28 +159,6 @@ export default function DataPage() {
           <p className="text-center text-muted-foreground">
             This page is only available to agents.
           </p>
-        </Card>
-      </main>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <main className="container mx-auto px-4 py-8">
-        <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
-        <Card className="p-6">
-          <p className="text-center text-muted-foreground">Loading transaction data...</p>
-        </Card>
-      </main>
-    );
-  }
-
-  if (error) {
-    return (
-      <main className="container mx-auto px-4 py-8">
-        <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
-        <Card className="p-6">
-          <p className="text-center text-destructive">Error loading transaction data</p>
         </Card>
       </main>
     );
@@ -340,7 +316,7 @@ export default function DataPage() {
           <h3 className="text-lg font-semibold mb-4">Deal Stages</h3>
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
+              <PieChart className="[&_path]:transition-colors [&_path]:duration-200">
                 <Pie
                   data={dealStagesData}
                   dataKey="value"
@@ -350,12 +326,11 @@ export default function DataPage() {
                   labelLine={!isMobile}
                 >
                   {dealStagesData.map((entry) => (
-                    <Cell
-                      key={`cell-${entry.key}`}
-                      fill={getStageColor(entry.key)}
+                    <Cell 
+                      key={`cell-${entry.type}`}
                       className={cn(
-                        "dark:text-white",
-                        entry.key === "closing" && isDark && "!fill-white"
+                        entry.className,
+                        "transition-colors duration-200"
                       )}
                     />
                   ))}
@@ -405,7 +380,10 @@ export default function DataPage() {
           <h3 className="text-lg font-semibold mb-4">Deal Progress</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dealStagesData}>
+              <BarChart 
+                data={dealStagesData}
+                className="[&_path]:transition-colors [&_path]:duration-200"
+              >
                 <XAxis
                   dataKey="name"
                   angle={-45}
@@ -414,10 +392,7 @@ export default function DataPage() {
                   stroke="currentColor"
                   tick={{ fill: "currentColor" }}
                 />
-                <YAxis
-                  stroke="currentColor"
-                  tick={{ fill: "currentColor" }}
-                />
+                <YAxis stroke="currentColor" tick={{ fill: "currentColor" }} />
                 <RechartsTooltip
                   contentStyle={{
                     backgroundColor: 'var(--background)',
@@ -427,12 +402,11 @@ export default function DataPage() {
                 />
                 <Bar dataKey="value">
                   {dealStagesData.map((entry) => (
-                    <Cell
-                      key={`cell-${entry.key}`}
-                      fill={getStageColor(entry.key)}
+                    <Cell 
+                      key={`cell-${entry.type}`}
                       className={cn(
-                        "dark:text-white",
-                        entry.key === "closing" && isDark && "!fill-white"
+                        entry.className,
+                        "transition-colors duration-200"
                       )}
                     />
                   ))}
