@@ -221,10 +221,10 @@ export function TransactionTable({
   };
 
   const filteredTransactions = transactions.filter(transaction =>
-    transaction.streetName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    transaction.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    transaction.state.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    transaction.zipCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (transaction.streetName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (transaction.city?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (transaction.state?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (transaction.zipCode?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
     (transaction.client &&
       `${transaction.client.firstName} ${transaction.client.lastName}`
         .toLowerCase()
