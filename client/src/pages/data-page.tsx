@@ -24,8 +24,6 @@ import {
 import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/hooks/use-theme";
-import { ChartContainer, ChartTooltipContent, ChartLegendContent } from "@/components/ui/chart";
-import { generateChartConfig } from "@/lib/chart-config";
 
 
 interface MonthlyData {
@@ -398,35 +396,34 @@ export default function DataPage() {
         <Card className="p-4">
           <h3 className="text-lg font-semibold mb-4">Deal Stages</h3>
           <div className="h-[350px] w-full">
-            <ChartContainer config={generateChartConfig()}>
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={dealStagesData}
                   cx="50%"
                   cy="50%"
                   labelLine={!isMobile}
-                  dataKey="value"
-                  nameKey="name"
                 >
                   {dealStagesData.map((entry, index) => (
                     <Cell 
-                      key={`cell-${entry.name}`}
-                      fill={`var(--color-chart${index + 1})`}
+                      key={`cell-${index}`} 
+                      fill={CHART_COLORS[theme.theme][`chart${index + 1}`] || CHART_COLORS[theme.theme].bar}
                       className="dark:opacity-90"
                     />
                   ))}
                 </Pie>
-                <ChartLegendContent
+                <Legend
+                  layout="horizontal"
                   verticalAlign="bottom"
-                  payload={dealStagesData.map((entry, index) => ({
-                    value: entry.name,
-                    color: `var(--color-chart${index + 1})`,
-                    dataKey: entry.name
-                  }))}
+                  formatter={(value, entry) => {
+                    const item = dealStagesData.find(d => d.name === value);
+                    const percent = item ? (item.value / dealStagesData.reduce((acc, curr) => acc + curr.value, 0) * 100).toFixed(0) : 0;
+                    return isMobile ? `${value} (${percent}%)` : value;
+                  }}
                 />
-                <ChartTooltipContent />
+                <RechartsTooltip />
               </PieChart>
-            </ChartContainer>
+            </ResponsiveContainer>
           </div>
         </Card>
       </div>
