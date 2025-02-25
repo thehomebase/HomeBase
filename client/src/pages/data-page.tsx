@@ -57,9 +57,8 @@ const CHART_COLORS = {
   }
 };
 
-const CHART_COLORS = ['#FB7185', '#4ADE80', '#FDE047', '#38BDF8', '#000000'];
-
 const getChartColor = (index: number, theme: 'light' | 'dark') => {
+  const CHART_COLORS = ['#FB7185', '#4ADE80', '#FDE047', '#38BDF8', '#000000'];
   if (theme === 'dark') {
     // Only override specific colors in dark mode
     switch (index) {
