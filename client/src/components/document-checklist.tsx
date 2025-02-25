@@ -155,12 +155,12 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                     <div key={doc.id} className="flex items-center gap-2 group">
                       <Checkbox
                         id={`doc-${doc.id}`}
-                        checked={doc.status === 'complete'}
+                        checked={doc.status === column.key}
                         onCheckedChange={(checked) => {
-                          if (typeof checked === 'boolean') {
+                          if (checked) {
                             updateDocumentMutation.mutate({
                               id: doc.id,
-                              status: checked ? 'complete' : 'not_applicable'
+                              status: column.key
                             });
                           }
                         }}
