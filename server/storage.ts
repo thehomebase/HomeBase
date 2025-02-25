@@ -16,11 +16,14 @@ interface ChecklistItem {
   phase: string;
 }
 
+// Update Document type definition
 interface Document {
   id: string;
   name: string;
   status: 'not_applicable' | 'waiting_signatures' | 'signed' | 'waiting_others' | 'complete';
   transactionId: number;
+  deadline: string | null;
+  deadlineTime: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -814,7 +817,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       const transactionExists = await db.execute(sql`
-        SELECT EXISTS(SELECT 1 FROM transactions WHERE id = ${data.transactionId})
+        SELECT EXISTS(SELECT1 FROM transactions WHERE id = ${data.transactionId})
       `);
 
       if (!transactionExists.rows[0].exists) {
@@ -1073,34 +1076,66 @@ export class DatabaseStorage implements IStorage {
 
   async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
-      // Validate status is one of the allowed values
-      if (data.status && !['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'].includes(data.status)) {
-        throw new Error('Invalid document status');
+      // Create SET clause for SQL update
+      const setColumns = [];
+      const values: any[] = [];
+      let paramCount = 1;
+
+      if (data.status !== undefined) {
+        setColumns.push(`status = $${paramCount}`);
+        values.push(data.status);
+        paramCount++;
       }
 
-      const updates = Object.entries(data)
-        .filter(([_, value]) => value !== undefined)
-        .map(([key, value]) => sql`${sql.identifier([key])} = ${value}`);
+      if (data.notes !== undefined) {
+        setColumns.push(`notes = $${paramCount}`);
+        values.push(data.notes);
+        paramCount++;
+      }
+
+      if (data.deadline !== undefined) {
+        setColumns.push(`deadline = $${paramCount}`);
+        values.push(data.deadline || null);
+        paramCount++;
+      }
+
+      if (data.deadlineTime !== undefined) {
+        setColumns.push(`deadline_time = $${paramCount}`);
+        values.push(data.deadlineTime || null);
+        paramCount++;
+      }
+
+      setColumns.push(`updated_at = CURRENT_TIMESTAMP`);
 
       const result = await db.execute(sql`
-        UPDATE documents 
-        SET ${sql.join(updates, sql`, `)}
+        UPDATE documents
+        SET ${sql.join(setColumns.map(col => sql.raw(col)), sql`, `)}
         WHERE id = ${id}
-        RETURNING *
+        RETURNING 
+          id,
+          name,
+          status,
+          transaction_id as "transactionId",
+          deadline,
+          deadline_time as "deadlineTime",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
       `);
 
       if (!result.rows[0]) {
         throw new Error('Document not found');
       }
 
-      const doc = result.rows[0];
+      const row = result.rows[0];
       return {
-        id: doc.id,
-        name: doc.name,
-        status: doc.status as Document['status'],
-        transactionId: Number(doc.transaction_id),
-        createdAt: new Date(doc.createdAt),
-        updatedAt: new Date(doc.updatedAt)
+        id: String(row.id),
+        name: String(row.name),
+        status: row.status as Document['status'],
+        transactionId: Number(row.transactionId),
+        deadline: row.deadline,
+        deadlineTime: row.deadlineTime,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
@@ -1110,15 +1145,10 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDocument(id: string): Promise<void> {
     try {
-      const result = await db.execute(sql`
+      await db.execute(sql`
         DELETE FROM documents 
         WHERE id = ${id}
-        RETURNING id
       `);
-
-      if (!result.rows[0]) {
-        throw new Error('Document not found');
-      }
     } catch (error) {
       console.error('Error in deleteDocument:', error);
       throw error;
@@ -1408,34 +1438,66 @@ export class DatabaseStorage implements IStorage {
 
   async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
-      // Validate status is one of the allowed values
-      if (data.status && !['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'].includes(data.status)) {
-        throw new Error('Invalid document status');
+      // Create SET clause for SQL update
+      const setColumns = [];
+      const values: any[] = [];
+      let paramCount = 1;
+
+      if (data.status !== undefined) {
+        setColumns.push(`status = $${paramCount}`);
+        values.push(data.status);
+        paramCount++;
       }
 
-      const updates = Object.entries(data)
-        .filter(([_, value]) => value !== undefined)
-        .map(([key, value]) => sql`${sql.identifier([key])} = ${value}`);
+      if (data.notes !== undefined) {
+        setColumns.push(`notes = $${paramCount}`);
+        values.push(data.notes);
+        paramCount++;
+      }
+
+      if (data.deadline !== undefined) {
+        setColumns.push(`deadline = $${paramCount}`);
+        values.push(data.deadline || null);
+        paramCount++;
+      }
+
+      if (data.deadlineTime !== undefined) {
+        setColumns.push(`deadline_time = $${paramCount}`);
+        values.push(data.deadlineTime || null);
+        paramCount++;
+      }
+
+      setColumns.push(`updated_at = CURRENT_TIMESTAMP`);
 
       const result = await db.execute(sql`
-        UPDATE documents 
-        SET ${sql.join(updates, sql`, `)}
+        UPDATE documents
+        SET ${sql.join(setColumns.map(col => sql.raw(col)), sql`, `)}
         WHERE id = ${id}
-        RETURNING *
+        RETURNING 
+          id,
+          name,
+          status,
+          transaction_id as "transactionId",
+          deadline,
+          deadline_time as "deadlineTime",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
       `);
 
       if (!result.rows[0]) {
         throw new Error('Document not found');
       }
 
-      const doc = result.rows[0];
+      const row = result.rows[0];
       return {
-        id: doc.id,
-        name: doc.name,
-        status: doc.status as Document['status'],
-        transactionId: Number(doc.transaction_id),
-        createdAt: new Date(doc.createdAt),
-        updatedAt: new Date(doc.updatedAt)
+        id: String(row.id),
+        name: String(row.name),
+        status: row.status as Document['status'],
+        transactionId: Number(row.transactionId),
+        deadline: row.deadline,
+        deadlineTime: row.deadlineTime,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt)
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
