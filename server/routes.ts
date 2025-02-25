@@ -550,17 +550,37 @@ export function registerRoutes(app: Express): Server {
   app.patch("/api/documents/:transactionId/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      const { deadline, deadlineTime } = req.body;
-      const document = await storage.updateDocument(req.params.id, req.body);
+      console.log('Updating document:', {
+        id: req.params.id,
+        data: req.body
+      });
 
-      // If both deadline and time are provided, create/update calendar event
-      if (deadline && deadlineTime) {
+      const document = await storage.updateDocument(req.params.id, req.body);
+      console.log('Document updated:', document);
+
+      // If both deadline and time are provided, sync with calendar
+      if (document.deadline && document.deadlineTime) {
         try {
-          await apiRequest("POST", `/api/calendar/events`, {
-            documentId: req.params.id,
-            date: deadline,
-            time: deadlineTime,
-            title: `Document Due: ${document.name}`
+          const deadlineDate = new Date(`${document.deadline}T${document.deadlineTime}`);
+          const calendar = ical({
+            name: "Real Estate Calendar",
+            timezone: 'America/Chicago'
+          });
+
+          calendar.createEvent({
+            start: deadlineDate,
+            end: deadlineDate,
+            summary: `Document Due: ${document.name}`,
+            description: `Deadline for document: ${document.name}`,
+          });
+
+          // Set calendar subscription headers
+          res.set({
+            'Content-Type': 'text/calendar; charset=utf-8',
+            'Content-Disposition': 'inline; filename=calendar.ics',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Refresh': '3600'
           });
         } catch (calendarError) {
           console.error('Error syncing with calendar:', calendarError);
@@ -571,7 +591,10 @@ export function registerRoutes(app: Express): Server {
       res.json(document);
     } catch (error) {
       console.error('Error updating document:', error);
-      res.status(500).json({ error: 'Failed to update document' });
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to update document',
+        details: error instanceof Error ? error.stack : undefined
+      });
     }
   });
 

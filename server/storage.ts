@@ -1077,25 +1077,31 @@ export class DatabaseStorage implements IStorage {
 
   async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
-      console.log('Updating document with:', { id, data });
+      console.log('Updating document with data:', {
+        id,
+        deadline: data.deadline,
+        deadlineTime: data.deadlineTime,
+        status: data.status,
+        notes: data.notes
+      });
 
-      // First fetch the current document to ensure it exists
+      // First verify the document exists
       const currentDoc = await db.execute(sql`
         SELECT * FROM documents WHERE id = ${id}
       `);
 
       if (!currentDoc.rows[0]) {
-        throw new Error('Document not found');
+        throw new Error(`Document with ID ${id} not found`);
       }
 
-      // Update document with new values, handling each field separately
+      // Build update query
       const result = await db.execute(sql`
         UPDATE documents
         SET 
-          status = ${data.status || currentDoc.rows[0].status},
-          notes = ${data.notes !== undefined ? data.notes : currentDoc.rows[0].notes},
-          deadline = ${data.deadline !== undefined ? data.deadline : currentDoc.rows[0].deadline},
-          deadline_time = ${data.deadlineTime !== undefined ? data.deadlineTime : currentDoc.rows[0].deadline_time},
+          status = COALESCE(${data.status}, status),
+          notes = COALESCE(${data.notes}, notes),
+          deadline = ${data.deadline ? sql`${data.deadline}::date` : sql`deadline`},
+          deadline_time = ${data.deadlineTime ? sql`${data.deadlineTime}::time` : sql`deadline_time`},
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
@@ -1104,13 +1110,13 @@ export class DatabaseStorage implements IStorage {
           status,
           transaction_id as "transactionId",
           notes,
-          deadline,
-          deadline_time as "deadlineTime",
+          deadline::text,
+          deadline_time::text as "deadlineTime",
           created_at as "createdAt",
           updated_at as "updatedAt"
       `);
 
-      console.log('Update result:', result.rows[0]);
+      console.log('Database update result:', result.rows[0]);
 
       if (!result.rows[0]) {
         throw new Error('Failed to update document');
@@ -1433,25 +1439,31 @@ export class DatabaseStorage implements IStorage {
 
   async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
-      console.log('Updating document with:', { id, data });
+      console.log('Updating document with data:', {
+        id,
+        deadline: data.deadline,
+        deadlineTime: data.deadlineTime,
+        status: data.status,
+        notes: data.notes
+      });
 
-      // First fetch the current document to ensure it exists
+      // First verify the document exists
       const currentDoc = await db.execute(sql`
         SELECT * FROM documents WHERE id = ${id}
       `);
 
       if (!currentDoc.rows[0]) {
-        throw new Error('Document not found');
+        throw new Error(`Document with ID ${id} not found`);
       }
 
-      // Update document with new values, handling each field separately
+      // Build update query
       const result = await db.execute(sql`
         UPDATE documents
         SET 
-          status = ${data.status || currentDoc.rows[0].status},
-          notes = ${data.notes !== undefined ? data.notes : currentDoc.rows[0].notes},
-          deadline = ${data.deadline !== undefined ? data.deadline : currentDoc.rows[0].deadline},
-          deadline_time = ${data.deadlineTime !== undefined ? data.deadlineTime : currentDoc.rows[0].deadline_time},
+          status = COALESCE(${data.status}, status),
+          notes = COALESCE(${data.notes}, notes),
+          deadline = ${data.deadline ? sql`${data.deadline}::date` : sql`deadline`},
+          deadline_time = ${data.deadlineTime ? sql`${data.deadlineTime}::time` : sql`deadline_time`},
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
@@ -1460,13 +1472,13 @@ export class DatabaseStorage implements IStorage {
           status,
           transaction_id as "transactionId",
           notes,
-          deadline,
-          deadline_time as "deadlineTime",
+          deadline::text,
+          deadline_time::text as "deadlineTime",
           created_at as "createdAt",
           updated_at as "updatedAt"
       `);
 
-      console.log('Update result:', result.rows[0]);
+      console.log('Database update result:', result.rows[0]);
 
       if (!result.rows[0]) {
         throw new Error('Failed to update document');
