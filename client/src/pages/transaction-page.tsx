@@ -15,6 +15,7 @@ import { TransactionContacts } from "@/components/transaction-contacts";
 export default function TransactionPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const [isEditing, setIsEditing] = useState(false);
   const parsedId = id ? parseInt(id, 10) : null;
 
   const { data: transaction, isLoading } = useQuery<Transaction>({
@@ -96,15 +97,15 @@ export default function TransactionPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Status</p>
-              <p className="text-lg capitalize">{transaction.status.replace('_', ' ')}</p>
+              <p className="text-base capitalize">{transaction.status.replace('_', ' ')}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Type</p>
-              <p className="text-lg capitalize">{transaction.type}</p>
+              <p className="text-base capitalize">{transaction.type}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Contract Price</p>
-              <p className="text-lg">
+              <p className="text-base">
                 {transaction.contractPrice
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
@@ -115,7 +116,7 @@ export default function TransactionPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Contract Date</p>
-              <p className="text-lg">
+              <p className="text-base">
                 {transaction.contractExecutionDate
                   ? new Date(transaction.contractExecutionDate).toLocaleDateString()
                   : 'Not set'}
@@ -123,7 +124,7 @@ export default function TransactionPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Option Period Expiration</p>
-              <p className="text-lg">
+              <p className="text-base">
                 {transaction.optionPeriodExpiration
                   ? new Date(transaction.optionPeriodExpiration).toLocaleDateString()
                   : 'Not set'}
@@ -131,7 +132,7 @@ export default function TransactionPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Option Fee</p>
-              <p className="text-lg">
+              <p className="text-base">
                 {transaction.optionFee
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
@@ -142,7 +143,7 @@ export default function TransactionPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Earnest Money</p>
-              <p className="text-lg">
+              <p className="text-base">
                 {transaction.earnestMoney
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
@@ -153,7 +154,7 @@ export default function TransactionPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Down Payment</p>
-              <p className="text-lg">
+              <p className="text-base">
                 {transaction.downPayment
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
@@ -164,7 +165,7 @@ export default function TransactionPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Seller Concessions</p>
-              <p className="text-lg">
+              <p className="text-base">
                 {transaction.sellerConcessions
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
@@ -175,7 +176,7 @@ export default function TransactionPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Closing Date</p>
-              <p className="text-lg">
+              <p className="text-base">
                 {transaction.closingDate
                   ? new Date(transaction.closingDate).toLocaleDateString()
                   : 'Not set'}
@@ -183,11 +184,11 @@ export default function TransactionPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">MLS Number</p>
-              <p className="text-lg">{transaction.mlsNumber || 'Not set'}</p>
+              <p className="text-base">{transaction.mlsNumber || 'Not set'}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Financing</p>
-              <p className="text-lg capitalize">{transaction.financing || 'Not set'}</p>
+              <p className="text-base capitalize">{transaction.financing || 'Not set'}</p>
             </div>
           </div>
         </CardContent>
