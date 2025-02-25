@@ -19,31 +19,7 @@ const defaultDocuments = [
   { id: "lead_paint", name: "Lead-Based Paint Disclosure", status: "not_applicable" },
   { id: "purchase_agreement", name: "Purchase Agreement", status: "not_applicable" },
   { id: "hoa_addendum", name: "HOA Addendum", status: "not_applicable" },
-  { id: "option_period", name: "Option Period", status: "not_applicable" },
-  { id: "third_party_financing", name: "Third Party Financing", status: "not_applicable" },
-  { id: "earnest_money_receipt", name: "Earnest Money Receipt", status: "not_applicable" },
-  { id: "amendment", name: "Amendment", status: "not_applicable" },
-  { id: "closing_disclosure", name: "Closing Disclosure", status: "not_applicable" },
-  { id: "inspection", name: "Home Inspection Report", status: "not_applicable" },
-  { id: "inspection_amendment", name: "Inspection Amendment", status: "not_applicable" },
-  { id: "inspection_response", name: "Inspection Response", status: "not_applicable" },
-  { id: "termite_inspection", name: "Termite Inspection", status: "not_applicable" },
-  { id: "appraisal", name: "Appraisal", status: "not_applicable" },
-  { id: "title_commitment", name: "Title Commitment", status: "not_applicable" },
-  { id: "loan_estimate", name: "Loan Estimate", status: "not_applicable" },
-  { id: "homeowners_insurance", name: "Homeowner's Insurance", status: "not_applicable" },
-  { id: "flood_insurance", name: "Flood Insurance", status: "not_applicable" },
-  { id: "warranty", name: "Home Warranty", status: "not_applicable" },
-  { id: "repairs", name: "Repair Documentation", status: "not_applicable" },
-  { id: "survey", name: "New Survey", status: "not_applicable" },
-  { id: "wire_instructions", name: "Wire Instructions", status: "not_applicable" },
-  { id: "sellers_affidavit", name: "Seller's Affidavit", status: "not_applicable" },
-  { id: "closing_statement", name: "Closing Statement", status: "not_applicable" },
-  { id: "deed", name: "Deed", status: "not_applicable" },
-  { id: "mortgage", name: "Mortgage", status: "not_applicable" },
-  { id: "occupancy_agreement", name: "Occupancy Agreement", status: "not_applicable" },
-  { id: "tax_certificate", name: "Tax Certificate", status: "not_applicable" },
-  { id: "addendums", name: "Additional Addendums", status: "not_applicable" }
+  { id: "inspection", name: "Home Inspection Report", status: "not_applicable" }
 ] as const;
 
 interface Document {
@@ -54,12 +30,12 @@ interface Document {
 }
 
 const statusColumns = [
-  { key: 'not_applicable', label: 'Not Applicable' },
-  { key: 'waiting_signatures', label: 'Waiting Signatures' },
-  { key: 'signed', label: 'Signed' },
-  { key: 'waiting_others', label: 'Waiting Others' },
-  { key: 'complete', label: 'Complete' }
-] as const;
+  { key: 'not_applicable' as const, label: 'Not Applicable' },
+  { key: 'waiting_signatures' as const, label: 'Waiting Signatures' },
+  { key: 'signed' as const, label: 'Signed' },
+  { key: 'waiting_others' as const, label: 'Waiting Others' },
+  { key: 'complete' as const, label: 'Complete' }
+];
 
 export function DocumentChecklist({ transactionId }: { transactionId: number }) {
   const { user } = useAuth();
@@ -67,26 +43,36 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   const { toast } = useToast();
   const [newDocument, setNewDocument] = useState("");
 
-  const { data: documents, isLoading } = useQuery({
+  const { data: documents, isLoading, isError } = useQuery({
     queryKey: ["/api/documents", transactionId],
     queryFn: async () => {
-      const response = await apiRequest("GET", `/api/documents/${transactionId}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch documents");
-      }
-      const existingDocs = await response.json();
-      if (!existingDocs || existingDocs.length === 0) {
-        const createResponse = await apiRequest("POST", `/api/documents/${transactionId}/initialize`, {
-          documents: defaultDocuments.map(doc => ({ ...doc, transactionId }))
-        });
-        if (!createResponse.ok) {
-          throw new Error("Failed to initialize documents");
+      try {
+        const response = await apiRequest("GET", `/api/documents/${transactionId}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch documents");
         }
-        return createResponse.json();
+        const existingDocs = await response.json();
+
+        // If no existing docs, initialize with defaults
+        if (!existingDocs || existingDocs.length === 0) {
+          const initResponse = await apiRequest("POST", `/api/documents/${transactionId}/initialize`, {
+            documents: defaultDocuments.map(doc => ({
+              ...doc,
+              transactionId
+            }))
+          });
+          if (!initResponse.ok) {
+            throw new Error("Failed to initialize documents");
+          }
+          return initResponse.json();
+        }
+        return existingDocs;
+      } catch (error) {
+        console.error('Error fetching documents:', error);
+        return [];
       }
-      return existingDocs;
     },
-    defaultData: defaultDocuments.map(doc => ({ ...doc, transactionId }))
+    defaultData: []
   });
 
   const updateDocumentMutation = useMutation({
@@ -159,9 +145,13 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     return <div>Loading...</div>;
   }
 
-  // Calculate progress
+  if (isError) {
+    return <div>Error loading documents</div>;
+  }
+
+  // Calculate progress using optional chaining and nullish coalescing
   const completedDocs = documents?.filter(doc => doc.status === 'complete')?.length ?? 0;
-  const progress = documents?.length > 0 ? Math.round((completedDocs / documents.length) * 100) : 0;
+  const progress = documents?.length ? Math.round((completedDocs / documents.length) * 100) : 0;
 
   return (
     <Card>
@@ -176,18 +166,25 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
             <div key={column.key} className="space-y-4">
               <h3 className="font-medium text-sm">{column.label}</h3>
               <div className="space-y-2">
-                {documents
+                {documents && documents
                   .filter(doc => doc.status === column.key)
                   .map((doc) => (
                     <div key={`${doc.id}-${column.key}`} className="flex items-center gap-2 group">
                       <Checkbox
                         id={`doc-${doc.id}-${column.key}`}
-                        checked={doc.status === column.key}
+                        checked={column.key === doc.status}
                         onCheckedChange={(checked) => {
-                          updateDocumentMutation.mutate({
-                            id: doc.id,
-                            status: checked ? column.key : 'not_applicable'
-                          });
+                          if (checked === false) {
+                            updateDocumentMutation.mutate({
+                              id: doc.id,
+                              status: 'not_applicable'
+                            });
+                          } else if (checked === true) {
+                            updateDocumentMutation.mutate({
+                              id: doc.id,
+                              status: column.key
+                            });
+                          }
                         }}
                       />
                       <label

@@ -569,6 +569,35 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/documents/:transactionId/initialize", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const transactionId = Number(req.params.transactionId);
+      const { documents } = req.body;
+
+      if (!Array.isArray(documents)) {
+        return res.status(400).json({ error: 'Documents must be an array' });
+      }
+
+      // Initialize all documents in series to maintain order
+      const createdDocs = [];
+      for (const doc of documents) {
+        const newDoc = await storage.createDocument({
+          name: doc.name,
+          status: doc.status,
+          transactionId
+        });
+        createdDocs.push(newDoc);
+      }
+
+      res.status(201).json(createdDocs);
+    } catch (error) {
+      console.error('Error initializing documents:', error);
+      res.status(500).json({ error: 'Failed to initialize documents' });
+    }
+  });
+
   // Calendar Integration
   app.get("/api/calendar/:userId/:type", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);

@@ -102,6 +102,15 @@ export const contacts = pgTable('contacts', {
   transactionId: integer('transaction_id').notNull()
 });
 
+export const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  status: text("status", { enum: ['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'] }).notNull(),
+  transactionId: integer("transaction_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
 const checklistItemSchema = z.object({
   id: z.string(),
   text: z.string(),
@@ -126,6 +135,11 @@ export const insertChecklistSchema = createInsertSchema(checklists).extend({
 });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
 export const insertContactSchema = createInsertSchema(contacts);
+export const insertDocumentSchema = createInsertSchema(documents).omit({ 
+  id: true,
+  createdAt: true,
+  updatedAt: true 
+});
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertClient = z.infer<typeof insertClientSchema>;
@@ -133,6 +147,7 @@ export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type InsertChecklist = z.infer<typeof insertChecklistSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type InsertContact = z.infer<typeof insertContactSchema>;
+export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 
 export type User = typeof users.$inferSelect;
 export type Client = typeof clients.$inferSelect;
@@ -140,3 +155,4 @@ export type Transaction = typeof transactions.$inferSelect;
 export type Checklist = typeof checklists.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Contact = typeof contacts.$inferSelect;
+export type Document = typeof documents.$inferSelect;

@@ -23,6 +23,8 @@ interface Document {
   name: string;
   status: 'not_applicable' | 'waiting_signatures' | 'signed' | 'waiting_others' | 'complete';
   transactionId: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface IStorage {
@@ -55,7 +57,7 @@ export interface IStorage {
 
   // Document operations
   getDocumentsByTransaction(transactionId: number): Promise<Document[]>;
-  createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document>;
+  createDocument(document: { name: string; status: Document['status']; transactionId: number }): Promise<Document>;
   updateDocument(id: string, data: Partial<Document>): Promise<Document>;
   deleteDocument(id: string): Promise<void>;
 }
@@ -993,16 +995,25 @@ export class DatabaseStorage implements IStorage {
   async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
     try {
       const result = await db.execute(sql`
-        SELECT * FROM documents 
+        SELECT 
+          id,
+          name,
+          status,
+          transaction_id as "transactionId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM documents 
         WHERE transaction_id = ${transactionId}
-        ORDER BY id ASC
+        ORDER BY created_at ASC
       `);
 
-      return result.rows.map(row => ({
-        id: String(row.id),
-        name: String(row.name),
-        status: String(row.status),
-        transactionId: Number(row.transaction_id)
+      return result.rows.map(doc => ({
+        id: doc.id,
+        name: doc.name,
+        status: doc.status as Document['status'],
+        transactionId: Number(doc.transactionId),
+        createdAt: new Date(doc.createdAt),
+        updatedAt: new Date(doc.updatedAt)
       }));
     } catch (error) {
       console.error('Error in getDocumentsByTransaction:', error);
@@ -1010,20 +1021,49 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document> {
+  async createDocument(data: { name: string; status: Document['status']; transactionId: number }): Promise<Document> {
     try {
+      // Validate the status is one of the allowed values
+      const validStatuses = ['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'] as const;
+      if (!validStatuses.includes(data.status as any)) {
+        throw new Error('Invalid document status');
+      }
+
       const result = await db.execute(sql`
-        INSERT INTO documents (name, status, transaction_id)
-        VALUES (${document.name}, ${document.status},${document.transactionId})
-        RETURNING *
+        INSERT INTO documents (
+          name,
+          status,
+          transaction_id,
+          created_at,
+          updated_at
+        ) VALUES (
+          ${data.name},
+          ${data.status},
+          ${data.transactionId},
+          NOW(),
+          NOW()
+        )
+        RETURNING 
+          id,
+          name,
+          status,
+          transaction_id as "transactionId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
       `);
 
-      const row = result.rows[0];
+      if (!result.rows[0]) {
+        throw new Error('Failed to create document');
+      }
+
+      const doc = result.rows[0];
       return {
-        id: String(row.id),
-        name: String(row.name),
-        status: String(row.status),
-        transactionId: Number(row.transaction_id)
+        id: doc.id,
+        name: doc.name,
+        status: doc.status as Document['status'],
+        transactionId: Number(doc.transactionId),
+        createdAt: new Date(doc.createdAt),
+        updatedAt: new Date(doc.updatedAt)
       };
     } catch (error) {
       console.error('Error in createDocument:', error);
@@ -1282,16 +1322,25 @@ export class DatabaseStorage implements IStorage {
   async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
     try {
       const result = await db.execute(sql`
-        SELECT * FROM documents 
+        SELECT 
+          id,
+          name,
+          status,
+          transaction_id as "transactionId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+        FROM documents 
         WHERE transaction_id = ${transactionId}
-        ORDER BY id ASC
+        ORDER BY created_at ASC
       `);
 
-      return result.rows.map(row => ({
-        id: String(row.id),
-        name: String(row.name),
-        status: String(row.status),
-        transactionId: Number(row.transaction_id)
+      return result.rows.map(doc => ({
+        id: doc.id,
+        name: doc.name,
+        status: doc.status as Document['status'],
+        transactionId: Number(doc.transactionId),
+        createdAt: new Date(doc.createdAt),
+        updatedAt: new Date(doc.updatedAt)
       }));
     } catch (error) {
       console.error('Error in getDocumentsByTransaction:', error);
@@ -1299,20 +1348,49 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createDocument(document: { name: string; status: string; transactionId: number }): Promise<Document> {
+  async createDocument(data: { name: string; status: Document['status']; transactionId: number }): Promise<Document> {
     try {
+      // Validate the status is one of the allowed values
+      const validStatuses = ['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'] as const;
+      if (!validStatuses.includes(data.status as any)) {
+        throw new Error('Invalid document status');
+      }
+
       const result = await db.execute(sql`
-        INSERT INTO documents (name, status, transaction_id)
-        VALUES (${document.name}, ${document.status},${document.transactionId})
-        RETURNING *
+        INSERT INTO documents (
+          name,
+          status,
+          transaction_id,
+          created_at,
+          updated_at
+        ) VALUES (
+          ${data.name},
+          ${data.status},
+          ${data.transactionId},
+          NOW(),
+          NOW()
+        )
+        RETURNING 
+          id,
+          name,
+          status,
+          transaction_id as "transactionId",
+          created_at as "createdAt",
+          updated_at as "updatedAt"
       `);
 
-      const row = result.rows[0];
+      if (!result.rows[0]) {
+        throw new Error('Failed to create document');
+      }
+
+      const doc = result.rows[0];
       return {
-        id: String(row.id),
-        name: String(row.name),
-        status: String(row.status),
-        transactionId: Number(row.transaction_id)
+        id: doc.id,
+        name: doc.name,
+        status: doc.status as Document['status'],
+        transactionId: Number(doc.transactionId),
+        createdAt: new Date(doc.createdAt),
+        updatedAt: new Date(doc.updatedAt)
       };
     } catch (error) {
       console.error('Error in createDocument:', error);
