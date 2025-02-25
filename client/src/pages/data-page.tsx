@@ -24,6 +24,7 @@ import {
 import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/hooks/use-theme";
+import { useEffect } from "react";
 
 
 interface MonthlyData {
@@ -108,8 +109,20 @@ export default function DataPage() {
     queryKey: ["/api/transactions"],
     enabled: !!user && user.role === "agent",
   });
-  const theme = useTheme();
-  console.log('Current theme:', theme.theme);
+  const { theme, setTheme } = useTheme();
+  
+  useEffect(() => {
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      setTheme(e.matches ? 'dark' : 'light');
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    console.log('Theme updated:', theme);
+    
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [theme, setTheme]);
 
   // Get all months in current year
   const currentYear = new Date().getFullYear();
