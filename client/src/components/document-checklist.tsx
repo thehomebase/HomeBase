@@ -2,13 +2,25 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
+import { DndContext, DragOverlay, closestCenter, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 import { Input } from "./ui/input";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
+
+
+const statusColumns = [
+  { key: 'not_applicable', label: 'Not Applicable' },
+  { key: 'waiting_signatures', label: 'Waiting Signatures' },
+  { key: 'signed', label: 'Signed' },
+  { key: 'waiting_others', label: 'Waiting Others' },
+  { key: 'complete', label: 'Complete' }
+] as const;
 
 const defaultDocuments = [
   { id: "iabs", name: "IABS", status: "not_applicable" },
@@ -29,19 +41,41 @@ interface Document {
   transactionId: number;
 }
 
-const statusColumns = [
-  { key: 'not_applicable' as const, label: 'Not Applicable' },
-  { key: 'waiting_signatures' as const, label: 'Waiting Signatures' },
-  { key: 'signed' as const, label: 'Signed' },
-  { key: 'waiting_others' as const, label: 'Waiting Others' },
-  { key: 'complete' as const, label: 'Complete' }
-];
+function SortableDocumentCard({ document }: { document: Document }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: document.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="bg-background border rounded-md p-2 cursor-grab active:cursor-grabbing"
+    >
+      <div className="text-sm">{document.name}</div>
+    </div>
+  );
+}
 
 export function DocumentChecklist({ transactionId }: { transactionId: number }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [newDocument, setNewDocument] = useState("");
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   const { data: documents, isLoading, isError } = useQuery({
     queryKey: ["/api/documents", transactionId],
@@ -53,7 +87,6 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         }
         const existingDocs = await response.json();
 
-        // If no existing docs, initialize with defaults
         if (!existingDocs || existingDocs.length === 0) {
           const initResponse = await apiRequest("POST", `/api/documents/${transactionId}/initialize`, {
             documents: defaultDocuments.map(doc => ({
@@ -134,6 +167,23 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     },
   });
 
+
+  function handleDragEnd(event: any) {
+    const { active, over } = event;
+
+    if (!over) return;
+
+    const column = over.id.split('-')[1];
+    if (column && active.id) {
+      updateDocumentMutation.mutate({
+        id: active.id,
+        status: column as Document['status']
+      });
+    }
+
+    setActiveId(null);
+  }
+
   const handleAddDocument = (e: React.FormEvent) => {
     e.preventDefault();
     if (newDocument.trim()) {
@@ -158,7 +208,6 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     );
   }
 
-  // Calculate progress using optional chaining and nullish coalescing
   const completedDocs = documents?.filter(doc => doc.status === 'complete')?.length ?? 0;
   const progress = documents?.length ? Math.round((completedDocs / documents.length) * 100) : 0;
 
@@ -170,55 +219,41 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         <div className="text-sm text-muted-foreground">{progress}% complete</div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {statusColumns.map(column => (
-            <div key={column.key} className="space-y-4">
-              <h3 className="font-medium text-sm">{column.label}</h3>
-              <div className="space-y-2">
-                {documents && documents
-                  .filter(doc => doc.status === column.key)
-                  .map((doc) => (
-                    <div key={`${doc.id}-${column.key}`} className="flex items-center gap-2 group">
-                      <Checkbox
-                        id={`doc-${doc.id}-${column.key}`}
-                        checked={column.key === doc.status}
-                        onCheckedChange={(checked) => {
-                          if (checked === false) {
-                            updateDocumentMutation.mutate({
-                              id: doc.id,
-                              status: 'not_applicable'
-                            });
-                          } else if (checked === true) {
-                            updateDocumentMutation.mutate({
-                              id: doc.id,
-                              status: column.key
-                            });
-                          }
-                        }}
-                      />
-                      <label
-                        htmlFor={`doc-${doc.id}-${column.key}`}
-                        className="text-sm flex-1 cursor-pointer"
-                      >
-                        {doc.name}
-                      </label>
-                      {user?.role === 'agent' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => removeDocumentMutation.mutate(doc.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+          onDragStart={(event) => setActiveId(event.active.id as string)}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {statusColumns.map(column => (
+              <div key={column.key} className="space-y-4">
+                <h3 className="font-medium text-sm">{column.label}</h3>
+                <div
+                  id={`column-${column.key}`}
+                  className="space-y-2 min-h-[100px] p-2 rounded-md bg-muted/50"
+                >
+                  <SortableContext items={documents.filter(doc => doc.status === column.key).map(d => d.id)}>
+                    {documents
+                      .filter(doc => doc.status === column.key)
+                      .map((doc) => (
+                        <SortableDocumentCard key={doc.id} document={doc} />
+                      ))}
+                  </SortableContext>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-
+            ))}
+          </div>
+          <DragOverlay>
+            {activeId && documents.find(d => d.id === activeId) ? (
+              <div className="bg-background border rounded-md p-2 shadow-lg">
+                <div className="text-sm">
+                  {documents.find(d => d.id === activeId)?.name}
+                </div>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
         {user?.role === 'agent' && (
           <form onSubmit={handleAddDocument} className="flex flex-col sm:flex-row gap-2 pt-6 mt-6 border-t">
             <Input
