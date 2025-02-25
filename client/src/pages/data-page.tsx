@@ -40,11 +40,11 @@ const CHART_COLORS = {
     line: '#3B82F6',
     text: '#000000',
     background: '#ffffff',
-    chart1: '#FB7185', // red
-    chart2: '#4ADE80', // green
-    chart3: '#FDE047', // yellow
-    chart4: '#38BDF8', // blue
-    chart5: '#000000', // purple
+    chart1: '#FB7185', // red/prospect
+    chart2: '#4ADE80', // green/active listing
+    chart3: '#FDE047', // yellow/live listing
+    chart4: '#38BDF8', // blue/mutual acceptance
+    chart5: '#A78BFA', // purple/closing
     tooltip: {
       background: '#ffffff',
       text: '#000000'
@@ -55,11 +55,11 @@ const CHART_COLORS = {
     line: '#60A5FA',
     text: '#FFFFFF',
     background: '#1a1a1a',
-    chart1: '#E14D62', // dark red
-    chart2: '#22C55E', // dark green
-    chart3: '#FFD700', // dark yellow
-    chart4: '#2196F3', // dark blue
-    chart5: '#7C3AED', // dark purple
+    chart1: '#E14D62', // dark red/prospect
+    chart2: '#22C55E', // dark green/active listing
+    chart3: '#FFD700', // dark yellow/live listing
+    chart4: '#2196F3', // dark blue/mutual acceptance
+    chart5: '#7C3AED', // dark purple/closing
     tooltip: {
       background: '#1a1a1a',
       text: '#FFFFFF'
