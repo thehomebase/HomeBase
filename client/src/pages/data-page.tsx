@@ -57,6 +57,11 @@ const CHART_COLORS = {
   }
 };
 
+const COLORS = {
+  light: ['#FB7185', '#4ADE80', '#FDE047', '#38BDF8', '#000000'],
+  dark: ['#FB7185', '#4ADE80', '#FDE047', '#38BDF8', '#FFFFFF']
+};
+
 const getChartColor = (index: number, theme: 'light' | 'dark') => {
   const CHART_COLORS = ['#FB7185', '#4ADE80', '#FDE047', '#38BDF8', '#000000'];
   if (theme === 'dark') {
