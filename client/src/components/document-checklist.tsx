@@ -36,7 +36,15 @@ const defaultDocuments = [
   { id: "warranty", name: "Home Warranty", status: "not_applicable" },
   { id: "repairs", name: "Repair Documentation", status: "not_applicable" },
   { id: "survey", name: "New Survey", status: "not_applicable" },
-  { id: "wire_instructions", name: "Wire Instructions", status: "not_applicable" }
+  { id: "wire_instructions", name: "Wire Instructions", status: "not_applicable" },
+  { id: "sellers_affidavit", name: "Seller's Affidavit", status: "not_applicable" },
+  { id: "closing_statement", name: "Closing Statement", status: "not_applicable" },
+  { id: "deed", name: "Deed", status: "not_applicable" },
+  { id: "mortgage", name: "Mortgage", status: "not_applicable" },
+  { id: "occupancy_agreement", name: "Occupancy Agreement", status: "not_applicable" },
+  { id: "tax_certificate", name: "Tax Certificate", status: "not_applicable" },
+  { id: "addendums", name: "Additional Addendums", status: "not_applicable" }
+] as const;
 ] as const;
 
 interface Document {
