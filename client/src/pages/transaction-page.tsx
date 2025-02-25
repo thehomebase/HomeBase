@@ -337,8 +337,28 @@ export default function TransactionPage() {
       <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] pr-24 max-w-full">
         <Card className="overflow-x-hidden w-full">
           <CardContent className="p-3 sm:p-6">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
               <h3 className="text-lg font-semibold">Transaction Summary</h3>
+              {user.role === 'agent' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="mt-2 sm:mt-0"
+                >
+                  {isEditing ? (
+                    <>
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel
+                    </>
+                  ) : (
+                    <>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit Details
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
