@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardCheck, FileText, UserPlus } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -17,7 +16,7 @@ export default function TransactionPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const parsedId = id ? parseInt(id, 10) : null;
-  
+
   const { data: transaction, isLoading } = useQuery<Transaction>({
     queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
