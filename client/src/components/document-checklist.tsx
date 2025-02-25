@@ -19,12 +19,24 @@ const defaultDocuments = [
   { id: "lead_paint", name: "Lead-Based Paint Disclosure", status: "not_applicable" },
   { id: "purchase_agreement", name: "Purchase Agreement", status: "not_applicable" },
   { id: "hoa_addendum", name: "HOA Addendum", status: "not_applicable" },
-  { id: "inspection", name: "Home Inspection Report", status: "not_applicable" },
   { id: "option_period", name: "Option Period", status: "not_applicable" },
   { id: "third_party_financing", name: "Third Party Financing", status: "not_applicable" },
   { id: "earnest_money_receipt", name: "Earnest Money Receipt", status: "not_applicable" },
   { id: "amendment", name: "Amendment", status: "not_applicable" },
-  { id: "closing_disclosure", name: "Closing Disclosure", status: "not_applicable" }
+  { id: "closing_disclosure", name: "Closing Disclosure", status: "not_applicable" },
+  { id: "inspection", name: "Home Inspection Report", status: "not_applicable" },
+  { id: "inspection_amendment", name: "Inspection Amendment", status: "not_applicable" },
+  { id: "inspection_response", name: "Inspection Response", status: "not_applicable" },
+  { id: "termite_inspection", name: "Termite Inspection", status: "not_applicable" },
+  { id: "appraisal", name: "Appraisal", status: "not_applicable" },
+  { id: "title_commitment", name: "Title Commitment", status: "not_applicable" },
+  { id: "loan_estimate", name: "Loan Estimate", status: "not_applicable" },
+  { id: "homeowners_insurance", name: "Homeowner's Insurance", status: "not_applicable" },
+  { id: "flood_insurance", name: "Flood Insurance", status: "not_applicable" },
+  { id: "warranty", name: "Home Warranty", status: "not_applicable" },
+  { id: "repairs", name: "Repair Documentation", status: "not_applicable" },
+  { id: "survey", name: "New Survey", status: "not_applicable" },
+  { id: "wire_instructions", name: "Wire Instructions", status: "not_applicable" }
 ] as const;
 
 interface Document {
