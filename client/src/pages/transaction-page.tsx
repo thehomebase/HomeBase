@@ -66,7 +66,7 @@ export default function TransactionPage() {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8 min-h-screen">
+    <main className="w-full px-4 py-8 min-h-screen">
       <div className="flex items-center gap-4 mb-6">
         <Link to="/transactions">
           <Button variant="ghost" size="icon">
