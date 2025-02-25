@@ -362,7 +362,7 @@ export default function DataPage() {
                     angle: 90,
                     position: 'insideRight',
                     offset: -90,
-                    style: { fill: CHART_COLORS[theme.theme].text }
+                    style: { fill: "currentColor" }
                   }}
                 />
                 <RechartsTooltip
