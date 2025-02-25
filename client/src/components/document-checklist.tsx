@@ -155,28 +155,13 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                     <div key={doc.id} className="flex items-center gap-2 group">
                       <Checkbox
                         id={`doc-${doc.id}`}
-                        checked={doc.status === column.key}
+                        checked={column.key === doc.status}
                         onCheckedChange={(checked) => {
-                          if (checked) {
-                            // Find current status index
-                            const currentStatusIndex = statusColumns.findIndex(col => col.key === doc.status);
-                            // Find clicked column index
-                            const clickedColumnIndex = statusColumns.findIndex(col => col.key === column.key);
-                            
-                            // If clicking a column to the right, move forward
-                            if (clickedColumnIndex > currentStatusIndex) {
-                              updateDocumentMutation.mutate({
-                                id: doc.id,
-                                status: column.key
-                              });
-                            } 
-                            // If clicking a column to the left, move backward
-                            else if (clickedColumnIndex < currentStatusIndex) {
-                              updateDocumentMutation.mutate({
-                                id: doc.id,
-                                status: column.key
-                              });
-                            }
+                          if (checked && column.key !== doc.status) {
+                            updateDocumentMutation.mutate({
+                              id: doc.id,
+                              status: column.key
+                            });
                           }
                         }}
                       />
