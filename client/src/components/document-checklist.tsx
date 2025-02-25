@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Progress } from "@/components/ui/progress";
 import { 
   DndContext, 
   DragOverlay,
@@ -242,17 +241,12 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     );
   }
 
-  const completedDocs = documents.filter(doc => doc.status === 'complete').length;
-  const progress = documents.length ? Math.round((completedDocs / documents.length) * 100) : 0;
-
   const activeDocument = activeId ? documents.find(doc => doc.id === activeId) : null;
 
   return (
     <Card>
-      <CardHeader className="space-y-2">
+      <CardHeader>
         <CardTitle className="text-lg">Documents</CardTitle>
-        <Progress value={progress} className="h-2" />
-        <div className="text-sm text-muted-foreground">{progress}% complete</div>
       </CardHeader>
       <CardContent>
         <DndContext
