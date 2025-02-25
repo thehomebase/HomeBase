@@ -420,7 +420,7 @@ export default function DataPage() {
                   {dealStagesData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
-                      fill={CHART_COLORS[theme.theme][`chart${index + 1}`] || CHART_COLORS[theme.theme].bar}
+                      fill={theme === 'dark' ? CHART_COLORS.dark[`chart${index + 1}`] : CHART_COLORS.light[`chart${index + 1}`]}
                       className="dark:opacity-90"
                     />
                   ))}
