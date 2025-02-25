@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -32,7 +32,8 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-const DEAL_STAGES = [
+// Define deal stages data
+const dealStagesData = [
   { name: 'Prospect', value: 4 },
   { name: 'Active Listing', value: 6 },
   { name: 'Live Listing', value: 3 },
@@ -40,23 +41,12 @@ const DEAL_STAGES = [
   { name: 'Closing in 1 Week', value: 1 }
 ];
 
-// Colors for light and dark themes
-const themeColors = {
-  light: {
-    prospect: '#FB7185',
-    activeListing: '#4ADE80', 
-    liveListing: '#FDE047',
-    mutualAcceptance: '#38BDF8',
-    closing: '#000000'
-  },
-  dark: {
-    prospect: '#E14D62',
-    activeListing: '#22C55E',
-    liveListing: '#FFD700',
-    mutualAcceptance: '#2196F3',
-    closing: '#FFFFFF'
-  }
-};
+// Define activity data
+const activityData = [
+  { month: 'Feb', meetings: 2, calls: 2 },
+  { month: 'Mar', meetings: 1, calls: 0 },
+  { month: 'Apr', meetings: 0, calls: 0 }
+];
 
 export default function DataPage() {
   const { user } = useAuth();
@@ -65,90 +55,85 @@ export default function DataPage() {
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const { theme } = useTheme();
-  const [isDarkMode, setIsDarkMode] = useState(theme === 'dark');
 
-  // Add back the transactions query
+  // Query transactions data
   const { data: transactions = [], isLoading, error } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     enabled: !!user && user.role === "agent",
   });
 
-  // Effect to track theme changes
-  useEffect(() => {
-    const isDark = theme === 'dark';
-    setIsDarkMode(isDark);
-    console.log('Theme changed:', { theme, isDark });
-  }, [theme]);
-
-  // Get color based on theme and stage index
-  const getStageColor = (index: number) => {
-    const colors = isDarkMode ? themeColors.dark : themeColors.light;
-    switch(index) {
-      case 0: return colors.prospect;
-      case 1: return colors.activeListing;
-      case 2: return colors.liveListing;
-      case 3: return colors.mutualAcceptance;
-      case 4: return colors.closing;
-      default: return isDarkMode ? '#FFFFFF' : '#000000';
-    }
-  };
+  // Theme-based chart colors
+  const isDark = theme === 'dark';
+  const chartColors = [
+    isDark ? '#E14D62' : '#FB7185', // Prospect (red)
+    isDark ? '#22C55E' : '#4ADE80', // Active Listing (green)
+    isDark ? '#FFD700' : '#FDE047', // Live Listing (yellow)
+    isDark ? '#2196F3' : '#38BDF8', // Mutual Acceptance (blue)
+    isDark ? '#FFFFFF' : '#000000'  // Closing in 1 Week (white/black)
+  ];
 
   const currentYear = new Date().getFullYear();
   const yearStart = startOfYear(new Date(currentYear, 0));
   const yearEnd = endOfYear(new Date(currentYear, 0));
   const allMonths = eachMonthOfInterval({ start: yearStart, end: yearEnd });
 
-  const initialMonthlyData = allMonths.reduce<Record<string, MonthlyData>>((acc, date) => {
-    const monthKey = format(date, 'MMM');
-    acc[monthKey] = {
-      month: monthKey,
-      totalVolume: 0,
-      cumulativeVolume: 0,
-      transactionCount: 0
-    };
-    return acc;
-  }, {});
-
-  const monthlyData = transactions
-    .filter(t => {
-      if (!t.closingDate || !t.contractPrice) return false;
-      const closeDate = new Date(t.closingDate);
-      const matchesStatus = !selectedStatus || t.status === selectedStatus;
-      const matchesStartDate = !startDate || closeDate >= startDate;
-      const matchesEndDate = !endDate || closeDate <= endDate;
-      return t.status === "closed" &&
-             getYear(closeDate) === currentYear &&
-             matchesStatus &&
-             matchesStartDate &&
-             matchesEndDate;
-    })
-    .reduce((acc, transaction) => {
-      const date = new Date(transaction.closingDate!);
+  // Process monthly data using useMemo
+  const monthlyData = useMemo(() => {
+    const initialData = allMonths.reduce<Record<string, MonthlyData>>((acc, date) => {
       const monthKey = format(date, 'MMM');
-
-      if (acc[monthKey]) {
-        acc[monthKey].totalVolume += transaction.contractPrice || 0;
-        acc[monthKey].transactionCount += 1;
-      }
-      return acc;
-    }, initialMonthlyData);
-
-  let runningTotal = 0;
-  const chartData = Object.entries(monthlyData)
-    .sort((a, b) => {
-      const monthA = parse(a[0], 'MMM', new Date());
-      const monthB = parse(b[0], 'MMM', new Date());
-      return monthA.getMonth() - monthB.getMonth();
-    })
-    .map(([month, data]) => {
-      runningTotal += data.totalVolume;
-      return {
-        month,
-        totalVolume: data.totalVolume,
-        cumulativeVolume: runningTotal,
-        transactionCount: data.transactionCount
+      acc[monthKey] = {
+        month: monthKey,
+        totalVolume: 0,
+        cumulativeVolume: 0,
+        transactionCount: 0
       };
-    });
+      return acc;
+    }, {});
+
+    return (transactions || [])
+      .filter(t => {
+        if (!t.closingDate || !t.contractPrice) return false;
+        const closeDate = new Date(t.closingDate);
+        const matchesStatus = !selectedStatus || t.status === selectedStatus;
+        const matchesStartDate = !startDate || closeDate >= startDate;
+        const matchesEndDate = !endDate || closeDate <= endDate;
+        return t.status === "closed" &&
+               getYear(closeDate) === currentYear &&
+               matchesStatus &&
+               matchesStartDate &&
+               matchesEndDate;
+      })
+      .reduce((acc, transaction) => {
+        const date = new Date(transaction.closingDate!);
+        const monthKey = format(date, 'MMM');
+
+        if (acc[monthKey]) {
+          acc[monthKey].totalVolume += transaction.contractPrice || 0;
+          acc[monthKey].transactionCount += 1;
+        }
+        return acc;
+      }, initialData);
+  }, [transactions, selectedStatus, startDate, endDate, currentYear, allMonths]);
+
+  // Convert monthly data to chart format and calculate cumulative volume
+  const chartData = useMemo(() => {
+    let runningTotal = 0;
+    return Object.entries(monthlyData)
+      .sort((a, b) => {
+        const monthA = parse(a[0], 'MMM', new Date());
+        const monthB = parse(b[0], 'MMM', new Date());
+        return monthA.getMonth() - monthB.getMonth();
+      })
+      .map(([month, data]) => {
+        runningTotal += data.totalVolume;
+        return {
+          month,
+          totalVolume: data.totalVolume,
+          cumulativeVolume: runningTotal,
+          transactionCount: data.transactionCount
+        };
+      });
+  }, [monthlyData]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -159,8 +144,9 @@ export default function DataPage() {
     }).format(value);
   };
 
-  const totalTransactions = chartData.reduce((sum, data) => sum + data.transactionCount, 0);
-  const totalVolume = chartData.reduce((sum, data) => sum + data.totalVolume, 0);
+  // Calculate totals
+  const totalTransactions = Object.values(monthlyData).reduce((sum, data) => sum + data.transactionCount, 0);
+  const totalVolume = Object.values(monthlyData).reduce((sum, data) => sum + data.totalVolume, 0);
   const averageDealSize = totalTransactions > 0 ? totalVolume / totalTransactions : 0;
   const winRate = 65;
 
@@ -200,7 +186,7 @@ export default function DataPage() {
   }
 
   return (
-    <main className="w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full w-full ml-[5px] pr-20 sm:pr-12 relative container mx-auto px-4 py-8">
+    <main className="container mx-auto px-4 py-8">
       <div className="flex flex-col gap-4 mb-8">
         <h2 className="text-2xl font-bold">Sales Data Analysis</h2>
         <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
@@ -353,28 +339,23 @@ export default function DataPage() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={DEAL_STAGES}
+                  data={dealStagesData}
                   dataKey="value"
                   nameKey="name"
                   cx="50%"
                   cy="50%"
                   labelLine={!isMobile}
                 >
-                  {DEAL_STAGES.map((entry, index) => {
-                    const color = getStageColor(index);
-                    console.log(`Pie chart color for ${entry.name}:`, { isDarkMode, color });
-                    return (
-                      <Cell
-                        key={`cell-${entry.name}`}
-                        fill={color}
-                      />
-                    );
-                  })}
+                  {dealStagesData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${entry.name}`}
+                      fill={chartColors[index]}
+                    />
+                  ))}
                 </Pie>
                 <Legend
                   layout="horizontal"
                   verticalAlign="bottom"
-                  formatter={(value) => value}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -387,7 +368,7 @@ export default function DataPage() {
           <h3 className="text-lg font-semibold mb-4">Activities Completed</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={activityData} className="[&_.recharts-bar-rectangle]:!fill-current">
+              <BarChart data={activityData}>
                 <XAxis dataKey="month" stroke="currentColor" tick={{ fill: "currentColor" }} />
                 <YAxis stroke="currentColor" tick={{ fill: "currentColor" }} />
                 <RechartsTooltip
@@ -409,17 +390,14 @@ export default function DataPage() {
           <h3 className="text-lg font-semibold mb-4">Deal Progress</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={DEAL_STAGES}>
+              <BarChart data={dealStagesData}>
                 <XAxis
                   dataKey="name"
                   angle={-45}
                   textAnchor="end"
-                  stroke="currentColor"
                   height={100}
-                  tick={{
-                    fill: "currentColor",
-                    fontSize: 14
-                  }}
+                  stroke="currentColor"
+                  tick={{ fill: "currentColor" }}
                 />
                 <YAxis
                   stroke="currentColor"
@@ -433,16 +411,12 @@ export default function DataPage() {
                   }}
                 />
                 <Bar dataKey="value">
-                  {DEAL_STAGES.map((entry, index) => {
-                    const color = getStageColor(index);
-                    console.log(`Bar chart color for ${entry.name}:`, { isDarkMode, color });
-                    return (
-                      <Cell
-                        key={`cell-${entry.name}`}
-                        fill={color}
-                      />
-                    );
-                  })}
+                  {dealStagesData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${entry.name}`}
+                      fill={chartColors[index]}
+                    />
+                  ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -452,9 +426,3 @@ export default function DataPage() {
     </main>
   );
 }
-
-const activityData = [
-  { month: 'Feb', meetings: 2, calls: 2 },
-  { month: 'Mar', meetings: 1, calls: 0 },
-  { month: 'Apr', meetings: 0, calls: 0 }
-];
