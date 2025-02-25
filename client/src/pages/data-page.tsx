@@ -40,6 +40,11 @@ const CHART_COLORS = {
     line: '#3B82F6',
     text: '#000000',
     background: '#ffffff',
+    chart1: '#FB7185', // red
+    chart2: '#4ADE80', // green
+    chart3: '#FDE047', // yellow
+    chart4: '#38BDF8', // blue
+    chart5: '#A78BFA', // purple
     tooltip: {
       background: '#ffffff',
       text: '#000000'
@@ -47,9 +52,14 @@ const CHART_COLORS = {
   },
   dark: {
     bar: '#22C55E',
-    line: '#60A5FA', 
+    line: '#60A5FA',
     text: '#FFFFFF',
     background: '#1a1a1a',
+    chart1: '#E14D62', // dark red
+    chart2: '#22C55E', // dark green
+    chart3: '#FFD700', // dark yellow
+    chart4: '#2196F3', // dark blue
+    chart5: '#7C3AED', // dark purple
     tooltip: {
       background: '#1a1a1a',
       text: '#FFFFFF'
@@ -397,7 +407,7 @@ export default function DataPage() {
                   {dealStagesData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
-                      fill={getChartColor(entry.name, theme.theme)}
+                      fill={CHART_COLORS[theme.theme][`chart${index + 1}`] || CHART_COLORS[theme.theme].bar}
                       className="dark:opacity-90"
                     />
                   ))}
