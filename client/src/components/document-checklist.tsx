@@ -171,13 +171,13 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   function handleDragEnd(event: any) {
     const { active, over } = event;
 
-    if (!over) return;
+    if (!over?.id || !active?.id) return;
 
-    const column = over.id.split('-')[1];
-    if (column && active.id) {
+    const status = over.id as Document['status'];
+    if (status) {
       updateDocumentMutation.mutate({
         id: active.id,
-        status: column as Document['status']
+        status: status
       });
     }
 
