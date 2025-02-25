@@ -1,12 +1,11 @@
 
-import { Label } from "@/components/ui/label";
-import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { useTransaction } from "@/hooks/use-transaction";
+import { Label } from "@/components/ui/label";
 
-export function TransactionPage() {
+export default function TransactionPage() {
   const { id } = useParams();
-  const { transaction, isLoading } = useTransaction(id);
+  const { data: transaction, isLoading } = useTransaction(id);
 
   if (isLoading) {
     return <div>Loading...</div>;
