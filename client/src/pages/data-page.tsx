@@ -471,7 +471,7 @@ export default function DataPage() {
                   {dealStagesData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
-                      fill={COLORS[theme.theme][index % COLORS[theme.theme].length]}
+                      fill={getChartColor(entry.name, theme.theme)}
                     />
                   ))}
                 </Bar>
