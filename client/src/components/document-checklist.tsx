@@ -29,6 +29,14 @@ interface Document {
   status: 'not_applicable' | 'waiting_signatures' | 'signed' | 'waiting_others' | 'complete';
 }
 
+const statusColumns = [
+  { key: 'not_applicable', label: 'Not Applicable' },
+  { key: 'waiting_signatures', label: 'Waiting Signatures' },
+  { key: 'signed', label: 'Signed' },
+  { key: 'waiting_others', label: 'Waiting Others' },
+  { key: 'complete', label: 'Complete' }
+] as const;
+
 export function DocumentChecklist({ transactionId }: { transactionId: number }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -136,73 +144,68 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         <div className="text-sm text-muted-foreground">{progress}% complete</div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {documents.map((doc: Document) => (
-            <div key={doc.id} className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 flex-1">
-                <Checkbox
-                  id={`doc-${doc.id}`}
-                  checked={doc.status === 'complete'}
-                  onCheckedChange={(checked) => {
-                    updateDocumentMutation.mutate({
-                      id: doc.id,
-                      status: checked ? 'complete' : 'not_applicable'
-                    });
-                  }}
-                  disabled={user?.role !== 'agent'}
-                />
-                <div className="flex-1">
-                  <label
-                    htmlFor={`doc-${doc.id}`}
-                    className={`text-sm ${doc.status === 'complete' ? "line-through text-muted-foreground" : ""}`}
-                  >
-                    {doc.name}
-                  </label>
-                  <select
-                    className="block w-full mt-1 text-sm px-2 py-1 rounded-md border"
-                    value={doc.status}
-                    onChange={(e) => updateDocumentMutation.mutate({ id: doc.id, status: e.target.value })}
-                    disabled={user?.role !== 'agent'}
-                  >
-                    <option value="not_applicable">Not Applicable</option>
-                    <option value="waiting_signatures">Waiting On Signature(s)</option>
-                    <option value="signed">Signed</option>
-                    <option value="waiting_others">Waiting On Others</option>
-                    <option value="complete">Complete</option>
-                  </select>
-                </div>
-                {user?.role === 'agent' && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => removeDocumentMutation.mutate(doc.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {statusColumns.map(column => (
+            <div key={column.key} className="space-y-4">
+              <h3 className="font-medium text-sm">{column.label}</h3>
+              <div className="space-y-2">
+                {documents
+                  .filter(doc => doc.status === column.key)
+                  .map((doc) => (
+                    <div key={doc.id} className="flex items-center gap-2 group">
+                      <Checkbox
+                        id={`doc-${doc.id}`}
+                        checked={doc.status === 'complete'}
+                        onCheckedChange={(checked) => {
+                          updateDocumentMutation.mutate({
+                            id: doc.id,
+                            status: checked ? 'complete' : 'not_applicable'
+                          });
+                        }}
+                        disabled={user?.role !== 'agent'}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <label
+                          htmlFor={`doc-${doc.id}`}
+                          className={`text-sm block truncate ${doc.status === 'complete' ? "line-through text-muted-foreground" : ""}`}
+                        >
+                          {doc.name}
+                        </label>
+                      </div>
+                      {user?.role === 'agent' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => removeDocumentMutation.mutate(doc.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
               </div>
             </div>
           ))}
-
-          {user?.role === 'agent' && (
-            <form onSubmit={handleAddDocument} className="flex flex-col sm:flex-row gap-2 pt-4 border-t">
-              <Input
-                placeholder="New document name..."
-                value={newDocument}
-                onChange={(e) => setNewDocument(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                type="submit"
-                disabled={!newDocument.trim() || addDocumentMutation.isPending}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Document
-              </Button>
-            </form>
-          )}
         </div>
+
+        {user?.role === 'agent' && (
+          <form onSubmit={handleAddDocument} className="flex flex-col sm:flex-row gap-2 pt-6 mt-6 border-t">
+            <Input
+              placeholder="New document name..."
+              value={newDocument}
+              onChange={(e) => setNewDocument(e.target.value)}
+              className="flex-1"
+            />
+            <Button
+              type="submit"
+              disabled={!newDocument.trim() || addDocumentMutation.isPending}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Document
+            </Button>
+          </form>
+        )}
       </CardContent>
     </Card>
   );
