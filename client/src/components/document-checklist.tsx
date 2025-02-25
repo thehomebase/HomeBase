@@ -19,7 +19,12 @@ const defaultDocuments = [
   { id: "lead_paint", name: "Lead-Based Paint Disclosure", status: "not_applicable" },
   { id: "purchase_agreement", name: "Purchase Agreement", status: "not_applicable" },
   { id: "hoa_addendum", name: "HOA Addendum", status: "not_applicable" },
-  { id: "inspection", name: "Home Inspection Report", status: "not_applicable" }
+  { id: "inspection", name: "Home Inspection Report", status: "not_applicable" },
+  { id: "option_period", name: "Option Period", status: "not_applicable" },
+  { id: "third_party_financing", name: "Third Party Financing", status: "not_applicable" },
+  { id: "earnest_money_receipt", name: "Earnest Money Receipt", status: "not_applicable" },
+  { id: "amendment", name: "Amendment", status: "not_applicable" },
+  { id: "closing_disclosure", name: "Closing Disclosure", status: "not_applicable" }
 ] as const;
 
 interface Document {
