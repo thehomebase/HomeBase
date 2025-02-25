@@ -817,7 +817,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error('Missing required fields');
       }
 
-      const transactionExists = await db.execute(sql`
+      const transactionExists = awaitdb.execute(sql`
         SELECT EXISTS(SELECT 1 FROM transactions WHERE id =${data.transactionId})
       `);
 
@@ -1094,14 +1094,14 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Document with ID ${id} not found`);
       }
 
-      // Build update query
+      // Build update query with proper SQL syntax
       const result = await db.execute(sql`
         UPDATE documents
         SET 
           status = COALESCE(${data.status}, status),
           notes = COALESCE(${data.notes}, notes),
-          deadline = ${data.deadline ? sql`${data.deadline}::date` : sql`deadline`},
-          deadline_time = ${data.deadlineTime ? sql`${data.deadlineTime}::time` : sql`deadline_time`},
+          deadline = COALESCE(${data.deadline}::date, deadline),
+          deadline_time = COALESCE(${data.deadlineTime}::time, deadline_time),
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
@@ -1456,14 +1456,14 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Document with ID ${id} not found`);
       }
 
-      // Build update query
+      // Build update query with proper SQL syntax
       const result = await db.execute(sql`
         UPDATE documents
         SET 
           status = COALESCE(${data.status}, status),
           notes = COALESCE(${data.notes}, notes),
-          deadline = ${data.deadline ? sql`${data.deadline}::date` : sql`deadline`},
-          deadline_time = ${data.deadlineTime ? sql`${data.deadlineTime}::time` : sql`deadline_time`},
+          deadline = COALESCE(${data.deadline}::date, deadline),
+          deadline_time = COALESCE(${data.deadlineTime}::time, deadline_time),
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
