@@ -26,7 +26,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/hooks/use-theme";
 import { useEffect } from "react";
 
-
 interface MonthlyData {
   month: string;
   totalVolume: number;
@@ -45,7 +44,7 @@ const CHART_COLORS = {
     chart2: '#4ADE80', // green/active listing
     chart3: '#FDE047', // yellow/live listing
     chart4: '#38BDF8', // blue/mutual acceptance
-    chart5: '#A78BFA', // purple/closing
+    chart5: '#000000', // black for light mode (was purple)
     tooltip: {
       background: '#ffffff',
       text: '#000000'
@@ -60,12 +59,28 @@ const CHART_COLORS = {
     chart2: '#22C55E', // dark green/active listing
     chart3: '#FFD700', // dark yellow/live listing
     chart4: '#2196F3', // dark blue/mutual acceptance
-    chart5: '#7C3AED', // dark purple/closing
+    chart5: '#FFFFFF', // white for dark mode (was purple)
     tooltip: {
       background: '#1a1a1a',
       text: '#FFFFFF'
     }
   }
+} as const;
+
+const DEAL_STAGES = {
+  'Prospect': 'prospect',
+  'Active Listing': 'activeListing',
+  'Live Listing': 'liveListing',
+  'Mutual Acceptance': 'mutualAcceptance',
+  'Closing in 1 Week': 'closing'
+} as const;
+
+type ThemeType = 'light' | 'dark';
+type ChartColorKey = keyof typeof CHART_COLORS.light & keyof typeof CHART_COLORS.dark;
+
+const getChartColor = (name: string, theme: ThemeType): string => {
+  const stageKey = DEAL_STAGES[name as keyof typeof DEAL_STAGES];
+  return `hsl(var(--chart-${stageKey}-${theme}))`;
 };
 
 const COLORS = {
@@ -85,25 +100,11 @@ const COLORS = {
   ]
 };
 
-const DEAL_STAGES = {
-  'Prospect': 'prospect',
-  'Active Listing': 'activeListing',
-  'Live Listing': 'liveListing',
-  'Mutual Acceptance': 'mutualAcceptance',
-  'Closing in 1 Week': 'closing'
-};
-
-const getChartColor = (name: string, theme: 'light' | 'dark'): string => {
-  const stageKey = DEAL_STAGES[name as keyof typeof DEAL_STAGES];
-  return `hsl(var(--chart-${stageKey}-${theme}))`;
-};
-
-
 export default function DataPage() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const { data: transactions = [], isLoading, error } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -148,8 +149,8 @@ export default function DataPage() {
       if (!t.closingDate || !t.contractPrice) return false;
       const closeDate = new Date(t.closingDate);
       const matchesStatus = !selectedStatus || t.status === selectedStatus;
-      const matchesStartDate = !startDate || closeDate >= new Date(startDate);
-      const matchesEndDate = !endDate || closeDate <= new Date(endDate);
+      const matchesStartDate = !startDate || closeDate >= (startDate);
+      const matchesEndDate = !endDate || closeDate <= (endDate);
       return t.status === "closed" &&
              getYear(closeDate) === currentYear &&
              matchesStatus &&
@@ -259,29 +260,28 @@ export default function DataPage() {
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-[180px] justify-start text-left font-normal">
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {startDate ? format(new Date(startDate), 'PP') : 'Start Date'}
+                {startDate ? format(startDate, 'PP') : 'Start Date'}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
-                mode="single"
-                selected={startDate ? new Date(startDate) : undefined}
-                onSelect={(date) => setStartDate(date ? date.toISOString() : '')}
+                selected={startDate}
+                onSelect={setStartDate}
               />
             </PopoverContent>
           </Popover>
+
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-[180px] justify-start text-left font-normal">
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {endDate ? format(new Date(endDate), 'PP') : 'End Date'}
+                {endDate ? format(endDate, 'PP') : 'End Date'}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
-                mode="single"
-                selected={endDate ? new Date(endDate) : undefined}
-                onSelect={(date) => setEndDate(date ? date.toISOString() : '')}
+                selected={endDate}
+                onSelect={setEndDate}
               />
             </PopoverContent>
           </Popover>
@@ -322,8 +322,8 @@ export default function DataPage() {
           <h3 className="text-lg font-semibold mb-2">Monthly Sales Performance</h3>
           <div className="h-[300px] sm:mx-3 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart 
-                data={chartData} 
+              <ComposedChart
+                data={chartData}
                 margin={{ top: 10, right: 10, bottom: isMobile ? 10 : -50, left: 10 }}
                 className="[&_.recharts-text]:fill-foreground [&_.recharts-cartesian-axis-tick-value]:fill-foreground [&_.recharts-legend-item-text]:text-foreground"
               >
@@ -340,7 +340,6 @@ export default function DataPage() {
                   tickFormatter={formatCurrency}
                   stroke="currentColor"
                   tick={{ fill: "currentColor" }}
-
                   label={{
                     value: 'Monthly Volume',
                     angle: -90,
@@ -413,15 +412,16 @@ export default function DataPage() {
               <PieChart>
                 <Pie
                   data={dealStagesData}
+                  dataKey="value"
+                  nameKey="name"
                   cx="50%"
                   cy="50%"
                   labelLine={!isMobile}
                 >
                   {dealStagesData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={theme === 'dark' ? CHART_COLORS.dark[`chart${index + 1}`] : CHART_COLORS.light[`chart${index + 1}`]}
-                      className="dark:opacity-90"
+                    <Cell
+                      key={`cell-${entry.name}`}
+                      fill={CHART_COLORS[theme as ThemeType][`chart${index + 1}` as ChartColorKey]}
                     />
                   ))}
                 </Pie>
@@ -449,11 +449,11 @@ export default function DataPage() {
               <BarChart data={activityData} className="[&_.recharts-bar-rectangle]:!fill-current">
                 <XAxis dataKey="month" stroke="currentColor" tick={{ fill: "currentColor" }} />
                 <YAxis stroke="currentColor" tick={{ fill: "currentColor" }} />
-                <RechartsTooltip 
+                <RechartsTooltip
                   contentStyle={{
-                    backgroundColor: theme.theme === 'dark' ? '#1a1a1a' : '#ffffff',
+                    backgroundColor: theme === 'dark' ? '#1a1a1a' : '#ffffff',
                     border: '1px solid #666',
-                    color: theme.theme === 'dark' ? '#ffffff' : '#000000'
+                    color: theme === 'dark' ? '#ffffff' : '#000000'
                   }}
                 />
                 <Legend formatter={(value) => <span className="text-foreground">{value}</span>} />
@@ -477,7 +477,7 @@ export default function DataPage() {
                   height={100}
                   tickFormatter={(value) => {
                     const words = value.split(' ');
-                    return words.length > 1 
+                    return words.length > 1
                       ? `${words.slice(0, Math.ceil(words.length / 2)).join(' ')}\n${words.slice(Math.ceil(words.length / 2)).join(' ')}`
                       : value;
                   }}
@@ -488,11 +488,11 @@ export default function DataPage() {
                     fill: "currentColor"
                   }}
                 />
-                <YAxis 
-                  stroke="currentColor" 
+                <YAxis
+                  stroke="currentColor"
                   tick={{ fill: "currentColor" }}
                 />
-                <RechartsTooltip 
+                <RechartsTooltip
                   contentStyle={{
                     backgroundColor: 'var(--background)',
                     border: '1px solid var(--border)',
@@ -500,16 +500,14 @@ export default function DataPage() {
                   }}
                 />
                 <Bar dataKey="value">
-                  {dealStagesData.map((entry) => (
-                    <Cell 
+                  {dealStagesData.map((entry, index) => (
+                    <Cell
                       key={`cell-${entry.name}`}
-                      fill={CHART_COLORS[theme.theme][`chart${Object.keys(DEAL_STAGES).indexOf(entry.name) + 1}`]}
+                      fill={CHART_COLORS[theme as ThemeType][`chart${index + 1}` as ChartColorKey]}
                     />
                   ))}
                 </Bar>
               </BarChart>
-
-
             </ResponsiveContainer>
           </div>
         </Card>
