@@ -24,7 +24,6 @@ import {
 import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/hooks/use-theme";
-import { useEffect } from "react";
 
 interface MonthlyData {
   month: string;
@@ -33,12 +32,12 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-const getChartColors = (theme: 'light' | 'dark') => ({
-  prospect: theme === 'light' ? '#FB7185' : '#E14D62', // red
-  activeListing: theme === 'light' ? '#4ADE80' : '#22C55E', // green
-  liveListing: theme === 'light' ? '#FDE047' : '#FFD700', // yellow
-  mutualAcceptance: theme === 'light' ? '#38BDF8' : '#2196F3', // blue
-  closing: theme === 'light' ? '#000000' : '#FFFFFF', // black/white
+const getChartColors = (currentTheme: 'light' | 'dark') => ({
+  prospect: currentTheme === 'light' ? '#FB7185' : '#E14D62', // red
+  activeListing: currentTheme === 'light' ? '#4ADE80' : '#22C55E', // green
+  liveListing: currentTheme === 'light' ? '#FDE047' : '#FFD700', // yellow
+  mutualAcceptance: currentTheme === 'light' ? '#38BDF8' : '#2196F3', // blue
+  closing: currentTheme === 'light' ? '#000000' : '#FFFFFF' // black in light mode, white in dark mode
 });
 
 const DEAL_STAGES = [
@@ -59,19 +58,8 @@ export default function DataPage() {
     queryKey: ["/api/transactions"],
     enabled: !!user && user.role === "agent",
   });
-  const { theme, setTheme } = useTheme();
+  const { theme } = useTheme();
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => {
-      setTheme(e.matches ? 'dark' : 'light');
-    };
-
-    mediaQuery.addEventListener('change', handleChange);
-    console.log('Theme updated:', theme);
-
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [theme, setTheme]);
 
   const currentYear = new Date().getFullYear();
   const yearStart = startOfYear(new Date(currentYear, 0));
@@ -366,7 +354,7 @@ export default function DataPage() {
                     return (
                       <Cell
                         key={`cell-${entry.name}`}
-                        fill={colors[stageKey]}
+                        fill={colors[stageKey as keyof ReturnType<typeof getChartColors>]}
                       />
                     );
                   })}
@@ -444,7 +432,7 @@ export default function DataPage() {
                     return (
                       <Cell
                         key={`cell-${entry.name}`}
-                        fill={colors[stageKey]}
+                        fill={colors[stageKey as keyof ReturnType<typeof getChartColors>]}
                       />
                     );
                   })}
