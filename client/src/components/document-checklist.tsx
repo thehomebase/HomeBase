@@ -138,7 +138,19 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
 
       {documents.map((doc: Document) => (
         <div key={doc.id} className="flex flex-col md:grid md:grid-cols-[1fr,200px,40px] gap-2 md:gap-4 md:items-center py-2 border-b last:border-b-0">
-          <div className="font-medium">{doc.name}</div>
+          <div className="font-medium flex items-center justify-between">
+            {doc.name}
+            {user?.role === 'agent' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 ml-2"
+                onClick={() => removeDocumentMutation.mutate(doc.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
           <select
             className="w-full px-3 py-2 border rounded-md mt-1 md:mt-0"
             value={doc.status}
@@ -151,20 +163,12 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
             <option value="waiting_others">Waiting On Others</option>
             <option value="complete">Complete</option>
           </select>
-          {user?.role === 'agent' && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => removeDocumentMutation.mutate(doc.id)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
+          
         </div>
       ))}
 
       {user?.role === 'agent' && (
-        <form onSubmit={handleAddDocument} className="grid grid-cols-[1fr,auto] gap-4 items-center pt-4 border-t">
+        <form onSubmit={handleAddDocument} className="flex flex-col sm:grid sm:grid-cols-[1fr,auto] gap-2 sm:gap-4 items-stretch sm:items-center pt-4 border-t">
           <Input
             placeholder="New document name..."
             value={newDocument}
@@ -172,6 +176,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
           />
           <Button
             type="submit"
+            className="mt-2 sm:mt-0"
             disabled={!newDocument.trim() || addDocumentMutation.isPending}
           >
             <Plus className="h-4 w-4 mr-2" />
