@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -32,21 +32,42 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-const getChartColors = (currentTheme: 'light' | 'dark') => ({
-  prospect: currentTheme === 'light' ? '#FB7185' : '#E14D62', // red
-  activeListing: currentTheme === 'light' ? '#4ADE80' : '#22C55E', // green
-  liveListing: currentTheme === 'light' ? '#FDE047' : '#FFD700', // yellow
-  mutualAcceptance: currentTheme === 'light' ? '#38BDF8' : '#2196F3', // blue
-  closing: currentTheme === 'light' ? '#000000' : '#FFFFFF' // black in light mode, white in dark mode
-});
+// Define chart colors with strict types
+type ChartTheme = 'light' | 'dark';
+type StageKey = keyof typeof DEAL_STAGES;
 
-const DEAL_STAGES = [
-  { name: 'Prospect', key: 'prospect' },
-  { name: 'Active Listing', key: 'activeListing' },
-  { name: 'Live Listing', key: 'liveListing' },
-  { name: 'Mutual Acceptance', key: 'mutualAcceptance' },
-  { name: 'Closing in 1 Week', key: 'closing' }
-] as const;
+const DEAL_STAGES = {
+  prospect: 'Prospect',
+  activeListing: 'Active Listing',
+  liveListing: 'Live Listing',
+  mutualAcceptance: 'Mutual Acceptance',
+  closing: 'Closing in 1 Week'
+} as const;
+
+const CHART_COLORS = {
+  light: {
+    prospect: '#FB7185',        // red
+    activeListing: '#4ADE80',   // green
+    liveListing: '#FDE047',     // yellow
+    mutualAcceptance: '#38BDF8',// blue
+    closing: '#000000'          // black
+  },
+  dark: {
+    prospect: '#E14D62',        // red
+    activeListing: '#22C55E',   // green
+    liveListing: '#FFD700',     // yellow
+    mutualAcceptance: '#2196F3',// blue
+    closing: '#FFFFFF'          // white
+  }
+} as const;
+
+const getStageData = () => [
+  { name: DEAL_STAGES.prospect, value: 4, key: 'prospect' },
+  { name: DEAL_STAGES.activeListing, value: 6, key: 'activeListing' },
+  { name: DEAL_STAGES.liveListing, value: 3, key: 'liveListing' },
+  { name: DEAL_STAGES.mutualAcceptance, value: 2, key: 'mutualAcceptance' },
+  { name: DEAL_STAGES.closing, value: 1, key: 'closing' }
+];
 
 export default function DataPage() {
   const { user } = useAuth();
@@ -60,6 +81,8 @@ export default function DataPage() {
   });
   const { theme } = useTheme();
 
+  // Ensure theme is strictly typed
+  const currentTheme: ChartTheme = theme === 'dark' ? 'dark' : 'light';
 
   const currentYear = new Date().getFullYear();
   const yearStart = startOfYear(new Date(currentYear, 0));
@@ -82,8 +105,8 @@ export default function DataPage() {
       if (!t.closingDate || !t.contractPrice) return false;
       const closeDate = new Date(t.closingDate);
       const matchesStatus = !selectedStatus || t.status === selectedStatus;
-      const matchesStartDate = !startDate || closeDate >= (startDate);
-      const matchesEndDate = !endDate || closeDate <= (endDate);
+      const matchesStartDate = !startDate || closeDate >= startDate;
+      const matchesEndDate = !endDate || closeDate <= endDate;
       return t.status === "closed" &&
              getYear(closeDate) === currentYear &&
              matchesStatus &&
@@ -118,13 +141,12 @@ export default function DataPage() {
       };
     });
 
-  const dealStagesData = [
-    { name: 'Prospect', value: 4 },
-    { name: 'Active Listing', value: 6 },
-    { name: 'Live Listing', value: 3 },
-    { name: 'Mutual Acceptance', value: 2 },
-    { name: 'Closing in 1 Week', value: 1 }
-  ];
+  const dealStagesData = getStageData();
+
+  useEffect(() => {
+    // Log theme changes for debugging
+    console.log('Theme changed:', { theme, currentTheme });
+  }, [theme, currentTheme]);
 
   const activityData = [
     { month: 'Feb', meetings: 2, calls: 2 },
@@ -195,6 +217,7 @@ export default function DataPage() {
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
+                mode="single"
                 selected={startDate}
                 onSelect={setStartDate}
               />
@@ -210,6 +233,7 @@ export default function DataPage() {
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
+                mode="single"
                 selected={endDate}
                 onSelect={setEndDate}
               />
@@ -249,7 +273,7 @@ export default function DataPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
         <Card className="p-4">
-          <h3 className="text-lg font-semibold mb-2">Monthly Sales Performance</h3>
+          <h3 className="text-lg font-semibold mb-4">Monthly Sales Performance</h3>
           <div className="h-[300px] sm:mx-3 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
@@ -306,14 +330,7 @@ export default function DataPage() {
                   }}
                   labelFormatter={(label) => `Month: ${label}`}
                 />
-                <Legend
-                  wrapperStyle={{ padding: '10px 0' }}
-                  formatter={(value) => (
-                    <span className="text-foreground">
-                      {value}
-                    </span>
-                  )}
-                />
+                <Legend />
                 <Bar
                   yAxisId="left"
                   dataKey="totalVolume"
@@ -325,7 +342,6 @@ export default function DataPage() {
                   type="monotone"
                   dataKey="cumulativeVolume"
                   stroke="currentColor"
-                  tick={{ fill: "currentColor" }}
                   strokeWidth={2}
                   dot={false}
                   name="Cumulative Volume"
@@ -348,13 +364,13 @@ export default function DataPage() {
                   cy="50%"
                   labelLine={!isMobile}
                 >
-                  {dealStagesData.map((entry, index) => {
-                    const colors = getChartColors(theme as 'light' | 'dark');
-                    const stageKey = DEAL_STAGES[index].key;
+                  {dealStagesData.map((entry) => {
+                    const color = CHART_COLORS[currentTheme][entry.key as StageKey];
+                    console.log(`Pie chart color for ${entry.name}:`, color);
                     return (
                       <Cell
                         key={`cell-${entry.name}`}
-                        fill={colors[stageKey as keyof ReturnType<typeof getChartColors>]}
+                        fill={color}
                       />
                     );
                   })}
@@ -362,13 +378,8 @@ export default function DataPage() {
                 <Legend
                   layout="horizontal"
                   verticalAlign="bottom"
-                  formatter={(value, entry) => {
-                    const item = dealStagesData.find(d => d.name === value);
-                    const percent = item ? (item.value / dealStagesData.reduce((acc, curr) => acc + curr.value, 0) * 100).toFixed(0) : 0;
-                    return isMobile ? `${value} (${percent}%)` : value;
-                  }}
+                  formatter={(value) => value}
                 />
-                <RechartsTooltip />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -385,12 +396,12 @@ export default function DataPage() {
                 <YAxis stroke="currentColor" tick={{ fill: "currentColor" }} />
                 <RechartsTooltip
                   contentStyle={{
-                    backgroundColor: theme === 'dark' ? '#1a1a1a' : '#ffffff',
-                    border: '1px solid #666',
-                    color: theme === 'dark' ? '#ffffff' : '#000000'
+                    backgroundColor: 'var(--background)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--foreground)'
                   }}
                 />
-                <Legend formatter={(value) => <span className="text-foreground">{value}</span>} />
+                <Legend />
                 <Bar dataKey="meetings" name="Meetings" fill="#4ADE80" />
                 <Bar dataKey="calls" name="Calls" className="text-foreground" fill="currentColor" />
               </BarChart>
@@ -426,13 +437,13 @@ export default function DataPage() {
                   }}
                 />
                 <Bar dataKey="value">
-                  {dealStagesData.map((entry, index) => {
-                    const colors = getChartColors(theme as 'light' | 'dark');
-                    const stageKey = DEAL_STAGES[index].key;
+                  {dealStagesData.map((entry) => {
+                    const color = CHART_COLORS[currentTheme][entry.key as StageKey];
+                    console.log(`Bar chart color for ${entry.name}:`, color);
                     return (
                       <Cell
                         key={`cell-${entry.name}`}
-                        fill={colors[stageKey as keyof ReturnType<typeof getChartColors>]}
+                        fill={color}
                       />
                     );
                   })}
