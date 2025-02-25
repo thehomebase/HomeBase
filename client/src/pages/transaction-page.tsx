@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
-import { ArrowLeft, Pencil, X } from "lucide-react";
+import { ArrowLeft, Check, ClipboardCheck, Pencil, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProgressChecklist } from "@/components/progress-checklist";
 import { DocumentChecklist } from "@/components/document-checklist";
 import { TransactionContacts } from "@/components/transaction-contacts";
+import { UserPlus, FileText } from "lucide-react"; // Added imports for UserPlus and FileText
 
 interface TransactionFormData {
   streetName?: string;
