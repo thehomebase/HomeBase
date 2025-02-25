@@ -388,7 +388,7 @@ export default function DataPage() {
                 <Bar
                   yAxisId="left"
                   dataKey="totalVolume"
-                  fill={CHART_COLORS[theme.theme].bar}
+                  fill={theme === 'dark' ? CHART_COLORS.dark.bar : CHART_COLORS.light.bar}
                   name="Monthly Volume"
                 />
                 <Line
