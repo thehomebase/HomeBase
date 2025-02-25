@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, boolean, json } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, integer, boolean, json, date, time } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from "zod";
 
@@ -107,6 +107,8 @@ export const documents = pgTable("documents", {
   name: text("name").notNull(),
   status: text("status", { enum: ['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'] }).notNull(),
   transactionId: integer("transaction_id").notNull(),
+  deadline: date("deadline"),
+  deadlineTime: time("deadline_time"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
