@@ -67,10 +67,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   const { toast } = useToast();
   const [newDocument, setNewDocument] = useState("");
 
-  const { data: documents = defaultDocuments.map(doc => ({
-    ...doc,
-    transactionId
-  })), isLoading } = useQuery({
+  const { data: documents, isLoading } = useQuery({
     queryKey: ["/api/documents", transactionId],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/documents/${transactionId}`);
@@ -78,11 +75,18 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         throw new Error("Failed to fetch documents");
       }
       const existingDocs = await response.json();
-      return existingDocs.length ? existingDocs : defaultDocuments.map(doc => ({
-        ...doc,
-        transactionId
-      }));
+      if (!existingDocs || existingDocs.length === 0) {
+        const createResponse = await apiRequest("POST", `/api/documents/${transactionId}/initialize`, {
+          documents: defaultDocuments.map(doc => ({ ...doc, transactionId }))
+        });
+        if (!createResponse.ok) {
+          throw new Error("Failed to initialize documents");
+        }
+        return createResponse.json();
+      }
+      return existingDocs;
     },
+    defaultData: defaultDocuments.map(doc => ({ ...doc, transactionId }))
   });
 
   const updateDocumentMutation = useMutation({
