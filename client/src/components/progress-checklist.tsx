@@ -317,7 +317,7 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
   if (error) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader >
           <CardTitle>Error loading checklist</CardTitle>
         </CardHeader>
         <CardContent>
@@ -331,7 +331,7 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
 
   return (
     <Card>
-      <CardHeader className="space-y-2">
+      <CardHeader className="space-y-2 w-full">
         <CardTitle className="text-lg">Progress</CardTitle>
         <Progress value={progress} className="h-2" />
         <div className="text-sm text-muted-foreground">{progress}% complete</div>
