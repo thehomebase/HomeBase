@@ -62,6 +62,7 @@ const COLORS = {
   dark: ['#22C55E', '#E14D62', '#FFD700', '#2196F3', '#FFFFFF'],
 };
 
+
 export default function DataPage() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
