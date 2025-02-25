@@ -146,7 +146,16 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   }
 
   if (isError) {
-    return <div>Error loading documents</div>;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Documents</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-red-500">Failed to load documents. Please try again.</div>
+        </CardContent>
+      </Card>
+    );
   }
 
   // Calculate progress using optional chaining and nullish coalescing
