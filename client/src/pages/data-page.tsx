@@ -57,6 +57,23 @@ const CHART_COLORS = {
   }
 };
 
+const COLORS = {
+  light: [
+    '#4ADE80', // green
+    '#3B82F6', // blue
+    '#F472B6', // pink
+    '#FB923C', // orange
+    '#A78BFA'  // purple
+  ],
+  dark: [
+    '#22C55E', // dark green
+    '#60A5FA', // dark blue
+    '#EC4899', // dark pink
+    '#F97316', // dark orange
+    '#8B5CF6'  // dark purple
+  ]
+};
+
 const DEAL_STAGES = {
   'Prospect': 'prospect',
   'Active Listing': 'activeListing',
