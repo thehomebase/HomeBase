@@ -121,8 +121,15 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-[1fr,200px,40px] gap-4 items-center font-medium text-sm text-muted-foreground">
+    <Card>
+      <CardHeader className="space-y-2">
+        <CardTitle className="text-lg">Documents</CardTitle>
+        <div className="flex flex-col sm:flex-row gap-2 py-2">
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="grid grid-cols-[1fr,200px,40px] gap-4 items-center font-medium text-sm text-muted-foreground">
         <div>Document</div>
         <div>Status</div>
         <div></div>
@@ -171,6 +178,8 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
           </Button>
         </form>
       )}
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
