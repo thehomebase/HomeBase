@@ -10,10 +10,23 @@ import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 
+const defaultDocuments = [
+  { id: "iabs", name: "IABS", status: "not_applicable" },
+  { id: "buyer_rep", name: "Buyer Rep Agreement", status: "not_applicable" },
+  { id: "listing_agreement", name: "Listing Agreement", status: "not_applicable" },
+  { id: "seller_disclosure", name: "Seller's Disclosure", status: "not_applicable" },
+  { id: "property_survey", name: "Property Survey", status: "not_applicable" },
+  { id: "lead_paint", name: "Lead-Based Paint Disclosure", status: "not_applicable" },
+  { id: "purchase_agreement", name: "Purchase Agreement", status: "not_applicable" },
+  { id: "hoa_addendum", name: "HOA Addendum", status: "not_applicable" },
+  { id: "inspection", name: "Home Inspection Report", status: "not_applicable" }
+] as const;
+
 interface Document {
   id: string;
   name: string;
   status: 'not_applicable' | 'waiting_signatures' | 'signed' | 'waiting_others' | 'complete';
+  transactionId: number;
 }
 
 const statusColumns = [
@@ -37,7 +50,11 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       if (!response.ok) {
         throw new Error("Failed to fetch documents");
       }
-      return response.json();
+      const existingDocs = await response.json();
+      return existingDocs.length ? existingDocs : defaultDocuments.map(doc => ({
+        ...doc,
+        transactionId
+      }));
     },
   });
 
@@ -134,12 +151,17 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                     <div key={`${doc.id}-${column.key}`} className="flex items-center gap-2 group">
                       <Checkbox
                         id={`doc-${doc.id}-${column.key}`}
-                        checked={true}
+                        checked={column.key === doc.status}
                         onCheckedChange={(checked) => {
                           if (checked === false) {
                             updateDocumentMutation.mutate({
                               id: doc.id,
                               status: 'not_applicable'
+                            });
+                          } else if (checked === true) {
+                            updateDocumentMutation.mutate({
+                              id: doc.id,
+                              status: column.key
                             });
                           }
                         }}
