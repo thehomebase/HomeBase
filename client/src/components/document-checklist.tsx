@@ -43,7 +43,10 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   const { toast } = useToast();
   const [newDocument, setNewDocument] = useState("");
 
-  const { data: documents = [], isLoading } = useQuery({
+  const { data: documents = defaultDocuments.map(doc => ({
+    ...doc,
+    transactionId
+  })), isLoading } = useQuery({
     queryKey: ["/api/documents", transactionId],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/documents/${transactionId}`);
@@ -151,19 +154,12 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                     <div key={`${doc.id}-${column.key}`} className="flex items-center gap-2 group">
                       <Checkbox
                         id={`doc-${doc.id}-${column.key}`}
-                        checked={column.key === doc.status}
+                        checked={doc.status === column.key}
                         onCheckedChange={(checked) => {
-                          if (checked === false) {
-                            updateDocumentMutation.mutate({
-                              id: doc.id,
-                              status: 'not_applicable'
-                            });
-                          } else if (checked === true) {
-                            updateDocumentMutation.mutate({
-                              id: doc.id,
-                              status: column.key
-                            });
-                          }
+                          updateDocumentMutation.mutate({
+                            id: doc.id,
+                            status: checked ? column.key : 'not_applicable'
+                          });
                         }}
                       />
                       <label
