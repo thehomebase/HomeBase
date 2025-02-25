@@ -461,7 +461,7 @@ export default function DataPage() {
                   angle={-90}
                   textAnchor="end"
                   stroke="currentColor"
-                  height={100}          // Increased height for multiple lines
+                  height={100}
                   tickFormatter={(value) => {
                     const words = value.split(' ');
                     return words.length > 1 
@@ -470,22 +470,26 @@ export default function DataPage() {
                   }}
                   tick={{
                     fontSize: 14,
-                    whiteSpace: 'pre-wrap',  // Enables line breaks
-                    lineHeight: '1.2em'      // Adjusts spacing between lines
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: '1.2em'
                   }}
                 />
-                <YAxis />
-                
-                <RechartsTooltip />
+                <YAxis stroke="currentColor" />
+                <RechartsTooltip 
+                  contentStyle={{
+                    backgroundColor: CHART_COLORS[theme.theme].tooltip.background,
+                    border: '1px solid #666',
+                    color: CHART_COLORS[theme.theme].tooltip.text
+                  }}
+                />
                 <Bar dataKey="value">
                   {dealStagesData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
-                      fill={getChartColor(entry.name, theme.theme)}
+                      fill={CHART_COLORS[theme.theme][`chart${index + 1}`]}
                     />
                   ))}
                 </Bar>
-                
               </BarChart>
 
               
