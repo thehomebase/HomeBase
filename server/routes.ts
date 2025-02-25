@@ -599,11 +599,44 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Calendar Integration
+  app.post("/api/calendar/events", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const { documentId, date, time, title } = req.body;
+
+      // Create a combined date-time string
+      const combinedDateTime = new Date(`${date}T${time}`);
+
+      // Get the document to verify it exists and belongs to this transaction
+      const document = await storage.getDocument(documentId);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      // Update the document with the deadline
+      await storage.updateDocument(documentId, {
+        deadline: date,
+        deadlineTime: time
+      });
+
+      // The calendar will be automatically updated on next sync since we're using the same data
+      res.status(201).json({ success: true });
+    } catch (error) {
+      console.error('Error creating calendar event:', error);
+      res.status(500).json({ error: 'Failed to create calendar event' });
+    }
+  });
+
   app.get("/api/calendar/:userId/:type", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      const transactions = await storage.getTransactionsByUser(Number(req.params.userId));
+      const [transactions, documents] = await Promise.all([
+        storage.getTransactionsByUser(Number(req.params.userId)),
+        storage.getAllDocumentsByUser(Number(req.params.userId))
+      ]);
+
       const isSubscription = req.params.type === 'subscribe';
 
       const calendar = ical({ 
@@ -611,14 +644,17 @@ export function registerRoutes(app: Express): Server {
         timezone: 'America/Chicago'
       });
 
+      // Add transaction events
       transactions.forEach(transaction => {
+        const address = `${transaction.streetName}, ${transaction.city}, ${transaction.state} ${transaction.zipCode}`;
+
         if (transaction.closingDate) {
           calendar.createEvent({
             start: new Date(transaction.closingDate),
             end: new Date(transaction.closingDate),
-            summary: `Closing - ${transaction.address}`,
-            description: `Closing for property at ${transaction.address}`,
-            location: transaction.address
+            summary: `Closing - ${address}`,
+            description: `Closing for property at ${address}`,
+            location: address
           });
         }
 
@@ -626,25 +662,36 @@ export function registerRoutes(app: Express): Server {
           calendar.createEvent({
             start: new Date(transaction.optionPeriodExpiration),
             end: new Date(transaction.optionPeriodExpiration),
-            summary: `Option Expiration - ${transaction.address}`,
-            description: `Option period expiration for property at ${transaction.address}`,
-            location: transaction.address
+            summary: `Option Expiration - ${address}`,
+            description: `Option period expiration for property at ${address}`,
+            location: address
+          });
+        }
+      });
+
+      // Add document deadlines
+      documents.forEach(doc => {
+        if (doc.deadline && doc.deadlineTime) {
+          const deadlineDate = new Date(`${doc.deadline}T${doc.deadlineTime}`);
+          calendar.createEvent({
+            start: deadlineDate,
+            end: deadlineDate,
+            summary: `Document Due: ${doc.name}`,
+            description: `Deadline for document: ${doc.name}`,
           });
         }
       });
 
       // Set headers based on request type
       if (isSubscription) {
-        // Headers for calendar subscription
         res.set({
           'Content-Type': 'text/calendar; charset=utf-8',
           'Content-Disposition': 'inline; filename=calendar.ics',
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
-          'Refresh': '3600' // Suggest refresh every hour
+          'Refresh': '3600'
         });
       } else {
-        // Headers for calendar download
         res.set({
           'Content-Type': 'text/calendar; charset=utf-8',
           'Content-Disposition': 'attachment; filename=calendar.ics'

@@ -23,11 +23,12 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Plus, Clock, FileText, AlertCircle } from "lucide-react";
+import { Plus, Clock, FileText } from "lucide-react";
 import { Input } from "./ui/input";
 import { format } from "date-fns";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
+import { Label } from "./ui/label";
 import {
   Tooltip,
   TooltipContent,
@@ -44,15 +45,15 @@ const statusColumns = [
 ] as const;
 
 const defaultDocuments = [
-  { id: "iabs", name: "IABS", status: "not_applicable", notes: "", deadline: null },
-  { id: "buyer_rep", name: "Buyer Rep Agreement", status: "not_applicable", notes: "", deadline: null },
-  { id: "listing_agreement", name: "Listing Agreement", status: "not_applicable", notes: "", deadline: null },
-  { id: "seller_disclosure", name: "Seller's Disclosure", status: "not_applicable", notes: "", deadline: null },
-  { id: "property_survey", name: "Property Survey", status: "not_applicable", notes: "", deadline: null },
-  { id: "lead_paint", name: "Lead-Based Paint Disclosure", status: "not_applicable", notes: "", deadline: null },
-  { id: "purchase_agreement", name: "Purchase Agreement", status: "not_applicable", notes: "", deadline: null },
-  { id: "hoa_addendum", name: "HOA Addendum", status: "not_applicable", notes: "", deadline: null },
-  { id: "inspection", name: "Home Inspection Report", status: "not_applicable", notes: "", deadline: null }
+  { id: "iabs", name: "IABS", status: "not_applicable", notes: "", deadline: null, deadlineTime: null },
+  { id: "buyer_rep", name: "Buyer Rep Agreement", status: "not_applicable", notes: "", deadline: null, deadlineTime: null },
+  { id: "listing_agreement", name: "Listing Agreement", status: "not_applicable", notes: "", deadline: null, deadlineTime: null },
+  { id: "seller_disclosure", name: "Seller's Disclosure", status: "not_applicable", notes: "", deadline: null, deadlineTime: null },
+  { id: "property_survey", name: "Property Survey", status: "not_applicable", notes: "", deadline: null, deadlineTime: null },
+  { id: "lead_paint", name: "Lead-Based Paint Disclosure", status: "not_applicable", notes: "", deadline: null, deadlineTime: null },
+  { id: "purchase_agreement", name: "Purchase Agreement", status: "not_applicable", notes: "", deadline: null, deadlineTime: null },
+  { id: "hoa_addendum", name: "HOA Addendum", status: "not_applicable", notes: "", deadline: null, deadlineTime: null },
+  { id: "inspection", name: "Home Inspection Report", status: "not_applicable", notes: "", deadline: null, deadlineTime: null }
 ] as const;
 
 interface Document {
@@ -62,6 +63,7 @@ interface Document {
   transactionId: number;
   notes?: string;
   deadline?: string | null;
+  deadlineTime?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -86,7 +88,7 @@ function DocumentCard({
   document: Document; 
   isDragging?: boolean;
   onUpdateNotes: (id: string, notes: string) => void;
-  onUpdateDeadline: (id: string, deadline: string) => void;
+  onUpdateDeadline: (id: string, deadline: string, time: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: document.id,
@@ -94,6 +96,7 @@ function DocumentCard({
   const [isEditing, setIsEditing] = useState(false);
   const [notes, setNotes] = useState(document.notes || '');
   const [deadline, setDeadline] = useState(document.deadline || '');
+  const [deadlineTime, setDeadlineTime] = useState(document.deadlineTime || '');
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -128,6 +131,7 @@ function DocumentCard({
                 </TooltipTrigger>
                 <TooltipContent>
                   Due: {format(new Date(document.deadline), 'MMM d, yyyy')}
+                  {document.deadlineTime && ` at ${document.deadlineTime}`}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -149,16 +153,32 @@ function DocumentCard({
 
       {isEditing && (
         <div className="mt-3 space-y-2" onClick={e => e.stopPropagation()}>
-          <div>
+          <div className="space-y-2">
+            <Label htmlFor={`date-${document.id}`} className="text-sm">
+              Date Due
+            </Label>
             <Input
+              id={`date-${document.id}`}
               type="date"
               value={deadline}
               onChange={(e) => {
                 setDeadline(e.target.value);
-                onUpdateDeadline(document.id, e.target.value);
+                onUpdateDeadline(document.id, e.target.value, deadlineTime);
               }}
               className="text-sm"
-              placeholder="Set deadline"
+            />
+            <Label htmlFor={`time-${document.id}`} className="text-sm">
+              Time Due
+            </Label>
+            <Input
+              id={`time-${document.id}`}
+              type="time"
+              value={deadlineTime}
+              onChange={(e) => {
+                setDeadlineTime(e.target.value);
+                onUpdateDeadline(document.id, deadline, e.target.value);
+              }}
+              className="text-sm"
             />
           </div>
           <Textarea
@@ -187,7 +207,7 @@ function DroppableColumn({
   documents: Document[];
   title: string;
   onUpdateNotes: (id: string, notes: string) => void;
-  onUpdateDeadline: (id: string, deadline: string) => void;
+  onUpdateDeadline: (id: string, deadline: string, time: string) => void;
 }) {
   const { setNodeRef } = useDroppable({
     id: status,
@@ -264,20 +284,44 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   });
 
   const updateDocumentMutation = useMutation({
-    mutationFn: async ({ id, status, notes, deadline }: { 
+    mutationFn: async ({ 
+      id, 
+      status, 
+      notes, 
+      deadline,
+      deadlineTime 
+    }: { 
       id: string; 
       status?: Document['status']; 
       notes?: string;
       deadline?: string;
+      deadlineTime?: string;
     }) => {
       const response = await apiRequest("PATCH", `/api/documents/${transactionId}/${id}`, { 
         status,
         notes,
-        deadline
+        deadline,
+        deadlineTime
       });
       if (!response.ok) {
         throw new Error("Failed to update document");
       }
+
+      // If we have both deadline and time, add to calendar
+      if (deadline && deadlineTime) {
+        try {
+          await apiRequest("POST", `/api/calendar/events`, {
+            documentId: id,
+            date: deadline,
+            time: deadlineTime,
+            title: `Document Due: ${documents.find(d => d.id === id)?.name}`,
+          });
+        } catch (error) {
+          console.error('Failed to add calendar event:', error);
+          // Don't throw error here as the document update was successful
+        }
+      }
+
       return response.json();
     },
     onSuccess: (updatedDoc) => {
@@ -353,10 +397,11 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     });
   };
 
-  const handleUpdateDeadline = (id: string, deadline: string) => {
+  const handleUpdateDeadline = (id: string, deadline: string, time: string) => {
     updateDocumentMutation.mutate({
       id,
-      deadline
+      deadline,
+      deadlineTime: time
     });
   };
 
