@@ -57,21 +57,17 @@ const CHART_COLORS = {
   }
 };
 
-const COLORS = {
-  light: ['#FB7185', '#4ADE80', '#FDE047', '#38BDF8', '#000000'],
-  dark: ['#FB7185', '#4ADE80', '#FDE047', '#38BDF8', '#FFFFFF']
+const DEAL_STAGES = {
+  'Prospect': 'prospect',
+  'Active Listing': 'activeListing',
+  'Live Listing': 'liveListing',
+  'Mutual Acceptance': 'mutualAcceptance',
+  'Closing in 1 Week': 'closing'
 };
 
-const getChartColor = (index: number, theme: 'light' | 'dark') => {
-  const CHART_COLORS = ['#FB7185', '#4ADE80', '#FDE047', '#38BDF8', '#000000'];
-  if (theme === 'dark') {
-    // Only override specific colors in dark mode
-    switch (index) {
-      case 4: return '#FFFFFF'; // Change black to white in dark mode
-      default: return CHART_COLORS[index];
-    }
-  }
-  return CHART_COLORS[index];
+const getChartColor = (name: string, theme: 'light' | 'dark'): string => {
+  const stageKey = DEAL_STAGES[name as keyof typeof DEAL_STAGES];
+  return `hsl(var(--chart-${stageKey}-${theme}))`;
 };
 
 
@@ -384,7 +380,7 @@ export default function DataPage() {
                   {dealStagesData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
-                      fill={getChartColor(index % CHART_COLORS.length, theme.theme)} 
+                      fill={getChartColor(entry.name, theme.theme)}
                       className="dark:opacity-90"
                     />
                   ))}

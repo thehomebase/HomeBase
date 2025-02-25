@@ -63,11 +63,26 @@ export default {
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         chart: {
-          "1": "hsl(var(--chart-1))",
-          "2": "hsl(var(--chart-2))",
-          "3": "hsl(var(--chart-3))",
-          "4": "hsl(var(--chart-4))",
-          "5": "hsl(var(--chart-5))",
+          prospect: {
+            light: "#FB7185",
+            dark: "#E14D62"
+          },
+          activeListing: {
+            light: "#4ADE80",
+            dark: "#22C55E"
+          },
+          liveListing: {
+            light: "#FDE047",
+            dark: "#FFD700"
+          },
+          mutualAcceptance: {
+            light: "#38BDF8",
+            dark: "#2196F3"
+          },
+          closing: {
+            light: "#A78BFA",
+            dark: "#7C3AED"
+          }
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
