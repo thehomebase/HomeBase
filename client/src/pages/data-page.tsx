@@ -33,29 +33,34 @@ interface StageConfig {
   name: string;
   value: number;
   type: StageType;
-  colorClass: string;
+  lightColor: string;
+  darkColor: string;
 }
 
-// Configure stages with Tailwind classes
+// Configure stages with consistent colors
 const dealStagesData: StageConfig[] = [
-  { name: 'Prospect', value: 4, type: 'prospect', colorClass: 'bg-[#FB7185] dark:bg-[#E14D62]' },
-  { name: 'Active Listing', value: 6, type: 'activeListing', colorClass: 'bg-[#4ADE80] dark:bg-[#22C55E]' },
-  { name: 'Live Listing', value: 3, type: 'liveListing', colorClass: 'bg-[#FDE047] dark:bg-[#FFD700]' },
-  { name: 'Mutual Acceptance', value: 2, type: 'mutualAcceptance', colorClass: 'bg-[#38BDF8] dark:bg-[#2196F3]' },
-  { name: 'Closing in 1 Week', value: 1, type: 'closing', colorClass: 'bg-black dark:bg-white' }
+  { name: 'Prospect', value: 4, type: 'prospect', lightColor: '#FB7185', darkColor: '#E14D62' },
+  { name: 'Active Listing', value: 6, type: 'activeListing', lightColor: '#4ADE80', darkColor: '#22C55E' },
+  { name: 'Live Listing', value: 3, type: 'liveListing', lightColor: '#FDE047', darkColor: '#FFD700' },
+  { name: 'Mutual Acceptance', value: 2, type: 'mutualAcceptance', lightColor: '#38BDF8', darkColor: '#2196F3' },
+  { name: 'Closing in 1 Week', value: 1, type: 'closing', lightColor: '#000000', darkColor: '#FFFFFF' }
 ];
 
 // Custom legend component
 const CustomLegend = () => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
   return (
     <ul className="flex flex-wrap justify-center gap-4 mt-4">
       {dealStagesData.map((stage) => (
         <li key={stage.type} className="flex items-center gap-2">
           <div
-            className={cn(
-              "w-3 h-3 rounded-sm transition-colors duration-200",
-              stage.colorClass
-            )}
+            style={{ 
+              backgroundColor: isDark ? stage.darkColor : stage.lightColor,
+              transition: 'background-color 0.2s'
+            }}
+            className="w-3 h-3 rounded-sm"
           />
           <span className="text-sm text-foreground transition-colors duration-200">
             {stage.name}
@@ -352,10 +357,8 @@ export default function DataPage() {
                   {dealStagesData.map((entry) => (
                     <Cell
                       key={`cell-${entry.type}`}
-                      className={cn(
-                        "transition-colors duration-200",
-                        entry.colorClass.replace(/bg-/g, "fill-")
-                      )}
+                      fill={isDark ? entry.darkColor : entry.lightColor}
+                      className="transition-colors duration-200"
                     />
                   ))}
                 </Pie>
@@ -424,10 +427,8 @@ export default function DataPage() {
                   {dealStagesData.map((entry) => (
                     <Cell
                       key={`cell-${entry.type}`}
-                      className={cn(
-                        "transition-colors duration-200",
-                        entry.colorClass.replace(/bg-/g, "fill-")
-                      )}
+                      fill={isDark ? entry.darkColor : entry.lightColor}
+                      className="transition-colors duration-200"
                     />
                   ))}
                 </Bar>
