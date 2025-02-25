@@ -23,27 +23,36 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Clock, FileText, AlertCircle } from "lucide-react";
 import { Input } from "./ui/input";
+import { format } from "date-fns";
+import { Textarea } from "./ui/textarea";
+import { Badge } from "./ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 
 const statusColumns = [
-  { key: 'not_applicable', label: 'Not Applicable' },
-  { key: 'waiting_signatures', label: 'Waiting Signatures' },
-  { key: 'signed', label: 'Signed' },
-  { key: 'waiting_others', label: 'Waiting Others' },
-  { key: 'complete', label: 'Complete' }
+  { key: 'not_applicable', label: 'Not Applicable', color: 'gray' },
+  { key: 'waiting_signatures', label: 'Waiting Signatures', color: 'orange' },
+  { key: 'signed', label: 'Signed', color: 'blue' },
+  { key: 'waiting_others', label: 'Waiting Others', color: 'yellow' },
+  { key: 'complete', label: 'Complete', color: 'green' }
 ] as const;
 
 const defaultDocuments = [
-  { id: "iabs", name: "IABS", status: "not_applicable" },
-  { id: "buyer_rep", name: "Buyer Rep Agreement", status: "not_applicable" },
-  { id: "listing_agreement", name: "Listing Agreement", status: "not_applicable" },
-  { id: "seller_disclosure", name: "Seller's Disclosure", status: "not_applicable" },
-  { id: "property_survey", name: "Property Survey", status: "not_applicable" },
-  { id: "lead_paint", name: "Lead-Based Paint Disclosure", status: "not_applicable" },
-  { id: "purchase_agreement", name: "Purchase Agreement", status: "not_applicable" },
-  { id: "hoa_addendum", name: "HOA Addendum", status: "not_applicable" },
-  { id: "inspection", name: "Home Inspection Report", status: "not_applicable" }
+  { id: "iabs", name: "IABS", status: "not_applicable", notes: "", deadline: null },
+  { id: "buyer_rep", name: "Buyer Rep Agreement", status: "not_applicable", notes: "", deadline: null },
+  { id: "listing_agreement", name: "Listing Agreement", status: "not_applicable", notes: "", deadline: null },
+  { id: "seller_disclosure", name: "Seller's Disclosure", status: "not_applicable", notes: "", deadline: null },
+  { id: "property_survey", name: "Property Survey", status: "not_applicable", notes: "", deadline: null },
+  { id: "lead_paint", name: "Lead-Based Paint Disclosure", status: "not_applicable", notes: "", deadline: null },
+  { id: "purchase_agreement", name: "Purchase Agreement", status: "not_applicable", notes: "", deadline: null },
+  { id: "hoa_addendum", name: "HOA Addendum", status: "not_applicable", notes: "", deadline: null },
+  { id: "inspection", name: "Home Inspection Report", status: "not_applicable", notes: "", deadline: null }
 ] as const;
 
 interface Document {
@@ -51,12 +60,40 @@ interface Document {
   name: string;
   status: typeof statusColumns[number]['key'];
   transactionId: number;
+  notes?: string;
+  deadline?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-function DocumentCard({ document, isDragging }: { document: Document; isDragging?: boolean }) {
+function getStatusColor(status: Document['status']) {
+  const statusConfig = statusColumns.find(col => col.key === status);
+  return {
+    'not_applicable': 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+    'waiting_signatures': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+    'signed': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    'waiting_others': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+    'complete': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  }[status] || 'bg-gray-100 text-gray-700';
+}
+
+function DocumentCard({ 
+  document, 
+  isDragging,
+  onUpdateNotes,
+  onUpdateDeadline 
+}: { 
+  document: Document; 
+  isDragging?: boolean;
+  onUpdateNotes: (id: string, notes: string) => void;
+  onUpdateDeadline: (id: string, deadline: string) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: document.id,
   });
+  const [isEditing, setIsEditing] = useState(false);
+  const [notes, setNotes] = useState(document.notes || '');
+  const [deadline, setDeadline] = useState(document.deadline || '');
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -64,15 +101,77 @@ function DocumentCard({ document, isDragging }: { document: Document; isDragging
     opacity: isDragging ? 0.5 : undefined,
   };
 
+  const statusColor = getStatusColor(document.status);
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
-      className={`bg-background border rounded-md p-2 cursor-move hover:bg-accent/50 ${isDragging ? 'opacity-50' : ''}`}
+      className={`bg-background border rounded-md p-3 cursor-move hover:bg-accent/50 ${isDragging ? 'opacity-50' : ''} relative`}
+      onClick={() => setIsEditing(!isEditing)}
     >
-      <div className="text-sm">{document.name}</div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          <div className="font-medium text-sm mb-1">{document.name}</div>
+          <Badge variant="secondary" className={`${statusColor} text-xs`}>
+            {statusColumns.find(col => col.key === document.status)?.label}
+          </Badge>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          {document.deadline && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  Due: {format(new Date(document.deadline), 'MMM d, yyyy')}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {document.notes && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  {document.notes}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      </div>
+
+      {isEditing && (
+        <div className="mt-3 space-y-2" onClick={e => e.stopPropagation()}>
+          <div>
+            <Input
+              type="date"
+              value={deadline}
+              onChange={(e) => {
+                setDeadline(e.target.value);
+                onUpdateDeadline(document.id, e.target.value);
+              }}
+              className="text-sm"
+              placeholder="Set deadline"
+            />
+          </div>
+          <Textarea
+            value={notes}
+            onChange={(e) => {
+              setNotes(e.target.value);
+              onUpdateNotes(document.id, e.target.value);
+            }}
+            className="text-sm min-h-[60px]"
+            placeholder="Add notes..."
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -80,19 +179,30 @@ function DocumentCard({ document, isDragging }: { document: Document; isDragging
 function DroppableColumn({ 
   status, 
   documents,
-  title 
+  title,
+  onUpdateNotes,
+  onUpdateDeadline
 }: { 
   status: typeof statusColumns[number]['key'];
   documents: Document[];
   title: string;
+  onUpdateNotes: (id: string, notes: string) => void;
+  onUpdateDeadline: (id: string, deadline: string) => void;
 }) {
   const { setNodeRef } = useDroppable({
     id: status,
   });
 
+  const statusColor = getStatusColor(status);
+
   return (
     <div className="space-y-4">
-      <h3 className="font-medium text-sm">{title}</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="font-medium text-sm">{title}</h3>
+        <Badge variant="secondary" className={`${statusColor} text-xs`}>
+          {documents.length}
+        </Badge>
+      </div>
       <div
         ref={setNodeRef}
         data-status={status}
@@ -100,7 +210,12 @@ function DroppableColumn({
       >
         <SortableContext items={documents.map(d => d.id)} strategy={verticalListSortingStrategy}>
           {documents.map((doc) => (
-            <DocumentCard key={doc.id} document={doc} />
+            <DocumentCard 
+              key={doc.id} 
+              document={doc} 
+              onUpdateNotes={onUpdateNotes}
+              onUpdateDeadline={onUpdateDeadline}
+            />
           ))}
         </SortableContext>
       </div>
@@ -130,7 +245,6 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       const response = await apiRequest("GET", `/api/documents/${transactionId}`);
       if (!response.ok) {
         if (response.status === 404) {
-          // Initialize documents if none exist
           const initResponse = await apiRequest("POST", `/api/documents/${transactionId}/initialize`, {
             documents: defaultDocuments.map(doc => ({
               ...doc,
@@ -150,10 +264,19 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   });
 
   const updateDocumentMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: Document['status'] }) => {
-      const response = await apiRequest("PATCH", `/api/documents/${transactionId}/${id}`, { status });
+    mutationFn: async ({ id, status, notes, deadline }: { 
+      id: string; 
+      status?: Document['status']; 
+      notes?: string;
+      deadline?: string;
+    }) => {
+      const response = await apiRequest("PATCH", `/api/documents/${transactionId}/${id}`, { 
+        status,
+        notes,
+        deadline
+      });
       if (!response.ok) {
-        throw new Error("Failed to update document status");
+        throw new Error("Failed to update document");
       }
       return response.json();
     },
@@ -163,16 +286,15 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       );
       toast({
         title: "Success",
-        description: "Document status updated successfully",
+        description: "Document updated successfully",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update document status",
+        description: "Failed to update document",
         variant: "destructive"
       });
-      // Refetch to ensure UI is in sync
       queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
     }
   });
@@ -224,6 +346,20 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     });
   };
 
+  const handleUpdateNotes = (id: string, notes: string) => {
+    updateDocumentMutation.mutate({
+      id,
+      notes
+    });
+  };
+
+  const handleUpdateDeadline = (id: string, deadline: string) => {
+    updateDocumentMutation.mutate({
+      id,
+      deadline
+    });
+  };
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -262,6 +398,8 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                 status={column.key}
                 title={column.label}
                 documents={documents.filter(doc => doc.status === column.key)}
+                onUpdateNotes={handleUpdateNotes}
+                onUpdateDeadline={handleUpdateDeadline}
               />
             ))}
           </div>
