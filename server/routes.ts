@@ -276,29 +276,16 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      console.log('Creating transaction with body:', req.body);
       const parsed = insertTransactionSchema.safeParse(req.body);
       if (!parsed.success) {
-        console.error('Validation error:', parsed.error);
-        return res.status(400).json(parsed.error);
+        return res.status(400).send(parsed.error.message);
       }
 
-      // Create transaction with the new schema fields
-      const transaction = await storage.createTransaction({
-        ...parsed.data,
-        agentId: req.user.id,
-        status: 'prospect',
-        participants: []
-      });
-
-      console.log('Created transaction:', transaction);
+      const transaction = await storage.createTransaction(parsed.data);
       res.status(201).json(transaction);
     } catch (error) {
       console.error('Error creating transaction:', error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : 'Error creating transaction',
-        details: error instanceof Error ? error.stack : undefined
-      });
+      res.status(500).send('Error creating transaction');
     }
   });
 

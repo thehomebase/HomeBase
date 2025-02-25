@@ -23,10 +23,7 @@ import { Trash2 } from "lucide-react";
 
 interface Transaction {
   id: number;
-  streetName: string;
-  city: string;
-  state: string;
-  zipCode: string;
+  address: string;
   status: string;
   type: 'buy' | 'sell';
   contractPrice: number | null;
@@ -106,7 +103,7 @@ function DraggableCard({
         }}
       >
         <div className="font-medium text-sm truncate pr-8 dark:text-white">
-          {transaction.streetName}
+          {transaction.address}
         </div>
         <div className="text-xs space-y-1.5">
           <div className="flex justify-between items-center">
@@ -283,7 +280,7 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
         {activeId && activeTransaction && activeTransaction.client ? (
           <Card className="p-3 w-[180px] shadow-lg cursor-grabbing dark:bg-gray-700">
             <div className="font-medium text-sm truncate dark:text-white">
-              {activeTransaction.streetName}
+              {activeTransaction.address}
             </div>
             <div className="text-sm text-primary dark:text-primary-foreground">
               {activeTransaction.client.firstName} {activeTransaction.client.lastName}

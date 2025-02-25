@@ -29,10 +29,7 @@ type ClientLookup = (client: Client) => boolean;
 // Update the Transaction interface to include all required fields
 interface Transaction extends Omit<SchemaTransaction, 'updatedAt'> {
   id: number;
-  streetName: string;
-  city: string;
-  state: string;
-  zipCode: string;
+  address: string;
   status: string;
   type: 'buy' | 'sell';
   participants: any[];
@@ -52,10 +49,7 @@ interface Transaction extends Omit<SchemaTransaction, 'updatedAt'> {
 }
 
 const createTransactionSchema = z.object({
-  streetName: z.string().min(1, "Street name is required"),
-  city: z.string().min(1, "City is required"),
-  state: z.string().min(2, "State is required"),
-  zipCode: z.string().min(5, "ZIP code is required"),
+  address: z.string().min(1),
   accessCode: z.string().min(6),
   type: z.enum(['buy', 'sell']),
   clientId: z.number().nullable(),
@@ -88,10 +82,7 @@ export default function TransactionsPage() {
   const form = useForm({
     resolver: zodResolver(createTransactionSchema),
     defaultValues: {
-      streetName: "",
-      city: "",
-      state: "",
-      zipCode: "",
+      address: "",
       accessCode: "",
       type: "buy" as const,
       clientId: null as number | null,
@@ -130,14 +121,6 @@ export default function TransactionsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       refetch();
-      form.reset();
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to create transaction",
-        variant: "destructive",
-      });
     },
   });
 
@@ -262,12 +245,12 @@ export default function TransactionsPage() {
                 <form onSubmit={form.handleSubmit((data) => createTransactionMutation.mutate(data))} className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="streetName"
+                    name="address"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Street Name</FormLabel>
+                        <FormLabel>Property Address</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Enter street name" />
+                          <Input {...field} placeholder="Enter property address" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -275,38 +258,35 @@ export default function TransactionsPage() {
                   />
                   <FormField
                     control={form.control}
-                    name="city"
+                    name="type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>City</FormLabel>
+                        <FormLabel>Transaction Type</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Enter city" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="state"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>State</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Enter state" maxLength={2} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="zipCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>ZIP Code</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Enter ZIP code" maxLength={5} />
+                          <div className="grid grid-cols-2 gap-4">
+                            <Button
+                              type="button"
+                              variant={field.value === 'buy' ? 'default' : 'outline'}
+                              className={cn(
+                                field.value === 'buy' && "bg-green-500 hover:bg-green-600",
+                                "dark:text-white"
+                              )}
+                              onClick={() => field.onChange('buy')}
+                            >
+                              Buy
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={field.value === 'sell' ? 'default' : 'outline'}
+                              className={cn(
+                                field.value === 'sell' && "bg-red-500 hover:bg-red-600",
+                                "dark:text-white"
+                              )}
+                              onClick={() => field.onChange('sell')}
+                            >
+                              Sell
+                            </Button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -415,7 +395,7 @@ export default function TransactionsPage() {
                     className="text-lg hover:underline dark:text-white truncate"
                     onClick={() => setLocation(`/transactions/${transaction.id}`)}
                   >
-                    {transaction.streetName}
+                    {transaction.address}
                   </CardTitle>
                   {user?.role === "agent" && (
                     <Button

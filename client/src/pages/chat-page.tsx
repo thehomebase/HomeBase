@@ -65,7 +65,7 @@ export default function ChatPage() {
           <h1 className="text-2xl font-bold">Transaction Chat</h1>
           {transaction && (
             <p className="text-muted-foreground">
-              {transaction.streetName}, {transaction.city}, {transaction.state} {transaction.zipCode}
+              {transaction.address}
             </p>
           )}
         </div>
