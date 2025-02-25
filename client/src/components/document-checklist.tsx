@@ -160,8 +160,8 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   }
 
   // Calculate progress
-  const completedDocs = documents.filter(doc => doc.status === 'complete').length;
-  const progress = documents.length > 0 ? Math.round((completedDocs / documents.length) * 100) : 0;
+  const completedDocs = documents?.filter(doc => doc.status === 'complete')?.length ?? 0;
+  const progress = documents?.length > 0 ? Math.round((completedDocs / documents.length) * 100) : 0;
 
   return (
     <Card>
