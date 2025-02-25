@@ -201,7 +201,7 @@ export default function DataPage() {
     <main className="container mx-auto px-4 py-8">
       <div className="flex flex-col gap-4 mb-8">
         <h2 className="text-2xl font-bold">Sales Data Analysis</h2>
-        <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
+        <div className="flex flex-col sm:flex-row gap-2 flex-wrap w-screen w-full">
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-[180px] justify-start text-left font-normal">
@@ -279,7 +279,7 @@ export default function DataPage() {
                   dataKey="month"
                   angle={-45}
                   textAnchor="end"
-                  height={40}
+                  height={60}
                   stroke="currentColor"
                   tick={{ fill: "currentColor" }}
                 />
