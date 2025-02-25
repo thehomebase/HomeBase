@@ -57,9 +57,17 @@ const CHART_COLORS = {
   }
 };
 
-const COLORS = {
-  light: ['#FB7185', '#4ADE80', '#FDE047', '#38BDF8', '#000000'],
-  dark: ['#22C55E', '#E14D62', '#FFD700', '#2196F3', '#FFFFFF'],
+const CHART_COLORS = ['#FB7185', '#4ADE80', '#FDE047', '#38BDF8', '#000000'];
+
+const getChartColor = (index: number, theme: 'light' | 'dark') => {
+  if (theme === 'dark') {
+    // Only override specific colors in dark mode
+    switch (index) {
+      case 4: return '#FFFFFF'; // Change black to white in dark mode
+      default: return CHART_COLORS[index];
+    }
+  }
+  return CHART_COLORS[index];
 };
 
 
@@ -372,7 +380,7 @@ export default function DataPage() {
                   {dealStagesData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
-                      fill={COLORS[theme.theme][index % COLORS[theme.theme].length]} 
+                      fill={getChartColor(index % CHART_COLORS.length, theme.theme)} 
                       className="dark:opacity-90"
                     />
                   ))}
