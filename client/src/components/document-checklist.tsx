@@ -45,7 +45,6 @@ const defaultDocuments = [
   { id: "tax_certificate", name: "Tax Certificate", status: "not_applicable" },
   { id: "addendums", name: "Additional Addendums", status: "not_applicable" }
 ] as const;
-] as const;
 
 interface Document {
   id: string;
