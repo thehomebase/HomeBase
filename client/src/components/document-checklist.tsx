@@ -171,10 +171,12 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   function handleDragEnd(event: any) {
     const { active, over } = event;
 
-    if (!over?.id || !active?.id) return;
+    if (!over || !active) return;
 
-    const status = over.id as Document['status'];
-    if (status) {
+    // Extract the status from the column's id
+    const status = over.id.replace('column-', '') as Document['status'];
+    
+    if (status && active.id) {
       updateDocumentMutation.mutate({
         id: active.id,
         status: status
@@ -230,7 +232,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
               <div key={column.key} className="space-y-4">
                 <h3 className="font-medium text-sm">{column.label}</h3>
                 <div
-                  id={`column-${column.key}`}
+                  id={column.key}
                   className="space-y-2 min-h-[100px] p-2 rounded-md bg-muted/50"
                 >
                   <SortableContext items={documents.filter(doc => doc.status === column.key).map(d => d.id)}>
