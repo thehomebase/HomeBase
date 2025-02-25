@@ -237,56 +237,58 @@ export class DatabaseStorage implements IStorage {
     try {
       const result = await db.execute(sql`
         INSERT INTO transactions (
-          address,
+          street_name,
+          city,
+          state,
+          zip_code,
           access_code,
           status,
+          type,
           agent_id,
           client_id,
-          participants,
-          contract_price,
-          option_period,
-          option_fee,
-          earnest_money,
-          down_payment,
-          seller_concessions,
-          closing_date,
-          type
+          participants
         ) VALUES (
-          ${insertTransaction.address},
+          ${insertTransaction.streetName},
+          ${insertTransaction.city},
+          ${insertTransaction.state},
+          ${insertTransaction.zipCode},
           ${insertTransaction.accessCode},
-          ${insertTransaction.status},
+          ${insertTransaction.status || 'prospect'},
+          ${insertTransaction.type || 'buy'},
           ${insertTransaction.agentId},
           ${insertTransaction.clientId || null},
-          ${JSON.stringify(insertTransaction.participants)}::jsonb,
-          ${insertTransaction.contractPrice || null},
-          ${insertTransaction.optionPeriod || null},
-          ${insertTransaction.optionFee || null},
-          ${insertTransaction.earnestMoney || null},
-          ${insertTransaction.downPayment || null},
-          ${insertTransaction.sellerConcessions || null},
-          ${insertTransaction.closingDate || null},
-          ${insertTransaction.type}
+          ${JSON.stringify(insertTransaction.participants || [])}::jsonb
         )
         RETURNING *
       `);
 
+      if (!result.rows[0]) {
+        throw new Error('Failed to create transaction');
+      }
+
       const row = result.rows[0];
       return {
         id: Number(row.id),
-        address: String(row.address),
+        streetName: String(row.street_name),
+        city: String(row.city),
+        state: String(row.state),
+        zipCode: String(row.zip_code),
         accessCode: String(row.access_code),
         status: String(row.status),
+        type: String(row.type),
         agentId: Number(row.agent_id),
         clientId: row.client_id ? Number(row.client_id) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
         contractPrice: row.contract_price ? Number(row.contract_price) : null,
-        optionPeriod: row.option_period ? Number(row.option_period) : null,
+        optionPeriodExpiration: row.option_period_expiration ? new Date(row.option_period_expiration) : null,
         optionFee: row.option_fee ? Number(row.option_fee) : null,
         earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
         downPayment: row.down_payment ? Number(row.down_payment) : null,
         sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
-        closingDate: row.closing_date ? String(row.closing_date) : null,
-        type: row.type
+        closingDate: row.closing_date ? new Date(row.closing_date) : null,
+        contractExecutionDate: row.contract_execution_date ? new Date(row.contract_execution_date) : null,
+        mlsNumber: row.mls_number || null,
+        financing: row.financing || null
       };
     } catch (error) {
       console.error('Error in createTransaction:', error);
@@ -1064,12 +1066,14 @@ export class DatabaseStorage implements IStorage {
       // Create a sanitized version of the data
       const sanitizedData = { ...data };
       
+
       // Special handling for labels array
       if ('labels' in sanitizedData) {
         const labelsArray = Array.isArray(sanitizedData.labels) 
           ? sanitizedData.labels.filter(label => typeof label === 'string' && label.trim().length > 0)
           : [];
         
+
         await db.execute(sql`
           UPDATE clients 
           SET labels = array[${sql.join(labelsArray, sql`, `)}]::text[]
@@ -1084,6 +1088,7 @@ export class DatabaseStorage implements IStorage {
         if (value !== undefined && key !== 'updatedAt') {
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
           
+
           if (value === null) {
             updateParts.push(sql`${sql.identifier([snakeKey])} = NULL`);
           } else {
