@@ -107,12 +107,80 @@ export default function TransactionPage() {
               </p>
             </div>
             <div>
+              <p className="text-sm font-medium text-muted-foreground">Contract Date</p>
+              <p className="text-lg">
+                {transaction.contractExecutionDate
+                  ? new Date(transaction.contractExecutionDate).toLocaleDateString()
+                  : 'Not set'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Option Period Expiration</p>
+              <p className="text-lg">
+                {transaction.optionPeriodExpiration
+                  ? new Date(transaction.optionPeriodExpiration).toLocaleDateString()
+                  : 'Not set'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Option Fee</p>
+              <p className="text-lg">
+                {transaction.optionFee
+                  ? new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                    }).format(transaction.optionFee)
+                  : 'Not set'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Earnest Money</p>
+              <p className="text-lg">
+                {transaction.earnestMoney
+                  ? new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                    }).format(transaction.earnestMoney)
+                  : 'Not set'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Down Payment</p>
+              <p className="text-lg">
+                {transaction.downPayment
+                  ? new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                    }).format(transaction.downPayment)
+                  : 'Not set'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Seller Concessions</p>
+              <p className="text-lg">
+                {transaction.sellerConcessions
+                  ? new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                    }).format(transaction.sellerConcessions)
+                  : 'Not set'}
+              </p>
+            </div>
+            <div>
               <p className="text-sm font-medium text-muted-foreground">Closing Date</p>
               <p className="text-lg">
                 {transaction.closingDate
                   ? new Date(transaction.closingDate).toLocaleDateString()
                   : 'Not set'}
               </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">MLS Number</p>
+              <p className="text-lg">{transaction.mlsNumber || 'Not set'}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Financing</p>
+              <p className="text-lg capitalize">{transaction.financing || 'Not set'}</p>
             </div>
           </div>
         </CardContent>
