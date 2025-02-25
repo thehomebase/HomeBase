@@ -25,7 +25,10 @@ import { CSS } from "@dnd-kit/utilities";
 
 interface Transaction {
   id: number;
-  address: string;
+  streetName: string;
+  city: string;
+  state: string;
+  zipCode: string;
   status: string;
   type: 'buy' | 'sell';
   clientId: number | null;
@@ -47,8 +50,8 @@ interface Column {
   isCustom?: boolean;
 }
 
-function SortableHeader({ column, onEdit, onDelete }: { 
-  column: Column; 
+function SortableHeader({ column, onEdit, onDelete }: {
+  column: Column;
   onEdit: (column: Column) => void;
   onDelete: (columnId: string) => void;
 }) {
@@ -114,7 +117,10 @@ export function TransactionTable({
   onTransactionClick: (id: number) => void;
 }) {
   const [columns, setColumns] = useState<Column[]>([
-    { id: 'title', title: 'Title', visible: true },
+    { id: 'streetName', title: 'Street Name', visible: true },
+    { id: 'city', title: 'City', visible: true },
+    { id: 'state', title: 'State', visible: true },
+    { id: 'zipCode', title: 'ZIP Code', visible: true },
     { id: 'closed_sales_price', title: 'Closed Sales Price', visible: true },
     { id: 'commission', title: 'Commission (%)', visible: true },
     { id: 'commission_usd', title: 'Commission ($USD)', visible: true },
@@ -151,7 +157,7 @@ export function TransactionTable({
   };
 
   const toggleColumn = (columnId: string) => {
-    setColumns(columns.map(col => 
+    setColumns(columns.map(col =>
       col.id === columnId ? { ...col, visible: !col.visible } : col
     ));
   };
@@ -215,7 +221,10 @@ export function TransactionTable({
   };
 
   const filteredTransactions = transactions.filter(transaction =>
-    transaction.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (transaction.streetName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (transaction.city?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (transaction.state?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (transaction.zipCode?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
     (transaction.client &&
       `${transaction.client.firstName} ${transaction.client.lastName}`
         .toLowerCase()
@@ -224,8 +233,14 @@ export function TransactionTable({
 
   const getColumnValue = (transaction: Transaction, columnId: string) => {
     switch (columnId) {
-      case 'title':
-        return transaction.address;
+      case 'streetName':
+        return transaction.streetName;
+      case 'city':
+        return transaction.city;
+      case 'state':
+        return transaction.state;
+      case 'zipCode':
+        return transaction.zipCode;
       case 'closed_sales_price':
         return formatValue(transaction.contractPrice, 'currency');
       case 'commission':
@@ -251,7 +266,7 @@ export function TransactionTable({
         return transaction.dealDuration ? `${transaction.dealDuration} days` : '-';
       default:
         if (columnId.startsWith('custom_')) {
-          return '-'; // Custom columns can be extended to store/display custom values
+          return '-';
         }
         return '-';
     }
@@ -345,8 +360,8 @@ export function TransactionTable({
                   {columns
                     .filter(column => column.visible)
                     .map((column) => (
-                      <SortableHeader 
-                        key={column.id} 
+                      <SortableHeader
+                        key={column.id}
                         column={column}
                         onEdit={editColumn}
                         onDelete={deleteColumn}

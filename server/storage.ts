@@ -235,59 +235,67 @@ export class DatabaseStorage implements IStorage {
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     try {
+      console.log('Creating transaction with data:', insertTransaction);
       const result = await db.execute(sql`
         INSERT INTO transactions (
-          address,
+          street_name,
+          city,
+          state,
+          zip_code,
           access_code,
           status,
+          type,
           agent_id,
           client_id,
-          participants,
-          contract_price,
-          option_period,
-          option_fee,
-          earnest_money,
-          down_payment,
-          seller_concessions,
-          closing_date,
-          type
+          participants
         ) VALUES (
-          ${insertTransaction.address},
+          ${insertTransaction.streetName},
+          ${insertTransaction.city},
+          ${insertTransaction.state},
+          ${insertTransaction.zipCode},
           ${insertTransaction.accessCode},
-          ${insertTransaction.status},
+          ${insertTransaction.status || 'prospect'},
+          ${insertTransaction.type || 'buy'},
           ${insertTransaction.agentId},
           ${insertTransaction.clientId || null},
-          ${JSON.stringify(insertTransaction.participants)}::jsonb,
-          ${insertTransaction.contractPrice || null},
-          ${insertTransaction.optionPeriod || null},
-          ${insertTransaction.optionFee || null},
-          ${insertTransaction.earnestMoney || null},
-          ${insertTransaction.downPayment || null},
-          ${insertTransaction.sellerConcessions || null},
-          ${insertTransaction.closingDate || null},
-          ${insertTransaction.type}
+          ${JSON.stringify(insertTransaction.participants || [])}::jsonb
         )
         RETURNING *
       `);
 
+      console.log('Database result:', result.rows[0]);
+
+      if (!result.rows[0]) {
+        throw new Error('Failed to create transaction');
+      }
+
       const row = result.rows[0];
-      return {
+      const transaction = {
         id: Number(row.id),
-        address: String(row.address),
+        streetName: String(row.street_name),
+        city: String(row.city),
+        state: String(row.state),
+        zipCode: String(row.zip_code),
         accessCode: String(row.access_code),
         status: String(row.status),
+        type: String(row.type),
         agentId: Number(row.agent_id),
         clientId: row.client_id ? Number(row.client_id) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
         contractPrice: row.contract_price ? Number(row.contract_price) : null,
-        optionPeriod: row.option_period ? Number(row.option_period) : null,
+        optionPeriodExpiration: row.option_period_expiration ? new Date(row.option_period_expiration) : null,
         optionFee: row.option_fee ? Number(row.option_fee) : null,
         earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
         downPayment: row.down_payment ? Number(row.down_payment) : null,
         sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
-        closingDate: row.closing_date ? String(row.closing_date) : null,
-        type: row.type
+        closingDate: row.closing_date ? new Date(row.closing_date) : null,
+        contractExecutionDate: row.contract_execution_date ? new Date(row.contract_execution_date) : null,
+        mlsNumber: row.mls_number || null,
+        financing: row.financing || null
       };
+
+      console.log('Returning transaction:', transaction);
+      return transaction;
     } catch (error) {
       console.error('Error in createTransaction:', error);
       throw error;
@@ -305,7 +313,10 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(sql`
         SELECT 
           id,
-          address,
+          street_name as "streetName",
+          city,
+          state,
+          zip_code as "zipCode",
           access_code as "accessCode",
           status,
           type,
@@ -321,7 +332,8 @@ export class DatabaseStorage implements IStorage {
           closing_date as "closingDate",
           contract_execution_date as "contractExecutionDate",
           mls_number as "mlsNumber",
-          financing
+          financing,
+          updated_at as "updatedAt"
         FROM transactions 
         WHERE id = ${id}
       `);
@@ -336,7 +348,10 @@ export class DatabaseStorage implements IStorage {
       const row = result.rows[0];
       const transaction: Transaction = {
         id: Number(row.id),
-        address: String(row.address),
+        streetName: String(row.streetName),
+        city: String(row.city),
+        state: String(row.state),
+        zipCode: String(row.zipCode),
         accessCode: String(row.accessCode),
         status: String(row.status),
         type: String(row.type),
@@ -344,15 +359,16 @@ export class DatabaseStorage implements IStorage {
         clientId: row.clientId ? Number(row.clientId) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
         contractPrice: row.contractPrice ? Number(row.contractPrice) : null,
-        optionPeriodExpiration: row.optionPeriodExpiration ? new Date(row.optionPeriodExpiration).toISOString() : null,
+        optionPeriodExpiration: row.optionPeriodExpiration ? new Date(row.optionPeriodExpiration) : null,
         optionFee: row.optionFee ? Number(row.optionFee) : null,
         earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
         downPayment: row.downPayment ? Number(row.downPayment) : null,
         sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
-        closingDate: row.closingDate ? new Date(row.closingDate).toISOString() : null,
-        contractExecutionDate: row.contractExecutionDate ? new Date(row.contractExecutionDate).toISOString() : null,
+        closingDate: row.closingDate ? new Date(row.closingDate) : null,
+        contractExecutionDate: row.contractExecutionDate ? new Date(row.contractExecutionDate) : null,
         mlsNumber: row.mlsNumber || null,
-        financing: row.financing || null
+        financing: row.financing || null,
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
       };
 
       console.log('Processed transaction:', transaction);
@@ -369,54 +385,65 @@ export class DatabaseStorage implements IStorage {
 
   async getTransactionsByUser(userId: number): Promise<Transaction[]> {
     try {
+      console.log('Fetching transactions for user:', userId);
       const result = await db.execute(sql`
         SELECT 
           t.id::integer,
-          t.address::text,
+          t.street_name::text as "streetName",
+          t.city::text,
+          t.state::text,
+          t.zip_code::text as "zipCode",
           t.access_code::text as "accessCode",
           t.status::text,
+          t.type::text,
           t.agent_id::integer as "agentId",
           COALESCE(t.client_id, null)::integer as "clientId",
           t.participants::jsonb,
           t.contract_price::numeric as "contractPrice",
-          t.option_period_expiration as "optionPeriodExpiration",
+          t.option_period_expiration::timestamptz as "optionPeriodExpiration",
           t.option_fee::numeric as "optionFee",
           t.earnest_money::numeric as "earnestMoney",
           t.down_payment::numeric as "downPayment",
           t.seller_concessions::numeric as "sellerConcessions",
-          t.closing_date::text as "closingDate",
-          t.type::text as "type",
-          t.contract_execution_date as "contractExecutionDate",
+          t.closing_date::timestamptz as "closingDate",
+          t.contract_execution_date::timestamptz as "contractExecutionDate",
           t.mls_number as "mlsNumber",
-          t.financing
+          t.financing,
+          t.updated_at::timestamptz as "updatedAt"
         FROM transactions t
         WHERE t.agent_id = ${userId}
         ORDER BY t.id DESC
       `);
 
+      console.log('Found transactions:', result.rows);
+
       return result.rows.map(row => ({
         id: Number(row.id),
-        address: String(row.address),
+        streetName: String(row.streetName),
+        city: String(row.city),
+        state: String(row.state),
+        zipCode: String(row.zipCode),
         accessCode: String(row.accessCode),
         status: String(row.status),
+        type: String(row.type),
         agentId: Number(row.agentId),
         clientId: row.clientId ? Number(row.clientId) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
         contractPrice: row.contractPrice ? Number(row.contractPrice) : null,
-        optionPeriodExpiration: row.optionPeriodExpiration ? new Date(row.optionPeriodExpiration).toISOString() : null,
+        optionPeriodExpiration: row.optionPeriodExpiration ? new Date(row.optionPeriodExpiration) : null,
         optionFee: row.optionFee ? Number(row.optionFee) : null,
         earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
         downPayment: row.downPayment ? Number(row.downPayment) : null,
         sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
-        closingDate: row.closingDate ? new Date(row.closingDate).toISOString() : null,
-        type: row.type,
-        contractExecutionDate: row.contractExecutionDate ? new Date(row.contractExecutionDate).toISOString() : null,
+        closingDate: row.closingDate ? new Date(row.closingDate) : null,
+        contractExecutionDate: row.contractExecutionDate ? new Date(row.contractExecutionDate) : null,
         mlsNumber: row.mlsNumber || null,
-        financing: row.financing || null
+        financing: row.financing || null,
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
       }));
     } catch (error) {
       console.error('Error in getTransactionsByUser:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -792,7 +819,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error('Transaction not found');
       }
 
-      const result = await db.execute(sql`
+            const result = await db.execute(sql`
         INSERT INTO contacts (
           role,
           first_name,
@@ -834,7 +861,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateContact(id: number, data: Partial<Contact>): Promise<Contact> {
     try {
-            const result = awaitdb.execute(sql`
+            const result = await db.execute(sql`
         UPDATE contacts 
         SET 
           role = COALESCE(${data.role}, role),
@@ -1064,12 +1091,14 @@ export class DatabaseStorage implements IStorage {
       // Create a sanitized version of the data
       const sanitizedData = { ...data };
       
+
       // Special handling for labels array
       if ('labels' in sanitizedData) {
         const labelsArray = Array.isArray(sanitizedData.labels) 
           ? sanitizedData.labels.filter(label => typeof label === 'string' && label.trim().length > 0)
           : [];
         
+
         await db.execute(sql`
           UPDATE clients 
           SET labels = array[${sql.join(labelsArray, sql`, `)}]::text[]
@@ -1084,6 +1113,7 @@ export class DatabaseStorage implements IStorage {
         if (value !== undefined && key !== 'updatedAt') {
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
           
+
           if (value === null) {
             updateParts.push(sql`${sql.identifier([snakeKey])} = NULL`);
           } else {
@@ -1311,17 +1341,6 @@ export class DatabaseStorage implements IStorage {
       `);
     } catch (error) {
       console.error('Error in deleteDocument:', error);
-      throw error;
-    }
-  }
-  async deleteTransaction(id: number): Promise<void> {
-    try {
-      await db.execute(sql`
-        DELETE FROM transactions 
-        WHERE id = ${id}
-      `);
-    } catch (error) {
-      console.error('Error in deleteTransaction:', error);
       throw error;
     }
   }
