@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -24,6 +24,7 @@ import {
 import { format, parse, startOfYear, eachMonthOfInterval, endOfYear, getYear } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "@/hooks/use-theme";
+import { cn } from "@/lib/utils";
 
 interface MonthlyData {
   month: string;
@@ -32,14 +33,19 @@ interface MonthlyData {
   transactionCount: number;
 }
 
-// Define deal stages data
-const dealStagesData = [
-  { name: 'Prospect', value: 4 },
-  { name: 'Active Listing', value: 6 },
-  { name: 'Live Listing', value: 3 },
-  { name: 'Mutual Acceptance', value: 2 },
-  { name: 'Closing in 1 Week', value: 1 }
-];
+// Define deal stages with consistent keys and colors
+const dealStagesConfig = {
+  prospect: { name: 'Prospect', value: 4, lightColor: '#FB7185', darkColor: '#E14D62' },
+  activeListing: { name: 'Active Listing', value: 6, lightColor: '#4ADE80', darkColor: '#22C55E' },
+  liveListing: { name: 'Live Listing', value: 3, lightColor: '#FDE047', darkColor: '#FFD700' },
+  mutualAcceptance: { name: 'Mutual Acceptance', value: 2, lightColor: '#38BDF8', darkColor: '#2196F3' },
+  closing: { name: 'Closing in 1 Week', value: 1, lightColor: '#000000', darkColor: '#FFFFFF' }
+};
+
+const dealStagesData = Object.entries(dealStagesConfig).map(([key, config]) => ({
+  ...config,
+  key
+}));
 
 // Define activity data
 const activityData = [
@@ -55,22 +61,19 @@ export default function DataPage() {
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
+  // Get color based on theme and stage configuration
+  const getStageColor = (stageKey: string): string => {
+    const config = dealStagesConfig[stageKey as keyof typeof dealStagesConfig];
+    return isDark ? config.darkColor : config.lightColor;
+  };
 
   // Query transactions data
   const { data: transactions = [], isLoading, error } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     enabled: !!user && user.role === "agent",
   });
-
-  // Theme-based chart colors
-  const isDark = theme === 'dark';
-  const chartColors = [
-    isDark ? '#E14D62' : '#FB7185', // Prospect (red)
-    isDark ? '#22C55E' : '#4ADE80', // Active Listing (green)
-    isDark ? '#FFD700' : '#FDE047', // Live Listing (yellow)
-    isDark ? '#2196F3' : '#38BDF8', // Mutual Acceptance (blue)
-    isDark ? '#FFFFFF' : '#000000'  // Closing in 1 Week (white/black)
-  ];
 
   const currentYear = new Date().getFullYear();
   const yearStart = startOfYear(new Date(currentYear, 0));
@@ -346,16 +349,28 @@ export default function DataPage() {
                   cy="50%"
                   labelLine={!isMobile}
                 >
-                  {dealStagesData.map((entry, index) => (
+                  {dealStagesData.map((entry) => (
                     <Cell
-                      key={`cell-${entry.name}`}
-                      fill={chartColors[index]}
+                      key={`cell-${entry.key}`}
+                      fill={getStageColor(entry.key)}
+                      className={cn(
+                        "dark:text-white",
+                        entry.key === "closing" && isDark && "!fill-white"
+                      )}
                     />
                   ))}
                 </Pie>
                 <Legend
                   layout="horizontal"
                   verticalAlign="bottom"
+                  formatter={(value) => value}
+                />
+                <RechartsTooltip
+                  contentStyle={{
+                    backgroundColor: 'var(--background)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--foreground)'
+                  }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -411,10 +426,14 @@ export default function DataPage() {
                   }}
                 />
                 <Bar dataKey="value">
-                  {dealStagesData.map((entry, index) => (
+                  {dealStagesData.map((entry) => (
                     <Cell
-                      key={`cell-${entry.name}`}
-                      fill={chartColors[index]}
+                      key={`cell-${entry.key}`}
+                      fill={getStageColor(entry.key)}
+                      className={cn(
+                        "dark:text-white",
+                        entry.key === "closing" && isDark && "!fill-white"
+                      )}
                     />
                   ))}
                 </Bar>
