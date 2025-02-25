@@ -1,14 +1,12 @@
 import { 
-  users, transactions, checklists, messages, clients,
-  type User, type Transaction, type Checklist, type Message, type Client,
+  users, transactions, checklists, messages, clients, documents,
+  type User, type Transaction, type Checklist, type Message, type Client, type Document,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient 
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
 import session from 'express-session';
 import MemoryStore from 'memorystore';
-
-const MemoryStoreSession = MemoryStore(session);
 
 // Define ChecklistItem type to match the frontend
 interface ChecklistItem {
@@ -61,6 +59,8 @@ export interface IStorage {
   updateDocument(id: string, data: Partial<Document>): Promise<Document>;
   deleteDocument(id: string): Promise<void>;
 }
+
+const MemoryStoreSession = MemoryStore(session);
 
 export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
@@ -1025,7 +1025,7 @@ export class DatabaseStorage implements IStorage {
     try {
       // Validate the status is one of the allowed values
       const validStatuses = ['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'] as const;
-      if (!validStatuses.includes(data.status as any)) {
+      if (!validStatuses.includes(data.status)) {
         throw new Error('Invalid document status');
       }
 
@@ -1098,7 +1098,9 @@ export class DatabaseStorage implements IStorage {
         id: doc.id,
         name: doc.name,
         status: doc.status as Document['status'],
-        transactionId: Number(doc.transaction_id)
+        transactionId: Number(doc.transaction_id),
+        createdAt: new Date(doc.createdAt),
+        updatedAt: new Date(doc.updatedAt)
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
@@ -1108,15 +1110,21 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDocument(id: string): Promise<void> {
     try {
-      await db.execute(sql`
+      const result = await db.execute(sql`
         DELETE FROM documents 
         WHERE id = ${id}
+        RETURNING id
       `);
+
+      if (!result.rows[0]) {
+        throw new Error('Document not found');
+      }
     } catch (error) {
       console.error('Error in deleteDocument:', error);
       throw error;
     }
   }
+
   async deleteTransaction(id: number): Promise<void> {
     try {
       await db.execute(sql`
@@ -1352,7 +1360,7 @@ export class DatabaseStorage implements IStorage {
     try {
       // Validate the status is one of the allowed values
       const validStatuses = ['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'] as const;
-      if (!validStatuses.includes(data.status as any)) {
+      if (!validStatuses.includes(data.status)) {
         throw new Error('Invalid document status');
       }
 
@@ -1425,7 +1433,9 @@ export class DatabaseStorage implements IStorage {
         id: doc.id,
         name: doc.name,
         status: doc.status as Document['status'],
-        transactionId: Number(doc.transaction_id)
+        transactionId: Number(doc.transaction_id),
+        createdAt: new Date(doc.createdAt),
+        updatedAt: new Date(doc.updatedAt)
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
