@@ -26,6 +26,7 @@ interface Document {
   deadlineTime: string | null;
   createdAt: Date;
   updatedAt: Date;
+  notes: string | null;
 }
 
 export interface IStorage {
@@ -1076,46 +1077,21 @@ export class DatabaseStorage implements IStorage {
 
   async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
-      // Create SET clause for SQL update
-      const setColumns = [];
-      const values: any[] = [];
-      let paramCount = 1;
-
-      if (data.status !== undefined) {
-        setColumns.push(`status = $${paramCount}`);
-        values.push(data.status);
-        paramCount++;
-      }
-
-      if (data.notes !== undefined) {
-        setColumns.push(`notes = $${paramCount}`);
-        values.push(data.notes);
-        paramCount++;
-      }
-
-      if (data.deadline !== undefined) {
-        setColumns.push(`deadline = $${paramCount}`);
-        values.push(data.deadline || null);
-        paramCount++;
-      }
-
-      if (data.deadlineTime !== undefined) {
-        setColumns.push(`deadline_time = $${paramCount}`);
-        values.push(data.deadlineTime || null);
-        paramCount++;
-      }
-
-      setColumns.push(`updated_at = CURRENT_TIMESTAMP`);
-
       const result = await db.execute(sql`
         UPDATE documents
-        SET ${sql.join(setColumns.map(col => sql.raw(col)), sql`, `)}
+        SET
+          status = COALESCE(${data.status}, status),
+          notes = COALESCE(${data.notes}, notes),
+          deadline = COALESCE(${data.deadline}, deadline),
+          deadline_time = COALESCE(${data.deadlineTime}, deadline_time),
+          updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
           id,
           name,
           status,
           transaction_id as "transactionId",
+          notes,
           deadline,
           deadline_time as "deadlineTime",
           created_at as "createdAt",
@@ -1132,6 +1108,7 @@ export class DatabaseStorage implements IStorage {
         name: String(row.name),
         status: row.status as Document['status'],
         transactionId: Number(row.transactionId),
+        notes: row.notes,
         deadline: row.deadline,
         deadlineTime: row.deadlineTime,
         createdAt: new Date(row.createdAt),
@@ -1438,46 +1415,21 @@ export class DatabaseStorage implements IStorage {
 
   async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
-      // Create SET clause for SQL update
-      const setColumns = [];
-      const values: any[] = [];
-      let paramCount = 1;
-
-      if (data.status !== undefined) {
-        setColumns.push(`status = $${paramCount}`);
-        values.push(data.status);
-        paramCount++;
-      }
-
-      if (data.notes !== undefined) {
-        setColumns.push(`notes = $${paramCount}`);
-        values.push(data.notes);
-        paramCount++;
-      }
-
-      if (data.deadline !== undefined) {
-        setColumns.push(`deadline = $${paramCount}`);
-        values.push(data.deadline || null);
-        paramCount++;
-      }
-
-      if (data.deadlineTime !== undefined) {
-        setColumns.push(`deadline_time = $${paramCount}`);
-        values.push(data.deadlineTime || null);
-        paramCount++;
-      }
-
-      setColumns.push(`updated_at = CURRENT_TIMESTAMP`);
-
       const result = await db.execute(sql`
         UPDATE documents
-        SET ${sql.join(setColumns.map(col => sql.raw(col)), sql`, `)}
+        SET
+          status = COALESCE(${data.status}, status),
+          notes = COALESCE(${data.notes}, notes),
+          deadline = COALESCE(${data.deadline}, deadline),
+          deadline_time = COALESCE(${data.deadlineTime}, deadline_time),
+          updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
           id,
           name,
           status,
           transaction_id as "transactionId",
+          notes,
           deadline,
           deadline_time as "deadlineTime",
           created_at as "createdAt",
@@ -1494,6 +1446,7 @@ export class DatabaseStorage implements IStorage {
         name: String(row.name),
         status: row.status as Document['status'],
         transactionId: Number(row.transactionId),
+        notes: row.notes,
         deadline: row.deadline,
         deadlineTime: row.deadlineTime,
         createdAt: new Date(row.createdAt),
