@@ -1033,21 +1033,32 @@ export class DatabaseStorage implements IStorage {
 
   async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
+      // Validate status is one of the allowed values
+      if (data.status && !['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'].includes(data.status)) {
+        throw new Error('Invalid document status');
+      }
+
+      const updates = Object.entries(data)
+        .filter(([_, value]) => value !== undefined)
+        .map(([key, value]) => sql`${sql.identifier([key])} = ${value}`);
+
       const result = await db.execute(sql`
         UPDATE documents 
-        SET 
-          status = COALESCE(${data.status}, status),
-          name = COALESCE(${data.name}, name)
+        SET ${sql.join(updates, sql`, `)}
         WHERE id = ${id}
         RETURNING *
       `);
 
-      const row = result.rows[0];
+      if (!result.rows[0]) {
+        throw new Error('Document not found');
+      }
+
+      const doc = result.rows[0];
       return {
-        id: String(row.id),
-        name: String(row.name),
-        status: String(row.status),
-        transactionId: Number(row.transaction_id)
+        id: doc.id,
+        name: doc.name,
+        status: doc.status as Document['status'],
+        transactionId: Number(doc.transaction_id)
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
@@ -1311,21 +1322,32 @@ export class DatabaseStorage implements IStorage {
 
   async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
+      // Validate status is one of the allowed values
+      if (data.status && !['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'].includes(data.status)) {
+        throw new Error('Invalid document status');
+      }
+
+      const updates = Object.entries(data)
+        .filter(([_, value]) => value !== undefined)
+        .map(([key, value]) => sql`${sql.identifier([key])} = ${value}`);
+
       const result = await db.execute(sql`
         UPDATE documents 
-        SET 
-          status = COALESCE(${data.status}, status),
-          name = COALESCE(${data.name}, name)
+        SET ${sql.join(updates, sql`, `)}
         WHERE id = ${id}
         RETURNING *
       `);
 
-      const row = result.rows[0];
+      if (!result.rows[0]) {
+        throw new Error('Document not found');
+      }
+
+      const doc = result.rows[0];
       return {
-        id: String(row.id),
-        name: String(row.name),
-        status: String(row.status),
-        transactionId: Number(row.transaction_id)
+        id: doc.id,
+        name: doc.name,
+        status: doc.status as Document['status'],
+        transactionId: Number(doc.transaction_id)
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
