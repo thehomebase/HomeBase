@@ -303,23 +303,10 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         deadline,
         deadlineTime
       });
-      if (!response.ok) {
-        throw new Error("Failed to update document");
-      }
 
-      // If we have both deadline and time, add to calendar
-      if (deadline && deadlineTime) {
-        try {
-          await apiRequest("POST", `/api/calendar/events`, {
-            documentId: id,
-            date: deadline,
-            time: deadlineTime,
-            title: `Document Due: ${documents.find(d => d.id === id)?.name}`,
-          });
-        } catch (error) {
-          console.error('Failed to add calendar event:', error);
-          // Don't throw error here as the document update was successful
-        }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update document');
       }
 
       return response.json();
@@ -333,10 +320,11 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
         description: "Document updated successfully",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Document update error:', error);
       toast({
         title: "Error",
-        description: "Failed to update document",
+        description: error instanceof Error ? error.message : "Failed to update document",
         variant: "destructive"
       });
       queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
@@ -393,15 +381,15 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   const handleUpdateNotes = (id: string, notes: string) => {
     updateDocumentMutation.mutate({
       id,
-      notes
+      notes: notes || null
     });
   };
 
   const handleUpdateDeadline = (id: string, deadline: string, time: string) => {
     updateDocumentMutation.mutate({
       id,
-      deadline,
-      deadlineTime: time
+      deadline: deadline || null,
+      deadlineTime: time || null
     });
   };
 

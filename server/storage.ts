@@ -818,7 +818,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       const transactionExists = await db.execute(sql`
-        SELECT EXISTS(SELECT1 FROM transactions WHERE id = ${data.transactionId})
+        SELECT EXISTS(SELECT 1 FROM transactions WHERE id =${data.transactionId})
       `);
 
       if (!transactionExists.rows[0].exists) {
@@ -1077,13 +1077,25 @@ export class DatabaseStorage implements IStorage {
 
   async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
+      console.log('Updating document with:', { id, data });
+
+      // First fetch the current document to ensure it exists
+      const currentDoc = await db.execute(sql`
+        SELECT * FROM documents WHERE id = ${id}
+      `);
+
+      if (!currentDoc.rows[0]) {
+        throw new Error('Document not found');
+      }
+
+      // Update document with new values, handling each field separately
       const result = await db.execute(sql`
         UPDATE documents
-        SET
-          status = COALESCE(${data.status}, status),
-          notes = COALESCE(${data.notes}, notes),
-          deadline = COALESCE(${data.deadline}, deadline),
-          deadline_time = COALESCE(${data.deadlineTime}, deadline_time),
+        SET 
+          status = ${data.status || currentDoc.rows[0].status},
+          notes = ${data.notes !== undefined ? data.notes : currentDoc.rows[0].notes},
+          deadline = ${data.deadline !== undefined ? data.deadline : currentDoc.rows[0].deadline},
+          deadline_time = ${data.deadlineTime !== undefined ? data.deadlineTime : currentDoc.rows[0].deadline_time},
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
@@ -1098,8 +1110,10 @@ export class DatabaseStorage implements IStorage {
           updated_at as "updatedAt"
       `);
 
+      console.log('Update result:', result.rows[0]);
+
       if (!result.rows[0]) {
-        throw new Error('Document not found');
+        throw new Error('Failed to update document');
       }
 
       const row = result.rows[0];
@@ -1116,6 +1130,10 @@ export class DatabaseStorage implements IStorage {
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+        console.error('Stack trace:', error.stack);
+      }
       throw error;
     }
   }
@@ -1415,13 +1433,25 @@ export class DatabaseStorage implements IStorage {
 
   async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
+      console.log('Updating document with:', { id, data });
+
+      // First fetch the current document to ensure it exists
+      const currentDoc = await db.execute(sql`
+        SELECT * FROM documents WHERE id = ${id}
+      `);
+
+      if (!currentDoc.rows[0]) {
+        throw new Error('Document not found');
+      }
+
+      // Update document with new values, handling each field separately
       const result = await db.execute(sql`
         UPDATE documents
-        SET
-          status = COALESCE(${data.status}, status),
-          notes = COALESCE(${data.notes}, notes),
-          deadline = COALESCE(${data.deadline}, deadline),
-          deadline_time = COALESCE(${data.deadlineTime}, deadline_time),
+        SET 
+          status = ${data.status || currentDoc.rows[0].status},
+          notes = ${data.notes !== undefined ? data.notes : currentDoc.rows[0].notes},
+          deadline = ${data.deadline !== undefined ? data.deadline : currentDoc.rows[0].deadline},
+          deadline_time = ${data.deadlineTime !== undefined ? data.deadlineTime : currentDoc.rows[0].deadline_time},
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
@@ -1436,8 +1466,10 @@ export class DatabaseStorage implements IStorage {
           updated_at as "updatedAt"
       `);
 
+      console.log('Update result:', result.rows[0]);
+
       if (!result.rows[0]) {
-        throw new Error('Document not found');
+        throw new Error('Failed to update document');
       }
 
       const row = result.rows[0];
@@ -1454,6 +1486,10 @@ export class DatabaseStorage implements IStorage {
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+        console.error('Stack trace:', error.stack);
+      }
       throw error;
     }
   }
@@ -1466,6 +1502,18 @@ export class DatabaseStorage implements IStorage {
       `);
     } catch (error) {
       console.error('Error in deleteDocument:', error);
+      throw error;
+    }
+  }
+
+  async deleteTransaction(id: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM transactions 
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error('Error in deleteTransaction:', error);
       throw error;
     }
   }
