@@ -82,13 +82,21 @@ export function registerRoutes(app: Express): Server {
 
   // Clients
   app.get("/api/clients", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (!req.isAuthenticated()) {
+      console.log('Client fetch failed: User not authenticated');
+      return res.sendStatus(401);
+    }
     try {
+      console.log('Fetching clients for agent:', req.user.id);
       const clients = await storage.getClientsByAgent(req.user.id);
+      console.log('Clients fetched successfully:', clients?.length);
       res.json(clients);
     } catch (error) {
       console.error('Error fetching clients:', error);
-      res.status(500).send('Error fetching clients');
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Error fetching clients',
+        details: error instanceof Error ? error.stack : undefined
+      });
     }
   });
 
