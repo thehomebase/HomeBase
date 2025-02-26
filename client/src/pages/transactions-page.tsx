@@ -16,7 +16,7 @@ import { useLocation } from "wouter";
 import { Plus, List, LayoutGrid, Table2, Trash2, Moon, Sun } from "lucide-react";
 import { NavTabs } from "@/components/ui/nav-tabs";
 import { KanbanBoard } from "@/components/kanban-board";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TransactionTable } from "@/components/transaction-table";
@@ -70,11 +70,7 @@ export default function TransactionsPage() {
   const [endDate, setEndDate] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
-    enabled: user?.role === "agent"
-  });
-
+  // Form setup with default values
   const form = useForm<CreateTransactionInput>({
     resolver: zodResolver(createTransactionSchema),
     defaultValues: {
@@ -88,6 +84,16 @@ export default function TransactionsPage() {
       secondaryClientId: null,
       status: 'prospect'
     },
+  });
+
+  useEffect(() => {
+    console.log("Dialog open state:", isDialogOpen);
+    console.log("Form state:", form.formState);
+  }, [isDialogOpen, form.formState]);
+
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+    enabled: user?.role === "agent"
   });
 
   const { data: transactions = [], refetch } = useQuery<Transaction[]>({
@@ -150,7 +156,6 @@ export default function TransactionsPage() {
     try {
       const validatedData = createTransactionSchema.parse(data);
       console.log("Data validation passed:", validatedData);
-
       await createTransactionMutation.mutateAsync(validatedData);
     } catch (error) {
       console.error("Form submission error:", error);
@@ -284,10 +289,16 @@ export default function TransactionsPage() {
               <Form {...form}>
                 <form
                   id="transactionForm"
-                  onSubmit={form.handleSubmit((data) => {
-                    console.log("Form submission handler called with data:", data);
-                    onSubmit(data);
-                  })}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    console.log("Form submission event fired");
+                    const formData = form.getValues();
+                    console.log("Current form values:", formData);
+                    form.handleSubmit((data) => {
+                      console.log("Form handler called with data:", data);
+                      onSubmit(data);
+                    })(e);
+                  }}
                   className="space-y-4"
                 >
                   <FormField
@@ -431,6 +442,11 @@ export default function TransactionsPage() {
                     type="submit"
                     className="w-full bg-primary text-white hover:bg-primary/90"
                     disabled={createTransactionMutation.isPending}
+                    onClick={() => {
+                      console.log("Create Transaction button clicked");
+                      const currentValues = form.getValues();
+                      console.log("Current form values:", currentValues);
+                    }}
                   >
                     {createTransactionMutation.isPending ? (
                       <>Creating...</>
