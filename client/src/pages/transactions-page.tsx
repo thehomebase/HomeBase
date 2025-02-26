@@ -52,7 +52,8 @@ const createTransactionSchema = insertTransactionSchema.extend({
   accessCode: z.string().min(6, "Access code must be at least 6 characters"),
   type: z.enum(['buy', 'sell']),
   clientId: z.number().nullable(),
-  secondaryClientId: z.number().nullable()
+  secondaryClientId: z.number().nullable(),
+  status: z.string().default('prospect')
 });
 
 export default function TransactionsPage() {
@@ -83,7 +84,8 @@ export default function TransactionsPage() {
       accessCode: "",
       type: "buy" as const,
       clientId: null,
-      secondaryClientId: null
+      secondaryClientId: null,
+      status: 'prospect'
     },
   });
 
@@ -94,10 +96,10 @@ export default function TransactionsPage() {
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: CreateTransactionInput) => {
+      console.log("Creating transaction with data:", data);
       const response = await apiRequest("POST", "/api/transactions", {
         ...data,
         agentId: user?.id,
-        status: 'prospect',
         participants: [],
         year: new Date().getFullYear()
       });
@@ -106,7 +108,10 @@ export default function TransactionsPage() {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to create transaction');
       }
-      return response.json();
+
+      const result = await response.json();
+      console.log("Transaction created successfully:", result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -118,6 +123,7 @@ export default function TransactionsPage() {
       });
     },
     onError: (error: Error) => {
+      console.error("Error creating transaction:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -171,6 +177,15 @@ export default function TransactionsPage() {
   });
 
   const isMobile = useIsMobile();
+
+  const onSubmit = async (data: CreateTransactionInput) => {
+    console.log("Form submitted with data:", data);
+    try {
+      await createTransactionMutation.mutateAsync(data);
+    } catch (error) {
+      console.error("Form submission error:", error);
+    }
+  };
 
   return (
     <main className="flex-1 min-w-0 overflow-x-hidden px-4">
@@ -243,10 +258,7 @@ export default function TransactionsPage() {
                 <DialogTitle>Create New Transaction</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit((data) => {
-                    console.log("Form data being submitted:", data);
-                    return createTransactionMutation.mutate(data);
-                  })} className="space-y-4">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
                     name="streetName"
@@ -304,9 +316,9 @@ export default function TransactionsPage() {
                     name="accessCode"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Passkey</FormLabel>
+                        <FormLabel>Access Code</FormLabel>
                         <FormControl>
-                          <Input {...field} type="text" placeholder="Enter passkey (min. 6 characters)" />
+                          <Input {...field} type="text" placeholder="Enter access code (min. 6 characters)" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -353,6 +365,7 @@ export default function TransactionsPage() {
                                 ))}
                               </select>
                             </FormControl>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
@@ -376,6 +389,7 @@ export default function TransactionsPage() {
                                 ))}
                               </select>
                             </FormControl>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
