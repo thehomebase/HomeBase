@@ -66,7 +66,7 @@ export default function TransactionsPage() {
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   );
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const [startDate, setStartDate] = useState<string>(new Date(new Date().getFullYear(), 0, 1).toISOString());
+  const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
   const { data: clients = [] } = useQuery<Client[]>({
@@ -156,23 +156,13 @@ export default function TransactionsPage() {
     },
   });
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    document.documentElement.classList.toggle('dark');
-  };
-
-  const handleDeleteTransaction = (id: number) => {
-    if (user?.role === "agent") {
-      deleteTransactionMutation.mutate(id);
-    }
-  };
-
   const filteredTransactions = transactions.filter((transaction: Transaction) => {
+    if (!selectedYear) return true; // Show all transactions when no year is selected
+
     const transactionDate = transaction.createdAt ? new Date(transaction.createdAt) : new Date();
     const yearMatch = selectedYear === null || transactionDate.getFullYear() === selectedYear;
-    const startDateMatch = startDate === "" || transactionDate >= new Date(startDate);
-    const endDateMatch = endDate === "" || transactionDate <= new Date(endDate);
+    const startDateMatch = !startDate || transactionDate >= new Date(startDate);
+    const endDateMatch = !endDate || transactionDate <= new Date(endDate);
     return yearMatch && startDateMatch && endDateMatch;
   });
 
@@ -184,6 +174,18 @@ export default function TransactionsPage() {
       await createTransactionMutation.mutateAsync(data);
     } catch (error) {
       console.error("Form submission error:", error);
+    }
+  };
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    document.documentElement.classList.toggle('dark');
+  };
+
+  const handleDeleteTransaction = (id: number) => {
+    if (user?.role === "agent") {
+      deleteTransactionMutation.mutate(id);
     }
   };
 
@@ -236,7 +238,7 @@ export default function TransactionsPage() {
               value={selectedYear || ""}
               onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value, 10) : null)}
             >
-              <option value="">{new Date().getFullYear()}</option>
+              <option value="">All</option>
               {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map((year) => (
                 <option key={year} value={year}>
                   {year}
@@ -331,8 +333,8 @@ export default function TransactionsPage() {
                       <FormItem>
                         <FormLabel>Transaction Type</FormLabel>
                         <FormControl>
-                          <select 
-                            {...field} 
+                          <select
+                            {...field}
                             className="w-full h-9 px-3 rounded-md border text-base bg-background"
                           >
                             <option value="buy">Buy</option>
