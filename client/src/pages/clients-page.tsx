@@ -264,21 +264,22 @@ export default function ClientsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="w-screen flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
-        <h2 className="text-2xl font-bold">Client Management</h2>
-        <div className="flex items-center gap-4 w-full">
-          <div className="relative flex-1 sm:flex-initial">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
+        <div className="flex flex-col sm:flex-row flex-grow sm:items-center gap-2 mb-2">
+          <h2 className="text-2xl font-bold dark:text-white">Client Management</h2>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search clients..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className="pl-8"
             />
           </div>
-          <Dialog open={isOpen} onOpenChange={setOpen}>
+        </div>
+        <Dialog open={isOpen} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white mb-0 mr-64">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Client
               </Button>
