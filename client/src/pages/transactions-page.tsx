@@ -243,7 +243,10 @@ export default function TransactionsPage() {
                 <DialogTitle>Create New Transaction</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit((data) => createTransactionMutation.mutate(data))} className="space-y-4">
+                <form onSubmit={form.handleSubmit((data) => {
+                    console.log("Form data being submitted:", data);
+                    return createTransactionMutation.mutate(data);
+                  })} className="space-y-4">
                   <FormField
                     control={form.control}
                     name="streetName"
@@ -304,6 +307,25 @@ export default function TransactionsPage() {
                         <FormLabel>Passkey</FormLabel>
                         <FormControl>
                           <Input {...field} type="text" placeholder="Enter passkey (min. 6 characters)" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Transaction Type</FormLabel>
+                        <FormControl>
+                          <select 
+                            {...field} 
+                            className="w-full h-9 px-3 rounded-md border text-base bg-background"
+                          >
+                            <option value="buy">Buy</option>
+                            <option value="sell">Sell</option>
+                          </select>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
