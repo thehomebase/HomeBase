@@ -389,6 +389,39 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
           </DragOverlay>
         </DndContext>
         {user?.role === 'agent' && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="ml-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Contact from Clients
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Contact from Clients</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                {clients.map((client) => (
+                  <div key={client.id} className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{client.firstName} {client.lastName}</div>
+                      <div className="text-sm text-muted-foreground">{client.email}</div>
+                    </div>
+                    <Button onClick={() => {
+                      updateDocumentMutation.mutate({
+                        id: client.id.toString(),
+                        status: 'complete',
+                        notes: `Added from client: ${client.firstName} ${client.lastName}`
+                      });
+                    }}>
+                      Add as Contact
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+          
           <form onSubmit={(e) => {
             e.preventDefault();
             if (newDocument.trim()) {

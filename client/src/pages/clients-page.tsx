@@ -540,6 +540,7 @@ export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = useState<number | null>(null);
+  const queryClient = useQueryClient();
 
   const handleClientUpdate = async (updatedClient: Client) => {
     try {
