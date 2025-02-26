@@ -140,11 +140,25 @@ export default function TransactionsPage() {
   });
 
   const onSubmit = async (data: CreateTransactionInput) => {
-    console.log("Form submitted with data:", data);
+    console.log("Form submission started", { data });
     try {
-      await createTransactionMutation.mutateAsync(data);
+      console.log("Validating form data...");
+      const validatedData = createTransactionSchema.parse(data);
+      console.log("Form data validated successfully", { validatedData });
+
+      console.log("Calling mutation...");
+      await createTransactionMutation.mutateAsync(validatedData);
+      console.log("Mutation completed successfully");
     } catch (error) {
       console.error("Form submission error:", error);
+      if (error instanceof z.ZodError) {
+        console.error("Validation errors:", error.errors);
+      }
+      toast({
+        title: "Error",
+        description: "Failed to create transaction. Please check the form fields.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -265,7 +279,14 @@ export default function TransactionsPage() {
                 <DialogTitle>Create New Transaction</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    console.log("Form submit event triggered");
+                    form.handleSubmit(onSubmit)(e);
+                  }} 
+                  className="space-y-4"
+                >
                   <FormField
                     control={form.control}
                     name="streetName"
@@ -402,7 +423,11 @@ export default function TransactionsPage() {
                       />
                     </div>
                   )}
-                  <Button type="submit" className="w-full bg-primary text-white hover:bg-primary/90" disabled={createTransactionMutation.isPending}>
+                  <Button
+                    type="submit"
+                    className="w-full bg-primary text-white hover:bg-primary/90"
+                    disabled={createTransactionMutation.isPending}
+                  >
                     {createTransactionMutation.isPending ? (
                       <>Creating...</>
                     ) : (
