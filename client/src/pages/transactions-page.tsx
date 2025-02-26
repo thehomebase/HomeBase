@@ -68,6 +68,7 @@ export default function TransactionsPage() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -96,40 +97,33 @@ export default function TransactionsPage() {
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: CreateTransactionInput) => {
-      console.log("Creating transaction with data:", data);
       const payload = {
         ...data,
         agentId: user?.id,
         participants: [],
         year: new Date().getFullYear()
       };
-      console.log("Sending payload to server:", payload);
 
       const response = await apiRequest("POST", "/api/transactions", payload);
-      console.log("Server response:", response);
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("Server error response:", errorData);
         throw new Error(errorData.error || 'Failed to create transaction');
       }
 
-      const result = await response.json();
-      console.log("Transaction created successfully:", result);
-      return result;
+      return response.json();
     },
-    onSuccess: (data) => {
-      console.log("Transaction creation succeeded:", data);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       refetch();
       form.reset();
+      setIsDialogOpen(false);
       toast({
         title: "Success",
         description: "Transaction created successfully"
       });
     },
     onError: (error: Error) => {
-      console.error("Transaction creation failed:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -137,6 +131,14 @@ export default function TransactionsPage() {
       });
     },
   });
+
+  const onSubmit = async (data: CreateTransactionInput) => {
+    try {
+      await createTransactionMutation.mutateAsync(data);
+    } catch (error) {
+      console.error("Form submission error:", error);
+    }
+  };
 
   const deleteTransactionMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -174,25 +176,6 @@ export default function TransactionsPage() {
 
   const isMobile = useIsMobile();
 
-  const onSubmit = async (data: CreateTransactionInput) => {
-    console.log("Form submitted with data:", data);
-    try {
-      const validatedData = createTransactionSchema.parse(data);
-      console.log("Validated data:", validatedData);
-      await createTransactionMutation.mutateAsync(validatedData);
-    } catch (error) {
-      console.error("Form submission error:", error);
-      if (error instanceof z.ZodError) {
-        console.error("Validation errors:", error.errors);
-      }
-      toast({
-        title: "Error",
-        description: "Failed to create transaction. Please check the form fields.",
-        variant: "destructive"
-      });
-    }
-  };
-
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
@@ -201,7 +184,7 @@ export default function TransactionsPage() {
 
   const handleDeleteTransaction = (id: number) => {
     if (user?.role === "agent") {
-      deleteTransactionMutation.mutate(id);
+      setDeleteId(id);
     }
   };
 
@@ -264,7 +247,7 @@ export default function TransactionsPage() {
           </div>
         </div>
         {user?.role === "agent" && (
-          <Dialog>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white mb-0 mr-64">
                 <Plus className="h-4 w-4 mr-2" />
@@ -496,7 +479,7 @@ export default function TransactionsPage() {
         )}
       </div>
 
-      <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
+      <AlertDialog open={deleteId !== null} onOpenChange={(open) => setDeleteId(open ? deleteId : null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
