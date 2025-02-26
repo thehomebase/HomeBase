@@ -265,8 +265,8 @@ export default function ClientsPage() {
 
   return (
     <>
-      <div className="container mx-auto px-4 py-8">
-        <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
+      <div className="container mx-auto px-4">
+        <div className="sm:w-screen flex flex-wrap bg-background relative px-0 py-8">
           <div className="flex flex-col sm:flex-row flex-grow sm:items-center gap-2 mb-2">
             <h2 className="text-2xl font-bold dark:text-white">Client Management</h2>
             <div className="relative w-full sm:w-72">

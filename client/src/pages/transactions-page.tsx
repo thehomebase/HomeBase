@@ -411,10 +411,7 @@ export default function TransactionsPage() {
                 onClick={() => setLocation(`/transactions/${transaction.id}`)}
               >
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle
-                    className="text-lg hover:underline dark:text-white truncate"
-                    onClick={() => setLocation(`/transactions/${transaction.id}`)}
-                  >
+                  <CardTitle className="text-lg hover:underline dark:text-white truncate">
                     {transaction.streetName}
                   </CardTitle>
                   {user?.role === "agent" && (
