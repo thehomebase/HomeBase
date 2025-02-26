@@ -360,7 +360,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="w-screen text-lg">Documents</CardTitle>
+        <CardTitle className="text-lg">Documents</CardTitle>
       </CardHeader>
       <CardContent>
         <DndContext

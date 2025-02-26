@@ -16,14 +16,18 @@ import { useLocation } from "wouter";
 import { Plus, List, LayoutGrid, Table2, Trash2, Moon, Sun } from "lucide-react";
 import { NavTabs } from "@/components/ui/nav-tabs";
 import { KanbanBoard } from "@/components/kanban-board";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TransactionTable } from "@/components/transaction-table";
-import { insertTransactionSchema, type Transaction as SchemaTransaction, type Client } from "@shared/schema";
+import { Transaction as SchemaTransaction } from "@shared/schema";
+import { Client } from "@shared/schema";
 
-// Update the Transaction interface to match schema
-interface Transaction extends SchemaTransaction {
+// Add proper type for client find operations
+type ClientLookup = (client: Client) => boolean;
+
+// Update the Transaction interface to include all required fields
+interface Transaction extends Omit<SchemaTransaction, 'updatedAt'> {
   id: number;
   streetName: string;
   city: string;
@@ -35,25 +39,27 @@ interface Transaction extends SchemaTransaction {
   contractPrice: number | null;
   clientId: number | null;
   secondaryClientId: number | null;
-  client?: Client | null;
-  secondaryClient?: Client | null;
+  client?: {
+    firstName: string;
+    lastName: string;
+  } | null;
+  secondaryClient?: {
+    firstName: string;
+    lastName: string;
+  } | null;
   createdAt: string;
-  updatedAt: string; // Added updatedAt
-  agentId: number;
+  year: number;
 }
 
-type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
-
-const createTransactionSchema = insertTransactionSchema.extend({
+const createTransactionSchema = z.object({
   streetName: z.string().min(1, "Street name is required"),
   city: z.string().min(1, "City is required"),
   state: z.string().min(2, "State is required"),
   zipCode: z.string().min(5, "ZIP code is required"),
-  accessCode: z.string().min(6, "Access code must be at least 6 characters"),
+  accessCode: z.string().min(6),
   type: z.enum(['buy', 'sell']),
   clientId: z.number().nullable(),
-  secondaryClientId: z.number().nullable(),
-  status: z.string().default('prospect')
+  secondaryClientId: z.number().nullable()
 });
 
 export default function TransactionsPage() {
@@ -66,12 +72,20 @@ export default function TransactionsPage() {
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   );
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const [startDate, setStartDate] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>(new Date(new Date().getFullYear(), 0, 1).toISOString());
   const [endDate, setEndDate] = useState<string>("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Form setup with default values
-  const form = useForm<CreateTransactionInput>({
+  const { data: clients = [] } = useQuery({
+    queryKey: ["/api/clients"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/clients");
+      if (!response.ok) throw new Error('Failed to fetch clients');
+      return response.json();
+    },
+    enabled: user?.role === "agent"
+  });
+
+  const form = useForm({
     resolver: zodResolver(createTransactionSchema),
     defaultValues: {
       streetName: "",
@@ -80,95 +94,52 @@ export default function TransactionsPage() {
       zipCode: "",
       accessCode: "",
       type: "buy" as const,
-      clientId: null,
-      secondaryClientId: null,
-      status: 'prospect'
+      clientId: null as number | null,
+      secondaryClientId: null as number | null
     },
-  });
-
-  useEffect(() => {
-    console.log("Dialog open state:", isDialogOpen);
-    console.log("Form state:", form.formState);
-  }, [isDialogOpen, form.formState]);
-
-  const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
-    enabled: user?.role === "agent"
   });
 
   const { data: transactions = [], refetch } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/transactions");
+      if (!response.ok) {
+        throw new Error('Failed to fetch transactions');
+      }
+      return response.json();
+    },
     enabled: !!user,
   });
 
   const createTransactionMutation = useMutation({
-    mutationFn: async (data: CreateTransactionInput) => {
-      console.log("Starting transaction creation with data:", data);
-      const payload = {
+    mutationFn: async (data: z.infer<typeof createTransactionSchema>) => {
+      const response = await apiRequest("POST", "/api/transactions", {
         ...data,
         agentId: user?.id,
-        participants: []
-      };
-      console.log("Sending payload to server:", payload);
-
-      try {
-        const response = await apiRequest("POST", "/api/transactions", payload);
-        console.log("Server response status:", response.status);
-        console.log("Server response headers:", Object.fromEntries(response.headers.entries()));
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error("Server error response:", errorData);
-          throw new Error(errorData.error || 'Failed to create transaction');
-        }
-
-        const result = await response.json();
-        console.log("Server success response:", result);
-        return result;
-      } catch (error) {
-        console.error("API request error:", error);
-        throw error;
+        status: 'prospect',
+        participants: [],
+        clientId: data.clientId || null,
+        secondaryClientId: data.secondaryClientId || null,
+        year: new Date().getFullYear()
+      });
+      if (!response.ok) {
+        throw new Error('Failed to create transaction');
       }
+      return response.json();
     },
-    onSuccess: (data) => {
-      console.log("Transaction created successfully:", data);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       refetch();
       form.reset();
-      setIsDialogOpen(false);
-      toast({
-        title: "Success",
-        description: "Transaction created successfully"
-      });
     },
-    onError: (error: Error) => {
-      console.error("Transaction creation failed:", error);
+    onError: () => {
       toast({
         title: "Error",
-        description: error.message,
-        variant: "destructive"
+        description: "Failed to create transaction",
+        variant: "destructive",
       });
     },
   });
-
-  const onSubmit = async (data: CreateTransactionInput) => {
-    console.log("onSubmit function called with data:", data);
-    try {
-      const validatedData = createTransactionSchema.parse(data);
-      console.log("Data validation passed:", validatedData);
-      await createTransactionMutation.mutateAsync(validatedData);
-    } catch (error) {
-      console.error("Form submission error:", error);
-      if (error instanceof z.ZodError) {
-        console.error("Validation errors:", error.errors);
-      }
-      toast({
-        title: "Error",
-        description: "Failed to create transaction. Please check the form fields.",
-        variant: "destructive"
-      });
-    }
-  };
 
   const deleteTransactionMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -194,16 +165,6 @@ export default function TransactionsPage() {
     },
   });
 
-  const filteredTransactions = transactions.filter((transaction: Transaction) => {
-    if (!selectedYear) return true; // Show all transactions when "All" is selected
-
-    // Only filter by year if selectedYear is set
-    const transactionDate = transaction.updatedAt ? new Date(transaction.updatedAt) : null;
-    return transactionDate ? transactionDate.getFullYear() === selectedYear : false;
-  });
-
-  const isMobile = useIsMobile();
-
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
@@ -212,13 +173,24 @@ export default function TransactionsPage() {
 
   const handleDeleteTransaction = (id: number) => {
     if (user?.role === "agent") {
-      setDeleteId(id);
+      deleteTransactionMutation.mutate(id);
     }
   };
 
+  const filteredTransactions = transactions.filter((transaction: Transaction) => {
+    const transactionDate = transaction.createdAt ? new Date(transaction.createdAt) : new Date();
+    const yearMatch = selectedYear === null || transactionDate.getFullYear() === selectedYear;
+    const startDateMatch = startDate === "" || transactionDate >= new Date(startDate);
+    const endDateMatch = endDate === "" || transactionDate <= new Date(endDate);
+    return yearMatch && startDateMatch && endDateMatch;
+  });
+
+
+  const isMobile = useIsMobile();
+
   return (
     <main className="flex-1 min-w-0 overflow-x-hidden px-4">
-      <div className="sm:w-screen flex flex-wrap bg-background relative px-0 py-8">
+      <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
         <div className="flex flex-col sm:flex-row flex-grow sm:items-center gap-2 mb-2">
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
           <div className="flex items-center gap-2">
@@ -252,7 +224,7 @@ export default function TransactionsPage() {
               pressed={theme === 'dark'}
               onPressedChange={toggleTheme}
               aria-label="Toggle theme"
-              className="hover:text-foreground dark:text-white dark:hover:text-white"
+              className=" hover:text-foreground dark:text-white dark:hover:text-white"
             >
               {theme === 'light' ? (
                 <Moon className="h-4 w-4" />
@@ -265,7 +237,7 @@ export default function TransactionsPage() {
               value={selectedYear || ""}
               onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value, 10) : null)}
             >
-              <option value="">All</option>
+              <option value="">{new Date().getFullYear()}</option>
               {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map((year) => (
                 <option key={year} value={year}>
                   {year}
@@ -275,7 +247,7 @@ export default function TransactionsPage() {
           </div>
         </div>
         {user?.role === "agent" && (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog>
             <DialogTrigger asChild>
               <Button className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white mb-0 mr-64">
                 <Plus className="h-4 w-4 mr-2" />
@@ -287,20 +259,7 @@ export default function TransactionsPage() {
                 <DialogTitle>Create New Transaction</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form
-                  id="transactionForm"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    console.log("Form submission event fired");
-                    const formData = form.getValues();
-                    console.log("Current form values:", formData);
-                    form.handleSubmit((data) => {
-                      console.log("Form handler called with data:", data);
-                      onSubmit(data);
-                    })(e);
-                  }}
-                  className="space-y-4"
-                >
+                <form onSubmit={form.handleSubmit((data) => createTransactionMutation.mutate(data))} className="space-y-4">
                   <FormField
                     control={form.control}
                     name="streetName"
@@ -358,28 +317,9 @@ export default function TransactionsPage() {
                     name="accessCode"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Access Code</FormLabel>
+                        <FormLabel>Passkey</FormLabel>
                         <FormControl>
-                          <Input {...field} type="text" placeholder="Enter access code (min. 6 characters)" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Transaction Type</FormLabel>
-                        <FormControl>
-                          <select
-                            {...field}
-                            className="w-full h-9 px-3 rounded-md border text-base bg-background"
-                          >
-                            <option value="buy">Buy</option>
-                            <option value="sell">Sell</option>
-                          </select>
+                          <Input {...field} type="text" placeholder="Enter passkey (min. 6 characters)" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -407,7 +347,6 @@ export default function TransactionsPage() {
                                 ))}
                               </select>
                             </FormControl>
-                            <FormMessage />
                           </FormItem>
                         )}
                       />
@@ -431,28 +370,13 @@ export default function TransactionsPage() {
                                 ))}
                               </select>
                             </FormControl>
-                            <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
                   )}
-                  <Button
-                    id="createTransactionBtn"
-                    type="submit"
-                    className="w-full bg-primary text-white hover:bg-primary/90"
-                    disabled={createTransactionMutation.isPending}
-                    onClick={() => {
-                      console.log("Create Transaction button clicked");
-                      const currentValues = form.getValues();
-                      console.log("Current form values:", currentValues);
-                    }}
-                  >
-                    {createTransactionMutation.isPending ? (
-                      <>Creating...</>
-                    ) : (
-                      <>Create Transaction</>
-                    )}
+                  <Button type="submit" className="w-full bg-primary text-white hover:bg-primary/90" disabled={createTransactionMutation.isPending}>
+                    Create Transaction
                   </Button>
                 </form>
               </Form>
@@ -488,7 +412,9 @@ export default function TransactionsPage() {
               >
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle
-                    className="text-lg hover:underline dark:text-white truncate">
+                    className="text-lg hover:underline dark:text-white truncate"
+                    onClick={() => setLocation(`/transactions/${transaction.id}`)}
+                  >
                     {transaction.streetName}
                   </CardTitle>
                   {user?.role === "agent" && (
@@ -508,8 +434,8 @@ export default function TransactionsPage() {
                 <CardContent>
                   <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize truncate">Status: {transaction.status.replace('_', ' ')}</p>
                   <p className="text-sm text-muted-foreground dark:text-gray-300 break-words">
-                    Client: {transaction.client
-                      ? `${transaction.client.firstName} ${transaction.client.lastName}`
+                    Client: {clients.find((c: Client) => c.id === transaction.clientId)
+                      ? `${clients.find((c: Client) => c.id === transaction.clientId)?.firstName} ${clients.find((c: Client) => c.id === transaction.clientId)?.lastName}`
                       : 'Not set'}
                   </p>
                   {transaction.secondaryClient && (
@@ -530,7 +456,7 @@ export default function TransactionsPage() {
         )}
       </div>
 
-      <AlertDialog open={deleteId !== null} onOpenChange={(open) => setDeleteId(open ? deleteId : null)}>
+      <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Transaction</AlertDialogTitle>

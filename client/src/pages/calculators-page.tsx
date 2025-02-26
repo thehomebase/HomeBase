@@ -80,7 +80,7 @@ export default function CalculatorsPage() {
   return (
     <main className="w-full ml-[5px] relative">
       <header className="border-b">
-        <div className="container px-2 py-8">
+        <div className="container px-2 py-4">
           <h1 className="text-2xl font-bold ">Financial Calculators</h1>
         </div>
       </header>
