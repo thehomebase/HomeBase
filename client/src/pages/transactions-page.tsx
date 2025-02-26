@@ -146,15 +146,12 @@ export default function TransactionsPage() {
   });
 
   const onSubmit = async (data: CreateTransactionInput) => {
-    console.log("Form submission started", { data });
+    console.log("onSubmit function called with data:", data);
     try {
-      console.log("Validating form data...");
       const validatedData = createTransactionSchema.parse(data);
-      console.log("Form data validated successfully", { validatedData });
+      console.log("Data validation passed:", validatedData);
 
-      console.log("Calling mutation...");
       await createTransactionMutation.mutateAsync(validatedData);
-      console.log("Mutation completed successfully");
     } catch (error) {
       console.error("Form submission error:", error);
       if (error instanceof z.ZodError) {
@@ -287,13 +284,10 @@ export default function TransactionsPage() {
               <Form {...form}>
                 <form
                   id="transactionForm"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    console.log("Form submit event triggered");
-                    const formData = new FormData(e.currentTarget);
-                    console.log("Form data:", Object.fromEntries(formData));
-                    form.handleSubmit(onSubmit)(e);
-                  }}
+                  onSubmit={form.handleSubmit((data) => {
+                    console.log("Form submission handler called with data:", data);
+                    onSubmit(data);
+                  })}
                   className="space-y-4"
                 >
                   <FormField
@@ -437,10 +431,6 @@ export default function TransactionsPage() {
                     type="submit"
                     className="w-full bg-primary text-white hover:bg-primary/90"
                     disabled={createTransactionMutation.isPending}
-                    onClick={(e) => {
-                      console.log("Button clicked!");
-                      // Don't prevent default here to allow form submission
-                    }}
                   >
                     {createTransactionMutation.isPending ? (
                       <>Creating...</>
