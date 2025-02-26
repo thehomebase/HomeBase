@@ -262,7 +262,8 @@ export class DatabaseStorage implements IStorage {
           client_id,
           secondary_client_id,
           participants,
-          year
+          year,
+          updated_at
         ) VALUES (
           ${insertTransaction.streetName},
           ${insertTransaction.city},
@@ -275,12 +276,11 @@ export class DatabaseStorage implements IStorage {
           ${insertTransaction.clientId || null},
           ${insertTransaction.secondaryClientId || null},
           ${JSON.stringify(insertTransaction.participants || [])}::jsonb,
-          ${new Date().getFullYear()}
+          ${new Date().getFullYear()},
+          NOW()
         )
         RETURNING *
       `);
-
-      console.log('Database result:', result.rows[0]);
 
       if (!result.rows[0]) {
         throw new Error('Failed to create transaction');
@@ -809,7 +809,7 @@ export class DatabaseStorage implements IStorage {
   async deleteContact(id: number) {
     try {
       const result = await db.execute(sql`
-        DELETE FROM contacts WHERE id = ${id} RETURNING id
+        DELETE FROM contacts WHERE id =${id} RETURNING id
       `);
       if (!result.rows[0]) {
         throw new Error('Contact not found');
