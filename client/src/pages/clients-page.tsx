@@ -412,26 +412,28 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      <Card>
-        <Tabs defaultValue="sellers" className="p-6">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="sellers">Sellers</TabsTrigger>
-            <TabsTrigger value="buyers">Buyers</TabsTrigger>
-          </TabsList>
-          <TabsContent value="sellers">
-            <ClientTable 
-              clients={sellers} 
-              onDelete={(id) => setClientToDelete(id)} 
-            />
-          </TabsContent>
-          <TabsContent value="buyers">
-            <ClientTable 
-              clients={buyers} 
-              onDelete={(id) => setClientToDelete(id)} 
-            />
-          </TabsContent>
-        </Tabs>
-      </Card>
+      <div>
+        <Card>
+          <Tabs defaultValue="sellers" className="p-6">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="sellers">Sellers</TabsTrigger>
+              <TabsTrigger value="buyers">Buyers</TabsTrigger>
+            </TabsList>
+            <TabsContent value="sellers">
+              <ClientTable 
+                clients={sellers} 
+                onDelete={(id) => setClientToDelete(id)} 
+              />
+            </TabsContent>
+            <TabsContent value="buyers">
+              <ClientTable 
+                clients={buyers} 
+                onDelete={(id) => setClientToDelete(id)} 
+              />
+            </TabsContent>
+          </Tabs>
+        </Card>
+      </div>
 
       <AlertDialog open={clientToDelete !== null} onOpenChange={() => setClientToDelete(null)}>
         <AlertDialogContent>
