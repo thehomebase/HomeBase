@@ -174,8 +174,8 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
   }
 
   return (
-    <Card>
-      <CardContent>
+    <Card className="flex">
+      <CardContent className="w-screen">
         <div className="hidden sm:block"> {/* Desktop View */}
         <Table>
           <TableHeader>
@@ -192,7 +192,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                   size="sm"
                   onClick={() => setIsAddingContact(true)}
                   disabled={isAddingContact}
-                  className="bg-black hover:bg-black/90"
+                  className="bg-black hover:bg-black/90 "
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Contact
@@ -332,14 +332,12 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                           onClick={() => updateContactMutation.mutate(editingContact)}
                           disabled={updateContactMutation.isPending}
                         >
-                          <Check className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => setEditingContact(null)}
                         >
-                          <X className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -496,7 +494,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                     </Button>
                   </div>
                 </div>
-                <div className="space-y-1 text-sm text-muted-foreground">
+                <div className="space-y-1 text-sm text-muted-foreground ">
                   <div>{contact.email}</div>
                   {contact.phone && <div>Phone: {contact.phone}</div>}
                   {contact.mobilePhone && <div>Mobile: {contact.mobilePhone}</div>}

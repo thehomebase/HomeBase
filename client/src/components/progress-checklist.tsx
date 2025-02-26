@@ -334,7 +334,7 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
       <CardHeader className="space-y-2 w-full">
         <CardTitle className="text-lg">Progress</CardTitle>
         <Progress value={progress} className="h-2" />
-        <div className="text-sm text-muted-foreground">{progress}% complete</div>
+        <div className="w-screen text-sm text-muted-foreground">{progress}% complete</div>
         <div className="flex flex-col sm:flex-row gap-2 py-2">
           <select
             value={activePhase}
