@@ -20,8 +20,7 @@ import { useState } from "react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TransactionTable } from "@/components/transaction-table";
-import { insertTransactionSchema, type Transaction as SchemaTransaction } from "@shared/schema";
-import { type Client } from "@shared/schema";
+import { insertTransactionSchema, type Transaction as SchemaTransaction, type Client } from "@shared/schema";
 
 // Update the Transaction interface to match schema
 interface Transaction extends SchemaTransaction {
@@ -43,12 +42,14 @@ interface Transaction extends SchemaTransaction {
   year: number;
 }
 
+type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
+
 const createTransactionSchema = insertTransactionSchema.extend({
   streetName: z.string().min(1, "Street name is required"),
   city: z.string().min(1, "City is required"),
   state: z.string().min(2, "State is required"),
   zipCode: z.string().min(5, "ZIP code is required"),
-  accessCode: z.string().min(6),
+  accessCode: z.string().min(6, "Access code must be at least 6 characters"),
   type: z.enum(['buy', 'sell']),
   clientId: z.number().nullable(),
   secondaryClientId: z.number().nullable()
@@ -72,7 +73,7 @@ export default function TransactionsPage() {
     enabled: user?.role === "agent"
   });
 
-  const form = useForm<z.infer<typeof createTransactionSchema>>({
+  const form = useForm<CreateTransactionInput>({
     resolver: zodResolver(createTransactionSchema),
     defaultValues: {
       streetName: "",
@@ -88,29 +89,22 @@ export default function TransactionsPage() {
 
   const { data: transactions = [], refetch } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/transactions");
-      if (!response.ok) {
-        throw new Error('Failed to fetch transactions');
-      }
-      return response.json();
-    },
     enabled: !!user,
   });
 
   const createTransactionMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof createTransactionSchema>) => {
+    mutationFn: async (data: CreateTransactionInput) => {
       const response = await apiRequest("POST", "/api/transactions", {
         ...data,
         agentId: user?.id,
         status: 'prospect',
         participants: [],
-        clientId: data.clientId,
-        secondaryClientId: data.secondaryClientId,
         year: new Date().getFullYear()
       });
+
       if (!response.ok) {
-        throw new Error('Failed to create transaction');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create transaction');
       }
       return response.json();
     },
@@ -118,12 +112,16 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       refetch();
       form.reset();
+      toast({
+        title: "Success",
+        description: "Transaction created successfully"
+      });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: "Failed to create transaction",
-        variant: "destructive",
+        description: error.message,
+        variant: "destructive"
       });
     },
   });
