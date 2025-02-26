@@ -262,7 +262,6 @@ export class DatabaseStorage implements IStorage {
           client_id,
           secondary_client_id,
           participants,
-          year,
           updated_at
         ) VALUES (
           ${insertTransaction.streetName},
@@ -276,7 +275,6 @@ export class DatabaseStorage implements IStorage {
           ${insertTransaction.clientId || null},
           ${insertTransaction.secondaryClientId || null},
           ${JSON.stringify(insertTransaction.participants || [])}::jsonb,
-          ${new Date().getFullYear()},
           NOW()
         )
         RETURNING *
@@ -816,7 +814,7 @@ export class DatabaseStorage implements IStorage {
       }
       return true;
     } catch (error) {
-      console.error('Error in deleteContact:', error);
+            console.error('Error in deleteContact:', error);
       throw error;
     }
   }

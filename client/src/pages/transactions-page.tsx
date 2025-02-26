@@ -39,7 +39,6 @@ interface Transaction extends SchemaTransaction {
   secondaryClient?: Client | null;
   createdAt: string;
   agentId: number;
-  year: number;
 }
 
 type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
@@ -100,8 +99,7 @@ export default function TransactionsPage() {
       const payload = {
         ...data,
         agentId: user?.id,
-        participants: [],
-        year: new Date().getFullYear()
+        participants: []
       };
 
       const response = await apiRequest("POST", "/api/transactions", payload);
