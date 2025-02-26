@@ -50,7 +50,7 @@ export const transactions = pgTable("transactions", {
   type: text("type").notNull().default('buy'), // 'buy' or 'sell'
   agentId: integer("agent_id").notNull(),
   clientId: integer("client_id"),
-  secondaryClientId: integer("secondary_client_id"),
+  secondaryClientId: integer("secondary_client_id"), // Added this field
   participants: json("participants").notNull().$type<{
     userId: number;
     role: string;
