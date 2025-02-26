@@ -443,6 +443,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
               Add Document
             </Button>
           </form>
+          </div>
         )}
       </CardContent>
     </Card>
