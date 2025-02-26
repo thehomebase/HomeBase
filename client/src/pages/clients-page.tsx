@@ -243,7 +243,7 @@ export default function ClientsPage() {
     },
   });
 
-  const filteredClients = clients.filter(client => 
+  const filteredClients = clients.filter(client =>
     [client.firstName, client.lastName, client.email, client.phone]
       .filter(Boolean)
       .some(field => field.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -278,83 +278,28 @@ export default function ClientsPage() {
           </div>
         </div>
         <Dialog open={isOpen} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white mb-0 mr-64">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Client
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Client</DialogTitle>
-              </DialogHeader>
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(createClientMutation.mutate)}
-                  className="space-y-4"
-                >
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="firstName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>First Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="lastName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Last Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+          <DialogTrigger asChild>
+            <Button className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white mb-0 mr-64">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Client
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Client</DialogTitle>
+            </DialogHeader>
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(createClientMutation.mutate)}
+                className="space-y-4"
+              >
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="address"
+                    name="firstName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Address</FormLabel>
+                        <FormLabel>First Name</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -364,18 +309,27 @@ export default function ClientsPage() {
                   />
                   <FormField
                     control={form.control}
-                    name="type"
+                    name="lastName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Client Type</FormLabel>
+                        <FormLabel>Last Name</FormLabel>
                         <FormControl>
-                          <select
-                            {...field}
-                            className="w-full px-3 py-2 border rounded-md"
-                          >
-                            <option value="seller">Seller</option>
-                            <option value="buyer">Buyer</option>
-                          </select>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -383,33 +337,78 @@ export default function ClientsPage() {
                   />
                   <FormField
                     control={form.control}
-                    name="notes"
+                    name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Notes</FormLabel>
+                        <FormLabel>Phone</FormLabel>
                         <FormControl>
-                          <textarea
-                            {...field}
-                            className="w-full px-3 py-2 border rounded-md"
-                            rows={3}
-                          />
+                          <Input {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={createClientMutation.isPending}
-                  >
-                    Add Client
-                  </Button>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Client Type</FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          className="w-full px-3 py-2 border rounded-md"
+                        >
+                          <option value="seller">Seller</option>
+                          <option value="buyer">Buyer</option>
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <textarea
+                          {...field}
+                          className="w-full px-3 py-2 border rounded-md"
+                          rows={3}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={createClientMutation.isPending}
+                >
+                  Add Client
+                </Button>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div>
@@ -420,15 +419,15 @@ export default function ClientsPage() {
               <TabsTrigger value="buyers">Buyers</TabsTrigger>
             </TabsList>
             <TabsContent value="sellers">
-              <ClientTable 
-                clients={sellers} 
-                onDelete={(id) => setClientToDelete(id)} 
+              <ClientTable
+                clients={sellers}
+                onDelete={(id) => setClientToDelete(id)}
               />
             </TabsContent>
             <TabsContent value="buyers">
-              <ClientTable 
-                clients={buyers} 
-                onDelete={(id) => setClientToDelete(id)} 
+              <ClientTable
+                clients={buyers}
+                onDelete={(id) => setClientToDelete(id)}
               />
             </TabsContent>
           </Tabs>
