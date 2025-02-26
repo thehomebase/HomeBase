@@ -241,11 +241,12 @@ export class DatabaseStorage implements IStorage {
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     try {
-      console.log('Creating transaction with data:', insertTransaction);
+      console.log('Starting transaction creation with data:', insertTransaction);
 
       // Validate required fields
       if (!insertTransaction.streetName || !insertTransaction.city || !insertTransaction.state || 
           !insertTransaction.zipCode || !insertTransaction.accessCode || !insertTransaction.agentId) {
+        console.error('Missing required fields:', insertTransaction);
         throw new Error('Missing required fields');
       }
 
@@ -274,11 +275,36 @@ export class DatabaseStorage implements IStorage {
           ${insertTransaction.agentId},
           ${insertTransaction.clientId || null},
           ${insertTransaction.secondaryClientId || null},
-          ${JSON.stringify(insertTransaction.participants || [])}::jsonb,
+          ${JSON.stringify([])}::jsonb,
           NOW()
         )
-        RETURNING *
+        RETURNING 
+          id,
+          street_name as "streetName",
+          city,
+          state,
+          zip_code as "zipCode",
+          access_code as "accessCode",
+          status,
+          type,
+          agent_id as "agentId",
+          client_id as "clientId",
+          secondary_client_id as "secondaryClientId",
+          participants,
+          contract_price as "contractPrice",
+          option_period_expiration as "optionPeriodExpiration",
+          option_fee as "optionFee",
+          earnest_money as "earnestMoney",
+          down_payment as "downPayment",
+          seller_concessions as "sellerConcessions",
+          closing_date as "closingDate",
+          contract_execution_date as "contractExecutionDate",
+          mls_number as "mlsNumber",
+          financing,
+          updated_at as "updatedAt"
       `);
+
+      console.log('Database result:', result.rows[0]);
 
       if (!result.rows[0]) {
         throw new Error('Failed to create transaction');
@@ -287,28 +313,28 @@ export class DatabaseStorage implements IStorage {
       const row = result.rows[0];
       return {
         id: Number(row.id),
-        streetName: String(row.street_name),
+        streetName: String(row.streetName),
         city: String(row.city),
         state: String(row.state),
-        zipCode: String(row.zip_code),
-        accessCode: String(row.access_code),
+        zipCode: String(row.zipCode),
+        accessCode: String(row.accessCode),
         status: String(row.status),
         type: String(row.type),
-        agentId: Number(row.agent_id),
-        clientId: row.client_id ? Number(row.client_id) : null,
-        secondaryClientId: row.secondary_client_id ? Number(row.secondary_client_id) : null,
+        agentId: Number(row.agentId),
+        clientId: row.clientId ? Number(row.clientId) : null,
+        secondaryClientId: row.secondaryClientId ? Number(row.secondaryClientId) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
-        contractPrice: row.contract_price ? Number(row.contract_price) : null,
-        optionPeriodExpiration: row.option_period_expiration ? new Date(row.option_period_expiration) : null,
-        optionFee: row.option_fee ? Number(row.option_fee) : null,
-        earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
-        downPayment: row.down_payment ? Number(row.down_payment) : null,
-        sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
-        closingDate: row.closing_date ? new Date(row.closing_date) : null,
-        contractExecutionDate: row.contract_execution_date ? new Date(row.contract_execution_date) : null,
-        mlsNumber: row.mls_number || null,
+        contractPrice: row.contractPrice ? Number(row.contractPrice) : null,
+        optionPeriodExpiration: row.optionPeriodExpiration ? new Date(row.optionPeriodExpiration) : null,
+        optionFee: row.optionFee ? Number(row.optionFee) : null,
+        earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
+        downPayment: row.downPayment ? Number(row.downPayment) : null,
+        sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
+        closingDate: row.closingDate ? new Date(row.closingDate) : null,
+        contractExecutionDate: row.contractExecutionDate ? new Date(row.contractExecutionDate) : null,
+        mlsNumber: row.mlsNumber || null,
         financing: row.financing || null,
-        updatedAt: row.updated_at ? new Date(row.updated_at) : null
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
       };
     } catch (error) {
       console.error('Error in createTransaction:', error);
