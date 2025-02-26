@@ -20,14 +20,11 @@ import { useState } from "react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TransactionTable } from "@/components/transaction-table";
-import { Transaction as SchemaTransaction } from "@shared/schema";
-import { Client } from "@shared/schema";
+import { insertTransactionSchema, type Transaction as SchemaTransaction } from "@shared/schema";
+import { type Client } from "@shared/schema";
 
-// Add proper type for client find operations
-type ClientLookup = (client: Client) => boolean;
-
-// Update the Transaction interface to include all required fields
-interface Transaction extends Omit<SchemaTransaction, 'updatedAt'> {
+// Update the Transaction interface to match schema
+interface Transaction extends SchemaTransaction {
   id: number;
   streetName: string;
   city: string;
@@ -39,19 +36,14 @@ interface Transaction extends Omit<SchemaTransaction, 'updatedAt'> {
   contractPrice: number | null;
   clientId: number | null;
   secondaryClientId: number | null;
-  client?: {
-    firstName: string;
-    lastName: string;
-  } | null;
-  secondaryClient?: {
-    firstName: string;
-    lastName: string;
-  } | null;
+  client?: Client | null;
+  secondaryClient?: Client | null;
   createdAt: string;
+  agentId: number;
   year: number;
 }
 
-const createTransactionSchema = z.object({
+const createTransactionSchema = insertTransactionSchema.extend({
   streetName: z.string().min(1, "Street name is required"),
   city: z.string().min(1, "City is required"),
   state: z.string().min(2, "State is required"),
@@ -75,17 +67,12 @@ export default function TransactionsPage() {
   const [startDate, setStartDate] = useState<string>(new Date(new Date().getFullYear(), 0, 1).toISOString());
   const [endDate, setEndDate] = useState<string>("");
 
-  const { data: clients = [] } = useQuery({
+  const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/clients");
-      if (!response.ok) throw new Error('Failed to fetch clients');
-      return response.json();
-    },
     enabled: user?.role === "agent"
   });
 
-  const form = useForm({
+  const form = useForm<z.infer<typeof createTransactionSchema>>({
     resolver: zodResolver(createTransactionSchema),
     defaultValues: {
       streetName: "",
@@ -94,8 +81,8 @@ export default function TransactionsPage() {
       zipCode: "",
       accessCode: "",
       type: "buy" as const,
-      clientId: null as number | null,
-      secondaryClientId: null as number | null
+      clientId: null,
+      secondaryClientId: null
     },
   });
 
@@ -118,8 +105,8 @@ export default function TransactionsPage() {
         agentId: user?.id,
         status: 'prospect',
         participants: [],
-        clientId: data.clientId || null,
-        secondaryClientId: data.secondaryClientId || null,
+        clientId: data.clientId,
+        secondaryClientId: data.secondaryClientId,
         year: new Date().getFullYear()
       });
       if (!response.ok) {
@@ -184,7 +171,6 @@ export default function TransactionsPage() {
     const endDateMatch = endDate === "" || transactionDate <= new Date(endDate);
     return yearMatch && startDateMatch && endDateMatch;
   });
-
 
   const isMobile = useIsMobile();
 
@@ -432,8 +418,8 @@ export default function TransactionsPage() {
                 <CardContent>
                   <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize truncate">Status: {transaction.status.replace('_', ' ')}</p>
                   <p className="text-sm text-muted-foreground dark:text-gray-300 break-words">
-                    Client: {clients.find((c: Client) => c.id === transaction.clientId)
-                      ? `${clients.find((c: Client) => c.id === transaction.clientId)?.firstName} ${clients.find((c: Client) => c.id === transaction.clientId)?.lastName}`
+                    Client: {transaction.client
+                      ? `${transaction.client.firstName} ${transaction.client.lastName}`
                       : 'Not set'}
                   </p>
                   {transaction.secondaryClient && (
