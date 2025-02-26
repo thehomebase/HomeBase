@@ -176,17 +176,10 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
-    console.log('Auth check request:', {
-      isAuthenticated: req.isAuthenticated(),
-      sessionId: req.sessionID,
-      user: req.user
-    });
-
     if (!req.isAuthenticated()) {
       console.log('Unauthenticated user request to /api/user');
       return res.sendStatus(401);
     }
-
     console.log('Authenticated user request:', req.user?.id);
     const { password, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);

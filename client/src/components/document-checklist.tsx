@@ -106,7 +106,7 @@ function DocumentCard({
       onClick={() => setIsEditing(!isEditing)}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 w-screen">
+        <div className="flex-1">
           <div className="font-medium text-sm mb-1">{document.name}</div>
           <Badge variant="secondary" className={`${statusColor} text-xs`}>
             {statusColumns.find(col => col.key === document.status)?.label}
@@ -360,7 +360,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Documents</CardTitle>
+        <CardTitle className="w-screen text-lg">Documents</CardTitle>
       </CardHeader>
       <CardContent>
         <DndContext
@@ -389,41 +389,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
           </DragOverlay>
         </DndContext>
         {user?.role === 'agent' && (
-          <div className="space-y-4">
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="ml-auto">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Contact from Clients
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add Contact from Clients</DialogTitle>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  {clients.map((client) => (
-                    <div key={client.id} className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{client.firstName} {client.lastName}</div>
-                        <div className="text-sm text-muted-foreground">{client.email}</div>
-                      </div>
-                      <Button onClick={() => {
-                        updateDocumentMutation.mutate({
-                          id: client.id.toString(),
-                          status: 'complete',
-                          notes: `Added from client: ${client.firstName} ${client.lastName}`
-                        });
-                      }}>
-                        Add as Contact
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </DialogContent>
-            </Dialog>
-            
-            <form onSubmit={(e) => {
+          <form onSubmit={(e) => {
             e.preventDefault();
             if (newDocument.trim()) {
               addDocumentMutation.mutate(newDocument.trim());
@@ -443,7 +409,6 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
               Add Document
             </Button>
           </form>
-          </div>
         )}
       </CardContent>
     </Card>
