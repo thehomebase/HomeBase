@@ -105,18 +105,24 @@ export default function TransactionsPage() {
       };
       console.log("Sending payload to server:", payload);
 
-      const response = await apiRequest("POST", "/api/transactions", payload);
-      console.log("Server response status:", response.status);
+      try {
+        const response = await apiRequest("POST", "/api/transactions", payload);
+        console.log("Server response status:", response.status);
+        console.log("Server response headers:", Object.fromEntries(response.headers.entries()));
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Server error response:", errorData);
-        throw new Error(errorData.error || 'Failed to create transaction');
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("Server error response:", errorData);
+          throw new Error(errorData.error || 'Failed to create transaction');
+        }
+
+        const result = await response.json();
+        console.log("Server success response:", result);
+        return result;
+      } catch (error) {
+        console.error("API request error:", error);
+        throw error;
       }
-
-      const result = await response.json();
-      console.log("Server success response:", result);
-      return result;
     },
     onSuccess: (data) => {
       console.log("Transaction created successfully:", data);
@@ -279,12 +285,15 @@ export default function TransactionsPage() {
                 <DialogTitle>Create New Transaction</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form 
+                <form
+                  id="transactionForm"
                   onSubmit={(e) => {
                     e.preventDefault();
                     console.log("Form submit event triggered");
+                    const formData = new FormData(e.currentTarget);
+                    console.log("Form data:", Object.fromEntries(formData));
                     form.handleSubmit(onSubmit)(e);
-                  }} 
+                  }}
                   className="space-y-4"
                 >
                   <FormField
@@ -424,9 +433,14 @@ export default function TransactionsPage() {
                     </div>
                   )}
                   <Button
+                    id="createTransactionBtn"
                     type="submit"
                     className="w-full bg-primary text-white hover:bg-primary/90"
                     disabled={createTransactionMutation.isPending}
+                    onClick={(e) => {
+                      console.log("Button clicked!");
+                      // Don't prevent default here to allow form submission
+                    }}
                   >
                     {createTransactionMutation.isPending ? (
                       <>Creating...</>
