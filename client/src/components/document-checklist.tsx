@@ -106,7 +106,7 @@ function DocumentCard({
       onClick={() => setIsEditing(!isEditing)}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex-1">
+        <div className="flex-1 w-screen">
           <div className="font-medium text-sm mb-1">{document.name}</div>
           <Badge variant="secondary" className={`${statusColor} text-xs`}>
             {statusColumns.find(col => col.key === document.status)?.label}
