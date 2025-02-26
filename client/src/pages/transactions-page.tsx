@@ -190,7 +190,7 @@ export default function TransactionsPage() {
 
   return (
     <main className="flex-1 min-w-0 overflow-x-hidden px-4">
-      <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
+      <div className="sm:w-screen flex flex-wrap bg-background relative px-0 py-8">
         <div className="flex flex-col sm:flex-row flex-grow sm:items-center gap-2 mb-2">
           <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
           <div className="flex items-center gap-2">
@@ -224,7 +224,7 @@ export default function TransactionsPage() {
               pressed={theme === 'dark'}
               onPressedChange={toggleTheme}
               aria-label="Toggle theme"
-              className=" hover:text-foreground dark:text-white dark:hover:text-white"
+              className="hover:text-foreground dark:text-white dark:hover:text-white"
             >
               {theme === 'light' ? (
                 <Moon className="h-4 w-4" />
@@ -411,7 +411,8 @@ export default function TransactionsPage() {
                 onClick={() => setLocation(`/transactions/${transaction.id}`)}
               >
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg hover:underline dark:text-white truncate">
+                  <CardTitle
+                    className="text-lg hover:underline dark:text-white truncate">
                     {transaction.streetName}
                   </CardTitle>
                   {user?.role === "agent" && (
