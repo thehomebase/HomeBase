@@ -38,6 +38,7 @@ interface Transaction extends SchemaTransaction {
   client?: Client | null;
   secondaryClient?: Client | null;
   createdAt: string;
+  updatedAt: string; // Added updatedAt
   agentId: number;
 }
 
@@ -163,13 +164,11 @@ export default function TransactionsPage() {
   });
 
   const filteredTransactions = transactions.filter((transaction: Transaction) => {
-    if (!selectedYear) return true; // Show all transactions when no year is selected
+    if (!selectedYear) return true; // Show all transactions when "All" is selected
 
-    const transactionDate = transaction.createdAt ? new Date(transaction.createdAt) : new Date();
-    const yearMatch = selectedYear === null || transactionDate.getFullYear() === selectedYear;
-    const startDateMatch = !startDate || transactionDate >= new Date(startDate);
-    const endDateMatch = !endDate || transactionDate <= new Date(endDate);
-    return yearMatch && startDateMatch && endDateMatch;
+    // Only filter by year if selectedYear is set
+    const transactionDate = transaction.updatedAt ? new Date(transaction.updatedAt) : null;
+    return transactionDate ? transactionDate.getFullYear() === selectedYear : false;
   });
 
   const isMobile = useIsMobile();
