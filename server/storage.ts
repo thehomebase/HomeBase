@@ -253,7 +253,8 @@ export class DatabaseStorage implements IStorage {
           type,
           agent_id,
           client_id,
-          participants
+          participants,
+          year
         ) VALUES (
           ${insertTransaction.streetName},
           ${insertTransaction.city},
@@ -264,7 +265,8 @@ export class DatabaseStorage implements IStorage {
           ${insertTransaction.type || 'buy'},
           ${insertTransaction.agentId},
           ${insertTransaction.clientId || null},
-          ${JSON.stringify(insertTransaction.participants || [])}::jsonb
+          ${JSON.stringify(insertTransaction.participants || [])}::jsonb,
+          ${new Date().getFullYear()}
         )
         RETURNING *
       `);
@@ -276,7 +278,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       const row = result.rows[0];
-      const transaction = {
+      return {
         id: Number(row.id),
         streetName: String(row.street_name),
         city: String(row.city),
@@ -287,6 +289,7 @@ export class DatabaseStorage implements IStorage {
         type: String(row.type),
         agentId: Number(row.agent_id),
         clientId: row.client_id ? Number(row.client_id) : null,
+        secondaryClientId: row.secondary_client_id ? Number(row.secondary_client_id) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
         contractPrice: row.contract_price ? Number(row.contract_price) : null,
         optionPeriodExpiration: row.option_period_expiration ? new Date(row.option_period_expiration) : null,
@@ -297,11 +300,9 @@ export class DatabaseStorage implements IStorage {
         closingDate: row.closing_date ? new Date(row.closing_date) : null,
         contractExecutionDate: row.contract_execution_date ? new Date(row.contract_execution_date) : null,
         mlsNumber: row.mls_number || null,
-        financing: row.financing || null
+        financing: row.financing || null,
+        updatedAt: row.updated_at ? new Date(row.updated_at) : null
       };
-
-      console.log('Returning transaction:', transaction);
-      return transaction;
     } catch (error) {
       console.error('Error in createTransaction:', error);
       throw error;
@@ -814,8 +815,7 @@ export class DatabaseStorage implements IStorage {
   async createContact(data: any) {
     try {
       if (!data.role || !data.firstName || !data.lastName || !data.email || !data.transactionId) {
-        throw new Error('Missing required fields');
-      }
+        throw new Error('Missing required fields');      }
 
       const transactionExists = await db.execute(sql`
         SELECT EXISTS(SELECT 1 FROM transactions WHERE id =${data.transactionId})
