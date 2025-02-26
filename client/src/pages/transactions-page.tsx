@@ -106,7 +106,7 @@ export default function TransactionsPage() {
       console.log("Sending payload to server:", payload);
 
       const response = await apiRequest("POST", "/api/transactions", payload);
-      console.log("Server response status:", response.status);
+      console.log("Server response:", response);
 
       if (!response.ok) {
         const errorData = await response.json();
