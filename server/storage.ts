@@ -818,7 +818,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       const transactionExists = await db.execute(sql`
-        SELECT EXISTS(SELECT 1 FROM transactions WHERE id=${data.transactionId})
+        SELECT EXISTS(SELECT 1 FROM transactions WHERE id =${data.transactionId})
       `);
 
       if (!transactionExists.rows[0].exists) {
@@ -1077,31 +1077,25 @@ export class DatabaseStorage implements IStorage {
 
   async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
-      console.log('Updating document with data:', {
-        id,
-        deadline: data.deadline,
-        deadlineTime: data.deadlineTime,
-        status: data.status,
-        notes: data.notes
-      });
+      console.log('Updating document with:', { id, data });
 
-      // First verify the document exists
+      // First fetch the current document to ensure it exists
       const currentDoc = await db.execute(sql`
         SELECT * FROM documents WHERE id = ${id}
       `);
 
       if (!currentDoc.rows[0]) {
-        throw new Error(`Document with ID ${id} not found`);
+        throw new Error('Document not found');
       }
 
-      // Build update query with proper SQL syntax
+      // Update document with new values, handling each field separately
       const result = await db.execute(sql`
         UPDATE documents
         SET 
-          status = CASE WHEN ${data.status} IS NULL THEN status ELSE ${data.status} END,
-          notes = CASE WHEN ${data.notes} IS NULL THEN notes ELSE ${data.notes} END,
-          deadline = CASE WHEN ${data.deadline} IS NULL THEN deadline ELSE ${data.deadline}::date END,
-          deadline_time = CASE WHEN ${data.deadlineTime} IS NULL THEN deadline_time ELSE ${data.deadlineTime}::time END,
+          status = ${data.status || currentDoc.rows[0].status},
+          notes = ${data.notes !== undefined ? data.notes : currentDoc.rows[0].notes},
+          deadline = ${data.deadline !== undefined ? data.deadline : currentDoc.rows[0].deadline},
+          deadline_time = ${data.deadlineTime !== undefined ? data.deadlineTime : currentDoc.rows[0].deadline_time},
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
@@ -1110,13 +1104,13 @@ export class DatabaseStorage implements IStorage {
           status,
           transaction_id as "transactionId",
           notes,
-          deadline::text,
-          deadline_time::text as "deadlineTime",
+          deadline,
+          deadline_time as "deadlineTime",
           created_at as "createdAt",
           updated_at as "updatedAt"
       `);
 
-      console.log('Database update result:', result.rows[0]);
+      console.log('Update result:', result.rows[0]);
 
       if (!result.rows[0]) {
         throw new Error('Failed to update document');
@@ -1439,31 +1433,25 @@ export class DatabaseStorage implements IStorage {
 
   async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
-      console.log('Updating document with data:', {
-        id,
-        deadline: data.deadline,
-        deadlineTime: data.deadlineTime,
-        status: data.status,
-        notes: data.notes
-      });
+      console.log('Updating document with:', { id, data });
 
-      // First verify the document exists
+      // First fetch the current document to ensure it exists
       const currentDoc = await db.execute(sql`
         SELECT * FROM documents WHERE id = ${id}
       `);
 
       if (!currentDoc.rows[0]) {
-        throw new Error(`Document with ID ${id} not found`);
+        throw new Error('Document not found');
       }
 
-      // Build update query with proper SQL syntax
+      // Update document with new values, handling each field separately
       const result = await db.execute(sql`
         UPDATE documents
         SET 
-          status = CASE WHEN ${data.status} IS NULL THEN status ELSE ${data.status} END,
-          notes = CASE WHEN ${data.notes} IS NULL THEN notes ELSE ${data.notes} END,
-          deadline = CASE WHEN ${data.deadline} IS NULL THEN deadline ELSE ${data.deadline}::date END,
-          deadline_time = CASE WHEN ${data.deadlineTime} IS NULL THEN deadline_time ELSE ${data.deadlineTime}::time END,
+          status = ${data.status || currentDoc.rows[0].status},
+          notes = ${data.notes !== undefined ? data.notes : currentDoc.rows[0].notes},
+          deadline = ${data.deadline !== undefined ? data.deadline : currentDoc.rows[0].deadline},
+          deadline_time = ${data.deadlineTime !== undefined ? data.deadlineTime : currentDoc.rows[0].deadline_time},
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
@@ -1472,13 +1460,13 @@ export class DatabaseStorage implements IStorage {
           status,
           transaction_id as "transactionId",
           notes,
-          deadline::text,
-          deadline_time::text as "deadlineTime",
+          deadline,
+          deadline_time as "deadlineTime",
           created_at as "createdAt",
           updated_at as "updatedAt"
       `);
 
-      console.log('Database update result:', result.rows[0]);
+      console.log('Update result:', result.rows[0]);
 
       if (!result.rows[0]) {
         throw new Error('Failed to update document');
