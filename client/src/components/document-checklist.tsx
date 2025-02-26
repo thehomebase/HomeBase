@@ -247,22 +247,39 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
 
       return response.json();
     },
-    onSuccess: (updatedDoc) => {
-      queryClient.setQueryData(["/api/documents", transactionId], (oldData: Document[] = []) =>
-        oldData.map(doc => doc.id === updatedDoc.id ? updatedDoc : doc)
+    onMutate: async (variables) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ["/api/documents", transactionId] });
+
+      // Snapshot the previous value
+      const previousDocuments = queryClient.getQueryData(["/api/documents", transactionId]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(["/api/documents", transactionId], (old: Document[] = []) => 
+        old.map(doc => 
+          doc.id === variables.id 
+            ? { ...doc, ...variables }
+            : doc
+        )
       );
-      toast({
-        title: "Success",
-        description: "Document updated successfully",
-      });
+
+      // Return a context object with the snapshotted value
+      return { previousDocuments };
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
       console.error('Document update error:', error);
+      // Rollback to the previous value if there was an error
+      if (context?.previousDocuments) {
+        queryClient.setQueryData(["/api/documents", transactionId], context.previousDocuments);
+      }
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update document",
         variant: "destructive"
       });
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure cache is in sync with server
       queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
     }
   });
