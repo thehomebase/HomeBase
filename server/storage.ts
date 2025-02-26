@@ -241,6 +241,8 @@ export class DatabaseStorage implements IStorage {
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     try {
+      console.log('Starting transaction creation with data:', insertTransaction);
+
       const result = await db.execute(sql`
         INSERT INTO transactions (
           street_name,
@@ -295,12 +297,15 @@ export class DatabaseStorage implements IStorage {
           updated_at as "updatedAt"
       `);
 
+      console.log('Database result:', result.rows[0]);
+
       if (!result.rows[0]) {
+        console.error('No rows returned from database insert');
         throw new Error('Failed to create transaction');
       }
 
       const row = result.rows[0];
-      return {
+      const transaction = {
         id: Number(row.id),
         streetName: String(row.streetName),
         city: String(row.city),
@@ -325,6 +330,9 @@ export class DatabaseStorage implements IStorage {
         financing: row.financing || null,
         updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
       };
+
+      console.log('Returning transaction:', transaction);
+      return transaction;
     } catch (error) {
       console.error('Error in createTransaction:', error);
       throw error;

@@ -97,21 +97,29 @@ export default function TransactionsPage() {
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: CreateTransactionInput) => {
+      console.log("Starting transaction creation with data:", data);
       const payload = {
         ...data,
         agentId: user?.id,
         participants: []
       };
+      console.log("Sending payload to server:", payload);
 
       const response = await apiRequest("POST", "/api/transactions", payload);
+      console.log("Server response status:", response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("Server error response:", errorData);
         throw new Error(errorData.error || 'Failed to create transaction');
       }
 
-      return response.json();
+      const result = await response.json();
+      console.log("Server success response:", result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Transaction created successfully:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       refetch();
       form.reset();
@@ -122,6 +130,7 @@ export default function TransactionsPage() {
       });
     },
     onError: (error: Error) => {
+      console.error("Transaction creation failed:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -131,6 +140,7 @@ export default function TransactionsPage() {
   });
 
   const onSubmit = async (data: CreateTransactionInput) => {
+    console.log("Form submitted with data:", data);
     try {
       await createTransactionMutation.mutateAsync(data);
     } catch (error) {
