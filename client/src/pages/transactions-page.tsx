@@ -414,7 +414,11 @@ export default function TransactionsPage() {
                     </div>
                   )}
                   <Button type="submit" className="w-full bg-primary text-white hover:bg-primary/90" disabled={createTransactionMutation.isPending}>
-                    Create Transaction
+                    {createTransactionMutation.isPending ? (
+                      <>Creating...</>
+                    ) : (
+                      <>Create Transaction</>
+                    )}
                   </Button>
                 </form>
               </Form>
