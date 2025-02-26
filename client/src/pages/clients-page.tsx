@@ -1,3 +1,4 @@
+
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -263,21 +264,22 @@ export default function ClientsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
-        <div className="flex flex-col sm:flex-row flex-grow sm:items-center gap-2 mb-2">
-          <h2 className="text-2xl font-bold dark:text-white">Client Management</h2>
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search clients..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8"
-            />
+    <>
+      <div className="container mx-auto px-4 py-8">
+        <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
+          <div className="flex flex-col sm:flex-row flex-grow sm:items-center gap-2 mb-2">
+            <h2 className="text-2xl font-bold dark:text-white">Client Management</h2>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search clients..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8"
+              />
+            </div>
           </div>
-        </div>
-        <Dialog open={isOpen} onOpenChange={setOpen}>
+          <Dialog open={isOpen} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white mb-0 mr-64">
                 <Plus className="h-4 w-4 mr-2" />
@@ -289,10 +291,7 @@ export default function ClientsPage() {
                 <DialogTitle>Add New Client</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(createClientMutation.mutate)}
-                  className="space-y-4"
-                >
+                <form onSubmit={form.handleSubmit(createClientMutation.mutate)} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -369,10 +368,7 @@ export default function ClientsPage() {
                       <FormItem>
                         <FormLabel>Client Type</FormLabel>
                         <FormControl>
-                          <select
-                            {...field}
-                            className="w-full px-3 py-2 border rounded-md"
-                          >
+                          <select {...field} className="w-full px-3 py-2 border rounded-md">
                             <option value="seller">Seller</option>
                             <option value="buyer">Buyer</option>
                           </select>
@@ -398,11 +394,7 @@ export default function ClientsPage() {
                       </FormItem>
                     )}
                   />
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={createClientMutation.isPending}
-                  >
+                  <Button type="submit" className="w-full" disabled={createClientMutation.isPending}>
                     Add Client
                   </Button>
                 </form>
@@ -410,50 +402,50 @@ export default function ClientsPage() {
             </DialogContent>
           </Dialog>
         </div>
-      </div>
 
-      <div>
-        <Card>
-          <Tabs defaultValue="sellers" className="p-6">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="sellers">Sellers</TabsTrigger>
-              <TabsTrigger value="buyers">Buyers</TabsTrigger>
-            </TabsList>
-            <TabsContent value="sellers">
-              <ClientTable 
-                clients={sellers} 
-                onDelete={(id) => setClientToDelete(id)} 
-              />
-            </TabsContent>
-            <TabsContent value="buyers">
-              <ClientTable 
-                clients={buyers} 
-                onDelete={(id) => setClientToDelete(id)} 
-              />
-            </TabsContent>
-          </Tabs>
-        </Card>
-      </div>
+        <div>
+          <Card>
+            <Tabs defaultValue="sellers" className="p-6">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="sellers">Sellers</TabsTrigger>
+                <TabsTrigger value="buyers">Buyers</TabsTrigger>
+              </TabsList>
+              <TabsContent value="sellers">
+                <ClientTable 
+                  clients={sellers} 
+                  onDelete={(id) => setClientToDelete(id)} 
+                />
+              </TabsContent>
+              <TabsContent value="buyers">
+                <ClientTable 
+                  clients={buyers} 
+                  onDelete={(id) => setClientToDelete(id)} 
+                />
+              </TabsContent>
+            </Tabs>
+          </Card>
+        </div>
 
-      <AlertDialog open={clientToDelete !== null} onOpenChange={() => setClientToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Client</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this client? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => clientToDelete && deleteClientMutation.mutate(clientToDelete)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+        <AlertDialog open={clientToDelete !== null} onOpenChange={() => setClientToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Client</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this client? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => clientToDelete && deleteClientMutation.mutate(clientToDelete)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </>
   );
 }
