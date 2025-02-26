@@ -97,15 +97,20 @@ export default function TransactionsPage() {
   const createTransactionMutation = useMutation({
     mutationFn: async (data: CreateTransactionInput) => {
       console.log("Creating transaction with data:", data);
-      const response = await apiRequest("POST", "/api/transactions", {
+      const payload = {
         ...data,
         agentId: user?.id,
         participants: [],
         year: new Date().getFullYear()
-      });
+      };
+      console.log("Sending payload to server:", payload);
+
+      const response = await apiRequest("POST", "/api/transactions", payload);
+      console.log("Server response status:", response.status);
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("Server error response:", errorData);
         throw new Error(errorData.error || 'Failed to create transaction');
       }
 
@@ -113,7 +118,8 @@ export default function TransactionsPage() {
       console.log("Transaction created successfully:", result);
       return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Transaction creation succeeded:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       refetch();
       form.reset();
@@ -123,7 +129,7 @@ export default function TransactionsPage() {
       });
     },
     onError: (error: Error) => {
-      console.error("Error creating transaction:", error);
+      console.error("Transaction creation failed:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -171,9 +177,19 @@ export default function TransactionsPage() {
   const onSubmit = async (data: CreateTransactionInput) => {
     console.log("Form submitted with data:", data);
     try {
-      await createTransactionMutation.mutateAsync(data);
+      const validatedData = createTransactionSchema.parse(data);
+      console.log("Validated data:", validatedData);
+      await createTransactionMutation.mutateAsync(validatedData);
     } catch (error) {
       console.error("Form submission error:", error);
+      if (error instanceof z.ZodError) {
+        console.error("Validation errors:", error.errors);
+      }
+      toast({
+        title: "Error",
+        description: "Failed to create transaction. Please check the form fields.",
+        variant: "destructive"
+      });
     }
   };
 

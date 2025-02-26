@@ -242,6 +242,13 @@ export class DatabaseStorage implements IStorage {
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     try {
       console.log('Creating transaction with data:', insertTransaction);
+
+      // Validate required fields
+      if (!insertTransaction.streetName || !insertTransaction.city || !insertTransaction.state || 
+          !insertTransaction.zipCode || !insertTransaction.accessCode || !insertTransaction.agentId) {
+        throw new Error('Missing required fields');
+      }
+
       const result = await db.execute(sql`
         INSERT INTO transactions (
           street_name,
@@ -253,6 +260,7 @@ export class DatabaseStorage implements IStorage {
           type,
           agent_id,
           client_id,
+          secondary_client_id,
           participants,
           year
         ) VALUES (
@@ -265,6 +273,7 @@ export class DatabaseStorage implements IStorage {
           ${insertTransaction.type || 'buy'},
           ${insertTransaction.agentId},
           ${insertTransaction.clientId || null},
+          ${insertTransaction.secondaryClientId || null},
           ${JSON.stringify(insertTransaction.participants || [])}::jsonb,
           ${new Date().getFullYear()}
         )
