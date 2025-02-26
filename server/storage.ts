@@ -241,15 +241,6 @@ export class DatabaseStorage implements IStorage {
 
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     try {
-      console.log('Starting transaction creation with data:', insertTransaction);
-
-      // Validate required fields
-      if (!insertTransaction.streetName || !insertTransaction.city || !insertTransaction.state || 
-          !insertTransaction.zipCode || !insertTransaction.accessCode || !insertTransaction.agentId) {
-        console.error('Missing required fields:', insertTransaction);
-        throw new Error('Missing required fields');
-      }
-
       const result = await db.execute(sql`
         INSERT INTO transactions (
           street_name,
@@ -303,8 +294,6 @@ export class DatabaseStorage implements IStorage {
           financing,
           updated_at as "updatedAt"
       `);
-
-      console.log('Database result:', result.rows[0]);
 
       if (!result.rows[0]) {
         throw new Error('Failed to create transaction');

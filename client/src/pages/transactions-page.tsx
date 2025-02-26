@@ -104,7 +104,6 @@ export default function TransactionsPage() {
       };
 
       const response = await apiRequest("POST", "/api/transactions", payload);
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to create transaction');
