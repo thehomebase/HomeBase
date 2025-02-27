@@ -1,3 +1,17 @@
+// Rename the local Document interface to avoid conflict
+interface StorageDocument {
+  id: string;
+  name: string;
+  status: 'not_applicable' | 'waiting_signatures' | 'signed' | 'waiting_others' | 'complete';
+  transactionId: number;
+  deadline: string | null;
+  deadlineTime: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  notes: string | null;
+}
+
+// Update Document type to use the imported one from schema.ts
 import { 
   users, transactions, checklists, messages, clients, documents,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
@@ -16,18 +30,18 @@ interface ChecklistItem {
   phase: string;
 }
 
-// Update Document type definition
-interface Document {
-  id: string;
-  name: string;
-  status: 'not_applicable' | 'waiting_signatures' | 'signed' | 'waiting_others' | 'complete';
-  transactionId: number;
-  deadline: string | null;
-  deadlineTime: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  notes: string | null;
-}
+// Update Document type definition - This line is now redundant because we import Document from @shared/schema
+// interface Document {
+//   id: string;
+//   name: string;
+//   status: 'not_applicable' | 'waiting_signatures' | 'signed' | 'waiting_others' | 'complete';
+//   transactionId: number;
+//   deadline: string | null;
+//   deadlineTime: string | null;
+//   createdAt: Date;
+//   updatedAt: Date;
+//   notes: string | null;
+// }
 
 export interface IStorage {
   // User operations
@@ -58,9 +72,9 @@ export interface IStorage {
   updateClient(id: number, data: Partial<Client>): Promise<Client>;
 
   // Document operations
-  getDocumentsByTransaction(transactionId: number): Promise<Document[]>;
-  createDocument(document: { name: string; status: Document['status']; transactionId: number }): Promise<Document>;
-  updateDocument(id: string, data: Partial<Document>): Promise<Document>;
+  getDocumentsByTransaction(transactionId: number): Promise<StorageDocument[]>;
+  createDocument(document: { name: string; status: StorageDocument['status']; transactionId: number }): Promise<StorageDocument>;
+  updateDocument(id: string, data: Partial<StorageDocument>): Promise<StorageDocument>;
   deleteDocument(id: string): Promise<void>;
 }
 
@@ -797,8 +811,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteContact(id: number) {
-    try {
-      const result = await db.execute(sql`
+    try {      const result = await db.execute(sql`
         DELETE FROM contacts WHERE id = ${id} RETURNING id
       `);
       if (!result.rows[0]) {
@@ -996,43 +1009,31 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
+  async getDocumentsByTransaction(transactionId: number): Promise<StorageDocument[]> {
     try {
       const result = await db.execute(sql`
-        SELECT 
-          id,
-          name,
-          status,
-          transaction_id as "transactionId",
-          created_at as "createdAt",
-          updated_at as "updatedAt"
-        FROM documents 
-        WHERE transaction_id = ${transactionId}
-        ORDER BY created_at ASC
+        SELECT * FROM documents WHERE transaction_id = ${transactionId}
       `);
 
-      return result.rows.map(doc => ({
-        id: doc.id,
-        name: doc.name,
-        status: doc.status as Document['status'],
-        transactionId: Number(doc.transactionId),
-        createdAt: new Date(doc.createdAt),
-        updatedAt: new Date(doc.updatedAt)
+      return result.rows.map(row => ({
+        id: String(row.id),
+        name: String(row.name),
+        status: row.status as StorageDocument['status'],
+        transactionId: Number(row.transaction_id),
+        deadline: row.deadline ? String(row.deadline) : null,
+        deadlineTime: row.deadline_time ? String(row.deadline_time) : null,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        notes: row.notes ? String(row.notes) : null
       }));
     } catch (error) {
       console.error('Error in getDocumentsByTransaction:', error);
-      return [];
+      throw error;
     }
   }
 
-  async createDocument(data: { name: string; status: Document['status']; transactionId: number }): Promise<Document> {
+  async createDocument(document: { name: string; status: StorageDocument['status']; transactionId: number }): Promise<StorageDocument> {
     try {
-      // Validate the status is one of the allowed values
-      const validStatuses = ['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'] as const;
-      if (!validStatuses.includes(data.status)) {
-        throw new Error('Invalid document status');
-      }
-
       const result = await db.execute(sql`
         INSERT INTO documents (
           name,
@@ -1041,33 +1042,25 @@ export class DatabaseStorage implements IStorage {
           created_at,
           updated_at
         ) VALUES (
-          ${data.name},
-          ${data.status},
-          ${data.transactionId},
+          ${document.name},
+          ${document.status},
+          ${document.transactionId},
           NOW(),
           NOW()
-        )
-        RETURNING 
-          id,
-          name,
-          status,
-          transaction_id as "transactionId",
-          created_at as "createdAt",
-          updated_at as "updatedAt"
+        ) RETURNING *
       `);
 
-      if (!result.rows[0]) {
-        throw new Error('Failed to create document');
-      }
-
-      const doc = result.rows[0];
+      const row = result.rows[0];
       return {
-        id: doc.id,
-        name: doc.name,
-        status: doc.status as Document['status'],
-        transactionId: Number(doc.transactionId),
-        createdAt: new Date(doc.createdAt),
-        updatedAt: new Date(doc.updatedAt)
+        id: String(row.id),
+        name: String(row.name),
+        status: row.status as StorageDocument['status'],
+        transactionId: Number(row.transaction_id),
+        deadline: row.deadline ? String(row.deadline) : null,
+        deadlineTime: row.deadline_time ? String(row.deadline_time) : null,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        notes: row.notes ? String(row.notes) : null
       };
     } catch (error) {
       console.error('Error in createDocument:', error);
@@ -1075,65 +1068,41 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
+  async updateDocument(id: string, data: Partial<StorageDocument>): Promise<StorageDocument> {
     try {
-      console.log('Updating document with:', { id, data });
+      // Create SET clause
+      const setColumns = Object.entries(data)
+        .filter(([_, value]) => value !== undefined)
+        .map(([key, value]) => {
+          const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+          if (value === null) {
+            return sql`${sql.identifier([snakeKey])} = NULL`;
+          }
+          return sql`${sql.identifier([snakeKey])} = ${value}`;
+        });
 
-      // First fetch the current document to ensure it exists
-      const currentDoc = await db.execute(sql`
-        SELECT * FROM documents WHERE id = ${id}
-      `);
-
-      if (!currentDoc.rows[0]) {
-        throw new Error('Document not found');
-      }
-
-      // Update document with new values, handling each field separately
       const result = await db.execute(sql`
         UPDATE documents
-        SET 
-          status = ${data.status || currentDoc.rows[0].status},
-          notes = ${data.notes !== undefined ? data.notes : currentDoc.rows[0].notes},
-          deadline = ${data.deadline !== undefined ? data.deadline : currentDoc.rows[0].deadline},
-          deadline_time = ${data.deadlineTime !== undefined ? data.deadlineTime : currentDoc.rows[0].deadline_time},
-          updated_at = CURRENT_TIMESTAMP
+        SET ${sql.join(setColumns, sql`, `)},
+            updated_at = NOW()
         WHERE id = ${id}
-        RETURNING 
-          id,
-          name,
-          status,
-          transaction_id as "transactionId",
-          notes,
-          deadline,
-          deadline_time as "deadlineTime",
-          created_at as "createdAt",
-          updated_at as "updatedAt"
+        RETURNING *
       `);
-
-      console.log('Update result:', result.rows[0]);
-
-      if (!result.rows[0]) {
-        throw new Error('Failed to update document');
-      }
 
       const row = result.rows[0];
       return {
         id: String(row.id),
         name: String(row.name),
-        status: row.status as Document['status'],
-        transactionId: Number(row.transactionId),
-        notes: row.notes,
-        deadline: row.deadline,
-        deadlineTime: row.deadlineTime,
-        createdAt: new Date(row.createdAt),
-        updatedAt: new Date(row.updatedAt)
+        status: row.status as StorageDocument['status'],
+        transactionId: Number(row.transaction_id),
+        deadline: row.deadline ? String(row.deadline) : null,
+        deadlineTime: row.deadline_time ? String(row.deadline_time) : null,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        notes: row.notes ? String(row.notes) : null
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
-      if (error instanceof Error) {
-        console.error('Error details:', error.message);
-        console.error('Stack trace:', error.stack);
-      }
       throw error;
     }
   }
@@ -1141,8 +1110,7 @@ export class DatabaseStorage implements IStorage {
   async deleteDocument(id: string): Promise<void> {
     try {
       await db.execute(sql`
-        DELETE FROM documents 
-        WHERE id = ${id}
+        DELETE FROM documents WHERE id = ${id}
       `);
     } catch (error) {
       console.error('Error in deleteDocument:', error);
@@ -1361,7 +1329,10 @@ export class DatabaseStorage implements IStorage {
           status,
           transaction_id as "transactionId",
           created_at as "createdAt",
-          updated_at as "updatedAt"
+          updated_at as "updatedAt",
+          deadline,
+          deadline_time as "deadlineTime",
+          notes
         FROM documents 
         WHERE transaction_id = ${transactionId}
         ORDER BY created_at ASC
@@ -1373,7 +1344,10 @@ export class DatabaseStorage implements IStorage {
         status: doc.status as Document['status'],
         transactionId: Number(doc.transactionId),
         createdAt: new Date(doc.createdAt),
-        updatedAt: new Date(doc.updatedAt)
+        updatedAt: new Date(doc.updatedAt),
+        deadline: doc.deadline,
+        deadlineTime: doc.deadlineTime,
+        notes: doc.notes
       }));
     } catch (error) {
       console.error('Error in getDocumentsByTransaction:', error);
@@ -1409,7 +1383,10 @@ export class DatabaseStorage implements IStorage {
           status,
           transaction_id as "transactionId",
           created_at as "createdAt",
-          updated_at as "updatedAt"
+          updated_at as "updatedAt",
+          deadline,
+          deadline_time as "deadlineTime",
+          notes
       `);
 
       if (!result.rows[0]) {
@@ -1423,7 +1400,10 @@ export class DatabaseStorage implements IStorage {
         status: doc.status as Document['status'],
         transactionId: Number(doc.transactionId),
         createdAt: new Date(doc.createdAt),
-        updatedAt: new Date(doc.updatedAt)
+        updatedAt: new Date(doc.updatedAt),
+        deadline: doc.deadline,
+        deadlineTime: doc.deadlineTime,
+        notes: doc.notes
       };
     } catch (error) {
       console.error('Error in createDocument:', error);
