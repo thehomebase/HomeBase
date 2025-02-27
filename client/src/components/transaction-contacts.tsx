@@ -164,12 +164,12 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
     }
 
     // Check for potential duplicates
-    const duplicate = clients.find(client => 
+    const duplicate = clients.find(client =>
       (client.firstName.toLowerCase() === newContact.firstName?.toLowerCase() &&
-       client.lastName.toLowerCase() === newContact.lastName?.toLowerCase()) &&
+        client.lastName.toLowerCase() === newContact.lastName?.toLowerCase()) &&
       (client.email?.toLowerCase() === newContact.email?.toLowerCase() ||
-       client.phone === newContact.phone ||
-       client.mobilePhone === newContact.mobilePhone)
+        client.phone === newContact.phone ||
+        client.mobilePhone === newContact.mobilePhone)
     );
 
     if (duplicate) {
@@ -197,14 +197,17 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
 
   const handleUseDuplicate = () => {
     if (potentialDuplicate) {
-      addContactMutation.mutate({
-        ...newContact,
+      // Create a complete contact object from the duplicate client data
+      const contactData: Partial<Contact> = {
+        ...newContact, // Keep the role that was selected
         firstName: potentialDuplicate.firstName,
         lastName: potentialDuplicate.lastName,
         email: potentialDuplicate.email,
-        phone: potentialDuplicate.phone,
-        mobilePhone: potentialDuplicate.mobilePhone,
-      });
+        phone: potentialDuplicate.phone || '',
+        mobilePhone: potentialDuplicate.mobilePhone || '',
+      };
+
+      addContactMutation.mutate(contactData);
     }
     setShowDuplicateDialog(false);
     setPotentialDuplicate(null);
