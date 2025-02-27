@@ -51,7 +51,7 @@ interface Contact {
   mobilePhone: string;
   email: string;
   transactionId: number;
-  clientId?: number; // Add clientId to track linked clients
+  clientId?: number; 
 }
 
 interface Client {
@@ -120,8 +120,10 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
   React.useEffect(() => {
     contacts.forEach((contact: Contact) => {
       if (contact.clientId) {
+        console.log('Checking sync for contact:', contact);
         const linkedClient = clients.find(client => client.id === contact.clientId);
         if (linkedClient) {
+          console.log('Found linked client:', linkedClient);
           const hasChanges = 
             linkedClient.firstName !== contact.firstName ||
             linkedClient.lastName !== contact.lastName ||
@@ -129,7 +131,25 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
             linkedClient.phone !== contact.phone ||
             linkedClient.mobilePhone !== contact.mobilePhone;
 
+          console.log('Changes detected:', hasChanges, {
+            currentContact: {
+              firstName: contact.firstName,
+              lastName: contact.lastName,
+              email: contact.email,
+              phone: contact.phone,
+              mobilePhone: contact.mobilePhone
+            },
+            linkedClient: {
+              firstName: linkedClient.firstName,
+              lastName: linkedClient.lastName,
+              email: linkedClient.email,
+              phone: linkedClient.phone,
+              mobilePhone: linkedClient.mobilePhone
+            }
+          });
+
           if (hasChanges) {
+            console.log('Updating contact with new client data');
             updateContactMutation.mutate({
               ...contact,
               firstName: linkedClient.firstName,
@@ -142,14 +162,48 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
         }
       }
     });
-  }, [clients]);
+  }, [clients, contacts]); 
+
+  // Create new client mutation
+  const createClientMutation = useMutation({
+    mutationFn: async (data: Partial<Client>) => {
+      const response = await apiRequest("POST", "/api/clients", {
+        ...data,
+        type: "buyer", 
+        status: "active"
+      });
+      if (!response.ok) {
+        throw new Error("Failed to create client");
+      }
+      return response.json();
+    }
+  });
 
   const addContactMutation = useMutation({
     mutationFn: async (data: Partial<Contact>) => {
+      let clientId = data.clientId;
+
+      if (!clientId && (data.role?.toLowerCase().includes('buyer') || data.role?.toLowerCase().includes('seller'))) {
+        try {
+          const newClient = await createClientMutation.mutateAsync({
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            phone: data.phone,
+            mobilePhone: data.mobilePhone,
+          });
+          clientId = newClient.id;
+        } catch (error) {
+          console.error('Error creating client:', error);
+        }
+      }
+
       const contactData = {
         ...data,
         transactionId,
+        clientId,
       };
+
       const response = await apiRequest("POST", "/api/contacts", contactData);
       if (!response.ok) {
         throw new Error("Failed to add contact");
@@ -168,6 +222,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
       setShowNewContactDialog(false);
       setShowLinkContactDialog(false);
       queryClient.invalidateQueries({ queryKey: ["/api/contacts", transactionId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] }); 
       toast({
         title: "Success",
         description: "Contact added successfully",
@@ -202,17 +257,21 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
     );
 
     if (duplicate) {
+      console.log('Found potential duplicate:', duplicate);
       setPotentialDuplicate(duplicate);
       setShowDuplicateDialog(true);
       return;
     }
 
+    console.log('Creating new contact:', newContact);
     addContactMutation.mutate(newContact);
   };
 
   const handleExistingClientSelect = (clientId: string) => {
+    console.log('Selected existing client:', clientId);
     const selectedClient = clients.find(c => c.id === Number(clientId));
     if (selectedClient) {
+      console.log('Found client details:', selectedClient);
       setNewContact({
         ...newContact,
         firstName: selectedClient.firstName,
@@ -220,22 +279,21 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
         email: selectedClient.email,
         phone: selectedClient.phone,
         mobilePhone: selectedClient.mobilePhone,
-        clientId: selectedClient.id, // Store the clientId for future syncing
+        clientId: selectedClient.id,
       });
     }
   };
 
   const handleUseDuplicate = () => {
     if (potentialDuplicate) {
-      // Create a complete contact object from the duplicate client data
       const contactData: Partial<Contact> = {
-        ...newContact, // Keep the role that was selected
+        ...newContact, 
         firstName: potentialDuplicate.firstName,
         lastName: potentialDuplicate.lastName,
         email: potentialDuplicate.email,
         phone: potentialDuplicate.phone || '',
         mobilePhone: potentialDuplicate.mobilePhone || '',
-        clientId: potentialDuplicate.id, // Store the clientId for future syncing
+        clientId: potentialDuplicate.id, 
       };
 
       addContactMutation.mutate(contactData);

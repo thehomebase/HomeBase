@@ -29,9 +29,10 @@ export const clients = pgTable("clients", {
   lastName: text("last_name").notNull(),
   email: text("email"),
   phone: text("phone"),
+  mobilePhone: text("mobile_phone"), 
   address: text("address"),
-  type: text("type").notNull(), // 'buyer' or 'seller'
-  status: text("status").notNull(), // 'active', 'inactive', 'pending'
+  type: text("type").notNull(), 
+  status: text("status").notNull(), 
   notes: text("notes"),
   labels: text("labels").array().default([]),
   agentId: integer("agent_id").notNull(),
@@ -47,10 +48,10 @@ export const transactions = pgTable("transactions", {
   zipCode: text("zip_code").notNull(),
   accessCode: text("access_code").notNull(),
   status: text("status").notNull(),
-  type: text("type").notNull().default('buy'), // 'buy' or 'sell'
+  type: text("type").notNull().default('buy'), 
   agentId: integer("agent_id").notNull(),
   clientId: integer("client_id"),
-  secondaryClientId: integer("secondary_client_id"), // Added this field
+  secondaryClientId: integer("secondary_client_id"), 
   participants: json("participants").notNull().$type<{
     userId: number;
     role: string;
@@ -99,7 +100,8 @@ export const contacts = pgTable('contacts', {
   email: text('email').notNull(),
   phone: text('phone'),
   mobilePhone: text('mobile_phone'),
-  transactionId: integer('transaction_id').notNull()
+  transactionId: integer('transaction_id').notNull(),
+  clientId: integer('client_id'), 
 });
 
 export const documents = pgTable("documents", {
