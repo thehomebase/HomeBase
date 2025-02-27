@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash2, Check, X, Pencil, UserPlus2 } from "lucide-react";
+import { Plus, Trash2, Check, X, Pencil, UserPlus2, Link } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,6 +17,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -73,7 +82,9 @@ interface TransactionContactsProps {
 export function TransactionContacts({ transactionId }: TransactionContactsProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isAddingContact, setIsAddingContact] = React.useState(false);
+  const [showAddOptionsDialog, setShowAddOptionsDialog] = React.useState(false);
+  const [showNewContactDialog, setShowNewContactDialog] = React.useState(false);
+  const [showLinkContactDialog, setShowLinkContactDialog] = React.useState(false);
   const [editingContact, setEditingContact] = React.useState<Contact | null>(null);
   const [showDuplicateDialog, setShowDuplicateDialog] = React.useState(false);
   const [potentialDuplicate, setPotentialDuplicate] = React.useState<Client | null>(null);
@@ -125,7 +136,8 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
         mobilePhone: "",
         email: "",
       });
-      setIsAddingContact(false);
+      setShowNewContactDialog(false);
+      setShowLinkContactDialog(false);
       queryClient.invalidateQueries({ queryKey: ["/api/contacts", transactionId] });
       toast({
         title: "Success",
@@ -283,8 +295,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                     <Button
                       variant="default"
                       size="sm"
-                      onClick={() => setIsAddingContact(true)}
-                      disabled={isAddingContact}
+                      onClick={() => setShowAddOptionsDialog(true)}
                       className="bg-black hover:bg-black/90"
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -294,91 +305,6 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isAddingContact && (
-                  <TableRow>
-                    <TableCell>
-                      <select
-                        className="w-full px-3 py-2 border rounded-md bg-background"
-                        value={newContact.role}
-                        onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
-                        required
-                      >
-                        <option value="">Select role</option>
-                        {CONTACT_ROLES.map((role) => (
-                          <option key={role} value={role}>
-                            {role}
-                          </option>
-                        ))}
-                      </select>
-                    </TableCell>
-                    <TableCell colSpan={5}>
-                      <div className="flex gap-2 items-center">
-                        <Select onValueChange={handleExistingClientSelect}>
-                          <SelectTrigger className="w-[200px]">
-                            <SelectValue placeholder="Select existing client" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {clients.map((client) => (
-                              <SelectItem key={client.id} value={client.id.toString()}>
-                                {client.firstName} {client.lastName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <span className="text-sm text-muted-foreground">or</span>
-                        <div className="flex gap-2 flex-1">
-                          <Input
-                            placeholder="First Name"
-                            value={newContact.firstName}
-                            onChange={(e) => setNewContact({ ...newContact, firstName: e.target.value })}
-                          />
-                          <Input
-                            placeholder="Last Name"
-                            value={newContact.lastName}
-                            onChange={(e) => setNewContact({ ...newContact, lastName: e.target.value })}
-                          />
-                          <Input
-                            type="email"
-                            placeholder="Email"
-                            value={newContact.email}
-                            onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
-                          />
-                          <Input
-                            type="tel"
-                            placeholder="Phone"
-                            value={newContact.phone}
-                            onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
-                          />
-                          <Input
-                            type="tel"
-                            placeholder="Mobile"
-                            value={newContact.mobilePhone}
-                            onChange={(e) => setNewContact({ ...newContact, mobilePhone: e.target.value })}
-                          />
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleSubmit}
-                          disabled={addContactMutation.isPending}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setIsAddingContact(false)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
                 {contacts.map((contact: Contact) => (
                   <TableRow key={contact.id}>
                     {editingContact?.id === contact.id ? (
@@ -479,7 +405,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                     )}
                   </TableRow>
                 ))}
-                {contacts.length === 0 && !isAddingContact && (
+                {contacts.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground">
                       No contacts added yet
@@ -496,79 +422,13 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => setIsAddingContact(true)}
-                disabled={isAddingContact}
+                onClick={() => setShowAddOptionsDialog(true)}
                 className="bg-black hover:bg-black/90"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Contact
               </Button>
             </div>
-            {isAddingContact && (
-              <div className="p-4 space-y-4 border-b">
-                <select
-                  className="w-full px-3 py-2 border rounded-md bg-background"
-                  value={newContact.role}
-                  onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
-                  required
-                >
-                  <option value="">Select role</option>
-                  {CONTACT_ROLES.map((role) => (
-                    <option key={role} value={role}>
-                      {role}
-                    </option>
-                  ))}
-                </select>
-                <Input
-                  placeholder="First Name"
-                  value={newContact.firstName}
-                  onChange={(e) => setNewContact({ ...newContact, firstName: e.target.value })}
-                  className="mt-2"
-                />
-                <Input
-                  placeholder="Last Name"
-                  value={newContact.lastName}
-                  onChange={(e) => setNewContact({ ...newContact, lastName: e.target.value })}
-                  className="mt-2"
-                />
-                <Input
-                  type="email"
-                  placeholder="Email"
-                  value={newContact.email}
-                  onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
-                  className="mt-2"
-                />
-                <Input
-                  type="tel"
-                  placeholder="Phone"
-                  value={newContact.phone}
-                  onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
-                  className="mt-2"
-                />
-                <Input
-                  type="tel"
-                  placeholder="Mobile"
-                  value={newContact.mobilePhone}
-                  onChange={(e) => setNewContact({ ...newContact, mobilePhone: e.target.value })}
-                  className="mt-2"
-                />
-                <div className="flex justify-end space-x-2 mt-4">
-                  <Button
-                    variant="default"
-                    onClick={handleSubmit}
-                    disabled={addContactMutation.isPending}
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setIsAddingContact(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
             <div className="divide-y">
               {contacts.map((contact: Contact) => (
                 <div key={contact.id} className="p-4 space-y-2">
@@ -597,14 +457,14 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                       </Button>
                     </div>
                   </div>
-                  <div className="space-y-1 text-sm text-muted-foreground ">
+                  <div className="space-y-1 text-sm text-muted-foreground">
                     <div>{contact.email}</div>
                     {contact.phone && <div>Phone: {contact.phone}</div>}
                     {contact.mobilePhone && <div>Mobile: {contact.mobilePhone}</div>}
                   </div>
                 </div>
               ))}
-              {contacts.length === 0 && !isAddingContact && (
+              {contacts.length === 0 && (
                 <div className="p-4 text-center text-muted-foreground">
                   No contacts added yet
                 </div>
@@ -614,6 +474,165 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
         </CardContent>
       </Card>
 
+      {/* Add Contact Options Dialog */}
+      <Dialog open={showAddOptionsDialog} onOpenChange={setShowAddOptionsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Contact</DialogTitle>
+            <DialogDescription>
+              Choose how you want to add a contact to this transaction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <Button
+              variant="outline"
+              className="flex items-center justify-start gap-2 h-20"
+              onClick={() => {
+                setShowAddOptionsDialog(false);
+                setShowNewContactDialog(true);
+              }}
+            >
+              <UserPlus2 className="h-5 w-5" />
+              <div className="text-left">
+                <div className="font-semibold">Add New Contact</div>
+                <div className="text-sm text-muted-foreground">Create a new contact from scratch</div>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex items-center justify-start gap-2 h-20"
+              onClick={() => {
+                setShowAddOptionsDialog(false);
+                setShowLinkContactDialog(true);
+              }}
+            >
+              <Link className="h-5 w-5" />
+              <div className="text-left">
+                <div className="font-semibold">Link Existing Contact</div>
+                <div className="text-sm text-muted-foreground">Connect an existing contact from your database</div>
+              </div>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Contact Dialog */}
+      <Dialog open={showNewContactDialog} onOpenChange={setShowNewContactDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Contact</DialogTitle>
+            <DialogDescription>
+              Fill in the contact details below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <select
+                className="w-full px-3 py-2 border rounded-md bg-background"
+                value={newContact.role}
+                onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
+                required
+              >
+                <option value="">Select role</option>
+                {CONTACT_ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                placeholder="First Name"
+                value={newContact.firstName}
+                onChange={(e) => setNewContact({ ...newContact, firstName: e.target.value })}
+              />
+              <Input
+                placeholder="Last Name"
+                value={newContact.lastName}
+                onChange={(e) => setNewContact({ ...newContact, lastName: e.target.value })}
+              />
+            </div>
+            <Input
+              type="email"
+              placeholder="Email"
+              value={newContact.email}
+              onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+            />
+            <Input
+              type="tel"
+              placeholder="Phone"
+              value={newContact.phone}
+              onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+            />
+            <Input
+              type="tel"
+              placeholder="Mobile"
+              value={newContact.mobilePhone}
+              onChange={(e) => setNewContact({ ...newContact, mobilePhone: e.target.value })}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewContactDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={addContactMutation.isPending}>
+              Add Contact
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link Existing Contact Dialog */}
+      <Dialog open={showLinkContactDialog} onOpenChange={setShowLinkContactDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link Existing Contact</DialogTitle>
+            <DialogDescription>
+              Select an existing contact and assign them a role in this transaction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <select
+                className="w-full px-3 py-2 border rounded-md bg-background"
+                value={newContact.role}
+                onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
+                required
+              >
+                <option value="">Select role</option>
+                {CONTACT_ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {role}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Select onValueChange={handleExistingClientSelect}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select existing contact" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((client) => (
+                  <SelectItem key={client.id} value={client.id.toString()}>
+                    {client.firstName} {client.lastName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLinkContactDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={addContactMutation.isPending}>
+              Link Contact
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Duplicate Check Dialog */}
       <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
