@@ -9,13 +9,14 @@ interface StorageDocument {
   createdAt: Date;
   updatedAt: Date;
   notes: string | null;
+  clientId?: number; // Added to track linked clients
 }
 
 // Update Document type to use the imported one from schema.ts
-import { 
+import {
   users, transactions, checklists, messages, clients, documents,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
-  type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient 
+  type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
@@ -67,13 +68,13 @@ export interface IStorage {
 
   // Session store
   sessionStore: session.Store;
-  getClientsByAgent(agentId: number):Promise<Client[]>;
-  createClient(insertClient:InsertClient):Promise<Client>;
+  getClientsByAgent(agentId: number): Promise<Client[]>;
+  createClient(insertClient: InsertClient): Promise<Client>;
   updateClient(id: number, data: Partial<Client>): Promise<Client>;
 
   // Document operations
   getDocumentsByTransaction(transactionId: number): Promise<StorageDocument[]>;
-  createDocument(document: { name: string; status: StorageDocument['status']; transactionId: number }): Promise<StorageDocument>;
+  createDocument(document: { name: string; status: StorageDocument['status']; transactionId: number; clientId?: number }): Promise<StorageDocument>;
   updateDocument(id: string, data: Partial<StorageDocument>): Promise<StorageDocument>;
   deleteDocument(id: string): Promise<void>;
 }
@@ -133,9 +134,9 @@ export class DatabaseStorage implements IStorage {
     ];
 
     this.BUYER_CHECKLIST_ITEMS = [
-      {id: "buying-criteria", text: "Determine buying criteria", phase: "Pre-Offer", completed: false},
-      {id: "hire-agent", text: "Hire a real estate agent", phase: "Pre-Offer", completed: false},
-      {id: "get-preapproval", text: "Hire a lender & get pre-approved", phase: "Pre-Offer", completed: false},
+      { id: "buying-criteria", text: "Determine buying criteria", phase: "Pre-Offer", completed: false },
+      { id: "hire-agent", text: "Hire a real estate agent", phase: "Pre-Offer", completed: false },
+      { id: "get-preapproval", text: "Hire a lender & get pre-approved", phase: "Pre-Offer", completed: false },
     ];
   }
 
@@ -846,7 +847,8 @@ export class DatabaseStorage implements IStorage {
           email,
           phone,
           mobile_phone,
-          transaction_id
+          transaction_id,
+          client_id
         ) VALUES (
           ${data.role},
           ${data.firstName},
@@ -854,7 +856,8 @@ export class DatabaseStorage implements IStorage {
           ${data.email},
           ${data.phone || null},
           ${data.mobilePhone || null},
-          ${data.transactionId}
+          ${data.transactionId},
+          ${data.clientId || null}
         ) RETURNING *
       `);
 
@@ -870,7 +873,8 @@ export class DatabaseStorage implements IStorage {
         email: result.rows[0].email,
         phone: result.rows[0].phone,
         mobilePhone: result.rows[0].mobile_phone,
-        transactionId: result.rows[0].transaction_id
+        transactionId: result.rows[0].transaction_id,
+        clientId: result.rows[0].client_id
       };
     } catch (error) {
       console.error('Error in createContact:', error);
@@ -888,7 +892,8 @@ export class DatabaseStorage implements IStorage {
           last_name = COALESCE(${data.lastName}, last_name),
           email = COALESCE(${data.email}, email),
           phone = COALESCE(${data.phone}, phone),
-          mobile_phone = COALESCE(${data.mobilePhone}, mobile_phone)
+          mobile_phone = COALESCE(${data.mobilePhone}, mobile_phone),
+          client_id = COALESCE(${data.clientId}, client_id)
         WHERE id = ${id}
         RETURNING *
       `);
@@ -905,7 +910,8 @@ export class DatabaseStorage implements IStorage {
         email: result.rows[0].email,
         phone: result.rows[0].phone,
         mobilePhone: result.rows[0].mobile_phone,
-        transactionId: result.rows[0].transaction_id
+        transactionId: result.rows[0].transaction_id,
+        clientId: result.rows[0].client_id
       };
     } catch (error) {
       console.error('Error in updateContact:', error);
@@ -1024,7 +1030,8 @@ export class DatabaseStorage implements IStorage {
         deadlineTime: row.deadline_time ? String(row.deadline_time) : null,
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at),
-        notes: row.notes ? String(row.notes) : null
+        notes: row.notes ? String(row.notes) : null,
+        clientId: row.client_id ? Number(row.client_id) : undefined
       }));
     } catch (error) {
       console.error('Error in getDocumentsByTransaction:', error);
@@ -1032,7 +1039,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createDocument(document: { name: string; status: StorageDocument['status']; transactionId: number }): Promise<StorageDocument> {
+  async createDocument(document: { name: string; status: StorageDocument['status']; transactionId: number; clientId?: number }): Promise<StorageDocument> {
     try {
       const result = await db.execute(sql`
         INSERT INTO documents (
@@ -1040,13 +1047,15 @@ export class DatabaseStorage implements IStorage {
           status,
           transaction_id,
           created_at,
-          updated_at
+          updated_at,
+          client_id
         ) VALUES (
           ${document.name},
           ${document.status},
           ${document.transactionId},
           NOW(),
-          NOW()
+          NOW(),
+          ${document.clientId || null}
         ) RETURNING *
       `);
 
@@ -1060,7 +1069,8 @@ export class DatabaseStorage implements IStorage {
         deadlineTime: row.deadline_time ? String(row.deadline_time) : null,
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at),
-        notes: row.notes ? String(row.notes) : null
+        notes: row.notes ? String(row.notes) : null,
+        clientId: row.client_id ? Number(row.client_id) : undefined
       };
     } catch (error) {
       console.error('Error in createDocument:', error);
@@ -1099,7 +1109,8 @@ export class DatabaseStorage implements IStorage {
         deadlineTime: row.deadline_time ? String(row.deadline_time) : null,
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at),
-        notes: row.notes ? String(row.notes) : null
+        notes: row.notes ? String(row.notes) : null,
+        clientId: row.client_id ? Number(row.client_id) : undefined
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
@@ -1332,7 +1343,8 @@ export class DatabaseStorage implements IStorage {
           updated_at as "updatedAt",
           deadline,
           deadline_time as "deadlineTime",
-          notes
+          notes,
+          client_id as "clientId"
         FROM documents 
         WHERE transaction_id = ${transactionId}
         ORDER BY created_at ASC
@@ -1347,7 +1359,8 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(doc.updatedAt),
         deadline: doc.deadline,
         deadlineTime: doc.deadlineTime,
-        notes: doc.notes
+        notes: doc.notes,
+        clientId: doc.clientId
       }));
     } catch (error) {
       console.error('Error in getDocumentsByTransaction:', error);
@@ -1355,7 +1368,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createDocument(data: { name: string; status: Document['status']; transactionId: number }): Promise<Document> {
+  async createDocument(data: { name: string; status: Document['status']; transactionId: number; clientId?: number }): Promise<Document> {
     try {
       // Validate the status is one of the allowed values
       const validStatuses = ['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'] as const;
@@ -1369,13 +1382,15 @@ export class DatabaseStorage implements IStorage {
           status,
           transaction_id,
           created_at,
-          updated_at
+          updated_at,
+          client_id
         ) VALUES (
           ${data.name},
           ${data.status},
           ${data.transactionId},
           NOW(),
-          NOW()
+          NOW(),
+          ${data.clientId || null}
         )
         RETURNING 
           id,
@@ -1386,7 +1401,8 @@ export class DatabaseStorage implements IStorage {
           updated_at as "updatedAt",
           deadline,
           deadline_time as "deadlineTime",
-          notes
+          notes,
+          client_id as "clientId"
       `);
 
       if (!result.rows[0]) {
@@ -1403,7 +1419,8 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(doc.updatedAt),
         deadline: doc.deadline,
         deadlineTime: doc.deadlineTime,
-        notes: doc.notes
+        notes: doc.notes,
+        clientId: doc.clientId
       };
     } catch (error) {
       console.error('Error in createDocument:', error);
@@ -1432,6 +1449,7 @@ export class DatabaseStorage implements IStorage {
           notes = ${data.notes !== undefined ? data.notes : currentDoc.rows[0].notes},
           deadline = ${data.deadline !== undefined ? data.deadline : currentDoc.rows[0].deadline},
           deadline_time = ${data.deadlineTime !== undefined ? data.deadlineTime : currentDoc.rows[0].deadline_time},
+          client_id = ${data.clientId !== undefined ? data.clientId : currentDoc.rows[0].client_id},
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
         RETURNING 
@@ -1443,7 +1461,8 @@ export class DatabaseStorage implements IStorage {
           deadline,
           deadline_time as "deadlineTime",
           created_at as "createdAt",
-          updated_at as "updatedAt"
+          updated_at as "updatedAt",
+          client_id as "clientId"
       `);
 
       console.log('Update result:', result.rows[0]);
@@ -1462,7 +1481,8 @@ export class DatabaseStorage implements IStorage {
         deadline: row.deadline,
         deadlineTime: row.deadlineTime,
         createdAt: new Date(row.createdAt),
-        updatedAt: new Date(row.updatedAt)
+        updatedAt: new Date(row.updatedAt),
+        clientId: row.clientId
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);

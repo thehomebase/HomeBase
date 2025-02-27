@@ -51,6 +51,7 @@ interface Contact {
   mobilePhone: string;
   email: string;
   transactionId: number;
+  clientId?: number; // Add clientId to track linked clients
 }
 
 interface Client {
@@ -114,6 +115,34 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
   });
 
   const queryClient = useQueryClient();
+
+  // Watch for client updates and sync contact information
+  React.useEffect(() => {
+    contacts.forEach((contact: Contact) => {
+      if (contact.clientId) {
+        const linkedClient = clients.find(client => client.id === contact.clientId);
+        if (linkedClient) {
+          const hasChanges = 
+            linkedClient.firstName !== contact.firstName ||
+            linkedClient.lastName !== contact.lastName ||
+            linkedClient.email !== contact.email ||
+            linkedClient.phone !== contact.phone ||
+            linkedClient.mobilePhone !== contact.mobilePhone;
+
+          if (hasChanges) {
+            updateContactMutation.mutate({
+              ...contact,
+              firstName: linkedClient.firstName,
+              lastName: linkedClient.lastName,
+              email: linkedClient.email,
+              phone: linkedClient.phone,
+              mobilePhone: linkedClient.mobilePhone,
+            });
+          }
+        }
+      }
+    });
+  }, [clients]);
 
   const addContactMutation = useMutation({
     mutationFn: async (data: Partial<Contact>) => {
@@ -191,6 +220,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
         email: selectedClient.email,
         phone: selectedClient.phone,
         mobilePhone: selectedClient.mobilePhone,
+        clientId: selectedClient.id, // Store the clientId for future syncing
       });
     }
   };
@@ -205,6 +235,7 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
         email: potentialDuplicate.email,
         phone: potentialDuplicate.phone || '',
         mobilePhone: potentialDuplicate.mobilePhone || '',
+        clientId: potentialDuplicate.id, // Store the clientId for future syncing
       };
 
       addContactMutation.mutate(contactData);
