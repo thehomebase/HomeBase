@@ -1,7 +1,6 @@
 import { pgTable, serial, text, timestamp, integer, boolean, json, date, time } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from "zod";
-import { clients } from "./schema"; // Added import statement
 
 export const privateMessages = pgTable("private_messages", {
   id: serial("id").primaryKey(),
@@ -93,18 +92,6 @@ export const messages = pgTable("messages", {
   isRead: boolean("is_read").default(false).notNull()
 });
 
-export const contacts = pgTable('contacts', {
-  id: serial('id').primaryKey(),
-  role: text('role').notNull(),
-  firstName: text('first_name').notNull(),
-  lastName: text('last_name').notNull(),
-  email: text('email').notNull(),
-  phone: text('phone'),
-  mobilePhone: text('mobile_phone'),
-  transactionId: integer('transaction_id').notNull(),
-  clientId: integer('client_id'), 
-});
-
 export const documents = pgTable("documents", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -113,7 +100,9 @@ export const documents = pgTable("documents", {
   deadline: date("deadline"),
   deadlineTime: time("deadline_time"),
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow()
+  updatedAt: timestamp("updated_at").defaultNow(),
+  notes: text("notes"),
+  clientId: integer("client_id")
 });
 
 const checklistItemSchema = z.object({
@@ -130,7 +119,6 @@ export const insertUserSchema = createInsertSchema(users).extend({
   lastName: z.string().min(1, "Last name is required"),
 });
 
-// Update the client insert schema with proper validation
 export const insertClientSchema = createInsertSchema(clients, {
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
@@ -151,7 +139,6 @@ export const insertChecklistSchema = createInsertSchema(checklists).extend({
   items: z.array(checklistItemSchema)
 });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
-export const insertContactSchema = createInsertSchema(contacts);
 export const insertDocumentSchema = createInsertSchema(documents).omit({ 
   id: true,
   createdAt: true,
@@ -163,7 +150,6 @@ export type InsertClient = z.infer<typeof insertClientSchema>;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type InsertChecklist = z.infer<typeof insertChecklistSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
-export type InsertContact = z.infer<typeof insertContactSchema>;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 
 export type User = typeof users.$inferSelect;
@@ -171,5 +157,4 @@ export type Client = typeof clients.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type Checklist = typeof checklists.$inferSelect;
 export type Message = typeof messages.$inferSelect;
-export type Contact = typeof contacts.$inferSelect;
 export type Document = typeof documents.$inferSelect;
