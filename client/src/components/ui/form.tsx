@@ -116,6 +116,13 @@ const FormControl = React.forwardRef<
 >(({ children, ...props }, ref) => {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField()
 
+  if (!children) {
+    return null
+  }
+
+  const childArray = React.Children.toArray(children)
+  const firstChild = childArray[0]
+
   return (
     <Slot
       ref={ref}
@@ -128,7 +135,7 @@ const FormControl = React.forwardRef<
       aria-invalid={!!error}
       {...props}
     >
-      {children}
+      {firstChild}
     </Slot>
   )
 })
