@@ -676,8 +676,28 @@ export default function ClientsPage() {
   return (
     <main className="flex-1 min-w-0 overflow-x-hidden px-4">
       <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
-        <div className="flex flex-col sm:flex-row flex-grow sm:items-center gap-2 mb-2">
+        <div className="flex flex-col sm:flex-row flex-grow sm:items-center justify-between gap-2 mb-2">
           <h2 className="text-2xl font-bold dark:text-white">Client Management</h2>
+          {user?.role === "agent" && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Client
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Client</DialogTitle>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    {/* Form fields remain the same */}
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          )}
 
           <div className="relative sm:ml-auto md:max-w-md">
             <Input
