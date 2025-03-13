@@ -110,12 +110,14 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json(parsed.error);
       }
 
-      // Ensure required fields are present
+      // Ensure required fields are present and handle empty arrays
       const clientData = {
         ...parsed.data,
         agentId: req.user.id,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        // Ensure labels is always an array
+        labels: Array.isArray(parsed.data.labels) ? parsed.data.labels : []
       };
 
       console.log('Creating client with data:', clientData);

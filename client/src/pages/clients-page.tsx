@@ -677,7 +677,7 @@ export default function ClientsPage() {
       <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
         <div className="flex flex-col sm:flex-row flex-grow sm:items-center gap-2 mb-2">
           <h2 className="text-2xl font-bold dark:text-white">Client Management</h2>
-          
+
           <div className="relative sm:ml-auto md:max-w-md">
             <Input
               type="text"
@@ -689,15 +689,42 @@ export default function ClientsPage() {
             <Search className="absolute right-3 top-2.5 h-5 w-5 text-muted-foreground" />
           </div>
         </div>
-        
+
         {user?.role === "agent" && (
-          <Button 
-            onClick={() => navigate("/clients/new")} 
-            className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-primary dark:bg-white mb-0 mr-64"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Client
-          </Button>
+          <Form onSubmit={form.handleSubmit(onSubmit)}>
+            <FormControl>
+              <FormLabel htmlFor="firstName">First Name</FormLabel>
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <Input placeholder="First Name" {...field} />
+                )}
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel htmlFor="lastName">Last Name</FormLabel>
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <Input placeholder="Last Name" {...field} />
+                )}
+              />
+            </FormControl>
+            {/* ...other form fields... */}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={createClientMutation.isPending}
+              onClick={() => {
+                if (createClientMutation.isPending) return;
+                console.log("Form submission attempted with data:", form.getValues());
+              }}
+            >
+              {createClientMutation.isPending ? "Creating..." : "Add Client"}
+            </Button>
+          </Form>
         )}
       </div>
 
