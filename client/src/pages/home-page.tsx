@@ -16,6 +16,7 @@ import { Logo } from "@/components/ui/logo";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import * as z from 'zod';
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
@@ -43,21 +44,13 @@ export default function HomePage() {
   });
 
   const createClientMutation = useMutation({
-    mutationFn: async (data: typeof form.getValues) => {
-      const sanitizedData = {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        type: data.type,
-        status: data.status,
-        email: data.email || null,
-        phone: data.phone || null,
-        address: data.address || null,
-        notes: data.notes || null,
-        labels: Array.isArray(data.labels) ? data.labels : [],
-        agentId: user?.id
-      };
+    mutationFn: async (values: z.infer<typeof insertClientSchema>) => {
+      const response = await apiRequest("POST", "/api/clients", {
+        ...values,
+        agentId: user?.id,
+        labels: Array.isArray(values.labels) ? values.labels : [],
+      });
 
-      const response = await apiRequest("POST", "/api/clients", sanitizedData);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to create client');
@@ -81,6 +74,14 @@ export default function HomePage() {
       });
     },
   });
+
+  const onSubmit = async (data: z.infer<typeof insertClientSchema>) => {
+    try {
+      await createClientMutation.mutateAsync(data);
+    } catch (error) {
+      console.error('Error submitting form:', error);
+    }
+  };
 
   const sellers = clients.filter((client) => client.type === "seller");
   const buyers = clients.filter((client) => client.type === "buyer");
@@ -207,11 +208,8 @@ export default function HomePage() {
               <DialogHeader>
                 <DialogTitle>Add New Client</DialogTitle>
               </DialogHeader>
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(createClientMutation.mutate)}
-                  className="space-y-4"
-                >
+              <Form {...form} onSubmit={form.handleSubmit(onSubmit)}>
+                <form className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}

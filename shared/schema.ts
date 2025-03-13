@@ -1,6 +1,7 @@
 import { pgTable, serial, text, timestamp, integer, boolean, json, date, time } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from "zod";
+import { clients } from "./schema"; // Added import statement
 
 export const privateMessages = pgTable("private_messages", {
   id: serial("id").primaryKey(),
@@ -129,10 +130,22 @@ export const insertUserSchema = createInsertSchema(users).extend({
   lastName: z.string().min(1, "Last name is required"),
 });
 
-export const insertClientSchema = createInsertSchema(clients).omit({ 
+// Update the client insert schema with proper validation
+export const insertClientSchema = createInsertSchema(clients, {
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Invalid email format").nullable(),
+  phone: z.string().nullable(),
+  mobilePhone: z.string().nullable(),
+  type: z.enum(["buyer", "seller"]),
+  status: z.enum(["active", "inactive", "pending"]),
+  labels: z.array(z.string()).default([]),
+  agentId: z.number(),
+}).omit({ 
   createdAt: true,
   updatedAt: true 
 });
+
 export const insertTransactionSchema = createInsertSchema(transactions);
 export const insertChecklistSchema = createInsertSchema(checklists).extend({
   items: z.array(checklistItemSchema)
