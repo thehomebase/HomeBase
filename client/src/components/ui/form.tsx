@@ -42,24 +42,28 @@ const FormField = <
 const useFormField = () => {
   const fieldContext = React.useContext(FormFieldContext)
   const itemContext = React.useContext(FormItemContext)
-  const { getFieldState, formState } = useFormContext()
-
-  const fieldState = fieldContext.name ? 
-    getFieldState(fieldContext.name, formState) : 
-    { invalid: false, isDirty: false, isTouched: false, error: undefined }
-
+  
+  // Check if field context exists first
   if (!fieldContext) {
     throw new Error("useFormField should be used within <FormField>")
   }
 
-  const { id } = itemContext
+  // Only try to get form context if we're in a form field context
+  const { getFieldState, formState } = useFormContext()
+  
+  const fieldState = fieldContext.name ? 
+    getFieldState(fieldContext.name, formState) : 
+    { invalid: false, isDirty: false, isTouched: false, error: undefined }
+
+  // Safely access itemContext properties
+  const id = itemContext?.id
 
   return {
     id,
     name: fieldContext.name,
-    formItemId: `${id}-form-item`,
-    formDescriptionId: `${id}-form-item-description`,
-    formMessageId: `${id}-form-item-message`,
+    formItemId: id ? `${id}-form-item` : undefined,
+    formDescriptionId: id ? `${id}-form-item-description` : undefined,
+    formMessageId: id ? `${id}-form-item-message` : undefined,
     ...fieldState,
   }
 }
@@ -106,7 +110,7 @@ FormLabel.displayName = "FormLabel"
 const FormControl = React.forwardRef<
   React.ElementRef<typeof Slot>,
   React.ComponentPropsWithoutRef<typeof Slot>
->(({ ...props }, ref) => {
+>(({ children, ...props }, ref) => {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField()
 
   return (
@@ -120,7 +124,9 @@ const FormControl = React.forwardRef<
       }
       aria-invalid={!!error}
       {...props}
-    />
+    >
+      {children}
+    </Slot>
   )
 })
 FormControl.displayName = "FormControl"
