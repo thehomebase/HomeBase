@@ -8,12 +8,25 @@ import {
   FieldValues,
   FormProvider,
   useFormContext,
+  FormState,
 } from "react-hook-form"
+
+const FormContext = React.createContext<{
+  formState?: FormState<any>
+}>({})
 
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 
-const Form = FormProvider
+const Form = React.forwardRef(({ ...props }, ref) => {
+  const formState = props.formState;
+  return (
+    <FormContext.Provider value={{ formState }}>
+      <FormProvider {...props} />
+    </FormContext.Provider>
+  )
+})
+Form.displayName = "Form"
 
 type FormFieldContextValue<
   TFieldValues extends FieldValues = FieldValues,
@@ -43,24 +56,23 @@ const useFormField = () => {
   const fieldContext = React.useContext(FormFieldContext)
   const itemContext = React.useContext(FormItemContext)
   
-  // Check if field context exists first
-  if (!fieldContext) {
-    throw new Error("useFormField should be used within <FormField>")
-  }
-
-  // Only try to get form context if we're in a form field context
-  const { getFieldState, formState } = useFormContext()
+  const { formState } = React.useContext(FormContext)
   
-  const fieldState = fieldContext.name ? 
-    getFieldState(fieldContext.name, formState) : 
-    { invalid: false, isDirty: false, isTouched: false, error: undefined }
+  const fieldState = fieldContext && fieldContext.name
+    ? {
+        invalid: !!(formState?.errors?.[fieldContext.name]),
+        isDirty: !!(formState?.dirtyFields?.[fieldContext.name]),
+        isTouched: !!(formState?.touchedFields?.[fieldContext.name]),
+        error: formState?.errors?.[fieldContext.name],
+      }
+    : { invalid: false, isDirty: false, isTouched: false, error: undefined }
 
   // Safely access itemContext properties
   const id = itemContext?.id
 
   return {
     id,
-    name: fieldContext.name,
+    name: fieldContext?.name,
     formItemId: id ? `${id}-form-item` : undefined,
     formDescriptionId: id ? `${id}-form-item-description` : undefined,
     formMessageId: id ? `${id}-form-item-message` : undefined,
