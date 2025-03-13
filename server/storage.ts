@@ -812,8 +812,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteContact(id: number) {
-    try {      const result = await db.execute(sql`
-        DELETE FROM contacts WHERE id = ${id} RETURNING id
+    try {      const result = await db.execute(sql`        DELETE FROM contacts WHERE id = ${id} RETURNING id
       `);
       if (!result.rows[0]) {
         throw new Error('Contact not found');
@@ -973,41 +972,66 @@ export class DatabaseStorage implements IStorage {
 
   async createClient(insertClient: InsertClient): Promise<Client> {
     try {
-      // Ensure labels is always an array
-      const labels = Array.isArray(insertClient.labels) 
-        ? insertClient.labels 
-        : insertClient.labels 
-          ? [insertClient.labels] 
-          : [];
-
-      const [client] = await db
-        .insert(clients)
-        .values({
-          ...insertClient,
-          labels,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        })
-        .returning();
-
-      if (!client) {
-        throw new Error('Failed to create client record');
+      // Validate required fields
+      if (!insertClient.firstName || !insertClient.lastName || !insertClient.type || !insertClient.status) {
+        throw new Error('Missing required fields');
       }
 
+      console.log('Creating client with data:', insertClient);
+
+      const result = await db.execute(sql`
+        INSERT INTO clients (
+          first_name,
+          last_name,
+          email,
+          phone,
+          mobile_phone,
+          address,
+          type,
+          status,
+          notes,
+          labels,
+          agent_id,
+          created_at,
+          updated_at
+        ) VALUES (
+          ${insertClient.firstName},
+          ${insertClient.lastName},
+          ${insertClient.email || null},
+          ${insertClient.phone || null},
+          ${insertClient.mobilePhone || null},
+          ${insertClient.address || null},
+          ${insertClient.type},
+          ${insertClient.status},
+          ${insertClient.notes || null},
+          ${JSON.stringify(insertClient.labels || [])},
+          ${insertClient.agentId},
+          NOW(),
+          NOW()
+        )
+        RETURNING *
+      `);
+
+      if (!result.rows[0]) {
+        throw new Error('Failed to create client');
+      }
+
+      const client = result.rows[0];
       return {
         id: Number(client.id),
-        firstName: String(client.firstName),
-        lastName: String(client.lastName),
+        firstName: String(client.first_name),
+        lastName: String(client.last_name),
         email: client.email ? String(client.email) : null,
         phone: client.phone ? String(client.phone) : null,
+        mobilePhone: client.mobile_phone ? String(client.mobile_phone) : null,
         address: client.address ? String(client.address) : null,
         type: String(client.type),
         status: String(client.status),
         notes: client.notes ? String(client.notes) : null,
         labels: Array.isArray(client.labels) ? client.labels : [],
-        agentId: Number(client.agentId),
-        createdAt: client.createdAt,
-        updatedAt: client.updatedAt
+        agentId: Number(client.agent_id),
+        createdAt: new Date(client.created_at),
+        updatedAt: new Date(client.updated_at)
       };
     } catch (error) {
       console.error('Error in createClient:', error);
@@ -1015,32 +1039,51 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getDocumentsByTransaction(transactionId: number): Promise<StorageDocument[]> {
+  async getDocumentsByTransaction(transactionId: number): Promise<Document[]> {
     try {
       const result = await db.execute(sql`
-        SELECT * FROM documents WHERE transaction_id = ${transactionId}
+        SELECT 
+          id,
+          name,
+          status,
+          transaction_id as "transactionId",
+          created_at as "createdAt",
+          updated_at as "updatedAt",
+          deadline,
+          deadline_time as "deadlineTime",
+          notes,
+          client_id as "clientId"
+        FROM documents 
+        WHERE transaction_id = ${transactionId}
+        ORDER BY created_at ASC
       `);
 
-      return result.rows.map(row => ({
-        id: String(row.id),
-        name: String(row.name),
-        status: row.status as StorageDocument['status'],
-        transactionId: Number(row.transaction_id),
-        deadline: row.deadline ? String(row.deadline) : null,
-        deadlineTime: row.deadline_time ? String(row.deadline_time) : null,
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at),
-        notes: row.notes ? String(row.notes) : null,
-        clientId: row.client_id ? Number(row.client_id) : undefined
+      return result.rows.map(doc => ({
+        id: doc.id,
+        name: doc.name,
+        status: doc.status as Document['status'],
+        transactionId: Number(doc.transactionId),
+        createdAt: new Date(doc.createdAt),
+        updatedAt: new Date(doc.updatedAt),
+        deadline: doc.deadline,
+        deadlineTime: doc.deadlineTime,
+        notes: doc.notes,
+        clientId: doc.clientId
       }));
     } catch (error) {
       console.error('Error in getDocumentsByTransaction:', error);
-      throw error;
+      return [];
     }
   }
 
-  async createDocument(document: { name: string; status: StorageDocument['status']; transactionId: number; clientId?: number }): Promise<StorageDocument> {
+  async createDocument(data: { name: string; status: Document['status']; transactionId: number; clientId?: number }): Promise<Document> {
     try {
+      // Validate the status is one of the allowed values
+      const validStatuses = ['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'] as const;
+      if (!validStatuses.includes(data.status)) {
+        throw new Error('Invalid document status');
+      }
+
       const result = await db.execute(sql`
         INSERT INTO documents (
           name,
@@ -1050,27 +1093,42 @@ export class DatabaseStorage implements IStorage {
           updated_at,
           client_id
         ) VALUES (
-          ${document.name},
-          ${document.status},
-          ${document.transactionId},
+          ${data.name},
+          ${data.status},
+          ${data.transactionId},
           NOW(),
           NOW(),
-          ${document.clientId || null}
-        ) RETURNING *
+          ${data.clientId || null}
+        )
+        RETURNING 
+          id,
+          name,
+          status,
+          transaction_id as "transactionId",
+          created_at as "createdAt",
+          updated_at as "updatedAt",
+          deadline,
+          deadline_time as "deadlineTime",
+          notes,
+          client_id as "clientId"
       `);
 
-      const row = result.rows[0];
+      if (!result.rows[0]) {
+        throw new Error('Failed to create document');
+      }
+
+      const doc = result.rows[0];
       return {
-        id: String(row.id),
-        name: String(row.name),
-        status: row.status as StorageDocument['status'],
-        transactionId: Number(row.transaction_id),
-        deadline: row.deadline ? String(row.deadline) : null,
-        deadlineTime: row.deadline_time ? String(row.deadline_time) : null,
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at),
-        notes: row.notes ? String(row.notes) : null,
-        clientId: row.client_id ? Number(row.client_id) : undefined
+        id: doc.id,
+        name: doc.name,
+        status: doc.status as Document['status'],
+        transactionId: Number(doc.transactionId),
+        createdAt: new Date(doc.createdAt),
+        updatedAt: new Date(doc.updatedAt),
+        deadline: doc.deadline,
+        deadlineTime: doc.deadlineTime,
+        notes: doc.notes,
+        clientId: doc.clientId
       };
     } catch (error) {
       console.error('Error in createDocument:', error);
@@ -1078,42 +1136,68 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateDocument(id: string, data: Partial<StorageDocument>): Promise<StorageDocument> {
+  async updateDocument(id: string, data: Partial<Document>): Promise<Document> {
     try {
-      // Create SET clause
-      const setColumns = Object.entries(data)
-        .filter(([_, value]) => value !== undefined)
-        .map(([key, value]) => {
-          const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-          if (value === null) {
-            return sql`${sql.identifier([snakeKey])} = NULL`;
-          }
-          return sql`${sql.identifier([snakeKey])} = ${value}`;
-        });
+      console.log('Updating document with:', { id, data });
 
+      // First fetch the current document to ensure it exists
+      const currentDoc = await db.execute(sql`
+        SELECT * FROM documents WHERE id = ${id}
+      `);
+
+      if (!currentDoc.rows[0]) {
+        throw new Error('Document not found');
+      }
+
+      // Update document with new values, handling each field separately
       const result = await db.execute(sql`
         UPDATE documents
-        SET ${sql.join(setColumns, sql`, `)},
-            updated_at = NOW()
+        SET 
+          status = ${data.status || currentDoc.rows[0].status},
+          notes = ${data.notes !== undefined ? data.notes : currentDoc.rows[0].notes},
+          deadline = ${data.deadline !== undefined ? data.deadline : currentDoc.rows[0].deadline},
+          deadline_time = ${data.deadlineTime !== undefined ? data.deadlineTime : currentDoc.rows[0].deadline_time},
+          client_id = ${data.clientId !== undefined ? data.clientId : currentDoc.rows[0].client_id},
+          updated_at = CURRENT_TIMESTAMP
         WHERE id = ${id}
-        RETURNING *
+        RETURNING 
+          id,
+          name,
+          status,
+          transaction_id as "transactionId",
+          notes,
+          deadline,
+          deadline_time as "deadlineTime",
+          created_at as "createdAt",
+          updated_at as "updatedAt",
+          client_id as "clientId"
       `);
+
+      console.log('Update result:', result.rows[0]);
+
+      if (!result.rows[0]) {
+        throw new Error('Failed to update document');
+      }
 
       const row = result.rows[0];
       return {
         id: String(row.id),
         name: String(row.name),
-        status: row.status as StorageDocument['status'],
-        transactionId: Number(row.transaction_id),
-        deadline: row.deadline ? String(row.deadline) : null,
-        deadlineTime: row.deadline_time ? String(row.deadline_time) : null,
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at),
-        notes: row.notes ? String(row.notes) : null,
-        clientId: row.client_id ? Number(row.client_id) : undefined
+        status: row.status as Document['status'],
+        transactionId: Number(row.transactionId),
+        notes: row.notes,
+        deadline: row.deadline,
+        deadlineTime: row.deadlineTime,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt),
+        clientId: row.clientId
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+        console.error('Stack trace:', error.stack);
+      }
       throw error;
     }
   }
@@ -1121,7 +1205,8 @@ export class DatabaseStorage implements IStorage {
   async deleteDocument(id: string): Promise<void> {
     try {
       await db.execute(sql`
-        DELETE FROM documents WHERE id = ${id}
+        DELETE FROM documents 
+        WHERE id = ${id}
       `);
     } catch (error) {
       console.error('Error in deleteDocument:', error);

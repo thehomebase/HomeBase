@@ -45,13 +45,16 @@ export default function HomePage() {
   const createClientMutation = useMutation({
     mutationFn: async (data: typeof form.getValues) => {
       const sanitizedData = {
-        ...data,
-        agentId: user?.id,
-        labels: Array.isArray(data.labels) ? data.labels : [],
+        firstName: data.firstName,
+        lastName: data.lastName,
+        type: data.type,
+        status: data.status,
         email: data.email || null,
         phone: data.phone || null,
         address: data.address || null,
-        notes: data.notes || null
+        notes: data.notes || null,
+        labels: Array.isArray(data.labels) ? data.labels : [],
+        agentId: user?.id
       };
 
       const response = await apiRequest("POST", "/api/clients", sanitizedData);
