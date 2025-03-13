@@ -8,25 +8,12 @@ import {
   FieldValues,
   FormProvider,
   useFormContext,
-  FormState,
 } from "react-hook-form"
-
-const FormContext = React.createContext<{
-  formState?: FormState<any>
-}>({})
 
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 
-const Form = React.forwardRef(({ ...props }, ref) => {
-  const formState = props.formState;
-  return (
-    <FormContext.Provider value={{ formState }}>
-      <FormProvider {...props} />
-    </FormContext.Provider>
-  )
-})
-Form.displayName = "Form"
+const Form = FormProvider
 
 type FormFieldContextValue<
   TFieldValues extends FieldValues = FieldValues,
@@ -55,27 +42,22 @@ const FormField = <
 const useFormField = () => {
   const fieldContext = React.useContext(FormFieldContext)
   const itemContext = React.useContext(FormItemContext)
-  
-  const { formState } = React.useContext(FormContext)
-  
-  const fieldState = fieldContext && fieldContext.name
-    ? {
-        invalid: !!(formState?.errors?.[fieldContext.name]),
-        isDirty: !!(formState?.dirtyFields?.[fieldContext.name]),
-        isTouched: !!(formState?.touchedFields?.[fieldContext.name]),
-        error: formState?.errors?.[fieldContext.name],
-      }
-    : { invalid: false, isDirty: false, isTouched: false, error: undefined }
+  const { getFieldState, formState } = useFormContext()
 
-  // Safely access itemContext properties
-  const id = itemContext?.id
+  const fieldState = getFieldState(fieldContext.name, formState)
+
+  if (!fieldContext) {
+    throw new Error("useFormField should be used within <FormField>")
+  }
+
+  const { id } = itemContext
 
   return {
     id,
-    name: fieldContext?.name,
-    formItemId: id ? `${id}-form-item` : undefined,
-    formDescriptionId: id ? `${id}-form-item-description` : undefined,
-    formMessageId: id ? `${id}-form-item-message` : undefined,
+    name: fieldContext.name,
+    formItemId: `${id}-form-item`,
+    formDescriptionId: `${id}-form-item-description`,
+    formMessageId: `${id}-form-item-message`,
     ...fieldState,
   }
 }
@@ -122,7 +104,7 @@ FormLabel.displayName = "FormLabel"
 const FormControl = React.forwardRef<
   React.ElementRef<typeof Slot>,
   React.ComponentPropsWithoutRef<typeof Slot>
->(({ children, ...props }, ref) => {
+>(({ ...props }, ref) => {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField()
 
   return (
@@ -136,9 +118,7 @@ const FormControl = React.forwardRef<
       }
       aria-invalid={!!error}
       {...props}
-    >
-      {children}
-    </Slot>
+    />
   )
 })
 FormControl.displayName = "FormControl"

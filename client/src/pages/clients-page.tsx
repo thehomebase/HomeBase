@@ -692,30 +692,26 @@ export default function ClientsPage() {
 
         {user?.role === "agent" && (
           <Form onSubmit={form.handleSubmit(onSubmit)}>
-            <FormField
-              control={form.control}
-              name="firstName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>First Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="First Name" {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="lastName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Last Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Last Name" {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            <FormControl>
+              <FormLabel htmlFor="firstName">First Name</FormLabel>
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <Input placeholder="First Name" {...field} />
+                )}
+              />
+            </FormControl>
+            <FormControl>
+              <FormLabel htmlFor="lastName">Last Name</FormLabel>
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <Input placeholder="Last Name" {...field} />
+                )}
+              />
+            </FormControl>
             {/* ...other form fields... */}
             <Button
               type="submit"
