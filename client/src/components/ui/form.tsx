@@ -122,13 +122,13 @@ const FormControl = React.forwardRef<
       id={formItemId}
       aria-describedby={
         !error
-          ? `${formDescriptionId}`
+          ? formDescriptionId
           : `${formDescriptionId} ${formMessageId}`
       }
       aria-invalid={!!error}
       {...props}
     >
-      {React.Children.only(children)}
+      {children}
     </Slot>
   )
 })
