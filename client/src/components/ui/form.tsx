@@ -42,15 +42,24 @@ const FormField = <
 const useFormField = () => {
   const fieldContext = React.useContext(FormFieldContext)
   const itemContext = React.useContext(FormItemContext)
-  const { getFieldState, formState } = useFormContext()
-
-  const fieldState = getFieldState(fieldContext.name, formState)
+  const form = useFormContext()
 
   if (!fieldContext) {
     throw new Error("useFormField should be used within <FormField>")
   }
 
+  if (!itemContext) {
+    throw new Error("useFormField should be used within <FormItem>")
+  }
+
   const { id } = itemContext
+
+  const fieldState = {
+    invalid: !!(form.formState?.errors?.[fieldContext.name]),
+    isDirty: !!(form.formState?.dirtyFields?.[fieldContext.name]),
+    isTouched: !!(form.formState?.touchedFields?.[fieldContext.name]),
+    error: form.formState?.errors?.[fieldContext.name]
+  }
 
   return {
     id,
