@@ -19,37 +19,11 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       colors: {
-        table: {
-          header: {
-            DEFAULT: "hsl(var(--background))",
-            dark: "hsl(0 0% 15%)"
-          },
-          row: {
-            DEFAULT: "hsl(var(--background))",
-            dark: "hsl(0 0% 12%)",
-            alternate: "hsl(0 0% 10%)"
-          }
-        },
-        background: {
-          DEFAULT: "hsl(var(--background))",
-          dark: "hsl(222.2 84% 4.9%)",
-          light: "hsl(0 0% 100%)"
-        },
-        foreground: {
-          DEFAULT: "hsl(var(--foreground))",
-          dark: "hsl(210 40% 98%)",
-          light: "hsl(222.2 84% 4.9%)"
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-          dark: "hsl(222.2 84% 4.9%)",
-          light: "hsl(0 0% 100%)"
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -57,6 +31,10 @@ export default {
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -66,44 +44,13 @@ export default {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
         },
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        chart: {
-          prospect: {
-            light: "#FB7185",
-            dark: "#E14D62"
-          },
-          activeListing: {
-            light: "#4ADE80",
-            dark: "#22C55E"
-          },
-          liveListing: {
-            light: "#FDE047",
-            dark: "#FFD700"
-          },
-          mutualAcceptance: {
-            light: "#38BDF8",
-            dark: "#2196F3"
-          },
-          closing: {
-            light: "#A78BFA",
-            dark: "#7C3AED"
-          }
-        },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
         },
       },
       keyframes: {
