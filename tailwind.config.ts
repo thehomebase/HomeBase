@@ -14,10 +14,22 @@ export default {
     },
     extend: {
       borderRadius: {
-        lg: "var(--radius)",
+        lg: "var(--radius)", 
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      colors: {
+        table: {
+          header: {
+            DEFAULT: "hsl(var(--background))",
+            dark: "hsl(0 0% 15%)"
+          },
+          row: {
+            DEFAULT: "hsl(var(--background))",
+            dark: "hsl(0 0% 12%)",
+            alternate: "hsl(0 0% 10%)"
+          }
+        },
       colors: {
         background: {
           DEFAULT: "hsl(var(--background))",
