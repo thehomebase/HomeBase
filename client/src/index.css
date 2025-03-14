@@ -56,3 +56,6 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Force reload trigger */
+.force-reload {}
