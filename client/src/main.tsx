@@ -7,6 +7,14 @@ import './index.css';
 
 const queryClient = new QueryClient();
 
+// Configure HMR
+if (import.meta.hot) {
+  import.meta.hot.accept(); // Accept updates to the module
+  import.meta.hot.on('vite:beforeUpdate', () => {
+    console.log('vite:beforeUpdate');
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
