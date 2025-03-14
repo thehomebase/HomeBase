@@ -16,15 +16,12 @@ import { useLocation } from "wouter";
 import { Plus, List, LayoutGrid, Table2, Trash2, Moon, Sun } from "lucide-react";
 import { NavTabs } from "@/components/ui/nav-tabs";
 import { KanbanBoard } from "@/components/kanban-board";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TransactionTable } from "@/components/transaction-table";
 import { Transaction as SchemaTransaction } from "@shared/schema";
 import { Client } from "@shared/schema";
-
-// Add proper type for client find operations
-type ClientLookup = (client: Client) => boolean;
 
 // Update the Transaction interface to include all required fields
 interface Transaction extends Omit<SchemaTransaction, 'updatedAt'> {
@@ -56,7 +53,7 @@ const createTransactionSchema = z.object({
   city: z.string().min(1, "City is required"),
   state: z.string().min(2, "State is required"),
   zipCode: z.string().min(5, "ZIP code is required"),
-  accessCode: z.string().min(6),
+  accessCode: z.string().min(6, "Access code must be at least 6 characters"),
   type: z.enum(['buy', 'sell']),
   clientId: z.number().nullable(),
   secondaryClientId: z.number().nullable()
@@ -65,9 +62,9 @@ const createTransactionSchema = z.object({
 export default function TransactionsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [view, setView] = useState<'list' | 'board' | 'table'>('board');
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const { toast } = useToast();
   const [theme, setTheme] = useState<'light' | 'dark'>(
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   );
@@ -75,38 +72,65 @@ export default function TransactionsPage() {
   const [startDate, setStartDate] = useState<string>(new Date(new Date().getFullYear(), 0, 1).toISOString());
   const [endDate, setEndDate] = useState<string>("");
 
-  const { data: clients = [] } = useQuery({
+  // Handle initial authentication check
+  useEffect(() => {
+    if (!user) {
+      console.log('No user found, waiting for auth state...');
+      // Don't redirect here, let the auth system handle it
+    }
+  }, [user]);
+
+  const { data: clients = [], isError: clientsError } = useQuery({
     queryKey: ["/api/clients"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/clients");
-      if (!response.ok) throw new Error('Failed to fetch clients');
-      return response.json();
+      try {
+        if (!user || user.role !== "agent") {
+          console.log('User not authorized to fetch clients');
+          return [];
+        }
+        const response = await apiRequest("GET", "/api/clients");
+        if (!response.ok) throw new Error('Failed to fetch clients');
+        return response.json();
+      } catch (error) {
+        console.error('Client fetch error:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load clients. Please try again.",
+          variant: "destructive",
+        });
+        return [];
+      }
     },
-    enabled: !!user && user.role === "agent", // Only fetch when user is authenticated
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    enabled: !!user && user.role === "agent",
+    staleTime: 5 * 60 * 1000,
   });
 
-  const { data: transactions = [], refetch } = useQuery<Transaction[]>({
+  const { data: transactions = [], isError: transactionsError } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     queryFn: async () => {
-      if (!user) {
-        throw new Error('Authentication required');
+      try {
+        if (!user) {
+          console.log('No user found, skipping transaction fetch');
+          return [];
+        }
+        const response = await apiRequest("GET", "/api/transactions");
+        if (!response.ok) {
+          throw new Error('Failed to fetch transactions');
+        }
+        return response.json();
+      } catch (error) {
+        console.error('Transaction fetch error:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load transactions. Please try again.",
+          variant: "destructive",
+        });
+        return [];
       }
-      const response = await apiRequest("GET", "/api/transactions");
-      if (!response.ok) {
-        throw new Error('Failed to fetch transactions');
-      }
-      return response.json();
     },
-    enabled: !!user, // Only fetch when user is authenticated
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    retry: 1, // Only retry once for auth failures
-    onError: (error) => {
-      if (error.message === 'Authentication required') {
-        // Handle auth error silently without redirect
-        console.log('Auth required, waiting for auth state...');
-      }
-    }
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
   });
 
   const createTransactionMutation = useMutation({
@@ -127,7 +151,10 @@ export default function TransactionsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      refetch();
+      toast({
+        title: "Success",
+        description: "Transaction created successfully",
+      });
       form.reset();
     },
     onError: () => {
@@ -235,7 +262,7 @@ export default function TransactionsPage() {
               pressed={theme === 'dark'}
               onPressedChange={toggleTheme}
               aria-label="Toggle theme"
-              className=" hover:text-foreground dark:text-white dark:hover:text-white"
+              className="hover:text-foreground dark:text-white dark:hover:text-white"
             >
               {theme === 'light' ? (
                 <Moon className="h-4 w-4" />
@@ -260,7 +287,7 @@ export default function TransactionsPage() {
         {user?.role === "agent" && (
           <Dialog>
             <DialogTrigger asChild>
-              <Button className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-black dark:bg-white mb-0 mr-64">
+              <Button className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-black dark:bg-white mb-0">
                 <Plus className="h-4 w-4 mr-2" />
                 New Transaction
               </Button>
@@ -336,6 +363,25 @@ export default function TransactionsPage() {
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Transaction Type</FormLabel>
+                        <FormControl>
+                          <select
+                            className="w-full h-9 px-3 rounded-md border text-base bg-background"
+                            value={field.value}
+                            onChange={(e) => field.onChange(e.target.value as 'buy' | 'sell')}
+                          >
+                            <option value="buy">Buy</option>
+                            <option value="sell">Sell</option>
+                          </select>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
                   {user?.role === "agent" && (
                     <div className="space-y-4">
                       <FormField
@@ -395,6 +441,7 @@ export default function TransactionsPage() {
           </Dialog>
         )}
       </div>
+
       <div className="flex-1 w-full bg-background">
         {view === 'board' ? (
           <div className="min-w-0 py-4">
@@ -435,7 +482,7 @@ export default function TransactionsPage() {
                       className="h-8 w-8 text-destructive hover:text-destructive"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteTransaction(transaction.id);
+                        setDeleteId(transaction.id);
                       }}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -443,14 +490,14 @@ export default function TransactionsPage() {
                   )}
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize truncate">Status: {transaction.status.replace('_', ' ')}</p>
-                  <p className="text-sm text-muted-foreground dark:text-gray-300 break-words">
-                    Client: {clients.find((c: Client) => c.id === transaction.clientId)
-                      ? `${clients.find((c: Client) => c.id === transaction.clientId)?.firstName} ${clients.find((c: Client) => c.id === transaction.clientId)?.lastName}`
-                      : 'Not set'}
+                  <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize">
+                    Status: {transaction.status.replace('_', ' ')}
+                  </p>
+                  <p className="text-sm text-muted-foreground dark:text-gray-300">
+                    Client: {transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : 'Not set'}
                   </p>
                   {transaction.secondaryClient && (
-                    <p className="text-sm text-muted-foreground dark:text-gray-300 break-words">
+                    <p className="text-sm text-muted-foreground dark:text-gray-300">
                       Secondary Client: {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}
                     </p>
                   )}
@@ -481,6 +528,7 @@ export default function TransactionsPage() {
               onClick={() => {
                 if (deleteId) {
                   deleteTransactionMutation.mutate(deleteId);
+                  setDeleteId(null);
                 }
               }}
               className="bg-destructive hover:bg-destructive/90"
