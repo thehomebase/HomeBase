@@ -33,8 +33,8 @@ export async function apiRequest(
       return res;
     } catch (error) {
       lastError = error as Error;
-      if (attempt < retries - 1) {
-        // Wait before retrying, with exponential backoff
+      if (attempt < retries - 1 && error.message !== "Please log in to access this resource") {
+        // Don't retry auth failures
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
         continue;
       }
@@ -69,8 +69,8 @@ export const getQueryFn: <T>(options: {
         return data;
       } catch (error) {
         lastError = error as Error;
-        if (attempt < retries - 1) {
-          // Wait before retrying, with exponential backoff
+        if (attempt < retries - 1 && error.message !== "Please log in to access this resource") {
+          // Don't retry auth failures
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
           continue;
         }

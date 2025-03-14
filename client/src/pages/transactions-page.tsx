@@ -82,33 +82,31 @@ export default function TransactionsPage() {
       if (!response.ok) throw new Error('Failed to fetch clients');
       return response.json();
     },
-    enabled: user?.role === "agent"
-  });
-
-  const form = useForm({
-    resolver: zodResolver(createTransactionSchema),
-    defaultValues: {
-      streetName: "",
-      city: "",
-      state: "",
-      zipCode: "",
-      accessCode: "",
-      type: "buy" as const,
-      clientId: null as number | null,
-      secondaryClientId: null as number | null
-    },
+    enabled: !!user && user.role === "agent", // Only fetch when user is authenticated
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   const { data: transactions = [], refetch } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     queryFn: async () => {
+      if (!user) {
+        throw new Error('Authentication required');
+      }
       const response = await apiRequest("GET", "/api/transactions");
       if (!response.ok) {
         throw new Error('Failed to fetch transactions');
       }
       return response.json();
     },
-    enabled: !!user,
+    enabled: !!user, // Only fetch when user is authenticated
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    retry: 1, // Only retry once for auth failures
+    onError: (error) => {
+      if (error.message === 'Authentication required') {
+        // Handle auth error silently without redirect
+        console.log('Auth required, waiting for auth state...');
+      }
+    }
   });
 
   const createTransactionMutation = useMutation({
@@ -185,8 +183,21 @@ export default function TransactionsPage() {
     return yearMatch && startDateMatch && endDateMatch;
   });
 
-
   const isMobile = useIsMobile();
+
+  const form = useForm({
+    resolver: zodResolver(createTransactionSchema),
+    defaultValues: {
+      streetName: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      accessCode: "",
+      type: "buy" as const,
+      clientId: null as number | null,
+      secondaryClientId: null as number | null
+    },
+  });
 
   return (
     <main className="flex-1 min-w-0 overflow-x-hidden px-4">
