@@ -77,4 +77,4 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "nodemon -e ts,tsx --exec \"tsx server/index.ts\""
+args = "nodemon"
