@@ -5,7 +5,15 @@ import { AuthProvider } from './hooks/use-auth';
 import App from './App';
 import './index.css';
 
-const queryClient = new QueryClient();
+// Create a persistent QueryClient instance
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // Data remains fresh for 5 minutes
+    },
+  },
+});
 
 // Configure HMR with enhanced error handling
 if (import.meta.hot) {
@@ -24,6 +32,8 @@ if (import.meta.hot) {
   // Log successful updates
   import.meta.hot.on('vite:afterUpdate', (data) => {
     console.log('HMR update applied:', data);
+    // Preserve query cache during HMR updates
+    queryClient.refetchQueries();
   });
 }
 
