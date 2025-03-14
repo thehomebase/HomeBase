@@ -7,11 +7,23 @@ import './index.css';
 
 const queryClient = new QueryClient();
 
-// Configure HMR
+// Configure HMR with enhanced error handling
 if (import.meta.hot) {
-  import.meta.hot.accept(); // Accept updates to the module
-  import.meta.hot.on('vite:beforeUpdate', () => {
-    console.log('vite:beforeUpdate');
+  import.meta.hot.accept();
+
+  // Log when HMR update is about to happen
+  import.meta.hot.on('vite:beforeUpdate', (data) => {
+    console.log('HMR update incoming:', data);
+  });
+
+  // Handle HMR errors
+  import.meta.hot.on('vite:error', (err) => {
+    console.error('HMR error:', err);
+  });
+
+  // Log successful updates
+  import.meta.hot.on('vite:afterUpdate', (data) => {
+    console.log('HMR update applied:', data);
   });
 }
 
