@@ -76,61 +76,46 @@ export default function TransactionsPage() {
   useEffect(() => {
     if (!user) {
       console.log('No user found, waiting for auth state...');
-      // Don't redirect here, let the auth system handle it
+      return; // Don't proceed with data fetching
     }
   }, [user]);
 
-  const { data: clients = [], isError: clientsError } = useQuery({
+  const { data: clients = [], isLoading: clientsLoading } = useQuery({
     queryKey: ["/api/clients"],
     queryFn: async () => {
       try {
         if (!user || user.role !== "agent") {
-          console.log('User not authorized to fetch clients');
           return [];
         }
         const response = await apiRequest("GET", "/api/clients");
-        if (!response.ok) throw new Error('Failed to fetch clients');
         return response.json();
       } catch (error) {
         console.error('Client fetch error:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load clients. Please try again.",
-          variant: "destructive",
-        });
         return [];
       }
     },
     enabled: !!user && user.role === "agent",
     staleTime: 5 * 60 * 1000,
+    retry: false // Don't retry on failure
   });
 
-  const { data: transactions = [], isError: transactionsError } = useQuery<Transaction[]>({
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     queryFn: async () => {
       try {
         if (!user) {
-          console.log('No user found, skipping transaction fetch');
           return [];
         }
         const response = await apiRequest("GET", "/api/transactions");
-        if (!response.ok) {
-          throw new Error('Failed to fetch transactions');
-        }
         return response.json();
       } catch (error) {
         console.error('Transaction fetch error:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load transactions. Please try again.",
-          variant: "destructive",
-        });
         return [];
       }
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
-    retry: 1,
+    retry: false // Don't retry on failure
   });
 
   const createTransactionMutation = useMutation({
