@@ -15,17 +15,34 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
-    method,
-    headers: {
-      ...(data ? { "Content-Type": "application/json" } : {}),
-    },
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  const retries = 3;
+  let lastError: Error | null = null;
 
-  await throwIfResNotOk(res);
-  return res;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          ...(data ? { "Content-Type": "application/json" } : {}),
+        },
+        body: data ? JSON.stringify(data) : undefined,
+        credentials: "include",
+      });
+
+      await throwIfResNotOk(res);
+      return res;
+    } catch (error) {
+      lastError = error as Error;
+      if (attempt < retries - 1) {
+        // Wait before retrying, with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        continue;
+      }
+      break;
+    }
+  }
+
+  throw lastError;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -34,17 +51,34 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
-      credentials: "include",
-    });
+    const retries = 3;
+    let lastError: Error | null = null;
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const res = await fetch(queryKey[0] as string, {
+          credentials: "include",
+        });
+
+        if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+          return null;
+        }
+
+        await throwIfResNotOk(res);
+        const data = await res.json();
+        return data;
+      } catch (error) {
+        lastError = error as Error;
+        if (attempt < retries - 1) {
+          // Wait before retrying, with exponential backoff
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          continue;
+        }
+        break;
+      }
     }
 
-    await throwIfResNotOk(res);
-    const data = await res.json();
-    return data;
+    throw lastError;
   };
 
 export const queryClient = new QueryClient({
@@ -53,11 +87,13 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000),
     },
     mutations: {
-      retry: false,
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000),
     },
   },
 });
