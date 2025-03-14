@@ -35,7 +35,7 @@ localPort = 8000
 externalPort = 8000
 
 [workflows]
-runButton = "Dev Server"
+runButton = "Dev Server (Nodemon)"
 
 [[workflows.workflow]]
 name = "Project"
@@ -69,3 +69,12 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run dev"
+
+[[workflows.workflow]]
+name = "Dev Server (Nodemon)"
+author = 36894477
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "nodemon -e ts,tsx --exec \"tsx server/index.ts\""
