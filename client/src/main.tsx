@@ -35,16 +35,26 @@ render();
 
 // Enhanced HMR configuration with fallback
 if (import.meta.hot) {
-  // Accept specific modules for HMR
   import.meta.hot.accept(['./App', './index.css'], (modules) => {
     console.log('HMR update detected, attempting hot reload');
     try {
-      // Clear query cache to ensure fresh data
       queryClient.clear();
-      // Try to re-render the application
       render();
     } catch (error) {
-      console.error('HMR update failed, falling back to full reload:', error);
+      console.error('HMR update failed:', error);
+    }
+  });
+
+  let isDisconnected = false;
+  
+  import.meta.hot.on('vite:ws-disconnect', () => {
+    isDisconnected = true;
+    console.log('HMR disconnected. Waiting for reconnection...');
+  });
+
+  import.meta.hot.on('vite:ws-connect', () => {
+    if (isDisconnected) {
+      console.log('HMR reconnected, reloading page...');
       window.location.reload();
     }
   });
