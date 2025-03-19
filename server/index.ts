@@ -3,6 +3,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { Server as HttpServer } from "http";
+import WebSocket from 'ws';
 
 // Enhanced environment logging
 const environment = process.env.NODE_ENV || 'development';
@@ -68,13 +69,18 @@ async function startServer(server: HttpServer): Promise<void> {
         }
       });
 
-      // Handle WebSocket upgrade for HMR
+      // Enhanced WebSocket handling for HMR
       serverInstance.on('upgrade', (request, socket, head) => {
         const url = new URL(request.url!, `http://${request.headers.host}`);
+        log(`WebSocket upgrade request for path: ${url.pathname}`);
+
         if (url.pathname.startsWith('/@vite/client') || url.pathname.startsWith('/hmr')) {
           log('HMR WebSocket connection requested');
           // Let Vite handle the WebSocket connection
           socket.emit('data', '');
+        } else {
+          log(`Unknown WebSocket upgrade request for path: ${url.pathname}`);
+          socket.destroy();
         }
       });
     });
