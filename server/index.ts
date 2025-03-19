@@ -5,6 +5,9 @@ import { setupVite, serveStatic, log } from "./vite";
 import { Server as HttpServer } from "http";
 import WebSocket from 'ws';
 
+// Add startup message to verify nodemon restarts
+log(`Server starting... [${new Date().toISOString()}]`);
+
 // Enhanced environment logging
 const environment = process.env.NODE_ENV || 'development';
 log(`Starting application in ${environment} environment`);
