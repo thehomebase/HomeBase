@@ -67,6 +67,16 @@ async function startServer(server: HttpServer): Promise<void> {
           process.exit(1);
         }
       });
+
+      // Handle WebSocket upgrade for HMR
+      serverInstance.on('upgrade', (request, socket, head) => {
+        const url = new URL(request.url!, `http://${request.headers.host}`);
+        if (url.pathname.startsWith('/@vite/client') || url.pathname.startsWith('/hmr')) {
+          log('HMR WebSocket connection requested');
+          // Let Vite handle the WebSocket connection
+          socket.emit('data', '');
+        }
+      });
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
