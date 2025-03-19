@@ -548,7 +548,7 @@ export default function ClientsPage() {
       const sanitizedClient = {
         ...updatedClient,
         labels: (Array.isArray(updatedClient.labels) ? updatedClient.labels : [])
-          .filter((label): label is string => 
+          .filter((label): label is string =>
             typeof label === 'string' && label.trim().length > 0
           )
       };
@@ -725,7 +725,7 @@ export default function ClientsPage() {
                         <FormItem>
                           <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input type="email" {...field} />
+                            <Input type="email" {...field} value={field.value ?? ""} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -738,7 +738,7 @@ export default function ClientsPage() {
                         <FormItem>
                           <FormLabel>Phone</FormLabel>
                           <FormControl>
-                            <Input type="tel" {...field} />
+                            <Input type="tel" {...field} value={field.value ?? ""} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -751,7 +751,7 @@ export default function ClientsPage() {
                         <FormItem>
                           <FormLabel>Address</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Input {...field} value={field.value ?? ""} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -797,7 +797,7 @@ export default function ClientsPage() {
                         <FormItem>
                           <FormLabel>Notes</FormLabel>
                           <FormControl>
-                            <textarea {...field} />
+                            <textarea {...field} value={field.value ?? ""} className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
