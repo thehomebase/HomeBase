@@ -11,38 +11,35 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // Data remains fresh for 5 minutes
+      retry: 1, // Only retry failed requests once
     },
   },
 });
 
-// Configure HMR with enhanced error handling
-if (import.meta.hot) {
-  import.meta.hot.accept();
+const container = document.getElementById('root')!;
+const root = createRoot(container);
 
-  // Log when HMR update is about to happen
-  import.meta.hot.on('vite:beforeUpdate', (data) => {
-    console.log('HMR update incoming:', data);
-  });
-
-  // Handle HMR errors
-  import.meta.hot.on('vite:error', (err) => {
-    console.error('HMR error:', err);
-  });
-
-  // Log successful updates
-  import.meta.hot.on('vite:afterUpdate', (data) => {
-    console.log('HMR update applied:', data);
-    // Preserve query cache during HMR updates
-    queryClient.refetchQueries();
-  });
+function render() {
+  root.render(
+    <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </QueryClientProvider>
+    </React.StrictMode>
+  );
 }
 
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </QueryClientProvider>
-  </React.StrictMode>
-);
+render();
+
+// Enhanced HMR configuration
+if (import.meta.hot) {
+  import.meta.hot.accept(['./App', './index.css'], (modules) => {
+    console.log('HMR update detected, re-rendering application');
+    // Clear query cache to ensure fresh data
+    queryClient.clear();
+    // Re-render the application
+    render();
+  });
+}
