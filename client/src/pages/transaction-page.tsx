@@ -18,16 +18,20 @@ export default function TransactionPage() {
   const [isEditing, setIsEditing] = useState(false);
   const parsedId = id ? parseInt(id, 10) : null;
 
-  const { data: transaction, isLoading } = useQuery<Transaction>({
+  const { data: transaction, isLoading, error } = useQuery<Transaction>({
     queryKey: ["/api/transactions", parsedId],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/transactions/${parsedId}`);
+      if (response.status === 404) {
+        throw new Error("Transaction not found");
+      }
       if (!response.ok) {
         throw new Error("Failed to fetch transaction");
       }
       return response.json();
     },
     enabled: !!parsedId && !!user,
+    retry: false
   });
 
   if (!user) {
