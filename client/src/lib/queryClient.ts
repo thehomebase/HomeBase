@@ -12,70 +12,19 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-const FETCH_TIMEOUT = 10000; // 10 seconds timeout
-
-async function fetchWithTimeout(resource: string, options: RequestInit = {}): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit = {}) {
+  const timeout = 10000;
   const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-
+  const id = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch(resource, {
+    const response = await fetch(url, {
       ...options,
       signal: controller.signal
     });
-    clearTimeout(id);
     return response;
-  } catch (error: any) {
+  } finally {
     clearTimeout(id);
-    if (error.name === 'AbortError') {
-      throw new Error('Request timed out');
-    }
-    throw error;
   }
-}
-
-export async function apiRequest(
-  method: string,
-  url: string,
-  data?: unknown | undefined,
-): Promise<Response> {
-  const retries = 3;
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt < retries; attempt++) {
-    try {
-      console.log(`Attempting API request to ${url} (attempt ${attempt + 1}/${retries})`);
-      const res = await fetchWithTimeout(url, {
-        method,
-        headers: {
-          ...(data ? { "Content-Type": "application/json" } : {}),
-        },
-        body: data ? JSON.stringify(data) : undefined,
-        credentials: "include",
-      });
-
-      await throwIfResNotOk(res);
-      return res;
-    } catch (error: any) {
-      lastError = error;
-      console.error(`API request failed (attempt ${attempt + 1}):`, error.message);
-
-      if (error.message === "Please log in to access this resource") {
-        console.log('Authentication required, not retrying');
-        break;
-      }
-
-      if (attempt < retries - 1) {
-        const delay = Math.pow(2, attempt) * 1000;
-        console.log(`Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
-      break;
-    }
-  }
-
-  throw lastError;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -104,33 +53,6 @@ export const getQueryFn: <T>(options: {
     }
   };
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
-      refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000),
-    },
-    mutations: {
-      retry: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000),
-    },
-  },
-});
-import { QueryClient } from "@tanstack/react-query";
-
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
 const API_BASE_URL = 'http://0.0.0.0:5000';
 
 export async function apiRequest(
@@ -155,3 +77,20 @@ export async function apiRequest(
 
   return response;
 }
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      queryFn: getQueryFn({ on401: "throw" }),
+      refetchInterval: false,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000),
+    },
+    mutations: {
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 30000),
+    },
+  },
+});
