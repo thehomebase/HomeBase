@@ -53,7 +53,8 @@ export const getQueryFn: <T>(options: {
     }
   };
 
-const API_BASE_URL = 'http://0.0.0.0:5000';
+// Use the current host instead of hardcoded value
+const API_BASE_URL = window.location.origin;
 
 export async function apiRequest(
   method: string,
@@ -61,21 +62,29 @@ export async function apiRequest(
   body?: any,
   headers: HeadersInit = {}
 ) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-    credentials: 'include',
-  });
+  console.log(`Making ${method} request to ${path}`);
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      credentials: 'include',
+    });
 
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API request failed: ${response.status} - ${errorText}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response;
+  } catch (error) {
+    console.error(`Request failed for ${path}:`, error);
+    throw error;
   }
-
-  return response;
 }
 
 export const queryClient = new QueryClient({
