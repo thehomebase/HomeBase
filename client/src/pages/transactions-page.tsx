@@ -6,32 +6,62 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { Toggle } from "@/components/ui/toggle";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
-import { Plus, List, LayoutGrid, Table2, Trash2, Moon, Sun } from "lucide-react";
+import {
+  Plus,
+  List,
+  LayoutGrid,
+  Table2,
+  Trash2,
+  Moon,
+  Sun,
+} from "lucide-react";
 import { NavTabs } from "@/components/ui/nav-tabs";
 import { KanbanBoard } from "@/components/kanban-board";
 import { useState, useEffect } from "react";
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { TransactionTable } from "@/components/transaction-table";
 import { Transaction as SchemaTransaction } from "@shared/schema";
 import { Client } from "@shared/schema";
 
 // Update the Transaction interface to include all required fields
-interface Transaction extends Omit<SchemaTransaction, 'updatedAt'> {
+interface Transaction extends Omit<SchemaTransaction, "updatedAt"> {
   id: number;
   streetName: string;
   city: string;
   state: string;
   zipCode: string;
   status: string;
-  type: 'buy' | 'sell';
+  type: "buy" | "sell";
   participants: any[];
   contractPrice: number | null;
   clientId: number | null;
@@ -54,28 +84,32 @@ const createTransactionSchema = z.object({
   state: z.string().min(2, "State is required"),
   zipCode: z.string().min(5, "ZIP code is required"),
   accessCode: z.string().min(6, "Access code must be at least 6 characters"),
-  type: z.enum(['buy', 'sell']),
+  type: z.enum(["buy", "sell"]),
   clientId: z.number().nullable(),
-  secondaryClientId: z.number().nullable()
+  secondaryClientId: z.number().nullable(),
 });
 
 export default function TransactionsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [view, setView] = useState<'list' | 'board' | 'table'>('board');
+  const [view, setView] = useState<"list" | "board" | "table">("board");
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [theme, setTheme] = useState<'light' | 'dark'>(
-    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  const [theme, setTheme] = useState<"light" | "dark">(
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light",
   );
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const [startDate, setStartDate] = useState<string>(new Date(new Date().getFullYear(), 0, 1).toISOString());
+  const [startDate, setStartDate] = useState<string>(
+    new Date(new Date().getFullYear(), 0, 1).toISOString(),
+  );
   const [endDate, setEndDate] = useState<string>("");
 
   // Handle initial authentication check
   useEffect(() => {
     if (!user) {
-      console.log('No user found, waiting for auth state...');
+      console.log("No user found, waiting for auth state...");
       return; // Don't proceed with data fetching
     }
   }, [user]);
@@ -90,16 +124,18 @@ export default function TransactionsPage() {
         const response = await apiRequest("GET", "/api/clients");
         return response.json();
       } catch (error) {
-        console.error('Client fetch error:', error);
+        console.error("Client fetch error:", error);
         return [];
       }
     },
     enabled: !!user && user.role === "agent",
     staleTime: 5 * 60 * 1000,
-    retry: false // Don't retry on failure
+    retry: false, // Don't retry on failure
   });
 
-  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<
+    Transaction[]
+  >({
     queryKey: ["/api/transactions"],
     queryFn: async () => {
       try {
@@ -109,13 +145,13 @@ export default function TransactionsPage() {
         const response = await apiRequest("GET", "/api/transactions");
         return response.json();
       } catch (error) {
-        console.error('Transaction fetch error:', error);
+        console.error("Transaction fetch error:", error);
         return [];
       }
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
-    retry: false // Don't retry on failure
+    retry: false, // Don't retry on failure
   });
 
   const createTransactionMutation = useMutation({
@@ -123,14 +159,14 @@ export default function TransactionsPage() {
       const response = await apiRequest("POST", "/api/transactions", {
         ...data,
         agentId: user?.id,
-        status: 'prospect',
+        status: "prospect",
         participants: [],
         clientId: data.clientId || null,
         secondaryClientId: data.secondaryClientId || null,
-        year: new Date().getFullYear()
+        year: new Date().getFullYear(),
       });
       if (!response.ok) {
-        throw new Error('Failed to create transaction');
+        throw new Error("Failed to create transaction");
       }
       return response.json();
     },
@@ -155,7 +191,7 @@ export default function TransactionsPage() {
     mutationFn: async (id: number) => {
       const response = await apiRequest("DELETE", `/api/transactions/${id}`);
       if (!response.ok) {
-        throw new Error('Failed to delete transaction');
+        throw new Error("Failed to delete transaction");
       }
       return response;
     },
@@ -176,9 +212,9 @@ export default function TransactionsPage() {
   });
 
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
+    const newTheme = theme === "light" ? "dark" : "light";
     setTheme(newTheme);
-    document.documentElement.classList.toggle('dark');
+    document.documentElement.classList.toggle("dark");
   };
 
   const handleDeleteTransaction = (id: number) => {
@@ -187,13 +223,20 @@ export default function TransactionsPage() {
     }
   };
 
-  const filteredTransactions = transactions.filter((transaction: Transaction) => {
-    const transactionDate = transaction.createdAt ? new Date(transaction.createdAt) : new Date();
-    const yearMatch = selectedYear === null || transactionDate.getFullYear() === selectedYear;
-    const startDateMatch = startDate === "" || transactionDate >= new Date(startDate);
-    const endDateMatch = endDate === "" || transactionDate <= new Date(endDate);
-    return yearMatch && startDateMatch && endDateMatch;
-  });
+  const filteredTransactions = transactions.filter(
+    (transaction: Transaction) => {
+      const transactionDate = transaction.createdAt
+        ? new Date(transaction.createdAt)
+        : new Date();
+      const yearMatch =
+        selectedYear === null || transactionDate.getFullYear() === selectedYear;
+      const startDateMatch =
+        startDate === "" || transactionDate >= new Date(startDate);
+      const endDateMatch =
+        endDate === "" || transactionDate <= new Date(endDate);
+      return yearMatch && startDateMatch && endDateMatch;
+    },
+  );
 
   const isMobile = useIsMobile();
 
@@ -207,7 +250,7 @@ export default function TransactionsPage() {
       accessCode: "",
       type: "buy" as const,
       clientId: null as number | null,
-      secondaryClientId: null as number | null
+      secondaryClientId: null as number | null,
     },
   });
 
@@ -215,28 +258,30 @@ export default function TransactionsPage() {
     <main className="flex-1 min-w-0 overflow-x-hidden px-4">
       <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
         <div className="flex flex-col sm:flex-row flex-grow sm:items-center gap-2 mb-2">
-          <h2 className="text-2xl font-bold dark:text-white">Your Transactions</h2>
+          <h2 className="text-2xl font-bold dark:text-white">
+            Your Transactions
+          </h2>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
               <Toggle
-                pressed={view === 'list'}
-                onPressedChange={() => setView('list')}
+                pressed={view === "list"}
+                onPressedChange={() => setView("list")}
                 aria-label="List view"
                 className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
               >
                 <List className="h-4" />
               </Toggle>
               <Toggle
-                pressed={view === 'board'}
-                onPressedChange={() => setView('board')}
+                pressed={view === "board"}
+                onPressedChange={() => setView("board")}
                 aria-label="Board view"
                 className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
               >
                 <LayoutGrid className="h-4 w-4" />
               </Toggle>
               <Toggle
-                pressed={view === 'table'}
-                onPressedChange={() => setView('table')}
+                pressed={view === "table"}
+                onPressedChange={() => setView("table")}
                 aria-label="Table view"
                 className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
               >
@@ -244,12 +289,12 @@ export default function TransactionsPage() {
               </Toggle>
             </div>
             <Toggle
-              pressed={theme === 'dark'}
+              pressed={theme === "dark"}
               onPressedChange={toggleTheme}
               aria-label="Toggle theme"
               className="hover:text-foreground dark:text-white dark:hover:text-white"
             >
-              {theme === 'light' ? (
+              {theme === "light" ? (
                 <Moon className="h-4 w-4" />
               ) : (
                 <Sun className="h-4 w-4" />
@@ -258,10 +303,17 @@ export default function TransactionsPage() {
             <select
               className="w-20 h-9 px-2 rounded-md border text-base bg-background"
               value={selectedYear || ""}
-              onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value, 10) : null)}
+              onChange={(e) =>
+                setSelectedYear(
+                  e.target.value ? parseInt(e.target.value, 10) : null,
+                )
+              }
             >
               <option value="">{new Date().getFullYear()}</option>
-              {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+              {Array.from(
+                { length: 10 },
+                (_, i) => new Date().getFullYear() - i,
+              ).map((year) => (
                 <option key={year} value={year}>
                   {year}
                 </option>
@@ -282,7 +334,12 @@ export default function TransactionsPage() {
                 <DialogTitle>Create New Transaction</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit((data) => createTransactionMutation.mutate(data))} className="space-y-4">
+                <form
+                  onSubmit={form.handleSubmit((data) =>
+                    createTransactionMutation.mutate(data),
+                  )}
+                  className="space-y-4"
+                >
                   <FormField
                     control={form.control}
                     name="streetName"
@@ -316,7 +373,11 @@ export default function TransactionsPage() {
                       <FormItem>
                         <FormLabel>State</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Enter state" maxLength={2} />
+                          <Input
+                            {...field}
+                            placeholder="Enter state"
+                            maxLength={2}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -329,7 +390,11 @@ export default function TransactionsPage() {
                       <FormItem>
                         <FormLabel>ZIP Code</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Enter ZIP code" maxLength={5} />
+                          <Input
+                            {...field}
+                            placeholder="Enter ZIP code"
+                            maxLength={5}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -342,7 +407,11 @@ export default function TransactionsPage() {
                       <FormItem>
                         <FormLabel>Passkey</FormLabel>
                         <FormControl>
-                          <Input {...field} type="text" placeholder="Enter passkey (min. 6 characters)" />
+                          <Input
+                            {...field}
+                            type="text"
+                            placeholder="Enter passkey (min. 6 characters)"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -358,7 +427,9 @@ export default function TransactionsPage() {
                           <select
                             className="w-full h-9 px-3 rounded-md border text-base bg-background"
                             value={field.value}
-                            onChange={(e) => field.onChange(e.target.value as 'buy' | 'sell')}
+                            onChange={(e) =>
+                              field.onChange(e.target.value as "buy" | "sell")
+                            }
                           >
                             <option value="buy">Buy</option>
                             <option value="sell">Sell</option>
@@ -379,7 +450,13 @@ export default function TransactionsPage() {
                               <select
                                 className="w-full h-9 px-3 rounded-md border text-base bg-background"
                                 value={field.value || ""}
-                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    e.target.value
+                                      ? Number(e.target.value)
+                                      : null,
+                                  )
+                                }
                               >
                                 <option value="">Select primary client</option>
                                 {clients.map((client: Client) => (
@@ -402,9 +479,17 @@ export default function TransactionsPage() {
                               <select
                                 className="w-full h-9 px-3 rounded-md border text-base bg-background"
                                 value={field.value || ""}
-                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    e.target.value
+                                      ? Number(e.target.value)
+                                      : null,
+                                  )
+                                }
                               >
-                                <option value="">Select secondary client</option>
+                                <option value="">
+                                  Select secondary client
+                                </option>
                                 {clients.map((client: Client) => (
                                   <option key={client.id} value={client.id}>
                                     {client.firstName} {client.lastName}
@@ -417,7 +502,11 @@ export default function TransactionsPage() {
                       />
                     </div>
                   )}
-                  <Button type="submit" className="w-full bg-primary text-white hover:bg-primary/90" disabled={createTransactionMutation.isPending}>
+                  <Button
+                    type="submit"
+                    className="w-full bg-primary text-white hover:bg-primary/90"
+                    disabled={createTransactionMutation.isPending}
+                  >
                     Create Transaction
                   </Button>
                 </form>
@@ -428,7 +517,7 @@ export default function TransactionsPage() {
       </div>
 
       <div className="flex-1 w-full bg-background">
-        {view === 'board' ? (
+        {view === "board" ? (
           <div className="min-w-0 py-4">
             <KanbanBoard
               transactions={filteredTransactions}
@@ -437,7 +526,7 @@ export default function TransactionsPage() {
               clients={clients}
             />
           </div>
-        ) : view === 'table' ? (
+        ) : view === "table" ? (
           <div className="px-4">
             <TransactionTable
               transactions={filteredTransactions}
@@ -456,7 +545,9 @@ export default function TransactionsPage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle
                     className="text-lg hover:underline dark:text-white truncate"
-                    onClick={() => setLocation(`/transactions/${transaction.id}`)}
+                    onClick={() =>
+                      setLocation(`/transactions/${transaction.id}`)
+                    }
                   >
                     {transaction.streetName}
                   </CardTitle>
@@ -476,14 +567,18 @@ export default function TransactionsPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize">
-                    Status: {transaction.status.replace('_', ' ')}
+                    Status: {transaction.status.replace("_", " ")}
                   </p>
                   <p className="text-sm text-muted-foreground dark:text-gray-300">
-                    Client: {transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : 'Not set'}
+                    Client:{" "}
+                    {transaction.client
+                      ? `${transaction.client.firstName} ${transaction.client.lastName}`
+                      : "Not set"}
                   </p>
                   {transaction.secondaryClient && (
                     <p className="text-sm text-muted-foreground dark:text-gray-300">
-                      Secondary Client: {transaction.secondaryClient.firstName} {transaction.secondaryClient.lastName}
+                      Secondary Client: {transaction.secondaryClient.firstName}{" "}
+                      {transaction.secondaryClient.lastName}
                     </p>
                   )}
                 </CardContent>
@@ -492,19 +587,26 @@ export default function TransactionsPage() {
 
             {filteredTransactions.length === 0 && (
               <div className="col-span-full text-center py-12 text-muted-foreground dark:text-gray-400">
-                No transactions found. {user?.role === "agent" ? "Create one to get started!" : "Ask your agent for an access code to join a transaction."}
+                No transactions found.{" "}
+                {user?.role === "agent"
+                  ? "Create one to get started!"
+                  : "Ask your agent for an access code to join a transaction."}
               </div>
             )}
           </div>
         )}
       </div>
 
-      <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
+      <AlertDialog
+        open={deleteId !== null}
+        onOpenChange={() => setDeleteId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this transaction? This action cannot be undone.
+              Are you sure you want to delete this transaction? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
