@@ -97,6 +97,48 @@ export function setupAuth(app: Express) {
     }
   });
 
+  app.post("/api/login", passport.authenticate("local"), (req, res) => {
+    if (req.user) {
+      console.log('Login successful, sending user data');
+      const { password, ...userWithoutPassword } = req.user;
+      res.status(200).json(userWithoutPassword);
+    } else {
+      console.log('Login failed, no user in request');
+      res.status(401).json({ error: "Authentication failed" });
+    }
+  });
+
+  app.post("/api/logout", (req, res, next) => {
+    const userId = req.user?.id;
+    console.log('Logout request for user:', userId);
+
+    req.logout((err) => {
+      if (err) {
+        console.error('Logout error:', err);
+        return next(err);
+      }
+      req.session.destroy((err) => {
+        if (err) {
+          console.error('Session destruction error:', err);
+          return next(err);
+        }
+        console.log('Logout successful for user:', userId);
+        res.sendStatus(200);
+      });
+    });
+  });
+
+  app.get("/api/user", (req, res) => {
+    if (!req.isAuthenticated()) {
+      console.log('Unauthenticated user request to /api/user');
+      return res.sendStatus(401);
+    }
+    console.log('Authenticated user request:', req.user?.id);
+    const { password, ...userWithoutPassword } = req.user;
+    res.json(userWithoutPassword);
+  });
+
+  // Moving the register route inside setupAuth function
   app.post("/api/register", async (req, res, next) => {
     try {
       console.log('Registration request body:', req.body);
@@ -144,44 +186,5 @@ export function setupAuth(app: Express) {
         res.status(500).json({ error: 'Error during registration' });
       }
     }
-  });
-
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    if (req.user) {
-      const { password, ...userWithoutPassword } = req.user;
-      res.status(200).json(userWithoutPassword);
-    } else {
-      res.status(401).json({ error: "Authentication failed" });
-    }
-  });
-
-  app.post("/api/logout", (req, res, next) => {
-    const userId = req.user?.id;
-    console.log('Logout request for user:', userId);
-
-    req.logout((err) => {
-      if (err) {
-        console.error('Logout error:', err);
-        return next(err);
-      }
-      req.session.destroy((err) => {
-        if (err) {
-          console.error('Session destruction error:', err);
-          return next(err);
-        }
-        console.log('Logout successful for user:', userId);
-        res.sendStatus(200);
-      });
-    });
-  });
-
-  app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) {
-      console.log('Unauthenticated user request to /api/user');
-      return res.sendStatus(401);
-    }
-    console.log('Authenticated user request:', req.user?.id);
-    const { password, ...userWithoutPassword } = req.user;
-    res.json(userWithoutPassword);
   });
 }
