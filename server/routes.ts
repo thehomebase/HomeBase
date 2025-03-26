@@ -745,28 +745,7 @@ export function registerRoutes(app: Express): Server {
     //Existing register code here.
   });
 
-  // Editor cache refresh endpoint - for developer tools
-  app.post("/api/refreshEditorCache", (req, res) => {
-    console.log("Editor cache refresh requested at:", new Date().toISOString());
-    res.json({ success: true, timestamp: Date.now() });
-  });
-  
-  // File changes check endpoint - for real-time file change detection
-  app.post("/api/checkFileChanges", (req, res) => {
-    const lastCheckTime = req.body?.lastCheck || 0;
-    const now = Date.now();
-    
-    // In a real implementation, this would check the filesystem
-    // For now, just return that no changes were found
-    res.json({ 
-      success: true, 
-      changes: false,
-      timestamp: now,
-      lastCheck: lastCheckTime
-    });
-  });
-
-  // Simple ping endpoint for polling
+  // Simple ping endpoint for health checks
   app.get("/ping", (req, res) => {
     res.json({ 
       timestamp: Date.now(),

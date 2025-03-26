@@ -46,7 +46,7 @@ import CalculatorsPage from "@/pages/calculators-page";
 import GlossaryPage from "./pages/glossary-page";
 import MessagesPage from "./pages/messages-page";
 import ClientPage from "@/pages/client-page"; // Import the new ClientPage component
-import EditorCacheRefresher from "@/components/EditorCacheRefresher"; // Component to help with editor cache issues
+// We're using Replit's built-in file refresh mechanism
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -269,8 +269,6 @@ function App() {
           <Router />
         </Layout>
         <Toaster />
-        {/* This component helps with editor cache issues by providing a refresh button */}
-        {import.meta.env.DEV && <EditorCacheRefresher />}
       </AuthProvider>
     </QueryClientProvider>
   );

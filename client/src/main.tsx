@@ -24,9 +24,9 @@ function render() {
 render();
 
 if (import.meta.hot) {
-  // Simple HMR setup - focus on detecting file changes
+  // Log when HMR update is received
   import.meta.hot.accept((mod) => {
-    console.log('HMR update received - Applying changes');
+    console.log('HMR update received');
     if (!mod) {
       window.location.reload();
       return;
@@ -39,11 +39,11 @@ if (import.meta.hot) {
     render();
   });
 
-  // Handle file changes
+  // Log when file changes are detected
   import.meta.hot.on('vite:beforeUpdate', (payload: any) => {
-    console.log('File changes detected, updating...');
+    console.log('File changes detected, updating interface...');
     
-    // Extract file names for notification
+    // Extract and log updated file names for easier debugging
     const updatedFiles = Array.isArray(payload.updates) 
       ? payload.updates.map((u: any) => {
           const path = u.path || u.acceptedPath || '';
@@ -58,7 +58,7 @@ if (import.meta.hot) {
     }
   });
   
-  // Handle websocket connection events
+  // Log HMR connection status
   import.meta.hot.on('vite:ws-connect', () => {
     console.log('HMR connected');
   });
@@ -67,65 +67,3 @@ if (import.meta.hot) {
     console.log('HMR disconnected, attempting to reconnect...');
   });
 }
-
-// Enhanced file change detection system
-(() => {
-  let lastFileCheck = Date.now();
-  let fileWatcherActive = false;
-  
-  // Function to notify the system about potential file changes
-  const notifyFileChange = () => {
-    // Dispatch a custom event that could be listened to by editor plugins
-    const event = new CustomEvent('file-system-change', { 
-      detail: { timestamp: Date.now() } 
-    });
-    window.dispatchEvent(event);
-    
-    // Force a browser check for changes in CSS
-    const links = document.querySelectorAll('link[rel="stylesheet"]');
-    links.forEach(link => {
-      const href = link.getAttribute('href');
-      if (href) {
-        link.setAttribute('href', href.split('?')[0] + '?t=' + Date.now());
-      }
-    });
-  };
-  
-  // Start a file watcher if it's not already running
-  const startFileWatcher = () => {
-    if (fileWatcherActive) return;
-    fileWatcherActive = true;
-    
-    // Check for file changes periodically
-    setInterval(() => {
-      // Only perform this check in development mode
-      if (import.meta.env.DEV) {
-        const now = Date.now();
-        
-        // Check if sufficient time has passed since last check
-        if (now - lastFileCheck > 2000) {
-          lastFileCheck = now;
-          
-          // Make a request to force the server to check file changes
-          fetch(`/ping?t=${now}`)
-            .then(() => {
-              notifyFileChange();
-            })
-            .catch(() => {
-              // Continue even if the request fails
-              notifyFileChange();
-            });
-        }
-      }
-    }, 3000);
-    
-    // Also setup a listener for editor focus events
-    window.addEventListener('focus', () => {
-      // When the window regains focus, check for changes
-      notifyFileChange();
-    });
-  };
-  
-  // Start the file watcher
-  startFileWatcher();
-})();
