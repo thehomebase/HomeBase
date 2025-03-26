@@ -40,38 +40,12 @@ import {
   PanelLeftClose,
   PanelLeft
 } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import CalculatorsPage from "@/pages/calculators-page";
 import GlossaryPage from "./pages/glossary-page";
 import MessagesPage from "./pages/messages-page";
 import ClientPage from "@/pages/client-page"; // Import the new ClientPage component
-
-// HMR Helper Component
-const HmrListener: React.FC = () => {
-  useEffect(() => {
-    const updateHmrState = () => {
-      document.documentElement.setAttribute('data-hmr-updated', Date.now().toString());
-      console.log('[HMR] HmrListener detected update');
-    };
-    
-    // Run on mount
-    updateHmrState();
-    
-    // Setup interval to check for updates
-    const intervalId = setInterval(() => {
-      const currentVal = getComputedStyle(document.documentElement).getPropertyValue('--hmr-timestamp');
-      if (currentVal !== localStorage.getItem('hmr-last-timestamp')) {
-        localStorage.setItem('hmr-last-timestamp', currentVal);
-        updateHmrState();
-      }
-    }, 1000);
-    
-    return () => clearInterval(intervalId);
-  }, []);
-  
-  return null;
-};
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -292,8 +266,6 @@ function App() {
       <AuthProvider>
         <Layout>
           <Router />
-          {/* HMR Listener for improved hot module reloading */}
-          <HmrListener />
         </Layout>
         <Toaster />
       </AuthProvider>

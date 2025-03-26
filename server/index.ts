@@ -77,12 +77,15 @@ async function startServer(server: HttpServer): Promise<void> {
         const url = new URL(request.url!, `http://${request.headers.host}`);
         log(`WebSocket upgrade request for path: ${url.pathname}`);
 
-        if (url.pathname.startsWith('/@vite/client') || url.pathname.startsWith('/hmr')) {
-          log('HMR WebSocket connection requested');
-          // Let Vite handle the WebSocket connection
-          socket.emit('data', '');
+        // Allow Vite HMR paths (updated to match Vite 5.4.x format)
+        if (url.pathname.startsWith('/__vite_hmr') || 
+            url.pathname.startsWith('/@vite/client') || 
+            url.pathname.startsWith('/hmr')) {
+          log('HMR WebSocket connection accepted');
+          // Don't interfere with the WebSocket connection - let it continue
         } else {
-          log(`Unknown WebSocket upgrade request for path: ${url.pathname}`);
+          log(`Non-HMR WebSocket request for path: ${url.pathname}`);
+          // Only destroy sockets that aren't for HMR
           socket.destroy();
         }
       });
