@@ -23,37 +23,30 @@ function render() {
 render();
 
 if (import.meta.hot) {
-  let retryCount = 0;
-  const maxRetries = 3;
-  const retryDelay = 1000;
-
-  // Clear retry count on successful connection
+  let wsRetryTimeout: NodeJS.Timeout;
+  
   import.meta.hot.on('vite:ws-connect', () => {
     console.log('WebSocket connected');
-    retryCount = 0;
+    if (wsRetryTimeout) clearTimeout(wsRetryTimeout);
   });
 
-  // Handle WebSocket disconnections
-  import.meta.hot.on('vite:ws-disconnect', async () => {
-    console.log('WebSocket disconnected');
+  import.meta.hot.on('vite:ws-disconnect', () => {
+    console.log('WebSocket disconnected, attempting reconnect...');
+    if (wsRetryTimeout) clearTimeout(wsRetryTimeout);
+    
+    wsRetryTimeout = setTimeout(() => {
+      console.log('Reloading page due to WebSocket disconnect');
+      window.location.reload();
+    }, 3000);
+  });
 
-    if (retryCount < maxRetries) {
-      retryCount++;
-      console.log(`Attempting reconnect ${retryCount}/${maxRetries}`);
-
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
-
-      try {
-        await fetch('/health');
-        console.log('Server reachable, forcing page reload');
-        window.location.reload();
-      } catch (err) {
-        console.error('Server unreachable:', err);
-      }
+  import.meta.hot.on('vite:error', (err: Error) => {
+    console.error('HMR error:', err);
+    if (err.message.includes('WebSocket') || err.message.includes('connection')) {
+      window.location.reload();
     }
   });
 
-  // Handle HMR updates
   import.meta.hot.accept(() => {
     console.log('HMR update received');
     queryClient.invalidateQueries();
