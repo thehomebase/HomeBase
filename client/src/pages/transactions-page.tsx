@@ -263,8 +263,8 @@ export default function TransactionsPage() {
           <h2 className="text-2xl font-bold dark:text-white">
             Your Transactions
           </h2>
-          <div className="px-3 py-2 mt-2 mb-4 bg-green-100 dark:bg-green-900 rounded-md">
-            <p className="text-sm">HMR is active and working correctly! This is the updated version.</p>
+          <div className="px-3 py-2 mt-2 mb-4 bg-blue-100 dark:bg-blue-900 rounded-md">
+            <p className="text-sm">HMR is active and working correctly! Updated: {new Date().toLocaleTimeString()}</p>
           </div>
           <div className="flex items-center gap-4">
             {user?.role === "agent" && (

@@ -48,6 +48,7 @@ import MessagesPage from "./pages/messages-page";
 import ClientPage from "@/pages/client-page"; // Import the new ClientPage component
 import FileChangeDetector from "./components/FileChangeDetector"; // Import FileChangeDetector
 import HmrStatus from "./components/HmrStatus"; // Import HmrStatus
+import HmrTrigger from "./components/HmrTrigger"; // Import HmrTrigger
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -272,6 +273,7 @@ function App() {
         <Toaster />
         <FileChangeDetector />
         <HmrStatus />
+        <HmrTrigger />
       </AuthProvider>
     </QueryClientProvider>
   );
