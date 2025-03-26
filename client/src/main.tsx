@@ -42,23 +42,35 @@ if (import.meta.hot) {
       render();
     } catch (error) {
       console.error('HMR update failed:', error);
-      window.location.reload();
     }
   });
 
+  let reconnectAttempts = 0;
+  const maxReconnectAttempts = 3;
   let reconnectTimeout: NodeJS.Timeout;
-  
+
   import.meta.hot.on('vite:ws-disconnect', () => {
-    console.log('HMR disconnected, scheduling reconnect...');
+    console.log('HMR disconnected, attempting reconnect...');
     clearTimeout(reconnectTimeout);
-    reconnectTimeout = setTimeout(() => {
-      console.log('Attempting page reload after disconnect');
-      window.location.reload();
-    }, 1000);
+    
+    if (reconnectAttempts < maxReconnectAttempts) {
+      reconnectTimeout = setTimeout(() => {
+        console.log(`Reconnect attempt ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
+        window.location.reload();
+      }, 1000);
+      reconnectAttempts++;
+    }
   });
 
   import.meta.hot.on('vite:ws-connect', () => {
     console.log('HMR connected');
     clearTimeout(reconnectTimeout);
+    reconnectAttempts = 0;
+  });
+
+  // Force refresh on any unhandled HMR errors
+  import.meta.hot.on('vite:error', (err) => {
+    console.error('HMR error:', err);
+    window.location.reload();
   });
 }
