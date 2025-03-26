@@ -77,8 +77,9 @@ html {
   }
 }
 
-/* HMR Trigger - Version 1.1 */
+/* HMR Trigger - Version 1.2 */
 .hmr-trigger { 
   /* This comment can be modified to trigger HMR refreshes */
-  /* Updated at ${new Date().toLocaleTimeString()} */
+  /* Updated at: March 26, 2025 */
+  /* Active: true */
 }

@@ -49,6 +49,7 @@ import ClientPage from "@/pages/client-page"; // Import the new ClientPage compo
 import FileChangeDetector from "./components/FileChangeDetector"; // Import FileChangeDetector
 import HmrStatus from "./components/HmrStatus"; // Import HmrStatus
 import HmrTrigger from "./components/HmrTrigger"; // Import HmrTrigger
+import FileChangeIndicator from "./components/FileChangeIndicator"; // Import FileChangeIndicator
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -274,6 +275,7 @@ function App() {
         <FileChangeDetector />
         <HmrStatus />
         <HmrTrigger />
+        <FileChangeIndicator />
       </AuthProvider>
     </QueryClientProvider>
   );
