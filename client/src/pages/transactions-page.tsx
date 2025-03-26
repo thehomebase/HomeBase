@@ -261,8 +261,11 @@ export default function TransactionsPage() {
       <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
         <div className="flex flex-col sm:flex-row flex-grow sm:items-center gap-2 mb-2">
           <h2 className="text-2xl font-bold dark:text-white">
-            Transaction Dashboard
+            Your Transactions
           </h2>
+          <div className="px-3 py-2 mt-2 mb-4 bg-green-100 dark:bg-green-900 rounded-md">
+            <p className="text-sm">HMR is active and working correctly! This is the updated version.</p>
+          </div>
           <div className="flex items-center gap-4">
             {user?.role === "agent" && (
               <Dialog open={showNewTransactionDialog} onOpenChange={setShowNewTransactionDialog}>
