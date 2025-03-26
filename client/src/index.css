@@ -1,20 +1,23 @@
 
-/* Force HMR trigger */
-:root[data-hmr-trigger] {
-  --hmr-trigger: true;
+/* Enhanced HMR trigger mechanism */
+:root {
+  --hmr-trigger: 1;
+  --hmr-timestamp: 1;
+  --hmr-update-count: 0;
 }
-
-
-/* Enable HMR for CSS */
-:root { --hmr-test: 0; }
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Force HMR update trigger */
-:root {
-  --hmr-trigger: 1;
+/* Force immediate style recalculation on HMR */
+:root[data-hmr-updated] {
+  animation: hmr-pulse 0.5s ease-in-out;
+}
+
+@keyframes hmr-pulse {
+  0% { opacity: 0.99; }
+  100% { opacity: 1; }
 }
 
 /* Light/Dark mode transitions */
