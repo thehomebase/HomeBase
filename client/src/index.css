@@ -1,3 +1,7 @@
+
+/* Enable HMR for CSS */
+:root { --hmr-test: 0; }
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

@@ -29,7 +29,10 @@ export async function setupVite(app: Express, server: Server) {
       server,
       protocol: 'wss',
       host: '0.0.0.0',
-      clientPort: 443
+      clientPort: 443,
+      timeout: 5000,
+      overlay: true,
+      path: '/__vite_hmr',
     },
     allowedHosts: true,
   };
