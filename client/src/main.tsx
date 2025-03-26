@@ -42,25 +42,32 @@ if (import.meta.hot) {
       render();
     } catch (error) {
       console.error('HMR update failed:', error);
-      window.location.reload();
     }
   });
 
-  let wsReconnectTimer: NodeJS.Timeout;
-  const wsReconnectDelay = 1000;
+  let reconnectAttempts = 0;
+  const maxReconnectAttempts = 5;
+  const reconnectDelay = 1000;
 
-  import.meta.hot.on('vite:ws-disconnect', () => {
-    console.log('HMR disconnected, scheduling reconnect...');
-    clearTimeout(wsReconnectTimer);
-    wsReconnectTimer = setTimeout(() => {
-      console.log('Attempting WebSocket reconnect...');
+  const attemptReconnect = () => {
+    if (reconnectAttempts < maxReconnectAttempts) {
+      console.log(`Attempting WebSocket reconnect (${reconnectAttempts + 1}/${maxReconnectAttempts})`);
       try {
         import.meta.hot?.send('vite:ws-reconnect');
+        reconnectAttempts++;
       } catch (err) {
-        console.error('WebSocket reconnect failed, reloading page:', err);
-        window.location.reload();
+        console.error('WebSocket reconnect failed:', err);
+        setTimeout(attemptReconnect, reconnectDelay);
       }
-    }, wsReconnectDelay);
+    } else {
+      console.log('Max reconnection attempts reached, reloading page');
+      window.location.reload();
+    }
+  };
+
+  import.meta.hot.on('vite:ws-disconnect', () => {
+    console.log('WebSocket disconnected');
+    setTimeout(attemptReconnect, reconnectDelay);
   });
 
   import.meta.hot.on('vite:ws-connect', () => {
