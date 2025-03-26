@@ -68,9 +68,20 @@ if (import.meta.hot) {
     reconnectAttempts = 0;
   });
 
-  // Force refresh on any unhandled HMR errors
+  // Better error handling for HMR
   import.meta.hot.on('vite:error', (err) => {
     console.error('HMR error:', err);
-    window.location.reload();
+    // Only reload if it's a connection error
+    if (err.message?.includes('WebSocket') || err.message?.includes('connection')) {
+      window.location.reload();
+    }
+  });
+
+  // Handle WebSocket connection issues
+  window.addEventListener('unhandledrejection', (event) => {
+    if (event.reason?.message?.includes('WebSocket')) {
+      console.log('WebSocket connection issue detected, attempting reconnect...');
+      import.meta.hot?.send('vite:ws-reconnect');
+    }
   });
 }
