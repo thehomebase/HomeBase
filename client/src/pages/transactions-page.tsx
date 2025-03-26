@@ -588,9 +588,15 @@ export default function TransactionsPage() {
             {filteredTransactions.length === 0 && (
               <div className="col-span-full text-center py-12 text-muted-foreground dark:text-gray-400">
                 No transactions found.{" "}
-                {user?.role === "agent"
-                  ? "Create one to get started!"
-                  : "Ask your agent for an access code to join a transaction."}
+                {user?.role === "agent" ? (
+                  <div className="mt-4">
+                    <Button onClick={() => setShowNewTransactionDialog(true)}>
+                      New Transaction
+                    </Button>
+                  </div>
+                ) : (
+                  "Ask your agent for an access code to join a transaction."
+                )}
               </div>
             )}
           </div>
