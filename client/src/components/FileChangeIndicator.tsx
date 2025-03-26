@@ -46,7 +46,7 @@ export function FileChangeIndicator() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -50 }}
           transition={{ duration: 0.3 }}
-          className="fixed top-4 right-4 z-50 bg-green-100 dark:bg-green-800 p-3 rounded-md shadow-lg"
+          className="fixed top-4 right-4 z-50 bg-blue-100 dark:bg-blue-800 p-3 rounded-md shadow-lg"
         >
           <div className="flex items-center space-x-2">
             <RefreshCw className="h-5 w-5 text-green-600 dark:text-green-400 animate-spin" />
