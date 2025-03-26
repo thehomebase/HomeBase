@@ -105,6 +105,8 @@ export default function TransactionsPage() {
     new Date(new Date().getFullYear(), 0, 1).toISOString(),
   );
   const [endDate, setEndDate] = useState<string>("");
+  const [showNewTransactionDialog, setShowNewTransactionDialog] = useState(false);
+
 
   // Handle initial authentication check
   useEffect(() => {
@@ -261,7 +263,200 @@ export default function TransactionsPage() {
           <h2 className="text-2xl font-bold dark:text-white">
             Your Transactions
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            {user?.role === "agent" && (
+              <Dialog open={showNewTransactionDialog} onOpenChange={setShowNewTransactionDialog}>
+                <DialogTrigger asChild>
+                  <Button className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-black dark:bg-white mb-0">
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Transaction
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create New Transaction</DialogTitle>
+                  </DialogHeader>
+                  <Form {...form}>
+                    <form
+                      onSubmit={form.handleSubmit((data) =>
+                        createTransactionMutation.mutate(data),
+                      )}
+                      className="space-y-4"
+                    >
+                      <FormField
+                        control={form.control}
+                        name="streetName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Street Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Enter street name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="city"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>City</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Enter city" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="state"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>State</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Enter state"
+                                maxLength={2}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="zipCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>ZIP Code</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Enter ZIP code"
+                                maxLength={5}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="accessCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Passkey</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="text"
+                                placeholder="Enter passkey (min. 6 characters)"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Transaction Type</FormLabel>
+                            <FormControl>
+                              <select
+                                className="w-full h-9 px-3 rounded-md border text-base bg-background"
+                                value={field.value}
+                                onChange={(e) =>
+                                  field.onChange(e.target.value as "buy" | "sell")
+                                }
+                              >
+                                <option value="buy">Buy</option>
+                                <option value="sell">Sell</option>
+                              </select>
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      {user?.role === "agent" && (
+                        <div className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="clientId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Primary Client</FormLabel>
+                                <FormControl>
+                                  <select
+                                    className="w-full h-9 px-3 rounded-md border text-base bg-background"
+                                    value={field.value || ""}
+                                    onChange={(e) =>
+                                      field.onChange(
+                                        e.target.value
+                                          ? Number(e.target.value)
+                                          : null,
+                                      )
+                                    }
+                                  >
+                                    <option value="">Select primary client</option>
+                                    {clients.map((client: Client) => (
+                                      <option key={client.id} value={client.id}>
+                                        {client.firstName} {client.lastName}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="secondaryClientId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Secondary Client</FormLabel>
+                                <FormControl>
+                                  <select
+                                    className="w-full h-9 px-3 rounded-md border text-base bg-background"
+                                    value={field.value || ""}
+                                    onChange={(e) =>
+                                      field.onChange(
+                                        e.target.value
+                                          ? Number(e.target.value)
+                                          : null,
+                                      )
+                                    }
+                                  >
+                                    <option value="">
+                                      Select secondary client
+                                    </option>
+                                    {clients.map((client: Client) => (
+                                      <option key={client.id} value={client.id}>
+                                        {client.firstName} {client.lastName}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+                      <Button
+                        type="submit"
+                        className="w-full bg-primary text-white hover:bg-primary/90"
+                        disabled={createTransactionMutation.isPending}
+                      >
+                        Create Transaction
+                      </Button>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            )}
             <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
               <Toggle
                 pressed={view === "list"}
@@ -321,199 +516,8 @@ export default function TransactionsPage() {
             </select>
           </div>
         </div>
-        {user?.role === "agent" && (
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-black dark:bg-white mb-0">
-                <Plus className="h-4 w-4 mr-2" />
-                New Transaction
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Transaction</DialogTitle>
-              </DialogHeader>
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit((data) =>
-                    createTransactionMutation.mutate(data),
-                  )}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={form.control}
-                    name="streetName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Street Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Enter street name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="city"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>City</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Enter city" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="state"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>State</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="Enter state"
-                            maxLength={2}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="zipCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>ZIP Code</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="Enter ZIP code"
-                            maxLength={5}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="accessCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Passkey</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="text"
-                            placeholder="Enter passkey (min. 6 characters)"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Transaction Type</FormLabel>
-                        <FormControl>
-                          <select
-                            className="w-full h-9 px-3 rounded-md border text-base bg-background"
-                            value={field.value}
-                            onChange={(e) =>
-                              field.onChange(e.target.value as "buy" | "sell")
-                            }
-                          >
-                            <option value="buy">Buy</option>
-                            <option value="sell">Sell</option>
-                          </select>
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  {user?.role === "agent" && (
-                    <div className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="clientId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Primary Client</FormLabel>
-                            <FormControl>
-                              <select
-                                className="w-full h-9 px-3 rounded-md border text-base bg-background"
-                                value={field.value || ""}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    e.target.value
-                                      ? Number(e.target.value)
-                                      : null,
-                                  )
-                                }
-                              >
-                                <option value="">Select primary client</option>
-                                {clients.map((client: Client) => (
-                                  <option key={client.id} value={client.id}>
-                                    {client.firstName} {client.lastName}
-                                  </option>
-                                ))}
-                              </select>
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="secondaryClientId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Secondary Client</FormLabel>
-                            <FormControl>
-                              <select
-                                className="w-full h-9 px-3 rounded-md border text-base bg-background"
-                                value={field.value || ""}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    e.target.value
-                                      ? Number(e.target.value)
-                                      : null,
-                                  )
-                                }
-                              >
-                                <option value="">
-                                  Select secondary client
-                                </option>
-                                {clients.map((client: Client) => (
-                                  <option key={client.id} value={client.id}>
-                                    {client.firstName} {client.lastName}
-                                  </option>
-                                ))}
-                              </select>
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  )}
-                  <Button
-                    type="submit"
-                    className="w-full bg-primary text-white hover:bg-primary/90"
-                    disabled={createTransactionMutation.isPending}
-                  >
-                    Create Transaction
-                  </Button>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        )}
+        
+
       </div>
 
       <div className="flex-1 w-full bg-background">
