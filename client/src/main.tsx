@@ -42,35 +42,23 @@ if (import.meta.hot) {
       render();
     } catch (error) {
       console.error('HMR update failed:', error);
+      window.location.reload();
     }
   });
 
-  let isDisconnected = false;
+  let reconnectTimeout: NodeJS.Timeout;
   
   import.meta.hot.on('vite:ws-disconnect', () => {
-    isDisconnected = true;
-    console.log('HMR disconnected. Waiting for reconnection...');
+    console.log('HMR disconnected, scheduling reconnect...');
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = setTimeout(() => {
+      console.log('Attempting page reload after disconnect');
+      window.location.reload();
+    }, 1000);
   });
 
   import.meta.hot.on('vite:ws-connect', () => {
-    if (isDisconnected) {
-      console.log('HMR reconnected, reloading page...');
-      window.location.reload();
-    }
-  });
-
-  // Handle connection loss
-  import.meta.hot.on('vite:ws-disconnect', () => {
-    console.log('Development server connection lost');
-    // Wait a bit to see if it reconnects
-    setTimeout(() => {
-      console.log('Forcing page reload due to lost connection');
-      window.location.reload();
-    }, 2000);
-  });
-
-  // Log reconnection
-  import.meta.hot.on('vite:ws-connect', () => {
-    console.log('Development server connected');
+    console.log('HMR connected');
+    clearTimeout(reconnectTimeout);
   });
 }
