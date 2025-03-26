@@ -1,3 +1,4 @@
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
@@ -23,33 +24,44 @@ function render() {
 render();
 
 if (import.meta.hot) {
-  let wsRetryTimeout: NodeJS.Timeout;
-  
+  let wsReconnectAttempts = 0;
+  const maxReconnectAttempts = 10;
+  const reconnectDelay = 1000;
+
+  const attemptReconnect = () => {
+    if (wsReconnectAttempts < maxReconnectAttempts) {
+      console.log(`Attempting WebSocket reconnect (${wsReconnectAttempts + 1}/${maxReconnectAttempts})`);
+      wsReconnectAttempts++;
+      import.meta.hot?.send('vite:ws-reconnect');
+    }
+  };
+
   import.meta.hot.on('vite:ws-connect', () => {
     console.log('WebSocket connected');
-    if (wsRetryTimeout) clearTimeout(wsRetryTimeout);
+    wsReconnectAttempts = 0;
   });
 
   import.meta.hot.on('vite:ws-disconnect', () => {
-    console.log('WebSocket disconnected, attempting reconnect...');
-    if (wsRetryTimeout) clearTimeout(wsRetryTimeout);
-    
-    wsRetryTimeout = setTimeout(() => {
-      console.log('Reloading page due to WebSocket disconnect');
-      window.location.reload();
-    }, 3000);
+    console.log('WebSocket disconnected');
+    setTimeout(attemptReconnect, reconnectDelay);
   });
 
   import.meta.hot.on('vite:error', (err: Error) => {
-    console.error('HMR error:', err);
-    if (err.message.includes('WebSocket') || err.message.includes('connection')) {
-      window.location.reload();
-    }
+    console.error('Vite HMR error:', err);
   });
 
-  import.meta.hot.accept(() => {
-    console.log('HMR update received');
+  import.meta.hot.accept((mod) => {
+    console.log('HMR update accepted');
+    if (!mod) {
+      window.location.reload();
+      return;
+    }
     queryClient.invalidateQueries();
     render();
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+    event.preventDefault();
   });
 }
