@@ -24,90 +24,10 @@ function render() {
 render();
 
 if (import.meta.hot) {
-  let wsReconnectAttempts = 0;
-  const maxReconnectAttempts = 20;
-  const reconnectDelay = 1000;
-  let pingInterval: number | null = null;
-  let hmrConnectionStatus = {
-    connected: false,
-    lastUpdate: Date.now(),
-    recentFiles: [] as string[]
-  };
-
-  // Make HMR status available globally for other components to use
-  // @ts-ignore - Adding custom property to window
-  window.__hmrStatus = hmrConnectionStatus;
-
-  // Enhanced reconnection logic
-  const attemptReconnect = () => {
-    if (wsReconnectAttempts < maxReconnectAttempts) {
-      console.log(`Attempting WebSocket reconnect (${wsReconnectAttempts + 1}/${maxReconnectAttempts})`);
-      wsReconnectAttempts++;
-      import.meta.hot?.send('vite:ws-reconnect');
-      setTimeout(attemptReconnect, reconnectDelay);
-    } else {
-      console.log('Maximum reconnection attempts reached, reloading page...');
-      window.location.reload();
-    }
-  };
-
-  // Keep connection alive with periodic pings
-  const startPingInterval = () => {
-    if (pingInterval) clearInterval(pingInterval);
-    pingInterval = setInterval(() => {
-      if (import.meta.hot && hmrConnectionStatus.connected) {
-        import.meta.hot.send('vite:ping');
-      }
-    }, 15000) as unknown as number;
-  };
-
-  // Handle WebSocket connection events
-  import.meta.hot.on('vite:ws-connect', () => {
-    console.log('WebSocket connected - HMR active');
-    wsReconnectAttempts = 0;
-    hmrConnectionStatus.connected = true;
-    startPingInterval();
-    
-    // Create a custom event to notify components of the connection
-    const connectionEvent = new CustomEvent('hmr-status-change', { 
-      detail: { status: 'connected' } 
-    });
-    window.dispatchEvent(connectionEvent);
-    
-    // Force query invalidation to refresh data
-    queryClient.invalidateQueries();
-  });
-
-  import.meta.hot.on('vite:ws-disconnect', () => {
-    console.log('WebSocket disconnected - HMR connection lost');
-    hmrConnectionStatus.connected = false;
-    if (pingInterval) clearInterval(pingInterval);
-    
-    // Create a custom event to notify components of the disconnection
-    const disconnectEvent = new CustomEvent('hmr-status-change', { 
-      detail: { status: 'disconnected' } 
-    });
-    window.dispatchEvent(disconnectEvent);
-    
-    // Start reconnection process
-    attemptReconnect();
-  });
-
-  import.meta.hot.on('vite:error', (payload: any) => {
-    console.error('Vite HMR error:', payload.err?.message || payload);
-    
-    // Create a custom event to notify components of the error
-    const errorEvent = new CustomEvent('hmr-status-change', { 
-      detail: { status: 'error', error: payload.err?.message || 'Unknown error' } 
-    });
-    window.dispatchEvent(errorEvent);
-  });
-
-  // Handle module updates
+  // Simple HMR setup - focus on detecting file changes
   import.meta.hot.accept((mod) => {
     console.log('HMR update received - Applying changes');
     if (!mod) {
-      console.log('No module provided, performing full reload');
       window.location.reload();
       return;
     }
@@ -116,17 +36,16 @@ if (import.meta.hot) {
     queryClient.invalidateQueries();
     
     // Re-render the application with updated modules
-    console.log('Re-rendering application with updated modules');
     render();
   });
 
-  // Display notification when updates are available
-  import.meta.hot.on('vite:beforeUpdate', (payload: { updates: Array<{ path: string; acceptedPath: string }> }) => {
-    console.log('HMR update available:', payload);
+  // Handle file changes
+  import.meta.hot.on('vite:beforeUpdate', (payload: any) => {
+    console.log('File changes detected, updating...');
     
-    // Extract file names from the payload
+    // Extract file names for notification
     const updatedFiles = Array.isArray(payload.updates) 
-      ? payload.updates.map(u => {
+      ? payload.updates.map((u: any) => {
           const path = u.path || u.acceptedPath || '';
           if (!path) return '';
           const parts = path.split('/');
@@ -134,23 +53,44 @@ if (import.meta.hot) {
         }).filter(Boolean)
       : [];
     
-    // Update the HMR status
-    hmrConnectionStatus.lastUpdate = Date.now();
-    hmrConnectionStatus.recentFiles = updatedFiles;
-    
-    // Create a custom event for file changes
-    const updateEvent = new CustomEvent('hmr-update', { 
-      detail: { 
-        files: updatedFiles,
-        timestamp: hmrConnectionStatus.lastUpdate
-      } 
-    });
-    window.dispatchEvent(updateEvent);
+    if (updatedFiles.length > 0) {
+      console.log('Updated files:', updatedFiles);
+    }
   });
-
-  // Improved error handling for unhandled promise rejections
-  window.addEventListener('unhandledrejection', (event) => {
-    console.error('Unhandled promise rejection:', event.reason);
-    event.preventDefault();
+  
+  // Handle websocket connection events
+  import.meta.hot.on('vite:ws-connect', () => {
+    console.log('HMR connected');
+  });
+  
+  import.meta.hot.on('vite:ws-disconnect', () => {
+    console.log('HMR disconnected, attempting to reconnect...');
   });
 }
+
+// Set up manual file change detection
+(() => {
+  let lastFileCheck = Date.now();
+  
+  // Force a periodic check for file changes
+  setInterval(() => {
+    // Only perform this check if we're in development mode
+    if (import.meta.env.DEV) {
+      const now = Date.now();
+      
+      // Check if files have changed since last check
+      if (now - lastFileCheck > 2000) { // Only check every 2 seconds
+        lastFileCheck = now;
+        
+        // Make a timestamp request to force the server to check file changes
+        fetch(`/ping?t=${now}`)
+          .then(() => {
+            // This doesn't need to succeed - just force a server check
+          })
+          .catch(() => {
+            // Ignore errors - this is just a trigger
+          });
+      }
+    }
+  }, 3000);
+})();

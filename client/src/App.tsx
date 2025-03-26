@@ -46,8 +46,6 @@ import CalculatorsPage from "@/pages/calculators-page";
 import GlossaryPage from "./pages/glossary-page";
 import MessagesPage from "./pages/messages-page";
 import ClientPage from "@/pages/client-page"; // Import the new ClientPage component
-import FileChangeDetector from "@/components/FileChangeDetector"; // Import the FileChangeDetector
-import HmrStatus from "@/components/HmrStatus"; // Import the HMR status component
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -270,8 +268,6 @@ function App() {
           <Router />
         </Layout>
         <Toaster />
-        <FileChangeDetector />
-        <HmrStatus />
       </AuthProvider>
     </QueryClientProvider>
   );
