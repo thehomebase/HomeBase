@@ -42,7 +42,6 @@ export function EditorRefreshHelper() {
       toast({
         title: "Editor cache refreshed",
         description: "The editor has been refreshed to show the latest file changes.",
-        icon: <FileText className="h-4 w-4" />,
       });
       
       // Try to refresh editor files if Replit API is available
