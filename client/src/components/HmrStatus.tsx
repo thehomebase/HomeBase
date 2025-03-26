@@ -13,13 +13,22 @@ type StatusType = 'idle' | 'connecting' | 'connected' | 'updating' | 'error' | '
  * It provides real-time feedback when changes are detected in the codebase.
  */
 export function HmrStatus({ className = '' }: HmrStatusProps) {
-  const [status, setStatus] = useState<StatusType>('idle');
-  const [message, setMessage] = useState<string>('');
-  const [visible, setVisible] = useState(false);
+  const [status, setStatus] = useState<StatusType>('connecting');
+  const [message, setMessage] = useState<string>('Connecting to HMR...');
+  const [visible, setVisible] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
 
   useEffect(() => {
     if (!import.meta.hot) return;
+
+    // Check if already connected
+    if (import.meta.hot.data && import.meta.hot.data.connected) {
+      console.log('Already connected to HMR');
+      setStatus('connected');
+      setMessage('HMR connected');
+      setVisible(true);
+      setTimeout(() => setVisible(false), 2000);
+    }
 
     const handleConnect = () => {
       console.log('HMR WebSocket connected');
@@ -68,10 +77,35 @@ export function HmrStatus({ className = '' }: HmrStatusProps) {
     import.meta.hot.on('vite:beforeUpdate', handleUpdate);
     import.meta.hot.on('vite:error', handleError);
 
-    // Initial status
-    setStatus('connecting');
-    setMessage('Connecting to HMR...');
-    setVisible(true);
+    // Force connection check
+    window.addEventListener('hmr-status-change', ((e: CustomEvent) => {
+      console.log('HMR status change event received', e.detail);
+      if (e.detail.status === 'connected') {
+        setStatus('connected');
+        setMessage('HMR connected');
+        setVisible(true);
+        setTimeout(() => setVisible(false), 2000);
+      } else if (e.detail.status === 'disconnected') {
+        setStatus('disconnected');
+        setMessage('Connection lost - reconnecting');
+        setVisible(true);
+      } else if (e.detail.status === 'error') {
+        setStatus('error');
+        setMessage(`HMR error: ${e.detail.error || 'check console'}`);
+        setVisible(true);
+        setTimeout(() => setVisible(false), 5000);
+      }
+    }) as EventListener);
+
+    // Auto-hide connecting message after a timeout
+    const timer = setTimeout(() => {
+      if (status === 'connecting') {
+        setStatus('connected');
+        setMessage('HMR ready');
+        setVisible(true);
+        setTimeout(() => setVisible(false), 2000);
+      }
+    }, 5000);
 
     return () => {
       // Clean up event handlers
@@ -81,8 +115,10 @@ export function HmrStatus({ className = '' }: HmrStatusProps) {
         import.meta.hot.off('vite:beforeUpdate', handleUpdate);
         import.meta.hot.off('vite:error', handleError);
       }
+      window.removeEventListener('hmr-status-change', ((e: CustomEvent) => {}) as EventListener);
+      clearTimeout(timer);
     };
-  }, []);
+  }, [status]);
 
   // Status styles and icons
   const statusColors = {
