@@ -77,5 +77,7 @@ html {
   }
 }
 
-/* HMR Trigger */
-.hmr-trigger { }
+/* HMR Trigger - Version 1.0 */
+.hmr-trigger { 
+  /* This comment can be modified to trigger HMR refreshes */
+}
