@@ -12,6 +12,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Force HMR update trigger */
+:root {
+  --hmr-trigger: 1;
+}
+
+/* Light/Dark mode transitions */
+html {
+  transition: background-color 0.3s ease;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
