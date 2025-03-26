@@ -1,4 +1,10 @@
 
+/* Force HMR trigger */
+:root[data-hmr-trigger] {
+  --hmr-trigger: true;
+}
+
+
 /* Enable HMR for CSS */
 :root { --hmr-test: 0; }
 
