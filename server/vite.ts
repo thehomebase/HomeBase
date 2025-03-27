@@ -31,7 +31,7 @@ export async function setupVite(app: Express, server: Server) {
         server,
         protocol: 'wss',
         host: true,
-        port: 5000,
+        port: 443,
         clientPort: 443,
       },
       watch: {
