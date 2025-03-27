@@ -37,83 +37,52 @@ app.get('/test', (_req, res) => {
   });
 });
 
-// Simplified server startup function with retry logic for port binding
+// Simplified server startup function optimized for Replit environment
 async function startServer(server: HttpServer): Promise<void> {
-  // Define potential ports to try - start with default and fallback to others
-  const defaultPort = 5000;
-  const fallbackPorts = [3000, 8080, 8000, 4000];
-  const host = '0.0.0.0';
+  // Get port from environment variable or use a default
+  // Replit sets process.env.PORT automatically, we should respect it
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const host = '0.0.0.0'; // Bind to all interfaces for Replit
   
   log(`Environment: ${environment}`);
+  log(`Using port from environment: ${port}`);
   
-  // Try the default port first, then fallbacks if needed
-  let currentPort = defaultPort;
-  let portIndex = 0;
-  let serverStarted = false;
-  
-  while (!serverStarted) {
-    log(`Attempting to start server on port: ${currentPort}`);
-    
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const serverInstance = server.listen(currentPort, host);
-        
-        serverInstance
-          .once('listening', () => {
-            log(`✅ Server successfully started and listening on ${host}:${currentPort}`);
-            process.env.PORT = String(currentPort);
-            serverStarted = true;
-            resolve();
-          })
-          .once('error', (err: NodeJS.ErrnoException) => {
-            if (err.code === 'EADDRINUSE') {
-              log(`Port ${currentPort} is already in use, trying another port...`);
-              
-              // Try next port
-              if (portIndex < fallbackPorts.length) {
-                currentPort = fallbackPorts[portIndex++];
-                serverInstance.close();
-                reject(new Error('PORT_IN_USE'));
-              } else {
-                log(`All ports are in use. Please free one of these ports: ${[defaultPort, ...fallbackPorts].join(', ')}`);
-                reject(err);
-              }
-            } else {
-              log(`Server error: ${err.message}`);
-              reject(err);
-            }
-          });
-          
-        // Enhanced WebSocket handling for HMR
-        serverInstance.on('upgrade', (request, socket, head) => {
-          const url = new URL(request.url!, `http://${request.headers.host}`);
-          
-          // Allow Vite HMR paths (updated to match Vite 5.4.x format)
-          if (url.pathname.startsWith('/__vite_hmr') || 
-              url.pathname.startsWith('/@vite/client') || 
-              url.pathname.startsWith('/hmr')) {
-            // Don't interfere with the WebSocket connection - let it continue
-          } else {
-            // Only destroy sockets that aren't for HMR
-            socket.destroy();
-          }
+  try {
+    await new Promise<void>((resolve, reject) => {
+      // Simple server start with one attempt - Replit manages port allocation
+      const serverInstance = server.listen(port, host);
+      
+      serverInstance
+        .once('listening', () => {
+          log(`✅ Server successfully started and listening on ${host}:${port}`);
+          resolve();
+        })
+        .once('error', (err: NodeJS.ErrnoException) => {
+          log(`Server error: ${err.message}`);
+          reject(err);
         });
+        
+      // Enhanced WebSocket handling for HMR
+      serverInstance.on('upgrade', (request, socket, head) => {
+        const url = new URL(request.url!, `http://${request.headers.host}`);
+        
+        // Allow Vite HMR paths (updated to match Vite 5.4.x format)
+        if (url.pathname.startsWith('/__vite_hmr') || 
+            url.pathname.startsWith('/@vite/client') || 
+            url.pathname.startsWith('/hmr')) {
+          // Let HMR connections pass through
+          log(`HMR WebSocket connection: ${url.pathname}`);
+        } else {
+          // Only destroy sockets that aren't for HMR
+          socket.destroy();
+        }
       });
-      
-      // If we get here, the server started successfully
-      break;
-      
-    } catch (error) {
-      if (error instanceof Error && error.message === 'PORT_IN_USE') {
-        // Continue the loop to try the next port
-        continue;
-      }
-      
-      // For other errors, throw and exit
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      log(`Failed to start server: ${errorMessage}`);
-      throw error;
-    }
+    });
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log(`Failed to start server: ${errorMessage}`);
+    throw error;
   }
 }
 
