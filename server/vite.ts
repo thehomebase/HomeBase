@@ -26,16 +26,19 @@ export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
     middlewareMode: true,
     appType: 'custom',
-    hmr: { 
-      server,
-      protocol: 'ws',
-      host: true,
-      clientPort: undefined,
-      port: undefined,
-      timeout: 5000,
-      overlay: true,
-    },
-    allowedHosts: true,
+    server: {
+      hmr: {
+        server,
+        protocol: 'wss',
+        host: 'localhost',
+        port: 5000,
+        clientPort: 443,
+      },
+      watch: {
+        usePolling: true,
+        interval: 100
+      }
+    }
   };
 
   const vite = await createViteServer({
