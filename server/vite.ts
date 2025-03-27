@@ -30,7 +30,7 @@ export async function setupVite(app: Express, server: Server) {
       hmr: {
         server,
         protocol: 'wss',
-        host: 'localhost',
+        host: true,
         port: 5000,
         clientPort: 443,
       },
@@ -38,7 +38,8 @@ export async function setupVite(app: Express, server: Server) {
         usePolling: true,
         interval: 100
       }
-    }
+    },
+    allowedHosts: true
   };
 
   const vite = await createViteServer({
