@@ -31,7 +31,9 @@ export async function setupVite(app: Express, server: Server) {
         server,
         protocol: 'wss',
         host: true,
-        port: 443,
+        port: 5000,
+        timeout: 30000,
+        overlay: true,
         clientPort: 443,
       },
       watch: {
