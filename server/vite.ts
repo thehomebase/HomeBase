@@ -29,12 +29,11 @@ export async function setupVite(app: Express, server: Server) {
     server: {
       hmr: {
         server,
-        protocol: 'wss',
-        host: true,
+        protocol: 'ws',
+        host: '0.0.0.0',
         port: 5000,
         timeout: 30000,
         overlay: true,
-        clientPort: 443,
       },
       watch: {
         usePolling: true,
