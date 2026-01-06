@@ -674,11 +674,11 @@ export default function ClientsPage() {
   });
 
   return (
-    <main className="flex-1 min-w-0 overflow-x-hidden px-4">
-      <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
-        <div className="flex flex-col sm:flex-row flex-grow sm:items-center justify-between gap-2 mb-2">
+    <main className="flex-1 min-w-0 px-4">
+      <div className="w-full flex flex-wrap bg-background relative px-2 py-8">
+        <div className="flex flex-col sm:flex-row w-full sm:items-center justify-between gap-2 mb-2">
           <h2 className="text-2xl font-bold dark:text-white">Client Management</h2>
-          <div className="flex items-center gap-3 sm:ml-auto">
+          <div className="flex items-center gap-3">
             <div className="relative">
               <Input
                 type="text"
@@ -692,7 +692,7 @@ export default function ClientsPage() {
             {user?.role === "agent" && (
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button className="whitespace-nowrap">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Client
                   </Button>
