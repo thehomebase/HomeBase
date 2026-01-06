@@ -125,10 +125,11 @@ export const insertClientSchema = createInsertSchema(clients, {
   email: z.union([
     z.string().email("Invalid email format"),
     z.string().length(0),
-    z.null()
+    z.null(),
+    z.undefined()
   ]).transform(val => val && val.trim() ? val : null),
-  phone: z.union([z.string(), z.null()]).transform(val => val && val.trim() ? val : null),
-  mobilePhone: z.union([z.string(), z.null()]).transform(val => val && val.trim() ? val : null),
+  phone: z.union([z.string(), z.null(), z.undefined()]).transform(val => val && typeof val === 'string' && val.trim() ? val : null),
+  mobilePhone: z.union([z.string(), z.null(), z.undefined()]).transform(val => val && typeof val === 'string' && val.trim() ? val : null),
   type: z.enum(["buyer", "seller"]),
   status: z.enum(["active", "inactive", "pending"]),
   labels: z.array(z.string()).default([]),

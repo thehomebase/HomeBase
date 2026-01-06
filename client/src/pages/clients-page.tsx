@@ -607,6 +607,7 @@ export default function ClientsPage() {
       lastName: "",
       email: null,
       phone: null,
+      mobilePhone: null,
       address: "",
       type: "seller",
       status: "active",
@@ -623,7 +624,11 @@ export default function ClientsPage() {
   }, [user?.id, form]);
 
   const onSubmit = async (data: InsertClient) => {
-    if (!user?.id) return;
+    console.log("Form submitted with data:", data);
+    if (!user?.id) {
+      console.log("No user ID, returning early");
+      return;
+    }
 
     try {
       const cleanedLabels = data.labels ?
@@ -635,12 +640,15 @@ export default function ClientsPage() {
         ...data,
         email: data.email?.trim() || null,
         phone: data.phone?.trim() || null,
+        mobilePhone: data.mobilePhone?.trim() || null,
         labels: cleanedLabels,
         agentId: user.id
       };
+      console.log("Submitting cleaned data:", cleanedData);
       await createClientMutation.mutateAsync(cleanedData);
       form.reset();
     } catch (error) {
+      console.error("Create client error:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to create client",
@@ -712,7 +720,7 @@ export default function ClientsPage() {
                     <DialogTitle>Add New Client</DialogTitle>
                   </DialogHeader>
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit, (errors) => console.log("Form validation errors:", errors))} className="space-y-4">
                       <FormField
                         control={form.control}
                         name="firstName"
