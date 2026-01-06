@@ -10,7 +10,6 @@ import { Timeline } from "@/components/ui/timeline";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Scheduler } from "@aldabil/react-scheduler";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,15 +24,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-const schedulerTheme = createTheme({
-  palette: {
-    secondary: {
-      main: '#000000',
-      contrastText: '#ffffff',
-    },
-  },
-});
 
 export default function CalendarPage() {
   const { user } = useAuth();
@@ -129,7 +119,6 @@ export default function CalendarPage() {
         <Timeline transactions={transactions} />
         {!showTable ? (
           <div className="w-full relative">
-            <ThemeProvider theme={schedulerTheme}>
               <Scheduler
                 events={events}
                 className="w-full overflow-x-hidden [&_.rs__cell]:!text-black [&_.rs__header]:!text-black [&_.rs__time]:!text-black [&_.rs__event]:!text-black dark:[&_.rs__cell]:!text-black dark:[&_.rs__header]:!text-black dark:[&_.rs__time]:!text-black dark:[&_.rs__event]:!text-black [&_.rs__today]:!text-black dark:[&_.rs__today]:!text-black [&_.rs__time-indicator]:!text-black dark:[&_.rs__time-indicator]:!text-black"
@@ -153,6 +142,28 @@ export default function CalendarPage() {
                   weekStartOn: 0,
                   startHour: 0,
                   endHour: 23,
+                  cellRenderer: ({ start, height, ...props }: { start: Date; height: number; [key: string]: any }) => {
+                    const dayNumber = start.getDate();
+                    const today = isToday(start);
+                    return (
+                      <div style={{ height: '100%', position: 'relative', padding: '4px' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: today ? '28px' : 'auto',
+                          height: today ? '28px' : 'auto',
+                          borderRadius: today ? '50%' : '0',
+                          border: today ? '2px solid #000' : 'none',
+                          fontWeight: today ? 'bold' : 'normal',
+                          fontSize: '14px',
+                          color: '#000',
+                        }}>
+                          {dayNumber.toString().padStart(2, '0')}
+                        </span>
+                      </div>
+                    );
+                  },
                 }}
                 navigation={{
                   toolbar: (toolbar) => {
@@ -172,7 +183,6 @@ export default function CalendarPage() {
                 fields={[]}
                 dialogMaxWidth="lg"
               />
-            </ThemeProvider>
           </div>
         ) : (
           <div>

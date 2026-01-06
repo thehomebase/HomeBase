@@ -80,12 +80,4 @@ html {
   }
 }
 
-/* Override react-scheduler today indicator only */
-/* Only target the colorDefault variant which is used for today */
-.MuiAvatar-root.MuiAvatar-circular.MuiAvatar-colorDefault {
-  background-color: transparent !important;
-  background: transparent !important;
-  border: 2px solid #000 !important;
-  color: #000 !important;
-}
 
