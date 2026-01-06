@@ -4,12 +4,13 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { type Transaction } from "@shared/schema";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import { List, Calendar as CalendarIcon } from "lucide-react";
 import { Timeline } from "@/components/ui/timeline";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Scheduler } from "@aldabil/react-scheduler";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,31 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+const schedulerTheme = createTheme({
+  palette: {
+    secondary: {
+      main: '#000000',
+      contrastText: '#000000',
+    },
+  },
+  components: {
+    MuiAvatar: {
+      styleOverrides: {
+        root: {
+          backgroundColor: 'transparent !important',
+          border: '2px solid #000 !important',
+          color: '#000 !important',
+        },
+        colorDefault: {
+          backgroundColor: 'transparent !important',
+          border: '2px solid #000 !important',
+          color: '#000 !important',
+        },
+      },
+    },
+  },
+});
 
 export default function CalendarPage() {
   const { user } = useAuth();
@@ -119,42 +145,50 @@ export default function CalendarPage() {
         <Timeline transactions={transactions} />
         {!showTable ? (
           <div className="w-full relative">
-            <Scheduler
-              events={events}
-              className="w-full overflow-x-hidden [&_.rs__cell]:!text-black [&_.rs__header]:!text-black [&_.rs__time]:!text-black [&_.rs__event]:!text-black dark:[&_.rs__cell]:!text-black dark:[&_.rs__header]:!text-black dark:[&_.rs__time]:!text-black dark:[&_.rs__event]:!text-black [&_.rs__today]:!text-black dark:[&_.rs__today]:!text-black [&_.rs__time-indicator]:!text-black dark:[&_.rs__time-indicator]:!text-black"
-              deletable={false}
-              draggable={false}
-              views={["month", "week", "day"]}
-              defaultView="month"
-              height={window.innerHeight - 250}
-              week={{
-                weekDays: [0, 1, 2, 3, 4, 5, 6],
-                weekStartOn: 0,
-                startHour: 0,
-                endHour: 23
-              }}
-              day={{
-                startHour: 0,
-                endHour: 23,
-              }}
-              navigation={{
-                toolbar: (toolbar) => {
-                  const { onNavigate, date } = toolbar;
-                  return (
-                    <div className="flex justify-between items-center mb-4">
-                      <div className="flex gap-2">
-                        <button onClick={() => onNavigate('PREV')} className="p-1">←</button>
-                        <span>{format(date, 'MMMM yyyy')}</span>
-                        <button onClick={() => onNavigate('NEXT')} className="p-1">→</button>
+            <ThemeProvider theme={schedulerTheme}>
+              <Scheduler
+                events={events}
+                className="w-full overflow-x-hidden [&_.rs__cell]:!text-black [&_.rs__header]:!text-black [&_.rs__time]:!text-black [&_.rs__event]:!text-black dark:[&_.rs__cell]:!text-black dark:[&_.rs__header]:!text-black dark:[&_.rs__time]:!text-black dark:[&_.rs__event]:!text-black [&_.rs__today]:!text-black dark:[&_.rs__today]:!text-black [&_.rs__time-indicator]:!text-black dark:[&_.rs__time-indicator]:!text-black"
+                deletable={false}
+                draggable={false}
+                views={["month", "week", "day"]}
+                defaultView="month"
+                height={window.innerHeight - 250}
+                week={{
+                  weekDays: [0, 1, 2, 3, 4, 5, 6],
+                  weekStartOn: 0,
+                  startHour: 0,
+                  endHour: 23
+                }}
+                day={{
+                  startHour: 0,
+                  endHour: 23,
+                }}
+                month={{
+                  weekDays: [0, 1, 2, 3, 4, 5, 6],
+                  weekStartOn: 0,
+                  startHour: 0,
+                  endHour: 23,
+                }}
+                navigation={{
+                  toolbar: (toolbar) => {
+                    const { onNavigate, date } = toolbar;
+                    return (
+                      <div className="flex justify-between items-center mb-4">
+                        <div className="flex gap-2">
+                          <button onClick={() => onNavigate('PREV')} className="p-1">←</button>
+                          <span>{format(date, 'MMMM yyyy')}</span>
+                          <button onClick={() => onNavigate('NEXT')} className="p-1">→</button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                }
-              }}
-              selectedDate={new Date()}
-              fields={[]}
-              dialogMaxWidth="lg"
-            />
+                    );
+                  }
+                }}
+                selectedDate={new Date()}
+                fields={[]}
+                dialogMaxWidth="lg"
+              />
+            </ThemeProvider>
           </div>
         ) : (
           <div>
