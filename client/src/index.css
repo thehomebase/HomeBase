@@ -80,39 +80,9 @@ html {
   }
 }
 
-/* Override react-scheduler today indicator - comprehensive targeting */
-/* Target the purple circle around today's date */
-.rs__cell.rs__today_cell .rs__today_circle,
-[class*="rs__today"] span,
-[class*="today_cell"] span,
-.MuiAvatar-root.MuiAvatar-circular,
-span[class*="MuiAvatar-circular"][style*="background"],
-div[class*="rs__cell"] span[style*="rgb(103, 58, 183)"],
-div[class*="rs__cell"] span[style*="rgb(156, 39, 176)"],
-div[class*="rs__cell"] span[style*="#673ab7"],
-div[class*="rs__cell"] span[style*="#9c27b0"],
-.rs__month span.MuiAvatar-root {
-  background-color: transparent !important;
-  background: transparent !important;
-  border: 2px solid #000 !important;
-  color: #000 !important;
-}
-
-/* Target MUI Avatar used for today indicator in month view */
+/* Override react-scheduler today indicator only */
+/* Only target the colorDefault variant which is used for today */
 .MuiAvatar-root.MuiAvatar-circular.MuiAvatar-colorDefault {
-  background-color: transparent !important;
-  background: transparent !important;
-  border: 2px solid #000 !important;
-  color: #000 !important;
-}
-
-/* Target any element with purple/magenta background color */
-span[style*="background-color: rgb(103, 58, 183)"],
-span[style*="background-color: rgb(156, 39, 176)"],
-span[style*="background-color:#673ab7"],
-span[style*="background-color:#9c27b0"],
-span[style*="background: rgb(103, 58, 183)"],
-span[style*="background: rgb(156, 39, 176)"] {
   background-color: transparent !important;
   background: transparent !important;
   border: 2px solid #000 !important;

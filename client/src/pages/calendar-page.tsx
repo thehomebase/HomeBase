@@ -30,23 +30,7 @@ const schedulerTheme = createTheme({
   palette: {
     secondary: {
       main: '#000000',
-      contrastText: '#000000',
-    },
-  },
-  components: {
-    MuiAvatar: {
-      styleOverrides: {
-        root: {
-          backgroundColor: 'transparent !important',
-          border: '2px solid #000 !important',
-          color: '#000 !important',
-        },
-        colorDefault: {
-          backgroundColor: 'transparent !important',
-          border: '2px solid #000 !important',
-          color: '#000 !important',
-        },
-      },
+      contrastText: '#ffffff',
     },
   },
 });
