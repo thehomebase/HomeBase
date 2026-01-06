@@ -936,13 +936,14 @@ export function registerRoutes(app: Express): Server {
 
   app.patch("/api/viewings/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
 
     try {
       const viewing = await storage.getViewing(Number(req.params.id));
       if (!viewing) {
         return res.status(404).json({ error: 'Viewing not found' });
       }
-      if (req.user.role === "agent" && viewing.agentId !== req.user.id) {
+      if (viewing.agentId !== req.user.id) {
         return res.sendStatus(403);
       }
       
@@ -981,6 +982,13 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Property Feedback API
+  // Helper to check if user is authorized for a viewing
+  const isAuthorizedForViewing = (user: Express.User, viewing: { agentId: number; clientId: number }): boolean => {
+    if (user.role === "agent" && viewing.agentId === user.id) return true;
+    if (user.role === "client" && user.clientRecordId && viewing.clientId === user.clientRecordId) return true;
+    return false;
+  };
+
   app.get("/api/viewings/:id/feedback", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
@@ -989,6 +997,11 @@ export function registerRoutes(app: Express): Server {
       if (!viewing) {
         return res.status(404).json({ error: 'Viewing not found' });
       }
+      
+      if (!isAuthorizedForViewing(req.user, viewing)) {
+        return res.sendStatus(403);
+      }
+      
       const feedback = await storage.getFeedbackByViewing(Number(req.params.id));
       res.json(feedback);
     } catch (error) {
@@ -1006,9 +1019,13 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: 'Viewing not found' });
       }
       
+      if (!isAuthorizedForViewing(req.user, viewing)) {
+        return res.sendStatus(403);
+      }
+      
       const feedbackData = {
         viewingId: Number(req.params.id),
-        clientId: req.user.id,
+        clientId: viewing.clientId,
         rating: Math.min(5, Math.max(1, Number(req.body.rating) || 3)),
         liked: req.body.liked || null,
         disliked: req.body.disliked || null,
@@ -1032,6 +1049,20 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
+      const feedback = await storage.getFeedback(Number(req.params.id));
+      if (!feedback) {
+        return res.status(404).json({ error: 'Feedback not found' });
+      }
+      
+      const viewing = await storage.getViewing(feedback.viewingId);
+      if (!viewing) {
+        return res.status(404).json({ error: 'Viewing not found' });
+      }
+      
+      if (!isAuthorizedForViewing(req.user, viewing)) {
+        return res.sendStatus(403);
+      }
+      
       const allowedFields = ['rating', 'liked', 'disliked', 'overallImpression', 'wouldPurchase'];
       const sanitizedData: Record<string, any> = {};
       for (const field of allowedFields) {

@@ -173,6 +173,7 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(sql`
         SELECT id, email, password, first_name as "firstName", 
                last_name as "lastName", role, agent_id as "agentId",
+               client_record_id as "clientRecordId",
                claimed_transaction_id as "claimedTransactionId",
                claimed_access_code as "claimedAccessCode"
         FROM users 
@@ -193,6 +194,7 @@ export class DatabaseStorage implements IStorage {
         lastName: String(user.lastName),
         role: String(user.role),
         agentId: user.agentId ? Number(user.agentId) : null,
+        clientRecordId: user.clientRecordId ? Number(user.clientRecordId) : null,
         claimedTransactionId: user.claimedTransactionId ? Number(user.claimedTransactionId) : null,
         claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null
       };
@@ -218,6 +220,7 @@ export class DatabaseStorage implements IStorage {
         lastName: String(user.lastName),
         role: String(user.role),
         agentId: user.agentId ? Number(user.agentId) : null,
+        clientRecordId: user.clientRecordId ? Number(user.clientRecordId) : null,
         claimedTransactionId: user.claimedTransactionId ? Number(user.claimedTransactionId) : null,
         claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null
       };
@@ -243,6 +246,7 @@ export class DatabaseStorage implements IStorage {
           lastName: insertUser.lastName,
           role: insertUser.role || 'user',
           agentId: null,
+          clientRecordId: null,
           claimedTransactionId: null,
           claimedAccessCode: null
         })
@@ -260,6 +264,7 @@ export class DatabaseStorage implements IStorage {
         lastName: String(user.lastName),
         role: String(user.role),
         agentId: user.agentId ? Number(user.agentId) : null,
+        clientRecordId: user.clientRecordId ? Number(user.clientRecordId) : null,
         claimedTransactionId: user.claimedTransactionId ? Number(user.claimedTransactionId) : null,
         claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null
       };
@@ -1996,6 +2001,17 @@ export class DatabaseStorage implements IStorage {
       return (result.rows as any[]).map(this.mapFeedbackRow);
     } catch (error) {
       console.error('Error in getFeedbackByClient:', error);
+      throw error;
+    }
+  }
+
+  async getFeedback(id: number): Promise<PropertyFeedback | undefined> {
+    try {
+      const result = await db.execute(sql`SELECT * FROM property_feedback WHERE id = ${id}`);
+      if (result.rows.length === 0) return undefined;
+      return this.mapFeedbackRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in getFeedback:', error);
       throw error;
     }
   }
