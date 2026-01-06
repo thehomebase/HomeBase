@@ -295,7 +295,7 @@ export default function MapPage() {
   }, [transactionsWithCoords.length, viewingsWithCoords.length]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div className="relative w-full overflow-hidden" style={{ height: "100vh" }}>
       <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
         <div className="flex gap-2">
           <div className="relative">
