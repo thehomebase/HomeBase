@@ -80,4 +80,12 @@ html {
   }
 }
 
+/* Override react-scheduler today indicator - target the MuiAvatar used for today's date */
+/* The library uses MuiAvatar with colorDefault variant only for today */
+.MuiAvatar-colorDefault {
+  background-color: transparent !important;
+  border: 2px solid #000 !important;
+  color: #000 !important;
+}
+
 

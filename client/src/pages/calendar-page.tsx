@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { type Transaction } from "@shared/schema";
-import { format, isToday } from "date-fns";
+import { format } from "date-fns";
 import { List, Calendar as CalendarIcon } from "lucide-react";
 import { Timeline } from "@/components/ui/timeline";
 import { Button } from "@/components/ui/button";
@@ -142,28 +142,6 @@ export default function CalendarPage() {
                   weekStartOn: 0,
                   startHour: 0,
                   endHour: 23,
-                  cellRenderer: ({ start, height, ...props }: { start: Date; height: number; [key: string]: any }) => {
-                    const dayNumber = start.getDate();
-                    const today = isToday(start);
-                    return (
-                      <div style={{ height: '100%', position: 'relative', padding: '4px' }}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: today ? '28px' : 'auto',
-                          height: today ? '28px' : 'auto',
-                          borderRadius: today ? '50%' : '0',
-                          border: today ? '2px solid #000' : 'none',
-                          fontWeight: today ? 'bold' : 'normal',
-                          fontSize: '14px',
-                          color: '#000',
-                        }}>
-                          {dayNumber.toString().padStart(2, '0')}
-                        </span>
-                      </div>
-                    );
-                  },
                 }}
                 navigation={{
                   toolbar: (toolbar) => {
