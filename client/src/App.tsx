@@ -39,7 +39,8 @@ import {
   Book,
   PanelLeftClose,
   PanelLeft,
-  Wrench
+  Wrench,
+  Map
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -48,6 +49,7 @@ import GlossaryPage from "./pages/glossary-page";
 import MessagesPage from "./pages/messages-page";
 import ClientPage from "@/pages/client-page";
 import ContractorsPage from "@/pages/contractors-page";
+import MapPage from "@/pages/map-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -117,6 +119,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                                 <Link href="/contractors" className="flex items-center gap-2">
                                   <Wrench className="h-4 w-4" />
                                   {isSidebarOpen && <span>Contractors</span>}
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                              <SidebarMenuButton asChild tooltip="Map">
+                                <Link href="/map" className="flex items-center gap-2">
+                                  <Map className="h-4 w-4" />
+                                  {isSidebarOpen && <span>Map</span>}
                                 </Link>
                               </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -242,6 +252,9 @@ function Router() {
           </Route>
           <Route path="/contractors">
             <ProtectedRoute path="/contractors" component={ContractorsPage} />
+          </Route>
+          <Route path="/map">
+            <ProtectedRoute path="/map" component={MapPage} />
           </Route>
           <Route path="/">
             <ProtectedRoute path="/" component={TransactionsPage} />
