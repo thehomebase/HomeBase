@@ -10,6 +10,16 @@ import { Timeline } from "@/components/ui/timeline";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Scheduler } from "@aldabil/react-scheduler";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+
+const calendarTheme = createTheme({
+  palette: {
+    secondary: {
+      main: 'rgba(0, 0, 0, 0.08)',
+      contrastText: '#000000',
+    },
+  },
+});
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -119,6 +129,7 @@ export default function CalendarPage() {
         <Timeline transactions={transactions} />
         {!showTable ? (
           <div className="w-full relative">
+            <ThemeProvider theme={calendarTheme}>
               <Scheduler
                 events={events}
                 className="w-full overflow-x-hidden [&_.rs__cell]:!text-black [&_.rs__header]:!text-black [&_.rs__time]:!text-black [&_.rs__event]:!text-black dark:[&_.rs__cell]:!text-black dark:[&_.rs__header]:!text-black dark:[&_.rs__time]:!text-black dark:[&_.rs__event]:!text-black [&_.rs__today]:!text-black dark:[&_.rs__today]:!text-black [&_.rs__time-indicator]:!text-black dark:[&_.rs__time-indicator]:!text-black"
@@ -161,6 +172,7 @@ export default function CalendarPage() {
                 fields={[]}
                 dialogMaxWidth="lg"
               />
+            </ThemeProvider>
           </div>
         ) : (
           <div>
