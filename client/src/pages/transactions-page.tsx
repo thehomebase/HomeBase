@@ -257,9 +257,9 @@ export default function TransactionsPage() {
   });
 
   return (
-    <main className="flex-1 min-w-0 overflow-x-hidden px-4">
-      <div className="sm:w-screen flex flex-wrap bg-background relative px-2 py-8">
-        <div className="flex flex-col sm:flex-row flex-grow sm:items-center gap-2 mb-2">
+    <main className="flex-1 min-w-0 px-4">
+      <div className="w-full flex flex-wrap bg-background relative px-2 py-8">
+        <div className="flex flex-col sm:flex-row w-full sm:items-center justify-between gap-2 mb-2">
           <h2 className="text-2xl font-bold dark:text-white">
             Your Transactions
           </h2>
@@ -267,7 +267,7 @@ export default function TransactionsPage() {
             {user?.role === "agent" && (
               <Dialog open={showNewTransactionDialog} onOpenChange={setShowNewTransactionDialog}>
                 <DialogTrigger asChild>
-                  <Button className="w-full sm:flex-1 sm:max-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 dark:text-black dark:bg-white mb-0">
+                  <Button className="whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 dark:text-black dark:bg-white">
                     <Plus className="h-4 w-4 mr-2" />
                     New Transaction
                   </Button>
