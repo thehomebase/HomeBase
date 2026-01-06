@@ -15,10 +15,12 @@ interface StorageDocument {
 // Update Document type to use the imported one from schema.ts
 import {
   users, transactions, checklists, messages, clients, documents, contractors, contractorReviews,
+  propertyViewings, propertyFeedback,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
-  type Contractor, type ContractorReview,
+  type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
-  type InsertDocument, type InsertContractor, type InsertContractorReview
+  type InsertDocument, type InsertContractor, type InsertContractorReview,
+  type InsertPropertyViewing, type InsertPropertyFeedback
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
@@ -84,6 +86,25 @@ export interface IStorage {
   getContractorReviews(contractorId: number): Promise<ContractorReview[]>;
   createContractorReview(review: InsertContractorReview): Promise<ContractorReview>;
   deleteContractorReview(id: number): Promise<void>;
+
+  // Property viewing operations
+  getViewingsByAgent(agentId: number): Promise<PropertyViewing[]>;
+  getViewingsByClient(clientId: number): Promise<PropertyViewing[]>;
+  getViewing(id: number): Promise<PropertyViewing | undefined>;
+  createViewing(viewing: InsertPropertyViewing): Promise<PropertyViewing>;
+  updateViewing(id: number, data: Partial<PropertyViewing>): Promise<PropertyViewing>;
+  deleteViewing(id: number): Promise<void>;
+
+  // Property feedback operations
+  getFeedbackByViewing(viewingId: number): Promise<PropertyFeedback[]>;
+  getFeedbackByClient(clientId: number): Promise<PropertyFeedback[]>;
+  createFeedback(feedback: InsertPropertyFeedback): Promise<PropertyFeedback>;
+  updateFeedback(id: number, data: Partial<PropertyFeedback>): Promise<PropertyFeedback>;
+  deleteFeedback(id: number): Promise<void>;
+
+  // Map data operations
+  getTransactionsWithCoordinates(agentId: number): Promise<Transaction[]>;
+  updateTransactionCoordinates(id: number, lat: number, lon: number): Promise<void>;
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -1860,6 +1881,251 @@ export class DatabaseStorage implements IStorage {
       agentRating: row.agent_rating ? Number(row.agent_rating) : null,
       agentNotes: row.agent_notes ? String(row.agent_notes) : null,
       createdAt: row.created_at ? new Date(row.created_at) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null
+    };
+  }
+
+  // Property Viewing Methods
+  async getViewingsByAgent(agentId: number): Promise<PropertyViewing[]> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM property_viewings WHERE agent_id = ${agentId} ORDER BY created_at DESC`
+      );
+      return (result.rows as any[]).map(this.mapViewingRow);
+    } catch (error) {
+      console.error('Error in getViewingsByAgent:', error);
+      throw error;
+    }
+  }
+
+  async getViewingsByClient(clientId: number): Promise<PropertyViewing[]> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM property_viewings WHERE client_id = ${clientId} ORDER BY created_at DESC`
+      );
+      return (result.rows as any[]).map(this.mapViewingRow);
+    } catch (error) {
+      console.error('Error in getViewingsByClient:', error);
+      throw error;
+    }
+  }
+
+  async getViewing(id: number): Promise<PropertyViewing | undefined> {
+    try {
+      const result = await db.execute(sql`SELECT * FROM property_viewings WHERE id = ${id}`);
+      if (result.rows.length === 0) return undefined;
+      return this.mapViewingRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in getViewing:', error);
+      throw error;
+    }
+  }
+
+  async createViewing(viewing: InsertPropertyViewing): Promise<PropertyViewing> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO property_viewings (agent_id, client_id, address, city, state, zip_code, latitude, longitude, status, scheduled_date, notes)
+        VALUES (${viewing.agentId}, ${viewing.clientId}, ${viewing.address}, ${viewing.city}, ${viewing.state}, ${viewing.zipCode || null}, ${viewing.latitude || null}, ${viewing.longitude || null}, ${viewing.status || 'scheduled'}, ${viewing.scheduledDate || null}, ${viewing.notes || null})
+        RETURNING *
+      `);
+      return this.mapViewingRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in createViewing:', error);
+      throw error;
+    }
+  }
+
+  async updateViewing(id: number, data: Partial<PropertyViewing>): Promise<PropertyViewing> {
+    try {
+      const existing = await this.getViewing(id);
+      if (!existing) throw new Error('Viewing not found');
+      
+      const updates: string[] = [];
+      const values: any[] = [];
+      
+      if (data.address !== undefined) { updates.push('address'); values.push(data.address); }
+      if (data.city !== undefined) { updates.push('city'); values.push(data.city); }
+      if (data.state !== undefined) { updates.push('state'); values.push(data.state); }
+      if (data.zipCode !== undefined) { updates.push('zip_code'); values.push(data.zipCode); }
+      if (data.latitude !== undefined) { updates.push('latitude'); values.push(data.latitude); }
+      if (data.longitude !== undefined) { updates.push('longitude'); values.push(data.longitude); }
+      if (data.status !== undefined) { updates.push('status'); values.push(data.status); }
+      if (data.scheduledDate !== undefined) { updates.push('scheduled_date'); values.push(data.scheduledDate); }
+      if (data.notes !== undefined) { updates.push('notes'); values.push(data.notes); }
+      
+      if (updates.length === 0) return existing;
+      
+      const setClause = updates.map((col, i) => `${col} = $${i + 2}`).join(', ');
+      const query = `UPDATE property_viewings SET ${setClause}, updated_at = NOW() WHERE id = $1 RETURNING *`;
+      const result = await db.execute(sql.raw(query, [id, ...values]));
+      return this.mapViewingRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in updateViewing:', error);
+      throw error;
+    }
+  }
+
+  async deleteViewing(id: number): Promise<void> {
+    try {
+      await db.execute(sql`DELETE FROM property_feedback WHERE viewing_id = ${id}`);
+      await db.execute(sql`DELETE FROM property_viewings WHERE id = ${id}`);
+    } catch (error) {
+      console.error('Error in deleteViewing:', error);
+      throw error;
+    }
+  }
+
+  // Property Feedback Methods
+  async getFeedbackByViewing(viewingId: number): Promise<PropertyFeedback[]> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM property_feedback WHERE viewing_id = ${viewingId} ORDER BY created_at DESC`
+      );
+      return (result.rows as any[]).map(this.mapFeedbackRow);
+    } catch (error) {
+      console.error('Error in getFeedbackByViewing:', error);
+      throw error;
+    }
+  }
+
+  async getFeedbackByClient(clientId: number): Promise<PropertyFeedback[]> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM property_feedback WHERE client_id = ${clientId} ORDER BY created_at DESC`
+      );
+      return (result.rows as any[]).map(this.mapFeedbackRow);
+    } catch (error) {
+      console.error('Error in getFeedbackByClient:', error);
+      throw error;
+    }
+  }
+
+  async createFeedback(feedback: InsertPropertyFeedback): Promise<PropertyFeedback> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO property_feedback (viewing_id, client_id, rating, liked, disliked, overall_impression, would_purchase)
+        VALUES (${feedback.viewingId}, ${feedback.clientId}, ${feedback.rating}, ${feedback.liked || null}, ${feedback.disliked || null}, ${feedback.overallImpression || null}, ${feedback.wouldPurchase ?? null})
+        RETURNING *
+      `);
+      return this.mapFeedbackRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in createFeedback:', error);
+      throw error;
+    }
+  }
+
+  async updateFeedback(id: number, data: Partial<PropertyFeedback>): Promise<PropertyFeedback> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE property_feedback
+        SET rating = COALESCE(${data.rating ?? null}, rating),
+            liked = COALESCE(${data.liked ?? null}, liked),
+            disliked = COALESCE(${data.disliked ?? null}, disliked),
+            overall_impression = COALESCE(${data.overallImpression ?? null}, overall_impression),
+            would_purchase = COALESCE(${data.wouldPurchase ?? null}, would_purchase),
+            updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `);
+      if (result.rows.length === 0) throw new Error('Feedback not found');
+      return this.mapFeedbackRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in updateFeedback:', error);
+      throw error;
+    }
+  }
+
+  async deleteFeedback(id: number): Promise<void> {
+    try {
+      await db.execute(sql`DELETE FROM property_feedback WHERE id = ${id}`);
+    } catch (error) {
+      console.error('Error in deleteFeedback:', error);
+      throw error;
+    }
+  }
+
+  // Map data operations
+  async getTransactionsWithCoordinates(agentId: number): Promise<Transaction[]> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM transactions WHERE agent_id = ${agentId} AND latitude IS NOT NULL AND longitude IS NOT NULL`
+      );
+      return (result.rows as any[]).map(this.mapTransactionRow.bind(this));
+    } catch (error) {
+      console.error('Error in getTransactionsWithCoordinates:', error);
+      throw error;
+    }
+  }
+
+  async updateTransactionCoordinates(id: number, lat: number, lon: number): Promise<void> {
+    try {
+      await db.execute(sql`UPDATE transactions SET latitude = ${lat}, longitude = ${lon} WHERE id = ${id}`);
+    } catch (error) {
+      console.error('Error in updateTransactionCoordinates:', error);
+      throw error;
+    }
+  }
+
+  private mapViewingRow(row: any): PropertyViewing {
+    return {
+      id: Number(row.id),
+      agentId: Number(row.agent_id),
+      clientId: Number(row.client_id),
+      address: String(row.address),
+      city: String(row.city),
+      state: String(row.state),
+      zipCode: row.zip_code ? String(row.zip_code) : null,
+      latitude: row.latitude ? Number(row.latitude) : null,
+      longitude: row.longitude ? Number(row.longitude) : null,
+      status: String(row.status),
+      scheduledDate: row.scheduled_date ? new Date(row.scheduled_date) : null,
+      notes: row.notes ? String(row.notes) : null,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null
+    };
+  }
+
+  private mapFeedbackRow(row: any): PropertyFeedback {
+    return {
+      id: Number(row.id),
+      viewingId: Number(row.viewing_id),
+      clientId: Number(row.client_id),
+      rating: Number(row.rating),
+      liked: row.liked ? String(row.liked) : null,
+      disliked: row.disliked ? String(row.disliked) : null,
+      overallImpression: row.overall_impression ? String(row.overall_impression) : null,
+      wouldPurchase: row.would_purchase !== null ? Boolean(row.would_purchase) : null,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null
+    };
+  }
+
+  private mapTransactionRow(row: any): Transaction {
+    return {
+      id: Number(row.id),
+      streetName: String(row.street_name),
+      city: String(row.city),
+      state: String(row.state),
+      zipCode: String(row.zip_code),
+      accessCode: String(row.access_code),
+      status: String(row.status),
+      type: String(row.type),
+      agentId: Number(row.agent_id),
+      clientId: row.client_id ? Number(row.client_id) : null,
+      secondaryClientId: row.secondary_client_id ? Number(row.secondary_client_id) : null,
+      participants: row.participants || [],
+      contractPrice: row.contract_price ? Number(row.contract_price) : null,
+      optionPeriodExpiration: row.option_period_expiration ? new Date(row.option_period_expiration) : null,
+      optionFee: row.option_fee ? Number(row.option_fee) : null,
+      earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
+      downPayment: row.down_payment ? Number(row.down_payment) : null,
+      sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
+      closingDate: row.closing_date ? new Date(row.closing_date) : null,
+      contractExecutionDate: row.contract_execution_date ? new Date(row.contract_execution_date) : null,
+      mlsNumber: row.mls_number ? String(row.mls_number) : null,
+      financing: row.financing ? String(row.financing) : null,
+      latitude: row.latitude ? Number(row.latitude) : null,
+      longitude: row.longitude ? Number(row.longitude) : null,
       updatedAt: row.updated_at ? new Date(row.updated_at) : null
     };
   }

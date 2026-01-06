@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema } from "@shared/schema";
 import ical from "ical-generator";
 
 // Seller checklist items
@@ -869,6 +869,269 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error deleting review:', error);
       res.status(500).json({ error: 'Failed to delete review' });
+    }
+  });
+
+  // Property Viewings API
+  app.get("/api/viewings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      let viewings;
+      if (req.user.role === "agent") {
+        viewings = await storage.getViewingsByAgent(req.user.id);
+      } else {
+        viewings = await storage.getViewingsByClient(req.user.id);
+      }
+      res.json(viewings);
+    } catch (error) {
+      console.error('Error fetching viewings:', error);
+      res.status(500).json({ error: 'Failed to fetch viewings' });
+    }
+  });
+
+  app.get("/api/viewings/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const viewing = await storage.getViewing(Number(req.params.id));
+      if (!viewing) {
+        return res.status(404).json({ error: 'Viewing not found' });
+      }
+      if (req.user.role === "agent" && viewing.agentId !== req.user.id) {
+        return res.sendStatus(403);
+      }
+      if (req.user.role === "client" && viewing.clientId !== req.user.id) {
+        return res.sendStatus(403);
+      }
+      res.json(viewing);
+    } catch (error) {
+      console.error('Error fetching viewing:', error);
+      res.status(500).json({ error: 'Failed to fetch viewing' });
+    }
+  });
+
+  app.post("/api/viewings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const viewingData = {
+        ...req.body,
+        agentId: req.user.id
+      };
+      
+      const parsed = insertPropertyViewingSchema.safeParse(viewingData);
+      if (!parsed.success) {
+        return res.status(400).json(parsed.error);
+      }
+      const viewing = await storage.createViewing(parsed.data);
+      res.status(201).json(viewing);
+    } catch (error) {
+      console.error('Error creating viewing:', error);
+      res.status(500).json({ error: 'Failed to create viewing' });
+    }
+  });
+
+  app.patch("/api/viewings/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const viewing = await storage.getViewing(Number(req.params.id));
+      if (!viewing) {
+        return res.status(404).json({ error: 'Viewing not found' });
+      }
+      if (req.user.role === "agent" && viewing.agentId !== req.user.id) {
+        return res.sendStatus(403);
+      }
+      
+      const allowedFields = ['address', 'city', 'state', 'zipCode', 'latitude', 'longitude', 'status', 'scheduledDate', 'notes'];
+      const sanitizedData: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          sanitizedData[field] = req.body[field];
+        }
+      }
+      
+      const updated = await storage.updateViewing(Number(req.params.id), sanitizedData);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating viewing:', error);
+      res.status(500).json({ error: 'Failed to update viewing' });
+    }
+  });
+
+  app.delete("/api/viewings/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const viewing = await storage.getViewing(Number(req.params.id));
+      if (!viewing || viewing.agentId !== req.user.id) {
+        return res.sendStatus(403);
+      }
+      await storage.deleteViewing(Number(req.params.id));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting viewing:', error);
+      res.status(500).json({ error: 'Failed to delete viewing' });
+    }
+  });
+
+  // Property Feedback API
+  app.get("/api/viewings/:id/feedback", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const viewing = await storage.getViewing(Number(req.params.id));
+      if (!viewing) {
+        return res.status(404).json({ error: 'Viewing not found' });
+      }
+      const feedback = await storage.getFeedbackByViewing(Number(req.params.id));
+      res.json(feedback);
+    } catch (error) {
+      console.error('Error fetching feedback:', error);
+      res.status(500).json({ error: 'Failed to fetch feedback' });
+    }
+  });
+
+  app.post("/api/viewings/:id/feedback", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const viewing = await storage.getViewing(Number(req.params.id));
+      if (!viewing) {
+        return res.status(404).json({ error: 'Viewing not found' });
+      }
+      
+      const feedbackData = {
+        viewingId: Number(req.params.id),
+        clientId: req.user.id,
+        rating: Math.min(5, Math.max(1, Number(req.body.rating) || 3)),
+        liked: req.body.liked || null,
+        disliked: req.body.disliked || null,
+        overallImpression: req.body.overallImpression || null,
+        wouldPurchase: req.body.wouldPurchase ?? null
+      };
+      
+      const parsed = insertPropertyFeedbackSchema.safeParse(feedbackData);
+      if (!parsed.success) {
+        return res.status(400).json(parsed.error);
+      }
+      const feedback = await storage.createFeedback(parsed.data);
+      res.status(201).json(feedback);
+    } catch (error) {
+      console.error('Error creating feedback:', error);
+      res.status(500).json({ error: 'Failed to create feedback' });
+    }
+  });
+
+  app.patch("/api/feedback/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const allowedFields = ['rating', 'liked', 'disliked', 'overallImpression', 'wouldPurchase'];
+      const sanitizedData: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          sanitizedData[field] = req.body[field];
+        }
+      }
+      
+      const updated = await storage.updateFeedback(Number(req.params.id), sanitizedData);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating feedback:', error);
+      res.status(500).json({ error: 'Failed to update feedback' });
+    }
+  });
+
+  // Map data endpoints
+  app.get("/api/map/transactions", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+    
+    try {
+      const transactions = await storage.getTransactionsWithCoordinates(req.user.id);
+      res.json(transactions);
+    } catch (error) {
+      console.error('Error fetching map transactions:', error);
+      res.status(500).json({ error: 'Failed to fetch transactions for map' });
+    }
+  });
+
+  app.post("/api/geocode", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    const { address } = req.body;
+    if (!address) {
+      return res.status(400).json({ error: 'Address is required' });
+    }
+    
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+        {
+          headers: {
+            'User-Agent': 'HomeBase-RealEstate-App/1.0'
+          }
+        }
+      );
+      const data = await response.json();
+      
+      if (data.length > 0) {
+        res.json({
+          lat: parseFloat(data[0].lat),
+          lon: parseFloat(data[0].lon),
+          displayName: data[0].display_name
+        });
+      } else {
+        res.status(404).json({ error: 'Address not found' });
+      }
+    } catch (error) {
+      console.error('Error geocoding address:', error);
+      res.status(500).json({ error: 'Failed to geocode address' });
+    }
+  });
+
+  app.post("/api/transactions/:id/geocode", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+    
+    try {
+      const transaction = await storage.getTransaction(Number(req.params.id));
+      if (!transaction || transaction.agentId !== req.user.id) {
+        return res.sendStatus(403);
+      }
+      
+      const address = `${transaction.streetName}, ${transaction.city}, ${transaction.state} ${transaction.zipCode}`;
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+        {
+          headers: {
+            'User-Agent': 'HomeBase-RealEstate-App/1.0'
+          }
+        }
+      );
+      const data = await response.json();
+      
+      if (data.length > 0) {
+        await storage.updateTransactionCoordinates(
+          Number(req.params.id),
+          parseFloat(data[0].lat),
+          parseFloat(data[0].lon)
+        );
+        res.json({ success: true, lat: data[0].lat, lon: data[0].lon });
+      } else {
+        res.status(404).json({ error: 'Address not found' });
+      }
+    } catch (error) {
+      console.error('Error geocoding transaction:', error);
+      res.status(500).json({ error: 'Failed to geocode transaction' });
     }
   });
 

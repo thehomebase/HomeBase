@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, boolean, json, date, time } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, integer, boolean, json, date, time, doublePrecision } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from "zod";
 
@@ -66,6 +66,8 @@ export const transactions = pgTable("transactions", {
   contractExecutionDate: timestamp("contract_execution_date"),
   mlsNumber: text("mls_number"),
   financing: text("financing"),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
   updatedAt: timestamp("updated_at").defaultNow()
 });
 
@@ -134,6 +136,36 @@ export const contractorReviews = pgTable("contractor_reviews", {
   createdAt: timestamp("created_at").defaultNow()
 });
 
+export const propertyViewings = pgTable("property_viewings", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  clientId: integer("client_id").notNull(),
+  address: text("address").notNull(),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  zipCode: text("zip_code"),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  status: text("status").notNull().default("scheduled"),
+  scheduledDate: timestamp("scheduled_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+export const propertyFeedback = pgTable("property_feedback", {
+  id: serial("id").primaryKey(),
+  viewingId: integer("viewing_id").notNull(),
+  clientId: integer("client_id").notNull(),
+  rating: integer("rating").notNull(),
+  liked: text("liked"),
+  disliked: text("disliked"),
+  overallImpression: text("overall_impression"),
+  wouldPurchase: boolean("would_purchase"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
 const checklistItemSchema = z.object({
   id: z.string(),
   text: z.string(),
@@ -187,6 +219,16 @@ export const insertContractorReviewSchema = createInsertSchema(contractorReviews
   id: true,
   createdAt: true
 });
+export const insertPropertyViewingSchema = createInsertSchema(propertyViewings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export const insertPropertyFeedbackSchema = createInsertSchema(propertyFeedback).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertClient = z.infer<typeof insertClientSchema>;
@@ -205,3 +247,7 @@ export type Message = typeof messages.$inferSelect;
 export type Document = typeof documents.$inferSelect;
 export type Contractor = typeof contractors.$inferSelect;
 export type ContractorReview = typeof contractorReviews.$inferSelect;
+export type PropertyViewing = typeof propertyViewings.$inferSelect;
+export type PropertyFeedback = typeof propertyFeedback.$inferSelect;
+export type InsertPropertyViewing = z.infer<typeof insertPropertyViewingSchema>;
+export type InsertPropertyFeedback = z.infer<typeof insertPropertyFeedbackSchema>;
