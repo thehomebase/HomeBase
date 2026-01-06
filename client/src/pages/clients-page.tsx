@@ -642,6 +642,8 @@ export default function ClientsPage() {
     }
   };
 
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
     enabled: !!user,
@@ -659,6 +661,7 @@ export default function ClientsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       form.reset();
+      setIsDialogOpen(false);
       toast({
         title: "Success",
         description: "Client added successfully",
@@ -690,7 +693,7 @@ export default function ClientsPage() {
               <Search className="absolute right-3 top-2.5 h-5 w-5 text-muted-foreground" />
             </div>
             {user?.role === "agent" && (
-              <Dialog>
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="whitespace-nowrap">
                     <Plus className="h-4 w-4 mr-2" />
@@ -829,7 +832,7 @@ export default function ClientsPage() {
 
       </div>
 
-      <Card>
+      <Card className="w-full">
         <ClientTable
           clients={clients}
           searchQuery={searchQuery}
