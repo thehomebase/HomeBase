@@ -80,3 +80,29 @@ html {
   }
 }
 
+/* Override react-scheduler today indicator */
+.rs__cell.rs__today_cell .rs__today_circle {
+  background-color: transparent !important;
+  border: 2px solid #000 !important;
+  color: #000 !important;
+}
+
+/* Target MUI-based today indicator in the scheduler */
+[class*="MuiPickersDay-today"],
+[class*="today"] span[class*="circle"],
+.rs__month_day_cell.rs__today span {
+  background-color: transparent !important;
+  border: 2px solid #000 !important;
+  color: #000 !important;
+}
+
+/* More specific targeting for @aldabil/react-scheduler */
+.MuiButtonBase-root.MuiPickersDay-root.Mui-selected,
+.rs__today span,
+button[class*="today"],
+.rs__header button[aria-current="date"] {
+  background-color: transparent !important;
+  border: 2px solid #000 !important;
+  color: #000 !important;
+}
+
