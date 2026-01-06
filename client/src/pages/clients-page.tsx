@@ -616,6 +616,12 @@ export default function ClientsPage() {
     },
   });
 
+  useEffect(() => {
+    if (user?.id) {
+      form.setValue("agentId", user.id);
+    }
+  }, [user?.id, form]);
+
   const onSubmit = async (data: InsertClient) => {
     if (!user?.id) return;
 
