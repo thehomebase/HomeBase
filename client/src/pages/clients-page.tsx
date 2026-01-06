@@ -600,20 +600,19 @@ export default function ClientsPage() {
     },
   });
 
-  const form = useForm<InsertClient & { labelColors: Record<string, string> }>({
+  const form = useForm<InsertClient>({
     resolver: zodResolver(insertClientSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
-      email: "",
-      phone: "",
+      email: null,
+      phone: null,
       address: "",
       type: "seller",
       status: "active",
       notes: "",
       agentId: user?.id || 0,
       labels: [],
-      labelColors: {},
     },
   });
 
@@ -628,6 +627,8 @@ export default function ClientsPage() {
 
       const cleanedData = {
         ...data,
+        email: data.email?.trim() || null,
+        phone: data.phone?.trim() || null,
         labels: cleanedLabels,
         agentId: user.id
       };

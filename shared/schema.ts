@@ -122,9 +122,13 @@ export const insertUserSchema = createInsertSchema(users).extend({
 export const insertClientSchema = createInsertSchema(clients, {
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email format").nullable(),
-  phone: z.string().nullable(),
-  mobilePhone: z.string().nullable(),
+  email: z.union([
+    z.string().email("Invalid email format"),
+    z.string().length(0),
+    z.null()
+  ]).transform(val => val && val.trim() ? val : null),
+  phone: z.union([z.string(), z.null()]).transform(val => val && val.trim() ? val : null),
+  mobilePhone: z.union([z.string(), z.null()]).transform(val => val && val.trim() ? val : null),
   type: z.enum(["buyer", "seller"]),
   status: z.enum(["active", "inactive", "pending"]),
   labels: z.array(z.string()).default([]),
