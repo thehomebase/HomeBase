@@ -389,8 +389,8 @@ const TableContent = ({
   return (
     <>
       {/* Desktop view - Table */}
-      <div className="hidden md:block">
-        <Table>
+      <div className="hidden md:block w-full min-w-0">
+        <Table className="w-full table-auto">
           <TableHeader>
             <TableRow className="bg-gray-100 dark:bg-gray-800">
               <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('lastName')}>
@@ -833,13 +833,15 @@ export default function ClientsPage() {
 
       </div>
 
-      <Card className="w-full">
-        <ClientTable
-          clients={clients}
-          searchQuery={searchQuery}
-          onUpdate={handleClientUpdate}
-          onDelete={setClientToDelete}
-        />
+      <Card className="w-full min-w-0 overflow-hidden">
+        <div className="w-full overflow-x-auto">
+          <ClientTable
+            clients={clients}
+            searchQuery={searchQuery}
+            onUpdate={handleClientUpdate}
+            onDelete={setClientToDelete}
+          />
+        </div>
       </Card>
       <ClientDetailsPanel
         client={selectedClient}
