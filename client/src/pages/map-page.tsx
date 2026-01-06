@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,12 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw } from "lucide-react";
+import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw, PanelRightClose, PanelRightOpen, X } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Transaction, PropertyViewing, PropertyFeedback, Client } from "@shared/schema";
+import type { Transaction, PropertyViewing, Client } from "@shared/schema";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -93,6 +93,7 @@ export default function MapPage() {
   const [showAddViewing, setShowAddViewing] = useState(false);
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
   const [selectedViewing, setSelectedViewing] = useState<PropertyViewing | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const [newViewing, setNewViewing] = useState({
     clientId: 0,
@@ -294,88 +295,27 @@ export default function MapPage() {
   }, [transactionsWithCoords.length, viewingsWithCoords.length]);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b bg-background">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">
-            {isAgent ? "Transaction Map" : "Property Viewings"}
-          </h1>
-          {isAgent && (
-            <Dialog open={showAddViewing} onOpenChange={setShowAddViewing}>
-              <DialogTrigger asChild>
-                <Button data-testid="button-add-viewing">
-                  <Plus className="h-4 w-4 mr-2" /> Add Property Viewing
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Schedule Property Viewing</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Client</Label>
-                    <Select value={String(newViewing.clientId)} onValueChange={(v) => setNewViewing({ ...newViewing, clientId: Number(v) })}>
-                      <SelectTrigger data-testid="select-client">
-                        <SelectValue placeholder="Select client" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map(c => (
-                          <SelectItem key={c.id} value={String(c.id)}>{c.firstName} {c.lastName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Street Address</Label>
-                    <Input value={newViewing.address} onChange={e => setNewViewing({ ...newViewing, address: e.target.value })} placeholder="123 Main St" data-testid="input-address" />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <Label>City</Label>
-                      <Input value={newViewing.city} onChange={e => setNewViewing({ ...newViewing, city: e.target.value })} placeholder="City" data-testid="input-city" />
-                    </div>
-                    <div>
-                      <Label>State</Label>
-                      <Input value={newViewing.state} onChange={e => setNewViewing({ ...newViewing, state: e.target.value })} placeholder="TX" data-testid="input-state" />
-                    </div>
-                    <div>
-                      <Label>Zip</Label>
-                      <Input value={newViewing.zipCode} onChange={e => setNewViewing({ ...newViewing, zipCode: e.target.value })} placeholder="12345" data-testid="input-zip" />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Notes</Label>
-                    <Textarea value={newViewing.notes} onChange={e => setNewViewing({ ...newViewing, notes: e.target.value })} placeholder="Any notes about this property..." data-testid="input-notes" />
-                  </div>
-                  <Button onClick={() => createViewingMutation.mutate(newViewing)} disabled={createViewingMutation.isPending || !newViewing.clientId || !newViewing.address} className="w-full" data-testid="button-submit-viewing">
-                    {createViewingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Schedule Viewing
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
-        
-        <div className="flex gap-2 mb-4">
-          <div className="relative flex-1">
+    <div className="relative h-full w-full overflow-hidden">
+      <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
+        <div className="flex gap-2">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search for an address..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && searchAddress()}
-              className="pl-10"
+              className="pl-10 w-80 bg-background shadow-lg"
               data-testid="input-address-search"
             />
           </div>
-          <Button onClick={searchAddress} disabled={isSearching} data-testid="button-search">
+          <Button onClick={searchAddress} disabled={isSearching} className="shadow-lg" data-testid="button-search">
             {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
           </Button>
         </div>
 
         {searchResults.length > 0 && (
-          <Card className="absolute z-[1000] w-[calc(100%-2rem)] max-w-2xl bg-background shadow-lg">
+          <Card className="w-96 bg-background shadow-lg">
             <CardContent className="p-2">
               {searchResults.map((result) => (
                 <button
@@ -387,7 +327,7 @@ export default function MapPage() {
                   <MapPin className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="font-medium">{result.display_name.split(",")[0]}</p>
-                    <p className="text-sm text-muted-foreground truncate">{result.display_name}</p>
+                    <p className="text-sm text-muted-foreground truncate max-w-[280px]">{result.display_name}</p>
                   </div>
                 </button>
               ))}
@@ -398,96 +338,161 @@ export default function MapPage() {
         <div className="flex flex-wrap gap-2">
           {isAgent && (
             <>
-              <Badge variant="outline" className="flex items-center gap-1">
+              <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
                 <Home className="h-3 w-3 text-green-600" />
-                {transactionsWithCoords.length} transactions on map
+                {transactionsWithCoords.length} transactions
               </Badge>
-              <Badge variant="outline" className="flex items-center gap-1">
+              <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
                 <MapPin className="h-3 w-3 text-blue-600" />
-                {viewingsWithCoords.length} viewings scheduled
+                {viewingsWithCoords.length} viewings
               </Badge>
             </>
           )}
           {!isAgent && (
-            <Badge variant="outline" className="flex items-center gap-1">
+            <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
               <MapPin className="h-3 w-3 text-blue-600" />
-              {viewingsWithCoords.length} properties to view
+              {viewingsWithCoords.length} properties
             </Badge>
           )}
         </div>
       </div>
 
-      <div className="flex-1 flex">
-        <div className="flex-1 relative">
-          <MapContainer
-            center={mapCenter}
-            zoom={mapZoom}
-            className="h-full w-full"
-            style={{ minHeight: "400px" }}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <MapController center={mapCenter} zoom={mapZoom} />
-            
-            {selectedLocation && (
-              <Circle
-                center={[selectedLocation.lat, selectedLocation.lon]}
-                radius={1000}
-                pathOptions={{ color: "blue", fillColor: "blue", fillOpacity: 0.1 }}
-              />
-            )}
-
-            {isAgent && transactionsWithCoords.map((tx) => (
-              <Marker key={`tx-${tx.id}`} position={[tx.latitude!, tx.longitude!]} icon={transactionIcon}>
-                <Popup>
-                  <div className="p-2 min-w-[200px]">
-                    <h3 className="font-bold text-green-700">{tx.streetName}</h3>
-                    <p className="text-sm text-gray-600">{tx.city}, {tx.state} {tx.zipCode}</p>
-                    <Badge className="mt-2" variant={tx.status === "active" ? "default" : "secondary"}>{tx.status}</Badge>
-                    <p className="text-sm mt-2">{tx.type === "buy" ? "Purchase" : "Sale"}</p>
-                    {tx.contractPrice && <p className="text-sm font-medium">${tx.contractPrice.toLocaleString()}</p>}
+      <div className="absolute top-4 right-4 z-[1000] flex gap-2">
+        {isAgent && (
+          <Dialog open={showAddViewing} onOpenChange={setShowAddViewing}>
+            <DialogTrigger asChild>
+              <Button className="shadow-lg" data-testid="button-add-viewing">
+                <Plus className="h-4 w-4 mr-2" /> Add Viewing
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Schedule Property Viewing</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Client</Label>
+                  <Select value={String(newViewing.clientId)} onValueChange={(v) => setNewViewing({ ...newViewing, clientId: Number(v) })}>
+                    <SelectTrigger data-testid="select-client">
+                      <SelectValue placeholder="Select client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map(c => (
+                        <SelectItem key={c.id} value={String(c.id)}>{c.firstName} {c.lastName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Street Address</Label>
+                  <Input value={newViewing.address} onChange={e => setNewViewing({ ...newViewing, address: e.target.value })} placeholder="123 Main St" data-testid="input-address" />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <Label>City</Label>
+                    <Input value={newViewing.city} onChange={e => setNewViewing({ ...newViewing, city: e.target.value })} placeholder="City" data-testid="input-city" />
                   </div>
-                </Popup>
-              </Marker>
-            ))}
-
-            {viewingsWithCoords.map((viewing) => (
-              <Marker key={`v-${viewing.id}`} position={[viewing.latitude!, viewing.longitude!]} icon={viewingIcon}>
-                <Popup>
-                  <div className="p-2 min-w-[200px]">
-                    <h3 className="font-bold text-blue-700">{viewing.address}</h3>
-                    <p className="text-sm text-gray-600">{viewing.city}, {viewing.state}</p>
-                    <Badge className="mt-2">{viewing.status}</Badge>
-                    {viewing.notes && <p className="text-sm mt-2 text-gray-500">{viewing.notes}</p>}
-                    {!isAgent && (
-                      <Button size="sm" className="mt-2 w-full" onClick={() => { setSelectedViewing(viewing); setShowFeedbackDialog(true); }} data-testid={`button-feedback-${viewing.id}`}>
-                        <Star className="h-3 w-3 mr-1" /> Leave Feedback
-                      </Button>
-                    )}
+                  <div>
+                    <Label>State</Label>
+                    <Input value={newViewing.state} onChange={e => setNewViewing({ ...newViewing, state: e.target.value })} placeholder="TX" data-testid="input-state" />
                   </div>
-                </Popup>
-              </Marker>
-            ))}
-
-            {nearbySchools.map((school) => (
-              <Marker key={school.id} position={[school.lat, school.lon]} icon={schoolIcon}>
-                <Popup>
-                  <div className="p-2">
-                    <h3 className="font-bold">{school.name}</h3>
-                    <p className="text-sm text-gray-600">School</p>
-                    {school.distance && <p className="text-sm">{formatDistance(school.distance)}</p>}
+                  <div>
+                    <Label>Zip</Label>
+                    <Input value={newViewing.zipCode} onChange={e => setNewViewing({ ...newViewing, zipCode: e.target.value })} placeholder="12345" data-testid="input-zip" />
                   </div>
-                </Popup>
-              </Marker>
-            ))}
-          </MapContainer>
+                </div>
+                <div>
+                  <Label>Notes</Label>
+                  <Textarea value={newViewing.notes} onChange={e => setNewViewing({ ...newViewing, notes: e.target.value })} placeholder="Any notes about this property..." data-testid="input-notes" />
+                </div>
+                <Button onClick={() => createViewingMutation.mutate(newViewing)} disabled={createViewingMutation.isPending || !newViewing.clientId || !newViewing.address} className="w-full" data-testid="button-submit-viewing">
+                  {createViewingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Schedule Viewing
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+        <Button variant="outline" className="shadow-lg bg-background" onClick={() => setSidebarOpen(!sidebarOpen)} data-testid="button-toggle-sidebar">
+          {sidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+        </Button>
+      </div>
+
+      <MapContainer
+        center={mapCenter}
+        zoom={mapZoom}
+        className="h-full w-full"
+        style={{ height: "100%", width: "100%" }}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <MapController center={mapCenter} zoom={mapZoom} />
+        
+        {selectedLocation && (
+          <Circle
+            center={[selectedLocation.lat, selectedLocation.lon]}
+            radius={1000}
+            pathOptions={{ color: "blue", fillColor: "blue", fillOpacity: 0.1 }}
+          />
+        )}
+
+        {isAgent && transactionsWithCoords.map((tx) => (
+          <Marker key={`tx-${tx.id}`} position={[tx.latitude!, tx.longitude!]} icon={transactionIcon}>
+            <Popup>
+              <div className="p-2 min-w-[200px]">
+                <h3 className="font-bold text-green-700">{tx.streetName}</h3>
+                <p className="text-sm text-gray-600">{tx.city}, {tx.state} {tx.zipCode}</p>
+                <Badge className="mt-2" variant={tx.status === "active" ? "default" : "secondary"}>{tx.status}</Badge>
+                <p className="text-sm mt-2">{tx.type === "buy" ? "Purchase" : "Sale"}</p>
+                {tx.contractPrice && <p className="text-sm font-medium">${tx.contractPrice.toLocaleString()}</p>}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+        {viewingsWithCoords.map((viewing) => (
+          <Marker key={`v-${viewing.id}`} position={[viewing.latitude!, viewing.longitude!]} icon={viewingIcon}>
+            <Popup>
+              <div className="p-2 min-w-[200px]">
+                <h3 className="font-bold text-blue-700">{viewing.address}</h3>
+                <p className="text-sm text-gray-600">{viewing.city}, {viewing.state}</p>
+                <Badge className="mt-2">{viewing.status}</Badge>
+                {viewing.notes && <p className="text-sm mt-2 text-gray-500">{viewing.notes}</p>}
+                {!isAgent && (
+                  <Button size="sm" className="mt-2 w-full" onClick={() => { setSelectedViewing(viewing); setShowFeedbackDialog(true); }} data-testid={`button-feedback-${viewing.id}`}>
+                    <Star className="h-3 w-3 mr-1" /> Leave Feedback
+                  </Button>
+                )}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+        {nearbySchools.map((school) => (
+          <Marker key={school.id} position={[school.lat, school.lon]} icon={schoolIcon}>
+            <Popup>
+              <div className="p-2">
+                <h3 className="font-bold">{school.name}</h3>
+                <p className="text-sm text-gray-600">School</p>
+                {school.distance && <p className="text-sm">{formatDistance(school.distance)}</p>}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+
+      <div className={`absolute top-0 right-0 h-full w-80 bg-background border-l shadow-xl z-[1001] transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="font-semibold">Properties</h2>
+          <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)} data-testid="button-close-sidebar">
+            <X className="h-4 w-4" />
+          </Button>
         </div>
-
-        <div className="w-80 border-l overflow-y-auto bg-background">
+        <div className="overflow-y-auto h-[calc(100%-60px)]">
           <Tabs defaultValue={isAgent ? "transactions" : "viewings"} className="w-full">
-            <TabsList className="w-full justify-start rounded-none border-b">
+            <TabsList className="w-full justify-start rounded-none border-b px-4">
               {isAgent && <TabsTrigger value="transactions">Transactions</TabsTrigger>}
               <TabsTrigger value="viewings">Viewings</TabsTrigger>
               {selectedLocation && <TabsTrigger value="nearby">Nearby</TabsTrigger>}
