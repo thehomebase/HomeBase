@@ -80,19 +80,26 @@ html {
   }
 }
 
-/* Override react-scheduler today indicator */
-/* Remove border from all date avatars by default */
-.MuiAvatar-root.MuiAvatar-circular {
-  background-color: transparent !important;
+/* Override react-scheduler month view - flatten all date avatars to plain text */
+.rs__month_view .MuiAvatar-root {
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
   border: none !important;
-  color: #000 !important;
+  font-size: inherit !important;
 }
 
-/* Only add black border for today's cell - targeting the colorDefault variant which is only used for today */
-.MuiAvatar-root.MuiAvatar-circular.MuiAvatar-colorDefault {
-  background-color: transparent !important;
-  border: 2px solid #000 !important;
-  color: #000 !important;
+/* Highlight today's cell with a subtle background */
+.rs__cell.rs__cell_today {
+  background-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Dark mode variant for today's cell */
+.dark .rs__cell.rs__cell_today {
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 
