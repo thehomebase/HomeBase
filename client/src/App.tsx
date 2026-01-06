@@ -38,14 +38,16 @@ import {
   Calculator,
   Book,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  Wrench
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import CalculatorsPage from "@/pages/calculators-page";
 import GlossaryPage from "./pages/glossary-page";
 import MessagesPage from "./pages/messages-page";
-import ClientPage from "@/pages/client-page"; // Import the new ClientPage component
+import ClientPage from "@/pages/client-page";
+import ContractorsPage from "@/pages/contractors-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -101,14 +103,24 @@ function Layout({ children }: { children: React.ReactNode }) {
                           </SidebarMenuButton>
                         </SidebarMenuItem>
                         {user?.role === "agent" && (
-                          <SidebarMenuItem>
-                            <SidebarMenuButton asChild tooltip="Data">
-                              <Link href="/data" className="flex items-center gap-2">
-                                <BarChart3 className="h-4 w-4" />
-                                {isSidebarOpen && <span>Data</span>}
-                              </Link>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
+                          <>
+                            <SidebarMenuItem>
+                              <SidebarMenuButton asChild tooltip="Data">
+                                <Link href="/data" className="flex items-center gap-2">
+                                  <BarChart3 className="h-4 w-4" />
+                                  {isSidebarOpen && <span>Data</span>}
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                              <SidebarMenuButton asChild tooltip="Contractors">
+                                <Link href="/contractors" className="flex items-center gap-2">
+                                  <Wrench className="h-4 w-4" />
+                                  {isSidebarOpen && <span>Contractors</span>}
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          </>
                         )}
                       </>
                     )}
@@ -227,6 +239,9 @@ function Router() {
           </Route>
           <Route path="/data">
             <ProtectedRoute path="/data" component={DataPage} />
+          </Route>
+          <Route path="/contractors">
+            <ProtectedRoute path="/contractors" component={ContractorsPage} />
           </Route>
           <Route path="/">
             <ProtectedRoute path="/" component={TransactionsPage} />

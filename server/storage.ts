@@ -14,10 +14,11 @@ interface StorageDocument {
 
 // Update Document type to use the imported one from schema.ts
 import {
-  users, transactions, checklists, messages, clients, documents,
+  users, transactions, checklists, messages, clients, documents, contractors, contractorReviews,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
+  type Contractor, type ContractorReview,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
-  type InsertDocument
+  type InsertDocument, type InsertContractor, type InsertContractorReview
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
@@ -71,6 +72,18 @@ export interface IStorage {
   createContact(data: any): Promise<any>;
   updateContact(id: number, data: Partial<any>): Promise<any>;
 
+  // Contractor operations
+  getContractors(agentId: number): Promise<Contractor[]>;
+  getAllContractors(): Promise<Contractor[]>;
+  getContractor(id: number): Promise<Contractor | undefined>;
+  createContractor(contractor: InsertContractor): Promise<Contractor>;
+  updateContractor(id: number, data: Partial<Contractor>): Promise<Contractor>;
+  deleteContractor(id: number): Promise<void>;
+
+  // Contractor review operations
+  getContractorReviews(contractorId: number): Promise<ContractorReview[]>;
+  createContractorReview(review: InsertContractorReview): Promise<ContractorReview>;
+  deleteContractorReview(id: number): Promise<void>;
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -1674,6 +1687,181 @@ export class DatabaseStorage implements IStorage {
       console.error('Error in updateUser:', error);
       throw error;
     }
+  }
+
+  // Contractor methods
+  async getContractors(agentId: number): Promise<Contractor[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM contractors WHERE agent_id = ${agentId} ORDER BY name
+      `);
+      return result.rows.map((row: any) => this.mapContractorRow(row));
+    } catch (error) {
+      console.error('Error in getContractors:', error);
+      throw error;
+    }
+  }
+
+  async getAllContractors(): Promise<Contractor[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM contractors ORDER BY name
+      `);
+      return result.rows.map((row: any) => this.mapContractorRow(row));
+    } catch (error) {
+      console.error('Error in getAllContractors:', error);
+      throw error;
+    }
+  }
+
+  async getContractor(id: number): Promise<Contractor | undefined> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM contractors WHERE id = ${id}
+      `);
+      if (!result.rows[0]) return undefined;
+      return this.mapContractorRow(result.rows[0] as any);
+    } catch (error) {
+      console.error('Error in getContractor:', error);
+      throw error;
+    }
+  }
+
+  async createContractor(contractor: InsertContractor): Promise<Contractor> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO contractors (
+          name, category, phone, email, website, address, city, state, zip_code,
+          description, google_maps_url, agent_id, agent_rating, agent_notes
+        ) VALUES (
+          ${contractor.name}, ${contractor.category}, ${contractor.phone || null},
+          ${contractor.email || null}, ${contractor.website || null}, ${contractor.address || null},
+          ${contractor.city || null}, ${contractor.state || null}, ${contractor.zipCode || null},
+          ${contractor.description || null}, ${contractor.googleMapsUrl || null},
+          ${contractor.agentId}, ${contractor.agentRating || null}, ${contractor.agentNotes || null}
+        )
+        RETURNING *
+      `);
+      return this.mapContractorRow(result.rows[0] as any);
+    } catch (error) {
+      console.error('Error in createContractor:', error);
+      throw error;
+    }
+  }
+
+  async updateContractor(id: number, data: Partial<Contractor>): Promise<Contractor> {
+    try {
+      const columns = Object.entries(data)
+        .filter(([key, value]) => value !== undefined && key !== 'id')
+        .map(([key, value]) => {
+          const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+          return sql`${sql.identifier([snakeKey])} = ${value}`;
+        });
+
+      if (columns.length === 0) {
+        const existing = await this.getContractor(id);
+        if (!existing) throw new Error('Contractor not found');
+        return existing;
+      }
+
+      const result = await db.execute(sql`
+        UPDATE contractors
+        SET ${sql.join(columns, sql`, `)}, updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      if (!result.rows[0]) {
+        throw new Error('Failed to update contractor');
+      }
+
+      return this.mapContractorRow(result.rows[0] as any);
+    } catch (error) {
+      console.error('Error in updateContractor:', error);
+      throw error;
+    }
+  }
+
+  async deleteContractor(id: number): Promise<void> {
+    try {
+      await db.execute(sql`DELETE FROM contractor_reviews WHERE contractor_id = ${id}`);
+      await db.execute(sql`DELETE FROM contractors WHERE id = ${id}`);
+    } catch (error) {
+      console.error('Error in deleteContractor:', error);
+      throw error;
+    }
+  }
+
+  async getContractorReviews(contractorId: number): Promise<ContractorReview[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM contractor_reviews WHERE contractor_id = ${contractorId} ORDER BY created_at DESC
+      `);
+      return result.rows.map((row: any) => ({
+        id: Number(row.id),
+        contractorId: Number(row.contractor_id),
+        reviewerName: String(row.reviewer_name),
+        rating: Number(row.rating),
+        comment: row.comment ? String(row.comment) : null,
+        createdAt: row.created_at ? new Date(row.created_at) : null
+      }));
+    } catch (error) {
+      console.error('Error in getContractorReviews:', error);
+      throw error;
+    }
+  }
+
+  async createContractorReview(review: InsertContractorReview): Promise<ContractorReview> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO contractor_reviews (contractor_id, reviewer_name, rating, comment)
+        VALUES (${review.contractorId}, ${review.reviewerName}, ${review.rating}, ${review.comment || null})
+        RETURNING *
+      `);
+      const row = result.rows[0] as any;
+      return {
+        id: Number(row.id),
+        contractorId: Number(row.contractor_id),
+        reviewerName: String(row.reviewer_name),
+        rating: Number(row.rating),
+        comment: row.comment ? String(row.comment) : null,
+        createdAt: row.created_at ? new Date(row.created_at) : null
+      };
+    } catch (error) {
+      console.error('Error in createContractorReview:', error);
+      throw error;
+    }
+  }
+
+  async deleteContractorReview(id: number): Promise<void> {
+    try {
+      await db.execute(sql`DELETE FROM contractor_reviews WHERE id = ${id}`);
+    } catch (error) {
+      console.error('Error in deleteContractorReview:', error);
+      throw error;
+    }
+  }
+
+  private mapContractorRow(row: any): Contractor {
+    return {
+      id: Number(row.id),
+      name: String(row.name),
+      category: String(row.category),
+      phone: row.phone ? String(row.phone) : null,
+      email: row.email ? String(row.email) : null,
+      website: row.website ? String(row.website) : null,
+      address: row.address ? String(row.address) : null,
+      city: row.city ? String(row.city) : null,
+      state: row.state ? String(row.state) : null,
+      zipCode: row.zip_code ? String(row.zip_code) : null,
+      description: row.description ? String(row.description) : null,
+      googleMapsUrl: row.google_maps_url ? String(row.google_maps_url) : null,
+      agentId: Number(row.agent_id),
+      agentRating: row.agent_rating ? Number(row.agent_rating) : null,
+      agentNotes: row.agent_notes ? String(row.agent_notes) : null,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null
+    };
   }
 
 }

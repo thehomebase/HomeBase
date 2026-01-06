@@ -105,6 +105,35 @@ export const documents = pgTable("documents", {
   clientId: integer("client_id")
 });
 
+export const contractors = pgTable("contractors", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  phone: text("phone"),
+  email: text("email"),
+  website: text("website"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  description: text("description"),
+  googleMapsUrl: text("google_maps_url"),
+  agentId: integer("agent_id").notNull(),
+  agentRating: integer("agent_rating"),
+  agentNotes: text("agent_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+export const contractorReviews = pgTable("contractor_reviews", {
+  id: serial("id").primaryKey(),
+  contractorId: integer("contractor_id").notNull(),
+  reviewerName: text("reviewer_name").notNull(),
+  rating: integer("rating").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
 const checklistItemSchema = z.object({
   id: z.string(),
   text: z.string(),
@@ -149,6 +178,15 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({
   createdAt: true,
   updatedAt: true 
 });
+export const insertContractorSchema = createInsertSchema(contractors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+export const insertContractorReviewSchema = createInsertSchema(contractorReviews).omit({
+  id: true,
+  createdAt: true
+});
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertClient = z.infer<typeof insertClientSchema>;
@@ -156,6 +194,8 @@ export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type InsertChecklist = z.infer<typeof insertChecklistSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type InsertContractor = z.infer<typeof insertContractorSchema>;
+export type InsertContractorReview = z.infer<typeof insertContractorReviewSchema>;
 
 export type User = typeof users.$inferSelect;
 export type Client = typeof clients.$inferSelect;
@@ -163,3 +203,5 @@ export type Transaction = typeof transactions.$inferSelect;
 export type Checklist = typeof checklists.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Document = typeof documents.$inferSelect;
+export type Contractor = typeof contractors.$inferSelect;
+export type ContractorReview = typeof contractorReviews.$inferSelect;

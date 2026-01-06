@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema } from "@shared/schema";
 import ical from "ical-generator";
 
 // Seller checklist items
@@ -704,6 +704,171 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error generating calendar feed:', error);
       res.status(500).json({ error: 'Failed to generate calendar feed' });
+    }
+  });
+
+  // Contractors
+  app.get("/api/contractors", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const contractors = await storage.getAllContractors();
+      res.json(contractors);
+    } catch (error) {
+      console.error('Error fetching contractors:', error);
+      res.status(500).json({ error: 'Failed to fetch contractors' });
+    }
+  });
+
+  app.get("/api/contractors/my", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const contractors = await storage.getContractors(req.user.id);
+      res.json(contractors);
+    } catch (error) {
+      console.error('Error fetching my contractors:', error);
+      res.status(500).json({ error: 'Failed to fetch contractors' });
+    }
+  });
+
+  app.get("/api/contractors/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const contractor = await storage.getContractor(Number(req.params.id));
+      if (!contractor) {
+        return res.status(404).json({ error: 'Contractor not found' });
+      }
+      res.json(contractor);
+    } catch (error) {
+      console.error('Error fetching contractor:', error);
+      res.status(500).json({ error: 'Failed to fetch contractor' });
+    }
+  });
+
+  app.post("/api/contractors", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const parsed = insertContractorSchema.safeParse({
+        ...req.body,
+        agentId: req.user.id
+      });
+      if (!parsed.success) {
+        return res.status(400).json(parsed.error);
+      }
+      const contractor = await storage.createContractor(parsed.data);
+      res.status(201).json(contractor);
+    } catch (error) {
+      console.error('Error creating contractor:', error);
+      res.status(500).json({ error: 'Failed to create contractor' });
+    }
+  });
+
+  app.patch("/api/contractors/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const contractor = await storage.getContractor(Number(req.params.id));
+      if (!contractor) {
+        return res.status(404).json({ error: 'Contractor not found' });
+      }
+      if (contractor.agentId !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized to edit this contractor' });
+      }
+      
+      const allowedFields = ['name', 'category', 'phone', 'email', 'website', 'address', 
+        'city', 'state', 'zipCode', 'description', 'googleMapsUrl', 'agentRating', 'agentNotes'];
+      const sanitizedData: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          sanitizedData[field] = req.body[field];
+        }
+      }
+      
+      const updated = await storage.updateContractor(Number(req.params.id), sanitizedData);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating contractor:', error);
+      res.status(500).json({ error: 'Failed to update contractor' });
+    }
+  });
+
+  app.delete("/api/contractors/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const contractor = await storage.getContractor(Number(req.params.id));
+      if (!contractor) {
+        return res.status(404).json({ error: 'Contractor not found' });
+      }
+      if (contractor.agentId !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized to delete this contractor' });
+      }
+      await storage.deleteContractor(Number(req.params.id));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting contractor:', error);
+      res.status(500).json({ error: 'Failed to delete contractor' });
+    }
+  });
+
+  // Contractor Reviews
+  app.get("/api/contractors/:id/reviews", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const reviews = await storage.getContractorReviews(Number(req.params.id));
+      res.json(reviews);
+    } catch (error) {
+      console.error('Error fetching contractor reviews:', error);
+      res.status(500).json({ error: 'Failed to fetch reviews' });
+    }
+  });
+
+  app.post("/api/contractors/:id/reviews", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const contractorId = Number(req.params.id);
+      const contractor = await storage.getContractor(contractorId);
+      if (!contractor) {
+        return res.status(404).json({ error: 'Contractor not found' });
+      }
+      
+      const reviewData = {
+        contractorId,
+        reviewerName: req.body.reviewerName,
+        rating: Math.min(5, Math.max(1, Number(req.body.rating) || 5)),
+        comment: req.body.comment || null
+      };
+      
+      const parsed = insertContractorReviewSchema.safeParse(reviewData);
+      if (!parsed.success) {
+        return res.status(400).json(parsed.error);
+      }
+      const review = await storage.createContractorReview(parsed.data);
+      res.status(201).json(review);
+    } catch (error) {
+      console.error('Error creating review:', error);
+      res.status(500).json({ error: 'Failed to create review' });
+    }
+  });
+
+  app.delete("/api/contractors/:contractorId/reviews/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      await storage.deleteContractorReview(Number(req.params.id));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting review:', error);
+      res.status(500).json({ error: 'Failed to delete review' });
     }
   });
 
