@@ -80,9 +80,16 @@ html {
   }
 }
 
-/* Override react-scheduler today indicator - target the MuiAvatar used for today's date */
-/* The library uses MuiAvatar with colorDefault variant only for today */
-.MuiAvatar-colorDefault {
+/* Override react-scheduler today indicator */
+/* Remove border from all date avatars by default */
+.MuiAvatar-root.MuiAvatar-circular {
+  background-color: transparent !important;
+  border: none !important;
+  color: #000 !important;
+}
+
+/* Only add black border for today's cell - targeting the colorDefault variant which is only used for today */
+.MuiAvatar-root.MuiAvatar-circular.MuiAvatar-colorDefault {
   background-color: transparent !important;
   border: 2px solid #000 !important;
   color: #000 !important;
