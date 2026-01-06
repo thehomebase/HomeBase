@@ -696,7 +696,7 @@ export default function ClientsPage() {
             {user?.role === "agent" && (
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="whitespace-nowrap">
+                  <Button className="whitespace-nowrap font-bold">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Client
                   </Button>
@@ -818,7 +818,7 @@ export default function ClientsPage() {
                           </FormItem>
                         )}
                       />
-                      <Button type="submit" disabled={createClientMutation.isPending}>
+                      <Button type="submit" disabled={createClientMutation.isPending} className="font-bold">
                         {createClientMutation.isPending ? "Creating..." : "Add Client"}
                       </Button>
                     </form>

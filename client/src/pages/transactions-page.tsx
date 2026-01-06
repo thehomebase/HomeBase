@@ -324,7 +324,7 @@ export default function TransactionsPage() {
             {user?.role === "agent" && (
               <Dialog open={showNewTransactionDialog} onOpenChange={setShowNewTransactionDialog}>
                 <DialogTrigger asChild>
-                  <Button className="whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 dark:text-black dark:bg-white">
+                  <Button className="whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 dark:text-black dark:bg-white font-bold">
                     <Plus className="h-4 w-4 mr-2" />
                     New Transaction
                   </Button>
