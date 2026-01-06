@@ -421,8 +421,8 @@ export default function MapPage() {
       <MapContainer
         center={mapCenter}
         zoom={mapZoom}
-        className="h-full w-full"
-        style={{ height: "100%", width: "100%" }}
+        className="absolute inset-0"
+        style={{ height: "100vh", width: "100%" }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
