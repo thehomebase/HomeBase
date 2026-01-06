@@ -264,6 +264,63 @@ export default function TransactionsPage() {
             Your Transactions
           </h2>
           <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
+              <Toggle
+                pressed={view === "list"}
+                onPressedChange={() => setView("list")}
+                aria-label="List view"
+                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
+              >
+                <List className="h-4" />
+              </Toggle>
+              <Toggle
+                pressed={view === "board"}
+                onPressedChange={() => setView("board")}
+                aria-label="Board view"
+                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Toggle>
+              <Toggle
+                pressed={view === "table"}
+                onPressedChange={() => setView("table")}
+                aria-label="Table view"
+                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
+              >
+                <Table2 className="h-4 w-4" />
+              </Toggle>
+            </div>
+            <Toggle
+              pressed={theme === "dark"}
+              onPressedChange={toggleTheme}
+              aria-label="Toggle theme"
+              className="hover:text-foreground dark:text-white dark:hover:text-white"
+            >
+              {theme === "light" ? (
+                <Moon className="h-4 w-4" />
+              ) : (
+                <Sun className="h-4 w-4" />
+              )}
+            </Toggle>
+            <select
+              className="w-20 h-9 px-2 rounded-md border text-base bg-background"
+              value={selectedYear || ""}
+              onChange={(e) =>
+                setSelectedYear(
+                  e.target.value ? parseInt(e.target.value, 10) : null,
+                )
+              }
+            >
+              <option value="">{new Date().getFullYear()}</option>
+              {Array.from(
+                { length: 10 },
+                (_, i) => new Date().getFullYear() - i,
+              ).map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
             {user?.role === "agent" && (
               <Dialog open={showNewTransactionDialog} onOpenChange={setShowNewTransactionDialog}>
                 <DialogTrigger asChild>
@@ -457,63 +514,6 @@ export default function TransactionsPage() {
                 </DialogContent>
               </Dialog>
             )}
-            <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
-              <Toggle
-                pressed={view === "list"}
-                onPressedChange={() => setView("list")}
-                aria-label="List view"
-                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
-              >
-                <List className="h-4" />
-              </Toggle>
-              <Toggle
-                pressed={view === "board"}
-                onPressedChange={() => setView("board")}
-                aria-label="Board view"
-                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </Toggle>
-              <Toggle
-                pressed={view === "table"}
-                onPressedChange={() => setView("table")}
-                aria-label="Table view"
-                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
-              >
-                <Table2 className="h-4 w-4" />
-              </Toggle>
-            </div>
-            <Toggle
-              pressed={theme === "dark"}
-              onPressedChange={toggleTheme}
-              aria-label="Toggle theme"
-              className="hover:text-foreground dark:text-white dark:hover:text-white"
-            >
-              {theme === "light" ? (
-                <Moon className="h-4 w-4" />
-              ) : (
-                <Sun className="h-4 w-4" />
-              )}
-            </Toggle>
-            <select
-              className="w-20 h-9 px-2 rounded-md border text-base bg-background"
-              value={selectedYear || ""}
-              onChange={(e) =>
-                setSelectedYear(
-                  e.target.value ? parseInt(e.target.value, 10) : null,
-                )
-              }
-            >
-              <option value="">{new Date().getFullYear()}</option>
-              {Array.from(
-                { length: 10 },
-                (_, i) => new Date().getFullYear() - i,
-              ).map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
         
