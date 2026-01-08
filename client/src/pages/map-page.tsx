@@ -273,11 +273,11 @@ export default function MapPage() {
   }, [transactionsWithCoords.length, viewingsWithCoords.length]);
 
   return (
-    <div className="relative h-full w-full min-h-0">
+    <div style={{ position: "fixed", top: 0, left: "60px", right: 0, bottom: 0 }}>
       <MapContainer
         center={mapCenter}
         zoom={mapZoom}
-        className="h-full w-full"
+        style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -334,7 +334,7 @@ export default function MapPage() {
         ))}
       </MapContainer>
 
-      <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
+      <div className="absolute top-4 z-[1000] flex flex-col gap-2" style={{ left: "180px" }}>
         <div className="flex gap-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
