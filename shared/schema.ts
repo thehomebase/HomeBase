@@ -167,6 +167,19 @@ export const propertyFeedback = pgTable("property_feedback", {
   updatedAt: timestamp("updated_at").defaultNow()
 });
 
+export const showingRequests = pgTable("showing_requests", {
+  id: serial("id").primaryKey(),
+  viewingId: integer("viewing_id").notNull(),
+  requesterId: integer("requester_id").notNull(),
+  recipientId: integer("recipient_id").notNull(),
+  requestedDate: timestamp("requested_date").notNull(),
+  status: text("status").notNull().default("pending"),
+  notes: text("notes"),
+  responseNotes: text("response_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
 const checklistItemSchema = z.object({
   id: z.string(),
   text: z.string(),
@@ -230,6 +243,11 @@ export const insertPropertyFeedbackSchema = createInsertSchema(propertyFeedback)
   createdAt: true,
   updatedAt: true
 });
+export const insertShowingRequestSchema = createInsertSchema(showingRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertClient = z.infer<typeof insertClientSchema>;
@@ -250,5 +268,7 @@ export type Contractor = typeof contractors.$inferSelect;
 export type ContractorReview = typeof contractorReviews.$inferSelect;
 export type PropertyViewing = typeof propertyViewings.$inferSelect;
 export type PropertyFeedback = typeof propertyFeedback.$inferSelect;
+export type ShowingRequest = typeof showingRequests.$inferSelect;
 export type InsertPropertyViewing = z.infer<typeof insertPropertyViewingSchema>;
 export type InsertPropertyFeedback = z.infer<typeof insertPropertyFeedbackSchema>;
+export type InsertShowingRequest = z.infer<typeof insertShowingRequestSchema>;
