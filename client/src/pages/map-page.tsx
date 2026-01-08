@@ -273,11 +273,10 @@ export default function MapPage() {
   }, [transactionsWithCoords.length, viewingsWithCoords.length]);
 
   return (
-    <div className="h-full w-full relative" style={{ minHeight: "500px" }}>
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, marginLeft: "60px" }}>
       <MapContainer
         center={mapCenter}
         zoom={mapZoom}
-        className="absolute inset-0"
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
