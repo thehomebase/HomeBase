@@ -273,7 +273,7 @@ export default function MapPage() {
   }, [transactionsWithCoords.length, viewingsWithCoords.length]);
 
   return (
-    <div className="absolute inset-0">
+    <div style={{ height: "100vh", width: "100%", position: "relative" }}>
       <MapContainer
         center={mapCenter}
         zoom={mapZoom}
@@ -334,7 +334,7 @@ export default function MapPage() {
         ))}
       </MapContainer>
 
-      <div className="absolute top-4 left-8 z-[1000] flex flex-col gap-2">
+      <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
         <div className="flex gap-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
