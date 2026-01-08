@@ -273,11 +273,11 @@ export default function MapPage() {
   }, [transactionsWithCoords.length, viewingsWithCoords.length]);
 
   return (
-    <div style={{ height: "100vh", width: "100%", position: "relative" }}>
+    <div className="relative h-full w-full min-h-0">
       <MapContainer
         center={mapCenter}
         zoom={mapZoom}
-        style={{ height: "100%", width: "100%" }}
+        className="h-full w-full"
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
