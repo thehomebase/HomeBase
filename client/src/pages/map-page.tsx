@@ -273,7 +273,7 @@ export default function MapPage() {
   }, [transactionsWithCoords.length, viewingsWithCoords.length]);
 
   return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, marginLeft: "60px" }}>
+    <div className="absolute inset-0">
       <MapContainer
         center={mapCenter}
         zoom={mapZoom}
