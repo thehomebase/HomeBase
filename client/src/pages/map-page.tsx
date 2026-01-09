@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw, PanelRightClose, PanelRightOpen, X, Calendar, Clock, Bell, Check, XCircle, Route, Navigation, Square, CheckSquare, Edit2, Trash2, Ban, CheckCircle } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw, PanelRightClose, PanelRightOpen, X, Calendar, Clock, Bell, Check, XCircle, Route, Navigation, Square, CheckSquare, Edit2, Trash2, Ban, CheckCircle, MoreVertical } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -583,63 +584,62 @@ export default function MapPage() {
                   </div>
                 )}
                 {isAgent && (
-                  <div className="flex flex-col gap-1 mt-3">
-                    <div className="flex gap-1">
-                      {viewing.status !== "approved" && (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="flex-1 text-green-600 border-green-200 hover:bg-green-50"
-                          onClick={() => updateViewingMutation.mutate({ id: viewing.id, data: { status: "approved" } })}
-                          data-testid={`button-popup-approve-${viewing.id}`}
-                        >
-                          <CheckCircle className="h-3 w-3 mr-1" /> Approve
-                        </Button>
-                      )}
+                  <div className="flex items-center gap-2 mt-3">
+                    {viewing.status !== "approved" && (
                       <Button 
                         size="sm" 
                         variant="outline" 
-                        className="flex-1"
-                        onClick={() => {
-                          setRescheduleViewing(viewing);
-                          if (viewing.scheduledDate) {
-                            const date = new Date(viewing.scheduledDate);
-                            setRescheduleDate(date.toISOString().split('T')[0]);
-                            setRescheduleTime(date.toTimeString().slice(0, 5));
-                          }
-                          setShowRescheduleDialog(true);
-                        }}
-                        data-testid={`button-popup-reschedule-${viewing.id}`}
+                        className="flex-1 text-green-600 border-green-200 hover:bg-green-50"
+                        onClick={() => updateViewingMutation.mutate({ id: viewing.id, data: { status: "approved" } })}
+                        data-testid={`button-popup-approve-${viewing.id}`}
                       >
-                        <Edit2 className="h-3 w-3 mr-1" /> Reschedule
+                        <CheckCircle className="h-3 w-3 mr-1" /> Approve
                       </Button>
-                    </div>
-                    <div className="flex gap-1">
-                      {viewing.status !== "cancelled" && (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="flex-1 text-orange-600 border-orange-200 hover:bg-orange-50"
-                          onClick={() => updateViewingMutation.mutate({ id: viewing.id, data: { status: "cancelled" } })}
-                          data-testid={`button-popup-cancel-${viewing.id}`}
-                        >
-                          <Ban className="h-3 w-3 mr-1" /> Cancel
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="outline" className="flex-1" data-testid={`button-popup-actions-${viewing.id}`}>
+                          <MoreVertical className="h-3 w-3 mr-1" /> Actions
                         </Button>
-                      )}
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
-                        onClick={() => {
-                          if (confirm("Are you sure you want to delete this property?")) {
-                            deleteViewingMutation.mutate(viewing.id);
-                          }
-                        }}
-                        data-testid={`button-popup-delete-${viewing.id}`}
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" /> Delete
-                      </Button>
-                    </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem 
+                          onClick={() => {
+                            setRescheduleViewing(viewing);
+                            if (viewing.scheduledDate) {
+                              const date = new Date(viewing.scheduledDate);
+                              setRescheduleDate(date.toISOString().split('T')[0]);
+                              setRescheduleTime(date.toTimeString().slice(0, 5));
+                            }
+                            setShowRescheduleDialog(true);
+                          }}
+                          data-testid={`menu-popup-reschedule-${viewing.id}`}
+                        >
+                          <Edit2 className="h-4 w-4 mr-2" /> Reschedule
+                        </DropdownMenuItem>
+                        {viewing.status !== "cancelled" && (
+                          <DropdownMenuItem 
+                            onClick={() => updateViewingMutation.mutate({ id: viewing.id, data: { status: "cancelled" } })}
+                            className="text-orange-600"
+                            data-testid={`menu-popup-cancel-${viewing.id}`}
+                          >
+                            <Ban className="h-4 w-4 mr-2" /> Cancel
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => {
+                            if (confirm("Are you sure you want to delete this property?")) {
+                              deleteViewingMutation.mutate(viewing.id);
+                            }
+                          }}
+                          className="text-red-600"
+                          data-testid={`menu-popup-delete-${viewing.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 )}
               </div>
@@ -987,12 +987,12 @@ export default function MapPage() {
                         )}
                       </div>
                       {isAgent && !routePlanningMode && (
-                        <div className="flex items-center gap-1 mt-2 pt-2 border-t">
+                        <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t">
                           {viewing.status !== "approved" && (
                             <Button 
                               size="sm" 
-                              variant="ghost" 
-                              className="h-7 text-xs text-green-600 hover:text-green-700 hover:bg-green-50"
+                              variant="outline" 
+                              className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50"
                               onClick={(e) => { e.stopPropagation(); updateViewingMutation.mutate({ id: viewing.id, data: { status: "approved" } }); }}
                               disabled={updateViewingMutation.isPending}
                               data-testid={`button-approve-${viewing.id}`}
@@ -1000,51 +1000,50 @@ export default function MapPage() {
                               <CheckCircle className="h-3 w-3 mr-1" /> Approve
                             </Button>
                           )}
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 text-xs"
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              setRescheduleViewing(viewing);
-                              if (viewing.scheduledDate) {
-                                const date = new Date(viewing.scheduledDate);
-                                setRescheduleDate(date.toISOString().split('T')[0]);
-                                setRescheduleTime(date.toTimeString().slice(0, 5));
-                              }
-                              setShowRescheduleDialog(true);
-                            }}
-                            data-testid={`button-reschedule-${viewing.id}`}
-                          >
-                            <Edit2 className="h-3 w-3 mr-1" /> Reschedule
-                          </Button>
-                          {viewing.status !== "cancelled" && (
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="h-7 text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                              onClick={(e) => { e.stopPropagation(); updateViewingMutation.mutate({ id: viewing.id, data: { status: "cancelled" } }); }}
-                              disabled={updateViewingMutation.isPending}
-                              data-testid={`button-cancel-${viewing.id}`}
-                            >
-                              <Ban className="h-3 w-3 mr-1" /> Cancel
-                            </Button>
-                          )}
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              if (confirm("Are you sure you want to delete this property?")) {
-                                deleteViewingMutation.mutate(viewing.id);
-                              }
-                            }}
-                            disabled={deleteViewingMutation.isPending}
-                            data-testid={`button-delete-${viewing.id}`}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" data-testid={`button-viewing-actions-${viewing.id}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  setRescheduleViewing(viewing);
+                                  if (viewing.scheduledDate) {
+                                    const date = new Date(viewing.scheduledDate);
+                                    setRescheduleDate(date.toISOString().split('T')[0]);
+                                    setRescheduleTime(date.toTimeString().slice(0, 5));
+                                  }
+                                  setShowRescheduleDialog(true);
+                                }}
+                                data-testid={`menu-reschedule-${viewing.id}`}
+                              >
+                                <Edit2 className="h-4 w-4 mr-2" /> Reschedule
+                              </DropdownMenuItem>
+                              {viewing.status !== "cancelled" && (
+                                <DropdownMenuItem 
+                                  onClick={() => updateViewingMutation.mutate({ id: viewing.id, data: { status: "cancelled" } })}
+                                  className="text-orange-600"
+                                  data-testid={`menu-cancel-${viewing.id}`}
+                                >
+                                  <Ban className="h-4 w-4 mr-2" /> Cancel
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  if (confirm("Are you sure you want to delete this property?")) {
+                                    deleteViewingMutation.mutate(viewing.id);
+                                  }
+                                }}
+                                className="text-red-600"
+                                data-testid={`menu-delete-${viewing.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       )}
                     </Card>
