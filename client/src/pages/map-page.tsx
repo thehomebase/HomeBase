@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, Circle, GeoJSON } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw, PanelRightClose, PanelRightOpen, X, Calendar, Clock, Bell, Check, XCircle } from "lucide-react";
+import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw, PanelRightClose, PanelRightOpen, X, Calendar, Clock, Bell, Check, XCircle, Route, Navigation, Square, CheckSquare } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -122,6 +122,17 @@ export default function MapPage() {
   const [requestTime, setRequestTime] = useState("");
   const [requestNotes, setRequestNotes] = useState("");
   const [showRequestsPanel, setShowRequestsPanel] = useState(false);
+
+  // Route planning state
+  const [routePlanningMode, setRoutePlanningMode] = useState(false);
+  const [selectedForRoute, setSelectedForRoute] = useState<Set<number>>(new Set());
+  const [routeData, setRouteData] = useState<{
+    optimized: boolean;
+    waypoints: Array<{ lat: number; lon: number; order: number; address?: string; id?: number }>;
+    geometry: any;
+    totalDistance: number;
+    totalDuration: number;
+  } | null>(null);
 
   const { data: transactions = [], isLoading: loadingTransactions } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -259,6 +270,79 @@ export default function MapPage() {
       toast({ title: "Failed to respond", description: "Could not update the request", variant: "destructive" });
     }
   });
+
+  const planRouteMutation = useMutation({
+    mutationFn: async (coordinates: Array<{ lat: number; lon: number; id: number; address: string }>) => {
+      const res = await apiRequest("POST", "/api/route-plan", { coordinates });
+      return res.json();
+    },
+    onSuccess: (data, variables) => {
+      const waypointsWithInfo = data.waypoints.map((wp: any, idx: number) => {
+        const original = variables.find((v: any) => 
+          Math.abs(v.lat - wp.lat) < 0.0001 && Math.abs(v.lon - wp.lon) < 0.0001
+        );
+        return {
+          ...wp,
+          address: original?.address || `Stop ${idx + 1}`,
+          id: original?.id
+        };
+      });
+      setRouteData({ ...data, waypoints: waypointsWithInfo });
+      toast({ 
+        title: data.optimized ? "Route optimized" : "Route planned",
+        description: `${waypointsWithInfo.length} stops, ${formatRouteDuration(data.totalDuration)}, ${formatRouteDistance(data.totalDistance)}`
+      });
+    },
+    onError: () => {
+      toast({ title: "Route planning failed", description: "Could not calculate route. Try fewer stops or check connectivity.", variant: "destructive" });
+    }
+  });
+
+  const formatRouteDistance = (meters: number) => {
+    const miles = meters / 1609.34;
+    return miles < 1 ? `${Math.round(meters)} m` : `${miles.toFixed(1)} mi`;
+  };
+
+  const formatRouteDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.round((seconds % 3600) / 60);
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins} min`;
+  };
+
+  const toggleRouteSelection = (viewingId: number) => {
+    const newSet = new Set(selectedForRoute);
+    if (newSet.has(viewingId)) {
+      newSet.delete(viewingId);
+    } else {
+      if (newSet.size < 10) {
+        newSet.add(viewingId);
+      } else {
+        toast({ title: "Limit reached", description: "Maximum 10 stops allowed", variant: "destructive" });
+      }
+    }
+    setSelectedForRoute(newSet);
+  };
+
+  const planRoute = () => {
+    const selectedViewings = viewingsWithCoords.filter(v => selectedForRoute.has(v.id));
+    if (selectedViewings.length < 2) {
+      toast({ title: "Not enough stops", description: "Select at least 2 properties to plan a route", variant: "destructive" });
+      return;
+    }
+    const coords = selectedViewings.map(v => ({
+      lat: v.latitude!,
+      lon: v.longitude!,
+      id: v.id,
+      address: v.address
+    }));
+    planRouteMutation.mutate(coords);
+  };
+
+  const clearRoute = () => {
+    setRouteData(null);
+    setSelectedForRoute(new Set());
+    setRoutePlanningMode(false);
+  };
 
   const searchAddress = async () => {
     if (!searchQuery.trim()) return;
@@ -427,6 +511,14 @@ export default function MapPage() {
             </Popup>
           </Marker>
         ))}
+        
+        {routeData?.geometry && (
+          <GeoJSON 
+            key={JSON.stringify(routeData.geometry)} 
+            data={routeData.geometry} 
+            style={{ color: "#2563eb", weight: 4, opacity: 0.8 }} 
+          />
+        )}
       </MapContainer>
 
       <div className="absolute top-4 z-[1000] flex flex-col gap-2" style={{ left: "180px" }}>
@@ -486,6 +578,37 @@ export default function MapPage() {
       </div>
 
       <div className="absolute top-4 right-4 z-[1000] flex gap-2">
+        {isAgent && !routePlanningMode && viewingsWithCoords.length >= 2 && (
+          <Button 
+            variant="outline" 
+            className="shadow-lg bg-background" 
+            onClick={() => setRoutePlanningMode(true)}
+            data-testid="button-plan-route"
+          >
+            <Route className="h-4 w-4 mr-2" /> Plan Route
+          </Button>
+        )}
+        {isAgent && routePlanningMode && (
+          <div className="flex gap-2">
+            <Button 
+              onClick={planRoute} 
+              disabled={selectedForRoute.size < 2 || planRouteMutation.isPending}
+              className="shadow-lg"
+              data-testid="button-calculate-route"
+            >
+              {planRouteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Navigation className="h-4 w-4 mr-2" />}
+              Calculate ({selectedForRoute.size})
+            </Button>
+            <Button 
+              variant="outline" 
+              className="shadow-lg bg-background" 
+              onClick={clearRoute}
+              data-testid="button-cancel-route"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
         {isAgent && (
           <Dialog open={showAddViewing} onOpenChange={setShowAddViewing}>
             <DialogTrigger asChild>
@@ -640,10 +763,37 @@ export default function MapPage() {
               ) : (
                 <div className="space-y-2">
                   {viewings.map((viewing) => (
-                    <Card key={viewing.id} className="p-3 cursor-pointer hover:bg-muted/50" onClick={() => { if (viewing.latitude && viewing.longitude) { setMapCenter([viewing.latitude, viewing.longitude]); setMapZoom(15); setSelectedViewing(viewing); } }}>
+                    <Card 
+                      key={viewing.id} 
+                      className={`p-3 cursor-pointer hover:bg-muted/50 ${routePlanningMode && selectedForRoute.has(viewing.id) ? 'ring-2 ring-primary bg-primary/5' : ''}`} 
+                      onClick={() => { 
+                        if (routePlanningMode && viewing.latitude && viewing.longitude) {
+                          toggleRouteSelection(viewing.id);
+                        } else if (viewing.latitude && viewing.longitude) { 
+                          setMapCenter([viewing.latitude, viewing.longitude]); 
+                          setMapZoom(15); 
+                          setSelectedViewing(viewing); 
+                        } 
+                      }}
+                    >
                       <div className="flex justify-between items-start">
-                        <div><h4 className="font-medium text-sm">{viewing.address}</h4><p className="text-xs text-muted-foreground">{viewing.city}, {viewing.state}</p><Badge variant="secondary" className="mt-1 text-xs">{viewing.status}</Badge></div>
-                        {!isAgent && (<Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedViewing(viewing); setShowFeedbackDialog(true); }} data-testid={`button-rate-${viewing.id}`}><Star className="h-4 w-4" /></Button>)}
+                        <div className="flex items-start gap-2">
+                          {routePlanningMode && viewing.latitude && viewing.longitude && (
+                            <div className="mt-0.5">
+                              {selectedForRoute.has(viewing.id) ? (
+                                <CheckSquare className="h-4 w-4 text-primary" />
+                              ) : (
+                                <Square className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </div>
+                          )}
+                          <div>
+                            <h4 className="font-medium text-sm">{viewing.address}</h4>
+                            <p className="text-xs text-muted-foreground">{viewing.city}, {viewing.state}</p>
+                            <Badge variant="secondary" className="mt-1 text-xs">{viewing.status}</Badge>
+                          </div>
+                        </div>
+                        {!isAgent && !routePlanningMode && (<Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedViewing(viewing); setShowFeedbackDialog(true); }} data-testid={`button-rate-${viewing.id}`}><Star className="h-4 w-4" /></Button>)}
                       </div>
                     </Card>
                   ))}
@@ -673,6 +823,46 @@ export default function MapPage() {
           </Tabs>
         </div>
       </div>
+
+      {routeData && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-[1000] bg-background rounded-lg shadow-xl border p-4 max-w-lg w-full" style={{ marginLeft: "30px" }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Navigation className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold">
+                {routeData.optimized ? "Optimized Route" : "Planned Route"}
+              </h3>
+            </div>
+            <div className="flex items-center gap-3 text-sm">
+              <span className="flex items-center gap-1">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                {formatRouteDuration(routeData.totalDuration)}
+              </span>
+              <span className="flex items-center gap-1">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                {formatRouteDistance(routeData.totalDistance)}
+              </span>
+              <Button variant="ghost" size="sm" onClick={clearRoute}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {routeData.waypoints.map((wp, idx) => (
+              <div 
+                key={idx} 
+                className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer"
+                onClick={() => { setMapCenter([wp.lat, wp.lon]); setMapZoom(16); }}
+              >
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+                  {idx + 1}
+                </div>
+                <span className="text-sm truncate">{wp.address}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Dialog open={showFeedbackDialog} onOpenChange={setShowFeedbackDialog}>
         <DialogContent>
