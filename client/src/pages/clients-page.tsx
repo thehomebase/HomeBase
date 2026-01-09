@@ -330,15 +330,36 @@ const ClientDetailsPanel = ({
             <h3 className="text-sm font-medium">Additional Details</h3>
             <div className="grid gap-4">
               <div className="space-y-2">
-                <Label>Type</Label>
-                <select
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                  value={editingClient.type}
-                  onChange={(e) => handleUpdate('type', e.target.value)}
-                >
-                  <option value="seller">Seller</option>
-                  <option value="buyer">Buyer</option>
-                </select>
+                <Label>Type (select all that apply)</Label>
+                <div className="flex flex-col gap-2">
+                  {['seller', 'buyer', 'renter'].map((typeOption) => {
+                    const types = Array.isArray(editingClient.type) ? editingClient.type : [editingClient.type];
+                    const isChecked = types.includes(typeOption);
+                    return (
+                      <label key={typeOption} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const currentTypes = Array.isArray(editingClient.type) ? editingClient.type : [editingClient.type];
+                            let newTypes: string[];
+                            if (e.target.checked) {
+                              newTypes = [...currentTypes, typeOption];
+                            } else {
+                              newTypes = currentTypes.filter(t => t !== typeOption);
+                              if (newTypes.length === 0) {
+                                return;
+                              }
+                            }
+                            handleUpdate('type', newTypes);
+                          }}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-sm capitalize">{typeOption}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
@@ -563,20 +584,29 @@ const ClientTable = ({
     });
   };
 
-  const sellers = filterClients(clients.filter(client => client.type === 'seller'));
-  const buyers = filterClients(clients.filter(client => client.type === 'buyer'));
+  const getClientTypes = (client: Client) => {
+    return Array.isArray(client.type) ? client.type : [client.type];
+  };
+
+  const sellers = filterClients(clients.filter(client => getClientTypes(client).includes('seller')));
+  const buyers = filterClients(clients.filter(client => getClientTypes(client).includes('buyer')));
+  const renters = filterClients(clients.filter(client => getClientTypes(client).includes('renter')));
 
   return (
     <Tabs defaultValue="sellers" className="p-6">
-      <TabsList className="grid w-full grid-cols-2 mb-6">
+      <TabsList className="grid w-full grid-cols-3 mb-6">
         <TabsTrigger value="sellers">Sellers</TabsTrigger>
         <TabsTrigger value="buyers">Buyers</TabsTrigger>
+        <TabsTrigger value="renters">Renters</TabsTrigger>
       </TabsList>
       <TabsContent value="sellers">
         <TableContent clients={sellers} onUpdate={onUpdate} onDelete={onDelete} />
       </TabsContent>
       <TabsContent value="buyers">
         <TableContent clients={buyers} onUpdate={onUpdate} onDelete={onDelete} />
+      </TabsContent>
+      <TabsContent value="renters">
+        <TableContent clients={renters} onUpdate={onUpdate} onDelete={onDelete} />
       </TabsContent>
     </Tabs>
   );
@@ -662,7 +692,7 @@ export default function ClientsPage() {
       street: "",
       city: "",
       zipCode: "",
-      type: "seller",
+      type: ["seller"],
       status: "active",
       notes: "",
       agentId: user?.id || 0,
@@ -935,12 +965,37 @@ export default function ClientsPage() {
                         name="type"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Type</FormLabel>
+                            <FormLabel>Type (select all that apply)</FormLabel>
                             <FormControl>
-                              <select {...field}>
-                                <option value="seller">Seller</option>
-                                <option value="buyer">Buyer</option>
-                              </select>
+                              <div className="flex flex-col gap-2">
+                                {(['seller', 'buyer', 'renter'] as const).map((typeOption) => {
+                                  const types = Array.isArray(field.value) ? field.value : [field.value];
+                                  const isChecked = types.includes(typeOption);
+                                  return (
+                                    <label key={typeOption} className="flex items-center gap-2 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                          const currentTypes = Array.isArray(field.value) ? field.value : [field.value];
+                                          let newTypes: string[];
+                                          if (e.target.checked) {
+                                            newTypes = [...currentTypes, typeOption];
+                                          } else {
+                                            newTypes = currentTypes.filter(t => t !== typeOption);
+                                            if (newTypes.length === 0) {
+                                              return;
+                                            }
+                                          }
+                                          field.onChange(newTypes);
+                                        }}
+                                        className="rounded border-gray-300"
+                                      />
+                                      <span className="text-sm capitalize">{typeOption}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
