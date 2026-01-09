@@ -1204,6 +1204,92 @@ export function registerRoutes(app: Express): Server {
     //Existing register code here.
   });
 
+  // Showing request routes
+  app.get("/api/showing-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const requests = await storage.getShowingRequestsByUser(req.user.id);
+      res.json(requests);
+    } catch (error) {
+      console.error('Error fetching showing requests:', error);
+      res.status(500).json({ error: 'Failed to fetch showing requests' });
+    }
+  });
+
+  app.get("/api/showing-requests/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const request = await storage.getShowingRequest(Number(req.params.id));
+      if (!request) {
+        return res.status(404).json({ error: 'Showing request not found' });
+      }
+      if (request.requesterId !== req.user.id && request.recipientId !== req.user.id) {
+        return res.sendStatus(403);
+      }
+      res.json(request);
+    } catch (error) {
+      console.error('Error fetching showing request:', error);
+      res.status(500).json({ error: 'Failed to fetch showing request' });
+    }
+  });
+
+  app.post("/api/showing-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const requestData = {
+        ...req.body,
+        requesterId: req.user.id,
+        status: 'pending'
+      };
+      const request = await storage.createShowingRequest(requestData);
+      res.status(201).json(request);
+    } catch (error) {
+      console.error('Error creating showing request:', error);
+      res.status(500).json({ error: 'Failed to create showing request' });
+    }
+  });
+
+  app.patch("/api/showing-requests/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const request = await storage.getShowingRequest(Number(req.params.id));
+      if (!request) {
+        return res.status(404).json({ error: 'Showing request not found' });
+      }
+      if (request.requesterId !== req.user.id && request.recipientId !== req.user.id) {
+        return res.sendStatus(403);
+      }
+      const updated = await storage.updateShowingRequest(Number(req.params.id), req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating showing request:', error);
+      res.status(500).json({ error: 'Failed to update showing request' });
+    }
+  });
+
+  app.delete("/api/showing-requests/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const request = await storage.getShowingRequest(Number(req.params.id));
+      if (!request) {
+        return res.status(404).json({ error: 'Showing request not found' });
+      }
+      if (request.requesterId !== req.user.id) {
+        return res.sendStatus(403);
+      }
+      await storage.deleteShowingRequest(Number(req.params.id));
+      res.sendStatus(204);
+    } catch (error) {
+      console.error('Error deleting showing request:', error);
+      res.status(500).json({ error: 'Failed to delete showing request' });
+    }
+  });
+
   // Simple ping endpoint for health checks
   app.get("/ping", (req, res) => {
     res.json({ 
