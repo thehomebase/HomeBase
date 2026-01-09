@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw, PanelRightClose, PanelRightOpen, X, Calendar, Clock, Bell, Check, XCircle, Route, Navigation, Square, CheckSquare } from "lucide-react";
+import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw, PanelRightClose, PanelRightOpen, X, Calendar, Clock, Bell, Check, XCircle, Route, Navigation, Square, CheckSquare, Edit2, Trash2, Ban, CheckCircle } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -142,6 +142,12 @@ export default function MapPage() {
     totalDistance: number;
     totalDuration: number;
   } | null>(null);
+
+  // Viewing management state
+  const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
+  const [rescheduleViewing, setRescheduleViewing] = useState<PropertyViewing | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
 
   const { data: transactions = [], isLoading: loadingTransactions } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -304,6 +310,43 @@ export default function MapPage() {
     },
     onError: () => {
       toast({ title: "Route planning failed", description: "Could not calculate route. Try fewer stops or check connectivity.", variant: "destructive" });
+    }
+  });
+
+  const updateViewingMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { status?: string; scheduledDate?: string } }) => {
+      const res = await apiRequest("PATCH", `/api/viewings/${id}`, data);
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/viewings"] });
+      if (variables.data.status === "approved") {
+        toast({ title: "Property approved", description: "The property has been approved for showing" });
+      } else if (variables.data.status === "cancelled") {
+        toast({ title: "Property cancelled", description: "The property showing has been cancelled" });
+      } else if (variables.data.scheduledDate) {
+        toast({ title: "Property rescheduled", description: "The showing time has been updated" });
+        setShowRescheduleDialog(false);
+        setRescheduleViewing(null);
+        setRescheduleDate("");
+        setRescheduleTime("");
+      }
+    },
+    onError: () => {
+      toast({ title: "Update failed", description: "Could not update the property", variant: "destructive" });
+    }
+  });
+
+  const deleteViewingMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/viewings/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/viewings"] });
+      toast({ title: "Property deleted", description: "The property has been removed" });
+    },
+    onError: () => {
+      toast({ title: "Delete failed", description: "Could not delete the property", variant: "destructive" });
     }
   });
 
@@ -515,13 +558,22 @@ export default function MapPage() {
         {viewingsWithCoords.map((viewing) => (
           <Marker key={`v-${viewing.id}`} position={[viewing.latitude!, viewing.longitude!]} icon={viewingIcon}>
             <Popup>
-              <div className="p-2 min-w-[200px]">
+              <div className="p-2 min-w-[220px]">
                 <h3 className="font-bold text-blue-700">{viewing.address}</h3>
                 <p className="text-sm text-gray-600">{viewing.city}, {viewing.state}</p>
-                <Badge className="mt-2">{viewing.status}</Badge>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant={viewing.status === "approved" ? "default" : viewing.status === "cancelled" ? "destructive" : "secondary"}>
+                    {viewing.status}
+                  </Badge>
+                  {viewing.scheduledDate && (
+                    <span className="text-xs text-gray-500">
+                      {new Date(viewing.scheduledDate).toLocaleDateString()} {new Date(viewing.scheduledDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
                 {viewing.notes && <p className="text-sm mt-2 text-gray-500">{viewing.notes}</p>}
                 {!isAgent && (
-                  <div className="flex flex-col gap-1 mt-2">
+                  <div className="flex flex-col gap-1 mt-3">
                     <Button size="sm" className="w-full" onClick={() => { setRequestViewing(viewing); setShowRequestDialog(true); }} data-testid={`button-request-showing-${viewing.id}`}>
                       <Calendar className="h-3 w-3 mr-1" /> Request Showing
                     </Button>
@@ -531,9 +583,64 @@ export default function MapPage() {
                   </div>
                 )}
                 {isAgent && (
-                  <Button size="sm" className="mt-2 w-full" onClick={() => { setRequestViewing(viewing); setShowRequestDialog(true); }} data-testid={`button-request-showing-agent-${viewing.id}`}>
-                    <Calendar className="h-3 w-3 mr-1" /> Request Showing
-                  </Button>
+                  <div className="flex flex-col gap-1 mt-3">
+                    <div className="flex gap-1">
+                      {viewing.status !== "approved" && (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="flex-1 text-green-600 border-green-200 hover:bg-green-50"
+                          onClick={() => updateViewingMutation.mutate({ id: viewing.id, data: { status: "approved" } })}
+                          data-testid={`button-popup-approve-${viewing.id}`}
+                        >
+                          <CheckCircle className="h-3 w-3 mr-1" /> Approve
+                        </Button>
+                      )}
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => {
+                          setRescheduleViewing(viewing);
+                          if (viewing.scheduledDate) {
+                            const date = new Date(viewing.scheduledDate);
+                            setRescheduleDate(date.toISOString().split('T')[0]);
+                            setRescheduleTime(date.toTimeString().slice(0, 5));
+                          }
+                          setShowRescheduleDialog(true);
+                        }}
+                        data-testid={`button-popup-reschedule-${viewing.id}`}
+                      >
+                        <Edit2 className="h-3 w-3 mr-1" /> Reschedule
+                      </Button>
+                    </div>
+                    <div className="flex gap-1">
+                      {viewing.status !== "cancelled" && (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="flex-1 text-orange-600 border-orange-200 hover:bg-orange-50"
+                          onClick={() => updateViewingMutation.mutate({ id: viewing.id, data: { status: "cancelled" } })}
+                          data-testid={`button-popup-cancel-${viewing.id}`}
+                        >
+                          <Ban className="h-3 w-3 mr-1" /> Cancel
+                        </Button>
+                      )}
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                        onClick={() => {
+                          if (confirm("Are you sure you want to delete this property?")) {
+                            deleteViewingMutation.mutate(viewing.id);
+                          }
+                        }}
+                        data-testid={`button-popup-delete-${viewing.id}`}
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" /> Delete
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
             </Popup>
@@ -854,11 +961,92 @@ export default function MapPage() {
                           <div>
                             <h4 className="font-medium text-sm">{viewing.address}</h4>
                             <p className="text-xs text-muted-foreground">{viewing.city}, {viewing.state}</p>
-                            <Badge variant="secondary" className="mt-1 text-xs">{viewing.status}</Badge>
+                            <div className="flex items-center gap-1 mt-1">
+                              <Badge 
+                                variant={viewing.status === "approved" ? "default" : viewing.status === "cancelled" ? "destructive" : "secondary"} 
+                                className="text-xs"
+                              >
+                                {viewing.status}
+                              </Badge>
+                              {viewing.scheduledDate && (
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(viewing.scheduledDate).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        {!isAgent && !routePlanningMode && (<Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedViewing(viewing); setShowFeedbackDialog(true); }} data-testid={`button-rate-${viewing.id}`}><Star className="h-4 w-4" /></Button>)}
+                        {!routePlanningMode && (
+                          <div className="flex items-center gap-1">
+                            {!isAgent && (
+                              <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedViewing(viewing); setShowFeedbackDialog(true); }} data-testid={`button-rate-${viewing.id}`}>
+                                <Star className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
+                      {isAgent && !routePlanningMode && (
+                        <div className="flex items-center gap-1 mt-2 pt-2 border-t">
+                          {viewing.status !== "approved" && (
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-7 text-xs text-green-600 hover:text-green-700 hover:bg-green-50"
+                              onClick={(e) => { e.stopPropagation(); updateViewingMutation.mutate({ id: viewing.id, data: { status: "approved" } }); }}
+                              disabled={updateViewingMutation.isPending}
+                              data-testid={`button-approve-${viewing.id}`}
+                            >
+                              <CheckCircle className="h-3 w-3 mr-1" /> Approve
+                            </Button>
+                          )}
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-7 text-xs"
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              setRescheduleViewing(viewing);
+                              if (viewing.scheduledDate) {
+                                const date = new Date(viewing.scheduledDate);
+                                setRescheduleDate(date.toISOString().split('T')[0]);
+                                setRescheduleTime(date.toTimeString().slice(0, 5));
+                              }
+                              setShowRescheduleDialog(true);
+                            }}
+                            data-testid={`button-reschedule-${viewing.id}`}
+                          >
+                            <Edit2 className="h-3 w-3 mr-1" /> Reschedule
+                          </Button>
+                          {viewing.status !== "cancelled" && (
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-7 text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                              onClick={(e) => { e.stopPropagation(); updateViewingMutation.mutate({ id: viewing.id, data: { status: "cancelled" } }); }}
+                              disabled={updateViewingMutation.isPending}
+                              data-testid={`button-cancel-${viewing.id}`}
+                            >
+                              <Ban className="h-3 w-3 mr-1" /> Cancel
+                            </Button>
+                          )}
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              if (confirm("Are you sure you want to delete this property?")) {
+                                deleteViewingMutation.mutate(viewing.id);
+                              }
+                            }}
+                            disabled={deleteViewingMutation.isPending}
+                            data-testid={`button-delete-${viewing.id}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
                     </Card>
                   ))}
                 </div>
@@ -1038,6 +1226,75 @@ export default function MapPage() {
             >
               {createShowingRequestMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Send Request
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRescheduleDialog} onOpenChange={setShowRescheduleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reschedule Property</DialogTitle>
+            <CardDescription>{rescheduleViewing?.address}, {rescheduleViewing?.city}</CardDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="flex items-center gap-2"><Calendar className="h-4 w-4" /> New Date</Label>
+              <Input 
+                type="date" 
+                value={rescheduleDate} 
+                onChange={(e) => setRescheduleDate(e.target.value)}
+                min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
+                className="mt-1"
+                data-testid="input-reschedule-date"
+              />
+            </div>
+            <div>
+              <Label className="flex items-center gap-2"><Clock className="h-4 w-4" /> New Time</Label>
+              <Select value={rescheduleTime} onValueChange={setRescheduleTime}>
+                <SelectTrigger className="mt-1" data-testid="input-reschedule-time">
+                  <SelectValue placeholder="Select a time" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="08:00">8:00 AM</SelectItem>
+                  <SelectItem value="08:30">8:30 AM</SelectItem>
+                  <SelectItem value="09:00">9:00 AM</SelectItem>
+                  <SelectItem value="09:30">9:30 AM</SelectItem>
+                  <SelectItem value="10:00">10:00 AM</SelectItem>
+                  <SelectItem value="10:30">10:30 AM</SelectItem>
+                  <SelectItem value="11:00">11:00 AM</SelectItem>
+                  <SelectItem value="11:30">11:30 AM</SelectItem>
+                  <SelectItem value="12:00">12:00 PM</SelectItem>
+                  <SelectItem value="12:30">12:30 PM</SelectItem>
+                  <SelectItem value="13:00">1:00 PM</SelectItem>
+                  <SelectItem value="13:30">1:30 PM</SelectItem>
+                  <SelectItem value="14:00">2:00 PM</SelectItem>
+                  <SelectItem value="14:30">2:30 PM</SelectItem>
+                  <SelectItem value="15:00">3:00 PM</SelectItem>
+                  <SelectItem value="15:30">3:30 PM</SelectItem>
+                  <SelectItem value="16:00">4:00 PM</SelectItem>
+                  <SelectItem value="16:30">4:30 PM</SelectItem>
+                  <SelectItem value="17:00">5:00 PM</SelectItem>
+                  <SelectItem value="17:30">5:30 PM</SelectItem>
+                  <SelectItem value="18:00">6:00 PM</SelectItem>
+                  <SelectItem value="18:30">6:30 PM</SelectItem>
+                  <SelectItem value="19:00">7:00 PM</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button 
+              onClick={() => {
+                if (rescheduleViewing && rescheduleDate && rescheduleTime) {
+                  const scheduledDate = new Date(`${rescheduleDate}T${rescheduleTime}`).toISOString();
+                  updateViewingMutation.mutate({ id: rescheduleViewing.id, data: { scheduledDate } });
+                }
+              }} 
+              disabled={updateViewingMutation.isPending || !rescheduleDate || !rescheduleTime} 
+              className="w-full"
+              data-testid="button-submit-reschedule"
+            >
+              {updateViewingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Update Schedule
             </Button>
           </div>
         </DialogContent>
