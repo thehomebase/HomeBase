@@ -76,6 +76,15 @@ const schoolIcon = new L.Icon({
   shadowSize: [33, 33]
 });
 
+const searchIcon = new L.Icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
 export default function MapPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -455,7 +464,38 @@ export default function MapPage() {
         <MapController center={mapCenter} zoom={mapZoom} />
         
         {selectedLocation && (
-          <Circle center={[selectedLocation.lat, selectedLocation.lon]} radius={1000} pathOptions={{ color: "blue", fillColor: "blue", fillOpacity: 0.1 }} />
+          <>
+            <Circle center={[selectedLocation.lat, selectedLocation.lon]} radius={1000} pathOptions={{ color: "blue", fillColor: "blue", fillOpacity: 0.1 }} />
+            <Marker position={[selectedLocation.lat, selectedLocation.lon]} icon={searchIcon}>
+              <Popup>
+                <div className="p-2 min-w-[220px]">
+                  <h3 className="font-bold text-red-700 text-sm">{selectedLocation.name.split(',')[0]}</h3>
+                  <p className="text-xs text-gray-600 mb-3">{selectedLocation.name.split(',').slice(1, 3).join(',')}</p>
+                  {isAgent && (
+                    <Button 
+                      size="sm" 
+                      className="w-full" 
+                      onClick={() => {
+                        const parts = selectedLocation.name.split(',').map(p => p.trim());
+                        setNewViewing({
+                          clientId: 0,
+                          address: parts[0] || '',
+                          city: parts[1] || '',
+                          state: parts[2]?.split(' ')[0] || '',
+                          zipCode: parts[2]?.split(' ')[1] || '',
+                          notes: ''
+                        });
+                        setShowAddViewing(true);
+                      }}
+                      data-testid="button-add-from-search"
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> Add as Property
+                    </Button>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          </>
         )}
 
         {isAgent && transactionsWithCoords.map((tx) => (
