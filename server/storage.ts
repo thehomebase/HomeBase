@@ -15,12 +15,13 @@ interface StorageDocument {
 // Update Document type to use the imported one from schema.ts
 import {
   users, transactions, checklists, messages, clients, documents, contractors, contractorReviews,
-  propertyViewings, propertyFeedback,
+  propertyViewings, propertyFeedback, showingRequests,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
   type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
+  type ShowingRequest,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
-  type InsertPropertyViewing, type InsertPropertyFeedback
+  type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
@@ -105,6 +106,13 @@ export interface IStorage {
   // Map data operations
   getTransactionsWithCoordinates(agentId: number): Promise<Transaction[]>;
   updateTransactionCoordinates(id: number, lat: number, lon: number): Promise<void>;
+
+  // Showing request operations
+  getShowingRequestsByUser(userId: number): Promise<ShowingRequest[]>;
+  getShowingRequest(id: number): Promise<ShowingRequest | undefined>;
+  createShowingRequest(request: InsertShowingRequest): Promise<ShowingRequest>;
+  updateShowingRequest(id: number, data: Partial<ShowingRequest>): Promise<ShowingRequest>;
+  deleteShowingRequest(id: number): Promise<void>;
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -2080,6 +2088,86 @@ export class DatabaseStorage implements IStorage {
       console.error('Error in updateTransactionCoordinates:', error);
       throw error;
     }
+  }
+
+  // Showing request operations
+  async getShowingRequestsByUser(userId: number): Promise<ShowingRequest[]> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM showing_requests WHERE requester_id = ${userId} OR recipient_id = ${userId} ORDER BY created_at DESC`
+      );
+      return (result.rows as any[]).map(this.mapShowingRequestRow.bind(this));
+    } catch (error) {
+      console.error('Error in getShowingRequestsByUser:', error);
+      throw error;
+    }
+  }
+
+  async getShowingRequest(id: number): Promise<ShowingRequest | undefined> {
+    try {
+      const result = await db.execute(sql`SELECT * FROM showing_requests WHERE id = ${id}`);
+      if (result.rows.length === 0) return undefined;
+      return this.mapShowingRequestRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in getShowingRequest:', error);
+      throw error;
+    }
+  }
+
+  async createShowingRequest(request: InsertShowingRequest): Promise<ShowingRequest> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO showing_requests (viewing_id, requester_id, recipient_id, requested_date, status, notes)
+        VALUES (${request.viewingId}, ${request.requesterId}, ${request.recipientId}, ${request.requestedDate}, ${request.status || 'pending'}, ${request.notes || null})
+        RETURNING *
+      `);
+      return this.mapShowingRequestRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in createShowingRequest:', error);
+      throw error;
+    }
+  }
+
+  async updateShowingRequest(id: number, data: Partial<ShowingRequest>): Promise<ShowingRequest> {
+    try {
+      const updates: string[] = [];
+      if (data.status !== undefined) updates.push(`status = '${data.status}'`);
+      if (data.responseNotes !== undefined) updates.push(`response_notes = '${data.responseNotes}'`);
+      if (data.requestedDate !== undefined) updates.push(`requested_date = '${data.requestedDate}'`);
+      updates.push(`updated_at = NOW()`);
+
+      const result = await db.execute(sql`
+        UPDATE showing_requests SET ${sql.raw(updates.join(', '))} WHERE id = ${id} RETURNING *
+      `);
+      return this.mapShowingRequestRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in updateShowingRequest:', error);
+      throw error;
+    }
+  }
+
+  async deleteShowingRequest(id: number): Promise<void> {
+    try {
+      await db.execute(sql`DELETE FROM showing_requests WHERE id = ${id}`);
+    } catch (error) {
+      console.error('Error in deleteShowingRequest:', error);
+      throw error;
+    }
+  }
+
+  private mapShowingRequestRow(row: any): ShowingRequest {
+    return {
+      id: Number(row.id),
+      viewingId: Number(row.viewing_id),
+      requesterId: Number(row.requester_id),
+      recipientId: Number(row.recipient_id),
+      requestedDate: new Date(row.requested_date),
+      status: String(row.status),
+      notes: row.notes ? String(row.notes) : null,
+      responseNotes: row.response_notes ? String(row.response_notes) : null,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null
+    };
   }
 
   private mapViewingRow(row: any): PropertyViewing {
