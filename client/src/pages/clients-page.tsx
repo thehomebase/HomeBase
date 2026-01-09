@@ -107,7 +107,11 @@ const ClientCard = ({ client, onSelect, onEdit }: {
             </div>
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">{client.address || 'No address'}</span>
+              <span className="text-sm">
+                {client.street || client.city || client.zipCode 
+                  ? `${client.street || ''}${client.city ? `, ${client.city}` : ''}${client.zipCode ? ` ${client.zipCode}` : ''}`
+                  : 'No address'}
+              </span>
             </div>
             <div className="text-xs text-muted-foreground">
               Added {format(new Date(client.createdAt), 'MMM d, yyyy')}
@@ -253,11 +257,28 @@ const ClientDetailsPanel = ({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Address</Label>
+                <Label>Street Address</Label>
                 <Input
-                  value={editingClient.address || ''}
-                  onChange={(e) => handleUpdate('address', e.target.value)}
+                  value={editingClient.street || ''}
+                  onChange={(e) => handleUpdate('street', e.target.value)}
+                  placeholder="123 Main St"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <Label>City</Label>
+                  <Input
+                    value={editingClient.city || ''}
+                    onChange={(e) => handleUpdate('city', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Zip Code</Label>
+                  <Input
+                    value={editingClient.zipCode || ''}
+                    onChange={(e) => handleUpdate('zipCode', e.target.value)}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -422,7 +443,11 @@ const TableContent = ({
                 <TableCell className="py-3">{client.lastName}</TableCell>
                 <TableCell className="py-3">{client.firstName}</TableCell>
                 <TableCell className="py-3">{client.email}</TableCell>
-                <TableCell className="py-3">{client.address}</TableCell>
+                <TableCell className="py-3">
+                  {client.street || client.city || client.zipCode 
+                    ? `${client.street || ''}${client.city ? `, ${client.city}` : ''}${client.zipCode ? ` ${client.zipCode}` : ''}`
+                    : '-'}
+                </TableCell>
                 <TableCell className="py-3">{client.phone}</TableCell>
                 <TableCell className="py-3">
                   <div className="flex flex-wrap gap-1">
@@ -511,7 +536,9 @@ const ClientTable = ({
       client.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.address?.toLowerCase().includes(searchQuery.toLowerCase())
+      client.street?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.zipCode?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   };
 
@@ -609,6 +636,9 @@ export default function ClientsPage() {
       phone: null,
       mobilePhone: null,
       address: "",
+      street: "",
+      city: "",
+      zipCode: "",
       type: "seller",
       status: "active",
       notes: "",
@@ -775,17 +805,45 @@ export default function ClientsPage() {
                       />
                       <FormField
                         control={form.control}
-                        name="address"
+                        name="street"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Address</FormLabel>
+                            <FormLabel>Street Address</FormLabel>
                             <FormControl>
-                              <Input {...field} value={field.value ?? ""} />
+                              <Input {...field} value={field.value ?? ""} placeholder="123 Main St" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+                      <div className="grid grid-cols-2 gap-2">
+                        <FormField
+                          control={form.control}
+                          name="city"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>City</FormLabel>
+                              <FormControl>
+                                <Input {...field} value={field.value ?? ""} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="zipCode"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Zip Code</FormLabel>
+                              <FormControl>
+                                <Input {...field} value={field.value ?? ""} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                       <FormField
                         control={form.control}
                         name="type"
