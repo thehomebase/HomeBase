@@ -108,7 +108,7 @@ export interface IStorage {
   updateTransactionCoordinates(id: number, lat: number, lon: number): Promise<void>;
 
   // Showing request operations
-  getShowingRequestsByUser(userId: number): Promise<ShowingRequest[]>;
+  getShowingRequestsByUser(userId: number, clientRecordId?: number | null): Promise<ShowingRequest[]>;
   getShowingRequest(id: number): Promise<ShowingRequest | undefined>;
   createShowingRequest(request: InsertShowingRequest): Promise<ShowingRequest>;
   updateShowingRequest(id: number, data: Partial<ShowingRequest>): Promise<ShowingRequest>;
@@ -2091,11 +2091,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Showing request operations
-  async getShowingRequestsByUser(userId: number): Promise<ShowingRequest[]> {
+  async getShowingRequestsByUser(userId: number, clientRecordId?: number | null): Promise<ShowingRequest[]> {
     try {
-      const result = await db.execute(
-        sql`SELECT * FROM showing_requests WHERE requester_id = ${userId} OR recipient_id = ${userId} ORDER BY created_at DESC`
-      );
+      let query;
+      if (clientRecordId) {
+        query = sql`SELECT * FROM showing_requests WHERE requester_id = ${userId} OR recipient_id = ${userId} OR requester_id = ${clientRecordId} OR recipient_id = ${clientRecordId} ORDER BY created_at DESC`;
+      } else {
+        query = sql`SELECT * FROM showing_requests WHERE requester_id = ${userId} OR recipient_id = ${userId} ORDER BY created_at DESC`;
+      }
+      const result = await db.execute(query);
       return (result.rows as any[]).map(this.mapShowingRequestRow.bind(this));
     } catch (error) {
       console.error('Error in getShowingRequestsByUser:', error);

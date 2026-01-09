@@ -881,7 +881,11 @@ export function registerRoutes(app: Express): Server {
       if (req.user.role === "agent") {
         viewings = await storage.getViewingsByAgent(req.user.id);
       } else {
-        viewings = await storage.getViewingsByClient(req.user.id);
+        const clientId = req.user.clientRecordId;
+        if (!clientId) {
+          return res.json([]);
+        }
+        viewings = await storage.getViewingsByClient(clientId);
       }
       res.json(viewings);
     } catch (error) {
@@ -1209,7 +1213,7 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      const requests = await storage.getShowingRequestsByUser(req.user.id);
+      const requests = await storage.getShowingRequestsByUser(req.user.id, req.user.clientRecordId);
       res.json(requests);
     } catch (error) {
       console.error('Error fetching showing requests:', error);
@@ -1225,7 +1229,10 @@ export function registerRoutes(app: Express): Server {
       if (!request) {
         return res.status(404).json({ error: 'Showing request not found' });
       }
-      if (request.requesterId !== req.user.id && request.recipientId !== req.user.id) {
+      const isRequester = request.requesterId === req.user.id;
+      const isRecipient = request.recipientId === req.user.id ||
+        (req.user.clientRecordId && request.recipientId === req.user.clientRecordId);
+      if (!isRequester && !isRecipient) {
         return res.sendStatus(403);
       }
       res.json(request);
@@ -1239,10 +1246,38 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
+      const { viewingId, requestedDate, notes } = req.body;
+      
+      if (!viewingId || !requestedDate) {
+        return res.status(400).json({ error: 'viewingId and requestedDate are required' });
+      }
+      
+      const viewing = await storage.getViewing(viewingId);
+      if (!viewing) {
+        return res.status(404).json({ error: 'Viewing not found' });
+      }
+      
+      let recipientId: number;
+      if (req.user.role === 'agent') {
+        if (viewing.agentId !== req.user.id) {
+          return res.status(403).json({ error: 'You can only create requests for your own viewings' });
+        }
+        recipientId = viewing.clientId;
+      } else {
+        const clientRecordId = req.user.clientRecordId;
+        if (!clientRecordId || viewing.clientId !== clientRecordId) {
+          return res.status(403).json({ error: 'You can only create requests for viewings assigned to you' });
+        }
+        recipientId = viewing.agentId;
+      }
+      
       const requestData = {
-        ...req.body,
+        viewingId,
         requesterId: req.user.id,
-        status: 'pending'
+        recipientId,
+        requestedDate: new Date(requestedDate),
+        status: 'pending',
+        notes: notes || null
       };
       const request = await storage.createShowingRequest(requestData);
       res.status(201).json(request);
@@ -1260,10 +1295,35 @@ export function registerRoutes(app: Express): Server {
       if (!request) {
         return res.status(404).json({ error: 'Showing request not found' });
       }
-      if (request.requesterId !== req.user.id && request.recipientId !== req.user.id) {
+      
+      const isRequester = request.requesterId === req.user.id;
+      const isRecipient = request.recipientId === req.user.id || 
+        (req.user.clientRecordId && request.recipientId === req.user.clientRecordId);
+      
+      if (!isRequester && !isRecipient) {
         return res.sendStatus(403);
       }
-      const updated = await storage.updateShowingRequest(Number(req.params.id), req.body);
+      
+      const { status, responseNotes } = req.body;
+      
+      if (status === 'approved' || status === 'declined') {
+        if (!isRecipient) {
+          return res.status(403).json({ error: 'Only the recipient can approve or decline' });
+        }
+      }
+      
+      if (status === 'cancelled') {
+        if (!isRequester) {
+          return res.status(403).json({ error: 'Only the requester can cancel' });
+        }
+      }
+      
+      const allowedStatuses = ['pending', 'approved', 'declined', 'cancelled'];
+      if (status && !allowedStatuses.includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+      }
+      
+      const updated = await storage.updateShowingRequest(Number(req.params.id), { status, responseNotes });
       res.json(updated);
     } catch (error) {
       console.error('Error updating showing request:', error);

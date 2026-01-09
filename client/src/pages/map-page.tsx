@@ -11,12 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw, PanelRightClose, PanelRightOpen, X } from "lucide-react";
+import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw, PanelRightClose, PanelRightOpen, X, Calendar, Clock, Bell, Check, XCircle } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Transaction, PropertyViewing, Client } from "@shared/schema";
+import type { Transaction, PropertyViewing, Client, ShowingRequest } from "@shared/schema";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -112,6 +112,13 @@ export default function MapPage() {
     wouldPurchase: false
   });
 
+  const [showRequestDialog, setShowRequestDialog] = useState(false);
+  const [requestViewing, setRequestViewing] = useState<PropertyViewing | null>(null);
+  const [requestDate, setRequestDate] = useState("");
+  const [requestTime, setRequestTime] = useState("");
+  const [requestNotes, setRequestNotes] = useState("");
+  const [showRequestsPanel, setShowRequestsPanel] = useState(false);
+
   const { data: transactions = [], isLoading: loadingTransactions } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     enabled: isAgent
@@ -125,6 +132,15 @@ export default function MapPage() {
     queryKey: ["/api/clients"],
     enabled: isAgent
   });
+
+  const { data: showingRequests = [] } = useQuery<ShowingRequest[]>({
+    queryKey: ["/api/showing-requests"]
+  });
+
+  const pendingRequests = showingRequests.filter(r => 
+    r.status === "pending" && 
+    (r.recipientId === user?.id || (user?.clientRecordId && r.recipientId === user.clientRecordId))
+  );
 
   const geocodeTransactionMutation = useMutation({
     mutationFn: async (transactionId: number) => {
@@ -172,6 +188,43 @@ export default function MapPage() {
     },
     onError: () => {
       toast({ title: "Failed to submit feedback", description: "Could not save your feedback", variant: "destructive" });
+    }
+  });
+
+  const createShowingRequestMutation = useMutation({
+    mutationFn: async (data: { viewingId: number; recipientId: number; requestedDate: string; notes?: string }) => {
+      const res = await apiRequest("POST", "/api/showing-requests", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/showing-requests"] });
+      setShowRequestDialog(false);
+      setRequestViewing(null);
+      setRequestDate("");
+      setRequestTime("");
+      setRequestNotes("");
+      toast({ title: "Request sent", description: "Your showing request has been submitted for approval" });
+    },
+    onError: () => {
+      toast({ title: "Failed to send request", description: "Could not submit showing request", variant: "destructive" });
+    }
+  });
+
+  const respondToRequestMutation = useMutation({
+    mutationFn: async ({ id, status, responseNotes }: { id: number; status: string; responseNotes?: string }) => {
+      const res = await apiRequest("PATCH", `/api/showing-requests/${id}`, { status, responseNotes });
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/showing-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/viewings"] });
+      toast({ 
+        title: variables.status === "approved" ? "Request approved" : "Request declined",
+        description: variables.status === "approved" ? "The showing has been confirmed" : "The showing request has been declined"
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to respond", description: "Could not update the request", variant: "destructive" });
     }
   });
 
@@ -312,8 +365,18 @@ export default function MapPage() {
                 <Badge className="mt-2">{viewing.status}</Badge>
                 {viewing.notes && <p className="text-sm mt-2 text-gray-500">{viewing.notes}</p>}
                 {!isAgent && (
-                  <Button size="sm" className="mt-2 w-full" onClick={() => { setSelectedViewing(viewing); setShowFeedbackDialog(true); }} data-testid={`button-feedback-${viewing.id}`}>
-                    <Star className="h-3 w-3 mr-1" /> Leave Feedback
+                  <div className="flex flex-col gap-1 mt-2">
+                    <Button size="sm" className="w-full" onClick={() => { setRequestViewing(viewing); setShowRequestDialog(true); }} data-testid={`button-request-showing-${viewing.id}`}>
+                      <Calendar className="h-3 w-3 mr-1" /> Request Showing
+                    </Button>
+                    <Button size="sm" variant="outline" className="w-full" onClick={() => { setSelectedViewing(viewing); setShowFeedbackDialog(true); }} data-testid={`button-feedback-${viewing.id}`}>
+                      <Star className="h-3 w-3 mr-1" /> Leave Feedback
+                    </Button>
+                  </div>
+                )}
+                {isAgent && (
+                  <Button size="sm" className="mt-2 w-full" onClick={() => { setRequestViewing(viewing); setShowRequestDialog(true); }} data-testid={`button-request-showing-agent-${viewing.id}`}>
+                    <Calendar className="h-3 w-3 mr-1" /> Request Showing
                   </Button>
                 )}
               </div>
@@ -429,6 +492,19 @@ export default function MapPage() {
             </DialogContent>
           </Dialog>
         )}
+        <Button 
+          variant="outline" 
+          className="shadow-lg bg-background relative" 
+          onClick={() => setShowRequestsPanel(!showRequestsPanel)} 
+          data-testid="button-showing-requests"
+        >
+          <Bell className="h-4 w-4" />
+          {pendingRequests.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              {pendingRequests.length}
+            </span>
+          )}
+        </Button>
         <Button variant="outline" className="shadow-lg bg-background" onClick={() => setSidebarOpen(!sidebarOpen)} data-testid="button-toggle-sidebar">
           {sidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
         </Button>
@@ -544,6 +620,139 @@ export default function MapPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request Showing Time</DialogTitle>
+            <CardDescription>{requestViewing?.address}, {requestViewing?.city}</CardDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="flex items-center gap-2"><Calendar className="h-4 w-4" /> Preferred Date</Label>
+              <Input 
+                type="date" 
+                value={requestDate} 
+                onChange={(e) => setRequestDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="mt-1"
+                data-testid="input-request-date"
+              />
+            </div>
+            <div>
+              <Label className="flex items-center gap-2"><Clock className="h-4 w-4" /> Preferred Time</Label>
+              <Input 
+                type="time" 
+                value={requestTime} 
+                onChange={(e) => setRequestTime(e.target.value)}
+                className="mt-1"
+                data-testid="input-request-time"
+              />
+            </div>
+            <div>
+              <Label>Notes (optional)</Label>
+              <Textarea 
+                value={requestNotes} 
+                onChange={(e) => setRequestNotes(e.target.value)}
+                placeholder="Any special requests or notes..."
+                data-testid="input-request-notes"
+              />
+            </div>
+            <Button 
+              onClick={() => {
+                if (requestViewing && requestDate && requestTime) {
+                  const requestedDate = new Date(`${requestDate}T${requestTime}`).toISOString();
+                  const recipientId = isAgent ? requestViewing.clientId : requestViewing.agentId;
+                  createShowingRequestMutation.mutate({
+                    viewingId: requestViewing.id,
+                    recipientId,
+                    requestedDate,
+                    notes: requestNotes || undefined
+                  });
+                }
+              }} 
+              disabled={createShowingRequestMutation.isPending || !requestDate || !requestTime} 
+              className="w-full"
+              data-testid="button-submit-request"
+            >
+              {createShowingRequestMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Send Request
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {showRequestsPanel && (
+        <div className="absolute top-16 right-4 z-[1002] w-80 bg-background rounded-lg shadow-xl border max-h-96 overflow-y-auto">
+          <div className="flex items-center justify-between p-3 border-b sticky top-0 bg-background">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Bell className="h-4 w-4" /> Showing Requests
+            </h3>
+            <Button variant="ghost" size="sm" onClick={() => setShowRequestsPanel(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="p-3">
+            {showingRequests.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No showing requests</p>
+            ) : (
+              <div className="space-y-3">
+                {showingRequests.map((request) => {
+                  const viewing = viewings.find(v => v.id === request.viewingId);
+                  const isPending = request.status === "pending";
+                  const isRecipient = request.recipientId === user?.id || 
+                    (user?.clientRecordId && request.recipientId === user.clientRecordId);
+                  
+                  return (
+                    <Card key={request.id} className={`p-3 ${isPending && isRecipient ? 'border-orange-300 bg-orange-50' : ''}`}>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-sm">{viewing?.address || 'Unknown property'}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(request.requestedDate).toLocaleDateString()} at {new Date(request.requestedDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </p>
+                          </div>
+                          <Badge variant={
+                            request.status === "approved" ? "default" :
+                            request.status === "declined" ? "destructive" : "secondary"
+                          }>
+                            {request.status}
+                          </Badge>
+                        </div>
+                        {request.notes && <p className="text-xs text-muted-foreground">{request.notes}</p>}
+                        {isPending && isRecipient && (
+                          <div className="flex gap-2 mt-2">
+                            <Button 
+                              size="sm" 
+                              className="flex-1"
+                              onClick={() => respondToRequestMutation.mutate({ id: request.id, status: "approved" })}
+                              disabled={respondToRequestMutation.isPending}
+                              data-testid={`button-approve-${request.id}`}
+                            >
+                              <Check className="h-3 w-3 mr-1" /> Approve
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => respondToRequestMutation.mutate({ id: request.id, status: "declined" })}
+                              disabled={respondToRequestMutation.isPending}
+                              data-testid={`button-decline-${request.id}`}
+                            >
+                              <XCircle className="h-3 w-3 mr-1" /> Decline
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
