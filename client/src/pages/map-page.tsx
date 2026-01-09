@@ -104,6 +104,10 @@ export default function MapPage() {
     notes: ""
   });
   
+  const [includeShowingRequest, setIncludeShowingRequest] = useState(false);
+  const [newShowingDate, setNewShowingDate] = useState("");
+  const [newShowingTime, setNewShowingTime] = useState("");
+  
   const [newFeedback, setNewFeedback] = useState({
     rating: 3,
     liked: "",
@@ -157,20 +161,48 @@ export default function MapPage() {
   });
 
   const createViewingMutation = useMutation({
-    mutationFn: async (data: typeof newViewing) => {
+    mutationFn: async (data: typeof newViewing & { requestShowing?: boolean; showingDate?: string; showingTime?: string }) => {
       const geocodeRes = await apiRequest("POST", "/api/geocode", { address: `${data.address}, ${data.city}, ${data.state} ${data.zipCode}` });
       const geo = await geocodeRes.json();
-      const res = await apiRequest("POST", "/api/viewings", { ...data, latitude: geo.lat, longitude: geo.lon });
-      return res.json();
+      const res = await apiRequest("POST", "/api/viewings", { 
+        clientId: data.clientId, 
+        address: data.address, 
+        city: data.city, 
+        state: data.state, 
+        zipCode: data.zipCode, 
+        notes: data.notes, 
+        latitude: geo.lat, 
+        longitude: geo.lon 
+      });
+      const viewing = await res.json();
+      
+      if (data.requestShowing && data.showingDate && data.showingTime) {
+        const requestedDate = new Date(`${data.showingDate}T${data.showingTime}`).toISOString();
+        await apiRequest("POST", "/api/showing-requests", {
+          viewingId: viewing.id,
+          requestedDate,
+          notes: data.notes || null
+        });
+      }
+      
+      return viewing;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/viewings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/showing-requests"] });
       setShowAddViewing(false);
       setNewViewing({ clientId: 0, address: "", city: "", state: "", zipCode: "", notes: "" });
-      toast({ title: "Viewing added", description: "Property viewing has been scheduled" });
+      setIncludeShowingRequest(false);
+      setNewShowingDate("");
+      setNewShowingTime("");
+      if (variables.requestShowing) {
+        toast({ title: "Property added", description: "Property and showing request have been created" });
+      } else {
+        toast({ title: "Property added", description: "Property has been added to the map" });
+      }
     },
     onError: () => {
-      toast({ title: "Failed to add viewing", description: "Could not create the property viewing", variant: "destructive" });
+      toast({ title: "Failed to add property", description: "Could not create the property", variant: "destructive" });
     }
   });
 
@@ -458,12 +490,12 @@ export default function MapPage() {
           <Dialog open={showAddViewing} onOpenChange={setShowAddViewing}>
             <DialogTrigger asChild>
               <Button className="shadow-lg" data-testid="button-add-viewing">
-                <Plus className="h-4 w-4 mr-2" /> Add Viewing
+                <Plus className="h-4 w-4 mr-2" /> Add Property
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Schedule Property Viewing</DialogTitle>
+                <DialogTitle>Add Property</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
@@ -485,8 +517,60 @@ export default function MapPage() {
                   <div><Label>Zip</Label><Input value={newViewing.zipCode} onChange={e => setNewViewing({ ...newViewing, zipCode: e.target.value })} placeholder="12345" data-testid="input-zip" /></div>
                 </div>
                 <div><Label>Notes</Label><Textarea value={newViewing.notes} onChange={e => setNewViewing({ ...newViewing, notes: e.target.value })} placeholder="Any notes..." data-testid="input-notes" /></div>
-                <Button onClick={() => createViewingMutation.mutate(newViewing)} disabled={createViewingMutation.isPending || !newViewing.clientId || !newViewing.address} className="w-full" data-testid="button-submit-viewing">
-                  {createViewingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Schedule Viewing
+                
+                <div className="border-t pt-4 mt-2">
+                  <div className="flex items-center gap-2 mb-3">
+                    <input 
+                      type="checkbox" 
+                      id="requestShowing" 
+                      checked={includeShowingRequest} 
+                      onChange={e => setIncludeShowingRequest(e.target.checked)} 
+                      className="rounded" 
+                      data-testid="checkbox-request-showing" 
+                    />
+                    <Label htmlFor="requestShowing" className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" /> Request a specific showing time
+                    </Label>
+                  </div>
+                  
+                  {includeShowingRequest && (
+                    <div className="grid grid-cols-2 gap-2 pl-6">
+                      <div>
+                        <Label>Date</Label>
+                        <Input 
+                          type="date" 
+                          value={newShowingDate} 
+                          onChange={e => setNewShowingDate(e.target.value)} 
+                          min={new Date().toISOString().split('T')[0]}
+                          data-testid="input-showing-date" 
+                        />
+                      </div>
+                      <div>
+                        <Label>Time</Label>
+                        <Input 
+                          type="time" 
+                          value={newShowingTime} 
+                          onChange={e => setNewShowingTime(e.target.value)} 
+                          data-testid="input-showing-time" 
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <Button 
+                  onClick={() => createViewingMutation.mutate({ 
+                    ...newViewing, 
+                    requestShowing: includeShowingRequest, 
+                    showingDate: newShowingDate, 
+                    showingTime: newShowingTime 
+                  })} 
+                  disabled={createViewingMutation.isPending || !newViewing.clientId || !newViewing.address || (includeShowingRequest && (!newShowingDate || !newShowingTime))} 
+                  className="w-full" 
+                  data-testid="button-submit-viewing"
+                >
+                  {createViewingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  {includeShowingRequest ? "Add Property & Request Showing" : "Add Property"}
                 </Button>
               </div>
             </DialogContent>
