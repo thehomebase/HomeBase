@@ -1170,6 +1170,96 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Route planning endpoint using OSRM
+  app.post("/api/route-plan", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    const { coordinates } = req.body;
+    
+    if (!coordinates || !Array.isArray(coordinates) || coordinates.length < 2) {
+      return res.status(400).json({ error: 'At least 2 coordinates are required' });
+    }
+    
+    if (coordinates.length > 10) {
+      return res.status(400).json({ error: 'Maximum 10 stops allowed' });
+    }
+
+    try {
+      // Format coordinates for OSRM: lon,lat;lon,lat;...
+      const coordString = coordinates
+        .map((c: { lat: number; lon: number }) => `${c.lon},${c.lat}`)
+        .join(';');
+      
+      // Use OSRM trip service for optimized route (TSP solving)
+      const response = await fetch(
+        `https://router.project-osrm.org/trip/v1/driving/${coordString}?overview=full&geometries=geojson&steps=true&roundtrip=false&source=first&destination=last`,
+        {
+          headers: {
+            'User-Agent': 'HomeBase-RealEstate-App/1.0'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        // Fallback to simple route if trip optimization fails
+        const routeResponse = await fetch(
+          `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=full&geometries=geojson`,
+          {
+            headers: {
+              'User-Agent': 'HomeBase-RealEstate-App/1.0'
+            }
+          }
+        );
+        
+        if (!routeResponse.ok) {
+          return res.status(500).json({ error: 'Route planning service unavailable' });
+        }
+        
+        const routeData = await routeResponse.json();
+        if (routeData.code !== 'Ok' || !routeData.routes?.length) {
+          return res.status(404).json({ error: 'No route found' });
+        }
+        
+        const route = routeData.routes[0];
+        return res.json({
+          optimized: false,
+          waypoints: coordinates.map((c: any, i: number) => ({ ...c, order: i })),
+          geometry: route.geometry,
+          totalDistance: route.distance, // in meters
+          totalDuration: route.duration  // in seconds
+        });
+      }
+      
+      const data = await response.json();
+      
+      if (data.code !== 'Ok' || !data.trips?.length) {
+        return res.status(404).json({ error: 'No route found' });
+      }
+      
+      const trip = data.trips[0];
+      
+      // Map waypoints back to original coordinates with optimized order
+      const orderedWaypoints = data.waypoints.map((wp: any) => ({
+        ...coordinates[wp.waypoint_index],
+        order: wp.trips_index !== undefined ? wp.trips_index : wp.waypoint_index,
+        originalIndex: wp.waypoint_index
+      })).sort((a: any, b: any) => a.order - b.order);
+      
+      res.json({
+        optimized: true,
+        waypoints: orderedWaypoints,
+        geometry: trip.geometry,
+        totalDistance: trip.distance, // in meters
+        totalDuration: trip.duration  // in seconds
+      });
+    } catch (error) {
+      console.error('Error planning route:', error);
+      res.status(500).json({ error: 'Failed to plan route' });
+    }
+  });
+
   app.post("/api/claim-transaction", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
