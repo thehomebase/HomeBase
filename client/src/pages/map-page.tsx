@@ -153,6 +153,9 @@ export default function MapPage() {
   // Client filter state (agents only)
   const [selectedClientFilter, setSelectedClientFilter] = useState<number | "all">("all");
 
+  // Map display filter (agents only)
+  const [mapDisplayFilter, setMapDisplayFilter] = useState<"showings" | "clients" | "listings">("showings");
+
   const { data: transactions = [], isLoading: loadingTransactions } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     enabled: isAgent
@@ -548,7 +551,7 @@ export default function MapPage() {
           </>
         )}
 
-        {isAgent && transactionsWithCoords.map((tx) => (
+        {isAgent && mapDisplayFilter === "listings" && transactionsWithCoords.map((tx) => (
           <Marker key={`tx-${tx.id}`} position={[tx.latitude!, tx.longitude!]} icon={transactionIcon}>
             <Popup>
               <div className="p-2 min-w-[200px]">
@@ -562,7 +565,7 @@ export default function MapPage() {
           </Marker>
         ))}
 
-        {viewingsWithCoords.map((viewing) => (
+        {(mapDisplayFilter === "showings" || mapDisplayFilter === "clients" || !isAgent) && viewingsWithCoords.map((viewing) => (
           <Marker key={`v-${viewing.id}`} position={[viewing.latitude!, viewing.longitude!]} icon={viewingIcon}>
             <Popup>
               <div className="p-2 min-w-[220px]">
@@ -708,18 +711,65 @@ export default function MapPage() {
           </Card>
         )}
 
+        {isAgent && (
+          <div className="flex items-center gap-1 bg-background rounded-lg p-1 shadow-lg">
+            <Button
+              size="sm"
+              variant={mapDisplayFilter === "showings" ? "default" : "ghost"}
+              className="h-7 text-xs"
+              onClick={() => { setMapDisplayFilter("showings"); setSelectedClientFilter("all"); }}
+              data-testid="filter-showings"
+            >
+              <MapPin className="h-3 w-3 mr-1" /> Showings
+            </Button>
+            <Button
+              size="sm"
+              variant={mapDisplayFilter === "clients" ? "default" : "ghost"}
+              className="h-7 text-xs"
+              onClick={() => setMapDisplayFilter("clients")}
+              data-testid="filter-clients"
+            >
+              <Star className="h-3 w-3 mr-1" /> By Client
+            </Button>
+            <Button
+              size="sm"
+              variant={mapDisplayFilter === "listings" ? "default" : "ghost"}
+              className="h-7 text-xs"
+              onClick={() => setMapDisplayFilter("listings")}
+              data-testid="filter-listings"
+            >
+              <Home className="h-3 w-3 mr-1" /> Listings
+            </Button>
+          </div>
+        )}
+        {isAgent && mapDisplayFilter === "clients" && clients.length > 0 && (
+          <Select 
+            value={selectedClientFilter === "all" ? "all" : String(selectedClientFilter)} 
+            onValueChange={(v) => setSelectedClientFilter(v === "all" ? "all" : Number(v))}
+          >
+            <SelectTrigger className="w-48 h-8 text-sm bg-background shadow-lg" data-testid="select-map-client-filter">
+              <SelectValue placeholder="Select client" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Clients</SelectItem>
+              {clients.map((client) => (
+                <SelectItem key={client.id} value={String(client.id)}>{client.firstName} {client.lastName}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <div className="flex flex-wrap gap-2">
-          {isAgent && (
-            <>
-              <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
-                <Home className="h-3 w-3 text-green-600" />
-                {transactionsWithCoords.length} transactions
-              </Badge>
-              <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
-                <MapPin className="h-3 w-3 text-blue-600" />
-                {viewingsWithCoords.length} viewings
-              </Badge>
-            </>
+          {isAgent && mapDisplayFilter === "listings" && (
+            <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
+              <Home className="h-3 w-3 text-green-600" />
+              {transactionsWithCoords.length} listings
+            </Badge>
+          )}
+          {isAgent && (mapDisplayFilter === "showings" || mapDisplayFilter === "clients") && (
+            <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
+              <MapPin className="h-3 w-3 text-blue-600" />
+              {viewingsWithCoords.length} {selectedClientFilter !== "all" ? "filtered" : ""} showings
+            </Badge>
           )}
           {!isAgent && (
             <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
@@ -933,22 +983,11 @@ export default function MapPage() {
 
             <TabsContent value="viewings" className="p-4">
               <h3 className="font-semibold mb-3 flex items-center gap-2"><MapPin className="h-4 w-4 text-blue-600" />{isAgent ? "Scheduled Viewings" : "Properties to View"}</h3>
-              {isAgent && clients.length > 0 && (
+              {isAgent && selectedClientFilter !== "all" && (
                 <div className="mb-3">
-                  <Select 
-                    value={selectedClientFilter === "all" ? "all" : String(selectedClientFilter)} 
-                    onValueChange={(v) => setSelectedClientFilter(v === "all" ? "all" : Number(v))}
-                  >
-                    <SelectTrigger className="w-full h-8 text-sm" data-testid="select-client-filter">
-                      <SelectValue placeholder="Filter by client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Clients</SelectItem>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={String(client.id)}>{client.firstName} {client.lastName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Badge variant="secondary" className="text-xs">
+                    Filtered by: {clients.find(c => c.id === selectedClientFilter)?.firstName} {clients.find(c => c.id === selectedClientFilter)?.lastName}
+                  </Badge>
                 </div>
               )}
               {loadingViewings ? (
