@@ -150,6 +150,9 @@ export default function MapPage() {
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
 
+  // Client filter state (agents only)
+  const [selectedClientFilter, setSelectedClientFilter] = useState<number | "all">("all");
+
   const { data: transactions = [], isLoading: loadingTransactions } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     enabled: isAgent
@@ -476,7 +479,10 @@ export default function MapPage() {
   };
 
   const transactionsWithCoords = transactions.filter(t => t.latitude && t.longitude);
-  const viewingsWithCoords = viewings.filter(v => v.latitude && v.longitude);
+  const filteredViewings = isAgent && selectedClientFilter !== "all" 
+    ? viewings.filter(v => v.clientId === selectedClientFilter)
+    : viewings;
+  const viewingsWithCoords = filteredViewings.filter(v => v.latitude && v.longitude);
 
   useEffect(() => {
     if (transactionsWithCoords.length > 0 && !selectedLocation) {
@@ -927,13 +933,31 @@ export default function MapPage() {
 
             <TabsContent value="viewings" className="p-4">
               <h3 className="font-semibold mb-3 flex items-center gap-2"><MapPin className="h-4 w-4 text-blue-600" />{isAgent ? "Scheduled Viewings" : "Properties to View"}</h3>
+              {isAgent && clients.length > 0 && (
+                <div className="mb-3">
+                  <Select 
+                    value={selectedClientFilter === "all" ? "all" : String(selectedClientFilter)} 
+                    onValueChange={(v) => setSelectedClientFilter(v === "all" ? "all" : Number(v))}
+                  >
+                    <SelectTrigger className="w-full h-8 text-sm" data-testid="select-client-filter">
+                      <SelectValue placeholder="Filter by client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Clients</SelectItem>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={String(client.id)}>{client.firstName} {client.lastName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {loadingViewings ? (
                 <div className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading...</div>
-              ) : viewings.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No viewings scheduled</p>
+              ) : filteredViewings.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{selectedClientFilter !== "all" ? "No viewings for this client" : "No viewings scheduled"}</p>
               ) : (
                 <div className="space-y-2">
-                  {viewings.map((viewing) => (
+                  {filteredViewings.map((viewing) => (
                     <Card 
                       key={viewing.id} 
                       className={`p-3 cursor-pointer hover:bg-muted/50 ${routePlanningMode && selectedForRoute.has(viewing.id) ? 'ring-2 ring-primary bg-primary/5' : ''}`} 
