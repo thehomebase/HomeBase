@@ -24,7 +24,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search } from "lucide-react";
+import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
@@ -425,7 +426,21 @@ const TableContent = ({
                 </div>
               </TableHead>
               <TableHead className="py-3 font-semibold">Email</TableHead>
-              <TableHead className="py-3 font-semibold">Current Address</TableHead>
+              <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('street')}>
+                <div className="flex items-center gap-1">
+                  Street {getSortIcon('street')}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('city')}>
+                <div className="flex items-center gap-1">
+                  City {getSortIcon('city')}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('zipCode')}>
+                <div className="flex items-center gap-1">
+                  Zip {getSortIcon('zipCode')}
+                </div>
+              </TableHead>
               <TableHead className="py-3 font-semibold">Phone</TableHead>
               <TableHead className="py-3 font-semibold">Labels</TableHead>
               <TableHead className="py-3 font-semibold">Actions</TableHead>
@@ -443,11 +458,9 @@ const TableContent = ({
                 <TableCell className="py-3">{client.lastName}</TableCell>
                 <TableCell className="py-3">{client.firstName}</TableCell>
                 <TableCell className="py-3">{client.email}</TableCell>
-                <TableCell className="py-3">
-                  {client.street || client.city || client.zipCode 
-                    ? `${client.street || ''}${client.city ? `, ${client.city}` : ''}${client.zipCode ? ` ${client.zipCode}` : ''}`
-                    : '-'}
-                </TableCell>
+                <TableCell className="py-3">{client.street || '-'}</TableCell>
+                <TableCell className="py-3">{client.city || '-'}</TableCell>
+                <TableCell className="py-3">{client.zipCode || '-'}</TableCell>
                 <TableCell className="py-3">{client.phone}</TableCell>
                 <TableCell className="py-3">
                   <div className="flex flex-wrap gap-1">
@@ -481,7 +494,7 @@ const TableContent = ({
             ))}
             {clients.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={9} className="text-center text-muted-foreground">
                   No clients found. Add your first client to get started!
                 </TableCell>
               </TableRow>
@@ -522,24 +535,32 @@ const TableContent = ({
 const ClientTable = ({
   clients,
   searchQuery,
+  selectedLabels,
   onUpdate,
   onDelete
 }: {
   clients: Client[];
   searchQuery: string;
+  selectedLabels: string[];
   onUpdate: (client: Client) => Promise<void>;
   onDelete: (clientId: number) => void;
 }) => {
   const filterClients = (clients: Client[]) => {
-    return clients.filter(client =>
-      client.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.street?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.zipCode?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    return clients.filter(client => {
+      const matchesSearch = searchQuery === '' || 
+        client.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        client.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        client.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        client.street?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        client.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        client.zipCode?.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesLabels = selectedLabels.length === 0 || 
+        selectedLabels.some(label => (client.labels || []).includes(label));
+      
+      return matchesSearch && matchesLabels;
+    });
   };
 
   const sellers = filterClients(clients.filter(client => client.type === 'seller'));
@@ -568,6 +589,8 @@ export default function ClientsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = useState<number | null>(null);
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+  const [labelFilterOpen, setLabelFilterOpen] = useState(false);
 
   const handleClientUpdate = async (updatedClient: Client) => {
     try {
@@ -694,6 +717,18 @@ export default function ClientsPage() {
     enabled: !!user,
   });
 
+  const allLabels = Array.from(
+    new Set(clients.flatMap(client => client.labels || []))
+  ).sort();
+
+  const toggleLabel = (label: string) => {
+    setSelectedLabels(prev => 
+      prev.includes(label) 
+        ? prev.filter(l => l !== label)
+        : [...prev, label]
+    );
+  };
+
   const createClientMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
       const response = await apiRequest("POST", "/api/clients", data);
@@ -737,6 +772,57 @@ export default function ClientsPage() {
               />
               <Search className="absolute right-3 top-2.5 h-5 w-5 text-muted-foreground" />
             </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Filter className="h-4 w-4" />
+                  Labels
+                  {selectedLabels.length > 0 && (
+                    <span className="ml-1 bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs">
+                      {selectedLabels.length}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {allLabels.length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    No labels available
+                  </DropdownMenuItem>
+                ) : (
+                  <>
+                    {allLabels.map((label, index) => (
+                      <DropdownMenuItem
+                        key={label}
+                        onClick={() => toggleLabel(label)}
+                        className="cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2 w-full">
+                          <div className={`w-4 h-4 border rounded flex items-center justify-center ${
+                            selectedLabels.includes(label) ? 'bg-primary border-primary' : 'border-gray-300'
+                          }`}>
+                            {selectedLabels.includes(label) && (
+                              <Check className="h-3 w-3 text-primary-foreground" />
+                            )}
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-full text-xs ${getLabelColor(label, index)}`}>
+                            {label}
+                          </span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                    {selectedLabels.length > 0 && (
+                      <DropdownMenuItem
+                        onClick={() => setSelectedLabels([])}
+                        className="cursor-pointer text-muted-foreground border-t mt-1 pt-2"
+                      >
+                        Clear all filters
+                      </DropdownMenuItem>
+                    )}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
             {user?.role === "agent" && (
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
@@ -910,6 +996,7 @@ export default function ClientsPage() {
           <ClientTable
             clients={clients}
             searchQuery={searchQuery}
+            selectedLabels={selectedLabels}
             onUpdate={handleClientUpdate}
             onDelete={setClientToDelete}
           />
