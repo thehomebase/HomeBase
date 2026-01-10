@@ -33,15 +33,50 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Pencil, X, ChevronRight } from "lucide-react";
+import { Pencil, X, ChevronRight, GripVertical } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 
 type SortConfig = {
   key: keyof Client;
   direction: 'asc' | 'desc';
 } | null;
+
+type ClientColumn = {
+  id: string;
+  title: string;
+  key: keyof Client | 'actions';
+  sortable: boolean;
+};
+
+const DEFAULT_COLUMNS: ClientColumn[] = [
+  { id: 'lastName', title: 'Last Name', key: 'lastName', sortable: true },
+  { id: 'firstName', title: 'First Name', key: 'firstName', sortable: true },
+  { id: 'email', title: 'Email', key: 'email', sortable: false },
+  { id: 'street', title: 'Street', key: 'street', sortable: true },
+  { id: 'city', title: 'City', key: 'city', sortable: true },
+  { id: 'zipCode', title: 'Zip', key: 'zipCode', sortable: true },
+  { id: 'phone', title: 'Phone', key: 'phone', sortable: false },
+  { id: 'labels', title: 'Labels', key: 'labels', sortable: false },
+  { id: 'actions', title: 'Actions', key: 'actions', sortable: false },
+];
 
 type AddressValidation = {
   streetInvalid: boolean;
@@ -409,6 +444,47 @@ const ClientDetailsPanel = ({
   );
 };
 
+const SortableHeader = ({ 
+  column, 
+  sortConfig, 
+  onSort 
+}: { 
+  column: ClientColumn; 
+  sortConfig: SortConfig;
+  onSort: (key: keyof Client) => void;
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id: column.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const getSortIcon = () => {
+    if (!sortConfig || sortConfig.key !== column.key) return null;
+    return sortConfig.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+  };
+
+  return (
+    <TableHead
+      ref={setNodeRef}
+      style={style}
+      className={`py-3 font-semibold ${column.sortable ? 'cursor-pointer' : ''}`}
+      onClick={() => column.sortable && column.key !== 'actions' && onSort(column.key as keyof Client)}
+    >
+      <div className="flex items-center gap-1">
+        <span {...attributes} {...listeners} className="cursor-grab">
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </span>
+        {column.title}
+        {column.sortable && getSortIcon()}
+      </div>
+    </TableHead>
+  );
+};
+
 const TableContent = ({
   clients,
   onUpdate,
@@ -420,7 +496,24 @@ const TableContent = ({
 }) => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [columns, setColumns] = useState<ClientColumn[]>(DEFAULT_COLUMNS);
   const [, navigate] = useLocation();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor)
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setColumns((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
 
   const sortData = (data: Client[], config: SortConfig) => {
     if (!config) return data;
@@ -450,53 +543,116 @@ const TableContent = ({
     });
   };
 
-  const getSortIcon = (columnKey: keyof Client) => {
-    if (!sortConfig || sortConfig.key !== columnKey) {
-      return null;
+  const renderCell = (client: Client, columnId: string) => {
+    const validation = getAddressValidation(client);
+    
+    switch (columnId) {
+      case 'lastName':
+        return client.lastName;
+      case 'firstName':
+        return client.firstName;
+      case 'email':
+        return client.email;
+      case 'street':
+        return (
+          <div className="flex items-center gap-1">
+            {client.street || '-'}
+            {validation.streetInvalid && (
+              <span title="Street address incomplete - needs number and street name">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+              </span>
+            )}
+          </div>
+        );
+      case 'city':
+        return (
+          <div className="flex items-center gap-1">
+            {client.city || '-'}
+            {validation.locationMissing && (
+              <span title="City or zip code required for mapping">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+              </span>
+            )}
+          </div>
+        );
+      case 'zipCode':
+        return (
+          <div className="flex items-center gap-1">
+            {client.zipCode || '-'}
+            {validation.locationMissing && (
+              <span title="City or zip code required for mapping">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+              </span>
+            )}
+          </div>
+        );
+      case 'phone':
+        return client.phone;
+      case 'labels':
+        return (
+          <div className="flex flex-wrap gap-1">
+            {(client.labels || []).map((label, index) => {
+              const colorClass = getLabelColor(label, index);
+              return (
+                <span
+                  key={`${client.id}-${label}-${index}`}
+                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}
+                >
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+        );
+      case 'actions':
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(client.id);
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        );
+      default:
+        return '-';
     }
-    return sortConfig.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
   };
 
   return (
     <>
       {/* Desktop view - Table */}
-      <div className="hidden md:block w-full min-w-0">
+      <div className="hidden md:block w-full min-w-0 overflow-x-auto">
         <Table className="w-full table-auto">
           <TableHeader>
             <TableRow className="bg-gray-100 dark:bg-gray-800">
-              <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('lastName')}>
-                <div className="flex items-center gap-1">
-                  Last Name {getSortIcon('lastName')}
-                </div>
-              </TableHead>
-              <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('firstName')}>
-                <div className="flex items-center gap-1">
-                  First Name {getSortIcon('firstName')}
-                </div>
-              </TableHead>
-              <TableHead className="py-3 font-semibold">Email</TableHead>
-              <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('street')}>
-                <div className="flex items-center gap-1">
-                  Street {getSortIcon('street')}
-                </div>
-              </TableHead>
-              <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('city')}>
-                <div className="flex items-center gap-1">
-                  City {getSortIcon('city')}
-                </div>
-              </TableHead>
-              <TableHead className="cursor-pointer py-3 font-semibold" onClick={() => requestSort('zipCode')}>
-                <div className="flex items-center gap-1">
-                  Zip {getSortIcon('zipCode')}
-                </div>
-              </TableHead>
-              <TableHead className="py-3 font-semibold">Phone</TableHead>
-              <TableHead className="py-3 font-semibold">Labels</TableHead>
-              <TableHead className="py-3 font-semibold">Actions</TableHead>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={columns.map(col => col.id)}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  {columns.map((column) => (
+                    <SortableHeader
+                      key={column.id}
+                      column={column}
+                      sortConfig={sortConfig}
+                      onSort={requestSort}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {clients.map((client, index) => (
+            {sortData(clients, sortConfig).map((client, index) => (
               <TableRow
                 key={client.id}
                 className={`hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
@@ -504,73 +660,16 @@ const TableContent = ({
                 }`}
                 onClick={() => setSelectedClient(client)}
               >
-                <TableCell className="py-3">{client.lastName}</TableCell>
-                <TableCell className="py-3">{client.firstName}</TableCell>
-                <TableCell className="py-3">{client.email}</TableCell>
-                <TableCell className="py-3">
-                  <div className="flex items-center gap-1">
-                    {client.street || '-'}
-                    {getAddressValidation(client).streetInvalid && (
-                      <span title="Street address incomplete - needs number and street name">
-                        <AlertTriangle className="h-4 w-4 text-amber-500" />
-                      </span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="py-3">
-                  <div className="flex items-center gap-1">
-                    {client.city || '-'}
-                    {getAddressValidation(client).locationMissing && (
-                      <span title="City or zip code required for mapping">
-                        <AlertTriangle className="h-4 w-4 text-amber-500" />
-                      </span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="py-3">
-                  <div className="flex items-center gap-1">
-                    {client.zipCode || '-'}
-                    {getAddressValidation(client).locationMissing && (
-                      <span title="City or zip code required for mapping">
-                        <AlertTriangle className="h-4 w-4 text-amber-500" />
-                      </span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="py-3">{client.phone}</TableCell>
-                <TableCell className="py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {(client.labels || []).map((label, index) => {
-                      const colorClass = getLabelColor(label, index);
-                      return (
-                        <span
-                          key={`${client.id}-${label}-${index}`}
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}
-                        >
-                          {label}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(client.id);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TableCell>
+                {columns.map((column) => (
+                  <TableCell key={column.id} className="py-3">
+                    {renderCell(client, column.id)}
+                  </TableCell>
+                ))}
               </TableRow>
             ))}
             {clients.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground">
+                <TableCell colSpan={columns.length} className="text-center text-muted-foreground">
                   No clients found. Add your first client to get started!
                 </TableCell>
               </TableRow>
