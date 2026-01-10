@@ -972,6 +972,54 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Contractor Recommendations API
+  app.get("/api/contractors/:id/recommendations", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const contractorId = Number(req.params.id);
+      const recommendations = await storage.getContractorRecommendations(contractorId);
+      const count = await storage.getContractorRecommendationCount(contractorId);
+      const hasRecommended = req.user.role === "agent" 
+        ? await storage.hasAgentRecommended(contractorId, req.user.id)
+        : false;
+      res.json({ recommendations, count, hasRecommended });
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+      res.status(500).json({ error: 'Failed to fetch recommendations' });
+    }
+  });
+
+  app.post("/api/contractors/:id/recommend", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const contractorId = Number(req.params.id);
+      await storage.addContractorRecommendation(contractorId, req.user.id);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error adding recommendation:', error);
+      res.status(500).json({ error: 'Failed to add recommendation' });
+    }
+  });
+
+  app.delete("/api/contractors/:id/recommend", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const contractorId = Number(req.params.id);
+      await storage.removeContractorRecommendation(contractorId, req.user.id);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error removing recommendation:', error);
+      res.status(500).json({ error: 'Failed to remove recommendation' });
+    }
+  });
+
   // Property Viewings API
   app.get("/api/viewings", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);

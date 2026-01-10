@@ -88,6 +88,13 @@ export interface IStorage {
   createContractorReview(review: InsertContractorReview): Promise<ContractorReview>;
   deleteContractorReview(id: number): Promise<void>;
 
+  // Contractor recommendation operations
+  getContractorRecommendations(contractorId: number): Promise<{ agentId: number; agentName: string }[]>;
+  getContractorRecommendationCount(contractorId: number): Promise<number>;
+  hasAgentRecommended(contractorId: number, agentId: number): Promise<boolean>;
+  addContractorRecommendation(contractorId: number, agentId: number): Promise<void>;
+  removeContractorRecommendation(contractorId: number, agentId: number): Promise<void>;
+
   // Property viewing operations
   getViewingsByAgent(agentId: number): Promise<PropertyViewing[]>;
   getViewingsByClient(clientId: number): Promise<PropertyViewing[]>;
@@ -1921,12 +1928,80 @@ export class DatabaseStorage implements IStorage {
       zipCode: row.zip_code ? String(row.zip_code) : null,
       description: row.description ? String(row.description) : null,
       googleMapsUrl: row.google_maps_url ? String(row.google_maps_url) : null,
+      yelpUrl: row.yelp_url ? String(row.yelp_url) : null,
       agentId: Number(row.agent_id),
       agentRating: row.agent_rating ? Number(row.agent_rating) : null,
       agentNotes: row.agent_notes ? String(row.agent_notes) : null,
       createdAt: row.created_at ? new Date(row.created_at) : null,
       updatedAt: row.updated_at ? new Date(row.updated_at) : null
     };
+  }
+
+  // Contractor recommendation methods
+  async getContractorRecommendations(contractorId: number): Promise<{ agentId: number; agentName: string }[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT cr.agent_id, u.first_name, u.last_name 
+        FROM contractor_recommendations cr 
+        JOIN users u ON cr.agent_id = u.id 
+        WHERE cr.contractor_id = ${contractorId}
+      `);
+      return result.rows.map((row: any) => ({
+        agentId: Number(row.agent_id),
+        agentName: `${row.first_name} ${row.last_name}`
+      }));
+    } catch (error) {
+      console.error('Error in getContractorRecommendations:', error);
+      throw error;
+    }
+  }
+
+  async getContractorRecommendationCount(contractorId: number): Promise<number> {
+    try {
+      const result = await db.execute(sql`
+        SELECT COUNT(*) as count FROM contractor_recommendations WHERE contractor_id = ${contractorId}
+      `);
+      return Number((result.rows[0] as any)?.count || 0);
+    } catch (error) {
+      console.error('Error in getContractorRecommendationCount:', error);
+      throw error;
+    }
+  }
+
+  async hasAgentRecommended(contractorId: number, agentId: number): Promise<boolean> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 1 FROM contractor_recommendations WHERE contractor_id = ${contractorId} AND agent_id = ${agentId}
+      `);
+      return result.rows.length > 0;
+    } catch (error) {
+      console.error('Error in hasAgentRecommended:', error);
+      throw error;
+    }
+  }
+
+  async addContractorRecommendation(contractorId: number, agentId: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        INSERT INTO contractor_recommendations (contractor_id, agent_id) 
+        VALUES (${contractorId}, ${agentId}) 
+        ON CONFLICT DO NOTHING
+      `);
+    } catch (error) {
+      console.error('Error in addContractorRecommendation:', error);
+      throw error;
+    }
+  }
+
+  async removeContractorRecommendation(contractorId: number, agentId: number): Promise<void> {
+    try {
+      await db.execute(sql`
+        DELETE FROM contractor_recommendations WHERE contractor_id = ${contractorId} AND agent_id = ${agentId}
+      `);
+    } catch (error) {
+      console.error('Error in removeContractorRecommendation:', error);
+      throw error;
+    }
   }
 
   // Property Viewing Methods
