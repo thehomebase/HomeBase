@@ -86,6 +86,20 @@ const searchIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+const clientIcon = new L.Icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+interface ClientWithCoords extends Client {
+  latitude?: number;
+  longitude?: number;
+}
+
 export default function MapPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -155,6 +169,10 @@ export default function MapPage() {
 
   // Map display filter (agents only)
   const [mapDisplayFilter, setMapDisplayFilter] = useState<"showings" | "clients" | "listings">("showings");
+
+  // Client geocoding state
+  const [clientsWithCoords, setClientsWithCoords] = useState<ClientWithCoords[]>([]);
+  const [isGeocodingClients, setIsGeocodingClients] = useState(false);
 
   const { data: transactions = [], isLoading: loadingTransactions } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -503,6 +521,70 @@ export default function MapPage() {
     }
   }, [transactionsWithCoords.length, viewingsWithCoords.length]);
 
+  // Geocode clients when switching to clients filter
+  useEffect(() => {
+    if (mapDisplayFilter !== "clients" || !isAgent || clients.length === 0) return;
+    
+    const geocodeClients = async () => {
+      setIsGeocodingClients(true);
+      const geocodedClients: ClientWithCoords[] = [];
+      
+      for (const client of clients) {
+        // Build address from available fields
+        const addressParts = [];
+        if (client.street) addressParts.push(client.street);
+        if (client.city) addressParts.push(client.city);
+        if (client.zipCode) addressParts.push(client.zipCode);
+        
+        // Skip clients without any address info
+        if (addressParts.length === 0) {
+          geocodedClients.push(client);
+          continue;
+        }
+        
+        const fullAddress = addressParts.join(", ");
+        
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1&countrycodes=us`,
+            { headers: { "Accept": "application/json" } }
+          );
+          const data = await response.json();
+          
+          if (data && data.length > 0) {
+            geocodedClients.push({
+              ...client,
+              latitude: parseFloat(data[0].lat),
+              longitude: parseFloat(data[0].lon)
+            });
+          } else {
+            geocodedClients.push(client);
+          }
+          
+          // Rate limit to respect Nominatim usage policy
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (error) {
+          console.error("Failed to geocode client:", client.id, error);
+          geocodedClients.push(client);
+        }
+      }
+      
+      setClientsWithCoords(geocodedClients);
+      setIsGeocodingClients(false);
+      
+      // Center map on first client with coordinates
+      const firstWithCoords = geocodedClients.find(c => c.latitude && c.longitude);
+      if (firstWithCoords && firstWithCoords.latitude && firstWithCoords.longitude) {
+        setMapCenter([firstWithCoords.latitude, firstWithCoords.longitude]);
+        setMapZoom(10);
+      }
+    };
+    
+    geocodeClients();
+  }, [mapDisplayFilter, clients, isAgent]);
+
+  const clientsWithValidCoords = clientsWithCoords.filter(c => c.latitude && c.longitude);
+
   return (
     <div style={{ position: "fixed", top: 0, left: "60px", right: 0, bottom: 0 }}>
       <MapContainer
@@ -667,6 +749,40 @@ export default function MapPage() {
             </Popup>
           </Marker>
         ))}
+
+        {isAgent && mapDisplayFilter === "clients" && clientsWithValidCoords.map((client) => (
+          <Marker key={`client-${client.id}`} position={[client.latitude!, client.longitude!]} icon={clientIcon}>
+            <Popup>
+              <div className="p-2 min-w-[220px]">
+                <h3 className="font-bold text-purple-700">{client.firstName} {client.lastName}</h3>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {(Array.isArray(client.type) ? client.type : [client.type]).map((t, idx) => (
+                    <Badge key={idx} variant="outline" className="text-xs capitalize">{t}</Badge>
+                  ))}
+                </div>
+                {(client.street || client.city || client.zipCode) && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    {client.street && <span>{client.street}<br/></span>}
+                    {client.city}{client.zipCode && `, ${client.zipCode}`}
+                  </p>
+                )}
+                {client.email && (
+                  <p className="text-sm text-gray-500 mt-1">{client.email}</p>
+                )}
+                {client.phone && (
+                  <p className="text-sm text-gray-500">{client.phone}</p>
+                )}
+                {client.labels && client.labels.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {client.labels.map((label, idx) => (
+                      <span key={idx} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{label}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
         
         {routeData?.geometry && (
           <GeoJSON 
@@ -729,7 +845,8 @@ export default function MapPage() {
               onClick={() => setMapDisplayFilter("clients")}
               data-testid="filter-clients"
             >
-              <Star className="h-3 w-3 mr-1" /> By Client
+              <Star className="h-3 w-3 mr-1" /> Clients
+              {isGeocodingClients && <Loader2 className="h-3 w-3 ml-1 animate-spin" />}
             </Button>
             <Button
               size="sm"
@@ -742,22 +859,6 @@ export default function MapPage() {
             </Button>
           </div>
         )}
-        {isAgent && mapDisplayFilter === "clients" && clients.length > 0 && (
-          <Select 
-            value={selectedClientFilter === "all" ? "all" : String(selectedClientFilter)} 
-            onValueChange={(v) => setSelectedClientFilter(v === "all" ? "all" : Number(v))}
-          >
-            <SelectTrigger className="w-48 h-8 text-sm bg-background shadow-lg" data-testid="select-map-client-filter">
-              <SelectValue placeholder="Select client" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Clients</SelectItem>
-              {clients.map((client) => (
-                <SelectItem key={client.id} value={String(client.id)}>{client.firstName} {client.lastName}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
         <div className="flex flex-wrap gap-2">
           {isAgent && mapDisplayFilter === "listings" && (
             <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
@@ -765,10 +866,16 @@ export default function MapPage() {
               {transactionsWithCoords.length} listings
             </Badge>
           )}
-          {isAgent && (mapDisplayFilter === "showings" || mapDisplayFilter === "clients") && (
+          {isAgent && mapDisplayFilter === "showings" && (
             <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
               <MapPin className="h-3 w-3 text-blue-600" />
-              {viewingsWithCoords.length} {selectedClientFilter !== "all" ? "filtered" : ""} showings
+              {viewingsWithCoords.length} showings
+            </Badge>
+          )}
+          {isAgent && mapDisplayFilter === "clients" && (
+            <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
+              <Star className="h-3 w-3 text-purple-600" />
+              {clientsWithValidCoords.length} of {clients.length} clients mapped
             </Badge>
           )}
           {!isAgent && (
