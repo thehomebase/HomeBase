@@ -841,6 +841,105 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/contractors/proximity", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    const { zip, radius = "20" } = req.query;
+    if (!zip || typeof zip !== "string") {
+      return res.status(400).json({ error: "Zip code is required" });
+    }
+    
+    const radiusMiles = parseFloat(radius as string) || 20;
+    
+    try {
+      const nominatimResponse = await fetch(
+        `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(zip)}&country=USA&format=json&limit=1`,
+        { headers: { "User-Agent": "HomeBase-RealEstate-App" } }
+      );
+      
+      if (!nominatimResponse.ok) {
+        return res.status(500).json({ error: "Geocoding service unavailable" });
+      }
+      
+      const geocodeResults = await nominatimResponse.json();
+      if (!geocodeResults.length) {
+        return res.status(404).json({ error: "Zip code not found" });
+      }
+      
+      const searchLat = parseFloat(geocodeResults[0].lat);
+      const searchLon = parseFloat(geocodeResults[0].lon);
+      
+      const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+        const R = 3959;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      };
+      
+      const contractors = await storage.getAllContractors();
+      
+      const contractorsWithDistance = await Promise.all(
+        contractors.map(async (contractor) => {
+          let lat = contractor.latitude;
+          let lon = contractor.longitude;
+          
+          if (!lat || !lon) {
+            const addressParts = [contractor.address, contractor.city, contractor.state, contractor.zipCode].filter(Boolean);
+            if (addressParts.length > 0) {
+              try {
+                const geoResponse = await fetch(
+                  `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addressParts.join(", "))}&format=json&limit=1`,
+                  { headers: { "User-Agent": "HomeBase-RealEstate-App" } }
+                );
+                if (geoResponse.ok) {
+                  const geoData = await geoResponse.json();
+                  if (geoData.length > 0) {
+                    lat = parseFloat(geoData[0].lat);
+                    lon = parseFloat(geoData[0].lon);
+                    storage.updateContractor(contractor.id, { latitude: lat, longitude: lon });
+                  }
+                }
+              } catch (e) {
+                console.error("Geocoding error for contractor:", contractor.id, e);
+              }
+            }
+          }
+          
+          const reviews = await storage.getContractorReviews(contractor.id);
+          let averageRating: number | null = null;
+          if (reviews.length > 0) {
+            const total = reviews.reduce((sum, r) => sum + r.rating, 0);
+            averageRating = Math.round((total / reviews.length) * 10) / 10;
+          }
+          
+          let distance: number | null = null;
+          if (lat && lon) {
+            distance = Math.round(haversineDistance(searchLat, searchLon, lat, lon) * 10) / 10;
+          }
+          
+          return { ...contractor, averageRating, reviewCount: reviews.length, distance };
+        })
+      );
+      
+      const filteredContractors = contractorsWithDistance
+        .filter(c => c.distance !== null && c.distance <= radiusMiles)
+        .sort((a, b) => (a.distance || 0) - (b.distance || 0));
+      
+      res.json({
+        searchLocation: { lat: searchLat, lon: searchLon, zip },
+        radius: radiusMiles,
+        contractors: filteredContractors
+      });
+    } catch (error) {
+      console.error("Error in proximity search:", error);
+      res.status(500).json({ error: "Failed to perform proximity search" });
+    }
+  });
+
   app.get("/api/contractors/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
