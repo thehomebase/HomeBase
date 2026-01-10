@@ -539,7 +539,7 @@ const TableContent = ({
       if (currentConfig.direction === 'asc') {
         return { key, direction: 'desc' };
       }
-      return null;
+      return { key, direction: 'asc' };
     });
   };
 
