@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { type Contractor, type ContractorReview } from "@shared/schema";
 import { 
   Plus, Search, Star, Phone, Mail, Globe, MapPin, 
-  Pencil, Trash2, ExternalLink, Building2
+  Pencil, Trash2, ExternalLink, Building2, Award, ThumbsUp, Users
 } from "lucide-react";
+import { SiYelp, SiGoogle } from "react-icons/si";
 
 const CATEGORIES = [
   { value: "all", label: "All Categories" },
@@ -63,13 +64,17 @@ function ContractorCard({
   onEdit, 
   onDelete,
   onViewDetails,
-  isOwner 
+  isOwner,
+  recommendationCount,
+  isPreferredVendor
 }: { 
   contractor: Contractor; 
   onEdit: () => void; 
   onDelete: () => void;
   onViewDetails: () => void;
   isOwner: boolean;
+  recommendationCount: number;
+  isPreferredVendor: boolean;
 }) {
   const categoryLabel = CATEGORIES.find(c => c.value === contractor.category)?.label || contractor.category;
   
@@ -77,9 +82,25 @@ function ContractorCard({
     <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={onViewDetails} data-testid={`card-contractor-${contractor.id}`}>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="text-lg">{contractor.name}</CardTitle>
-            <Badge variant="secondary" className="mt-1">{categoryLabel}</Badge>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <CardTitle className="text-lg">{contractor.name}</CardTitle>
+              {isPreferredVendor && (
+                <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
+                  <Award className="h-3 w-3 mr-1" />
+                  Preferred Vendor
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <Badge variant="secondary">{categoryLabel}</Badge>
+              {recommendationCount > 0 && (
+                <Badge variant="outline" className="text-green-600 border-green-600">
+                  <Users className="h-3 w-3 mr-1" />
+                  {recommendationCount} agent{recommendationCount !== 1 ? 's' : ''} recommend
+                </Badge>
+              )}
+            </div>
           </div>
           {isOwner && (
             <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
@@ -123,6 +144,32 @@ function ContractorCard({
             </div>
           )}
         </div>
+        {(contractor.googleMapsUrl || contractor.yelpUrl) && (
+          <div className="flex items-center gap-2 mt-3 pt-2 border-t" onClick={(e) => e.stopPropagation()}>
+            {contractor.googleMapsUrl && (
+              <a 
+                href={contractor.googleMapsUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+              >
+                <SiGoogle className="h-3 w-3" />
+                Google
+              </a>
+            )}
+            {contractor.yelpUrl && (
+              <a 
+                href={contractor.yelpUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-red-600 hover:underline"
+              >
+                <SiYelp className="h-3 w-3" />
+                Yelp
+              </a>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -149,6 +196,7 @@ function ContractorForm({
     zipCode: contractor?.zipCode || "",
     description: contractor?.description || "",
     googleMapsUrl: contractor?.googleMapsUrl || "",
+    yelpUrl: contractor?.yelpUrl || "",
     agentRating: contractor?.agentRating || 0,
     agentNotes: contractor?.agentNotes || ""
   });
@@ -223,6 +271,16 @@ function ContractorForm({
           />
         </div>
         <div className="space-y-2">
+          <Label htmlFor="yelpUrl">Yelp Link</Label>
+          <Input
+            id="yelpUrl"
+            value={form.yelpUrl}
+            onChange={(e) => setForm({ ...form, yelpUrl: e.target.value })}
+            placeholder="Link to view reviews on Yelp"
+            data-testid="input-contractor-yelp-url"
+          />
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="city">City</Label>
           <Input
             id="city"
@@ -285,6 +343,7 @@ function ContractorDetail({
   onClose: () => void;
   isOwner: boolean;
 }) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [reviewForm, setReviewForm] = useState({ reviewerName: "", rating: 5, comment: "" });
 
@@ -293,6 +352,36 @@ function ContractorDetail({
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/contractors/${contractor.id}/reviews`);
       return res.json();
+    }
+  });
+
+  const { data: recommendationData, refetch: refetchRecommendations } = useQuery<{ count: number; hasRecommended: boolean; recommendations: any[] }>({
+    queryKey: ["/api/contractors", contractor.id, "recommendations"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/contractors/${contractor.id}/recommendations`);
+      return res.json();
+    }
+  });
+
+  const recommendMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/contractors/${contractor.id}/recommend`);
+    },
+    onSuccess: () => {
+      refetchRecommendations();
+      queryClient.invalidateQueries({ queryKey: ["/api/contractors"] });
+      toast({ title: "You've recommended this contractor!" });
+    }
+  });
+
+  const unrecommendMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/contractors/${contractor.id}/recommend`);
+    },
+    onSuccess: () => {
+      refetchRecommendations();
+      queryClient.invalidateQueries({ queryKey: ["/api/contractors"] });
+      toast({ title: "Recommendation removed" });
     }
   });
 
@@ -324,8 +413,22 @@ function ContractorDetail({
       <div>
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold">{contractor.name}</h2>
-            <Badge variant="secondary" className="mt-1">{categoryLabel}</Badge>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-2xl font-bold">{contractor.name}</h2>
+              <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
+                <Award className="h-3 w-3 mr-1" />
+                Preferred Vendor
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <Badge variant="secondary">{categoryLabel}</Badge>
+              {(recommendationData?.count || 0) > 0 && (
+                <Badge variant="outline" className="text-green-600 border-green-600">
+                  <Users className="h-3 w-3 mr-1" />
+                  {recommendationData?.count} agent{recommendationData?.count !== 1 ? 's' : ''} recommend
+                </Badge>
+              )}
+            </div>
           </div>
           {contractor.agentRating && (
             <div className="text-right">
@@ -336,6 +439,32 @@ function ContractorDetail({
         </div>
         {contractor.description && (
           <p className="text-muted-foreground mt-3">{contractor.description}</p>
+        )}
+        
+        {user?.role === "agent" && (
+          <div className="mt-4">
+            {recommendationData?.hasRecommended ? (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => unrecommendMutation.mutate()}
+                disabled={unrecommendMutation.isPending}
+              >
+                <ThumbsUp className="h-4 w-4 mr-2 fill-current" />
+                You Recommend This Contractor
+              </Button>
+            ) : (
+              <Button 
+                variant="default" 
+                size="sm"
+                onClick={() => recommendMutation.mutate()}
+                disabled={recommendMutation.isPending}
+              >
+                <ThumbsUp className="h-4 w-4 mr-2" />
+                Recommend This Contractor
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -362,9 +491,17 @@ function ContractorDetail({
         )}
         {contractor.googleMapsUrl && (
           <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
+            <SiGoogle className="h-4 w-4 text-muted-foreground" />
             <a href={contractor.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-              View on Google Maps <ExternalLink className="h-3 w-3 inline" />
+              View on Google <ExternalLink className="h-3 w-3 inline" />
+            </a>
+          </div>
+        )}
+        {contractor.yelpUrl && (
+          <div className="flex items-center gap-2">
+            <SiYelp className="h-4 w-4 text-red-500" />
+            <a href={contractor.yelpUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              View on Yelp <ExternalLink className="h-3 w-3 inline" />
             </a>
           </div>
         )}
@@ -463,11 +600,36 @@ export default function ContractorsPage() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingContractor, setEditingContractor] = useState<Contractor | null>(null);
   const [viewingContractor, setViewingContractor] = useState<Contractor | null>(null);
+  const [recommendationCounts, setRecommendationCounts] = useState<Record<number, number>>({});
 
   const { data: contractors = [], isLoading } = useQuery<Contractor[]>({
     queryKey: ["/api/contractors"],
     enabled: !!user
   });
+
+  // Fetch recommendation counts for all contractors
+  const fetchRecommendationCounts = async (contractorsList: Contractor[]) => {
+    const counts: Record<number, number> = {};
+    for (const c of contractorsList) {
+      try {
+        const res = await fetch(`/api/contractors/${c.id}/recommendations`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          counts[c.id] = data.count || 0;
+        }
+      } catch {
+        counts[c.id] = 0;
+      }
+    }
+    setRecommendationCounts(counts);
+  };
+
+  // Fetch recommendation counts when contractors load
+  useEffect(() => {
+    if (contractors.length > 0) {
+      fetchRecommendationCounts(contractors);
+    }
+  }, [contractors]);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -603,6 +765,8 @@ export default function ContractorsPage() {
               onDelete={() => handleDelete(contractor)}
               onViewDetails={() => setViewingContractor(contractor)}
               isOwner={contractor.agentId === user.id}
+              recommendationCount={recommendationCounts[contractor.id] || 0}
+              isPreferredVendor={true}
             />
           ))}
         </div>
