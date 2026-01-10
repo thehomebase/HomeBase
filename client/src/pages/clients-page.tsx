@@ -43,18 +43,30 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 } | null;
 
-const isAddressMappable = (client: Client): boolean => {
+type AddressValidation = {
+  streetInvalid: boolean;
+  locationMissing: boolean; // both city AND zip are missing
+};
+
+const getAddressValidation = (client: Client): AddressValidation => {
   const street = client.street?.trim() || '';
   const hasCity = client.city && client.city.trim().length > 0;
   const hasZip = client.zipCode && client.zipCode.trim().length > 0;
   
   // Street must have both numbers and letters to be a valid address
-  // e.g., "123 Main St" is valid, but "123" or "Main St" alone are not ideal
   const hasNumbers = /\d/.test(street);
   const hasLetters = /[a-zA-Z]/.test(street);
   const isValidStreet = street.length > 0 && hasNumbers && hasLetters;
   
-  return isValidStreet && (hasCity || hasZip);
+  return {
+    streetInvalid: !isValidStreet,
+    locationMissing: !hasCity && !hasZip
+  };
+};
+
+const isAddressMappable = (client: Client): boolean => {
+  const validation = getAddressValidation(client);
+  return !validation.streetInvalid && !validation.locationMissing;
 };
 
 const ClientCard = ({ client, onSelect, onEdit }: {
@@ -72,13 +84,8 @@ const ClientCard = ({ client, onSelect, onEdit }: {
       >
         <div className="flex items-center gap-3">
           <div>
-            <h3 className="font-medium flex items-center gap-1">
+            <h3 className="font-medium">
               {client.firstName} {client.lastName}
-              {!isAddressMappable(client) && (
-                <span title="Address incomplete - cannot be mapped">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                </span>
-              )}
             </h3>
             <span className={`text-xs px-2 py-0.5 rounded-full ${
               client.status === 'active'
@@ -127,10 +134,24 @@ const ClientCard = ({ client, onSelect, onEdit }: {
             </div>
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">
-                {client.street || client.city || client.zipCode 
-                  ? `${client.street || ''}${client.city ? `, ${client.city}` : ''}${client.zipCode ? ` ${client.zipCode}` : ''}`
-                  : 'No address'}
+              <span className="text-sm flex items-center gap-1">
+                {client.street || client.city || client.zipCode ? (
+                  <>
+                    <span className="flex items-center gap-1">
+                      {client.street || '-'}
+                      {getAddressValidation(client).streetInvalid && (
+                        <AlertTriangle className="h-3 w-3 text-amber-500" title="Street incomplete" />
+                      )}
+                    </span>
+                    {client.city && `, ${client.city}`}
+                    {client.zipCode && ` ${client.zipCode}`}
+                    {getAddressValidation(client).locationMissing && (
+                      <AlertTriangle className="h-3 w-3 text-amber-500" title="City or zip required" />
+                    )}
+                  </>
+                ) : (
+                  <>No address <AlertTriangle className="h-3 w-3 text-amber-500" title="Address missing" /></>
+                )}
               </span>
             </div>
             <div className="text-xs text-muted-foreground">
@@ -483,21 +504,39 @@ const TableContent = ({
                 }`}
                 onClick={() => setSelectedClient(client)}
               >
+                <TableCell className="py-3">{client.lastName}</TableCell>
+                <TableCell className="py-3">{client.firstName}</TableCell>
+                <TableCell className="py-3">{client.email}</TableCell>
                 <TableCell className="py-3">
                   <div className="flex items-center gap-1">
-                    {client.lastName}
-                    {!isAddressMappable(client) && (
-                      <span title="Address incomplete - cannot be mapped">
+                    {client.street || '-'}
+                    {getAddressValidation(client).streetInvalid && (
+                      <span title="Street address incomplete - needs number and street name">
                         <AlertTriangle className="h-4 w-4 text-amber-500" />
                       </span>
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="py-3">{client.firstName}</TableCell>
-                <TableCell className="py-3">{client.email}</TableCell>
-                <TableCell className="py-3">{client.street || '-'}</TableCell>
-                <TableCell className="py-3">{client.city || '-'}</TableCell>
-                <TableCell className="py-3">{client.zipCode || '-'}</TableCell>
+                <TableCell className="py-3">
+                  <div className="flex items-center gap-1">
+                    {client.city || '-'}
+                    {getAddressValidation(client).locationMissing && (
+                      <span title="City or zip code required for mapping">
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="py-3">
+                  <div className="flex items-center gap-1">
+                    {client.zipCode || '-'}
+                    {getAddressValidation(client).locationMissing && (
+                      <span title="City or zip code required for mapping">
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="py-3">{client.phone}</TableCell>
                 <TableCell className="py-3">
                   <div className="flex flex-wrap gap-1">
