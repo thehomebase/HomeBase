@@ -14,8 +14,17 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { type Contractor, type ContractorReview } from "@shared/schema";
 import { 
   Plus, Search, Star, Phone, Mail, Globe, MapPin, 
-  Pencil, Trash2, ExternalLink, Building2, Award, ThumbsUp, Users
+  Pencil, Trash2, ExternalLink, Building2, Award, ThumbsUp, Users,
+  LayoutGrid, List
 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { SiYelp, SiGoogle } from "react-icons/si";
 
 const CATEGORIES = [
@@ -596,6 +605,7 @@ export default function ContractorsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingContractor, setEditingContractor] = useState<Contractor | null>(null);
@@ -733,6 +743,24 @@ export default function ContractorsPage() {
             ))}
           </SelectContent>
         </Select>
+        <div className="flex border rounded-md">
+          <Button
+            variant={viewMode === "cards" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("cards")}
+            className="rounded-r-none"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "table" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("table")}
+            className="rounded-l-none"
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -755,7 +783,7 @@ export default function ContractorsPage() {
             </Button>
           )}
         </div>
-      ) : (
+      ) : viewMode === "cards" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredContractors.map((contractor) => (
             <ContractorCard
@@ -769,6 +797,111 @@ export default function ContractorsPage() {
               isPreferredVendor={true}
             />
           ))}
+        </div>
+      ) : (
+        <div className="border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Rating</TableHead>
+                <TableHead>Links</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredContractors.map((contractor) => {
+                const categoryLabel = CATEGORIES.find(c => c.value === contractor.category)?.label || contractor.category;
+                const recCount = recommendationCounts[contractor.id] || 0;
+                return (
+                  <TableRow key={contractor.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setViewingContractor(contractor)}>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-medium">{contractor.name}</span>
+                        <div className="flex gap-1 flex-wrap">
+                          <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-xs px-1.5 py-0">
+                            <Award className="h-2.5 w-2.5 mr-0.5" />
+                            Preferred
+                          </Badge>
+                          {recCount > 0 && (
+                            <Badge variant="outline" className="text-green-600 border-green-600 text-xs px-1.5 py-0">
+                              <Users className="h-2.5 w-2.5 mr-0.5" />
+                              {recCount}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{categoryLabel}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {contractor.phone ? (
+                        <a href={`tel:${contractor.phone}`} className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                          {contractor.phone}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {contractor.city || contractor.state ? (
+                        <span>{[contractor.city, contractor.state].filter(Boolean).join(', ')}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {contractor.agentRating ? (
+                        <div className="flex items-center gap-1">
+                          <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                          <span>{contractor.agentRating}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                        {contractor.googleMapsUrl && (
+                          <a href={contractor.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
+                            <SiGoogle className="h-4 w-4" />
+                          </a>
+                        )}
+                        {contractor.yelpUrl && (
+                          <a href={contractor.yelpUrl} target="_blank" rel="noopener noreferrer" className="text-red-500 hover:text-red-600">
+                            <SiYelp className="h-4 w-4" />
+                          </a>
+                        )}
+                        {contractor.website && (
+                          <a href={contractor.website.startsWith('http') ? contractor.website : `https://${contractor.website}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
+                            <Globe className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        {contractor.agentId === user.id && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingContractor(contractor)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(contractor)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
 
