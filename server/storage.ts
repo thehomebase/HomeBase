@@ -1392,13 +1392,26 @@ export class DatabaseStorage implements IStorage {
           ? sanitizedData.labels.filter(label => typeof label === 'string' && label.trim().length > 0)
           : [];
         
-
         await db.execute(sql`
           UPDATE clients 
           SET labels = array[${sql.join(labelsArray, sql`, `)}]::text[]
           WHERE id = ${id}
         `);
         delete sanitizedData.labels;
+      }
+
+      // Special handling for type array
+      if ('type' in sanitizedData) {
+        const typeArray = Array.isArray(sanitizedData.type) 
+          ? sanitizedData.type.filter(t => typeof t === 'string' && t.trim().length > 0)
+          : [String(sanitizedData.type)];
+        
+        await db.execute(sql`
+          UPDATE clients 
+          SET type = array[${sql.join(typeArray, sql`, `)}]::text[]
+          WHERE id = ${id}
+        `);
+        delete sanitizedData.type;
       }
 
       // Handle remaining fields
