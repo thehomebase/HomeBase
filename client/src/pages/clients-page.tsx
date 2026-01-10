@@ -24,7 +24,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check, Upload, FileSpreadsheet, Info } from "lucide-react";
+import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check, Upload, FileSpreadsheet, Info, AlertTriangle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +43,13 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 } | null;
 
+const isAddressMappable = (client: Client): boolean => {
+  const hasStreet = client.street && client.street.trim().length > 0;
+  const hasCity = client.city && client.city.trim().length > 0;
+  const hasZip = client.zipCode && client.zipCode.trim().length > 0;
+  return hasStreet && (hasCity || hasZip);
+};
+
 const ClientCard = ({ client, onSelect, onEdit }: {
   client: Client;
   onSelect: (client: Client) => void;
@@ -58,8 +65,13 @@ const ClientCard = ({ client, onSelect, onEdit }: {
       >
         <div className="flex items-center gap-3">
           <div>
-            <h3 className="font-medium">
+            <h3 className="font-medium flex items-center gap-1">
               {client.firstName} {client.lastName}
+              {!isAddressMappable(client) && (
+                <span title="Address incomplete - cannot be mapped">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                </span>
+              )}
             </h3>
             <span className={`text-xs px-2 py-0.5 rounded-full ${
               client.status === 'active'
@@ -464,7 +476,16 @@ const TableContent = ({
                 }`}
                 onClick={() => setSelectedClient(client)}
               >
-                <TableCell className="py-3">{client.lastName}</TableCell>
+                <TableCell className="py-3">
+                  <div className="flex items-center gap-1">
+                    {client.lastName}
+                    {!isAddressMappable(client) && (
+                      <span title="Address incomplete - cannot be mapped">
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="py-3">{client.firstName}</TableCell>
                 <TableCell className="py-3">{client.email}</TableCell>
                 <TableCell className="py-3">{client.street || '-'}</TableCell>
