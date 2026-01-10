@@ -44,10 +44,17 @@ type SortConfig = {
 } | null;
 
 const isAddressMappable = (client: Client): boolean => {
-  const hasStreet = client.street && client.street.trim().length > 0;
+  const street = client.street?.trim() || '';
   const hasCity = client.city && client.city.trim().length > 0;
   const hasZip = client.zipCode && client.zipCode.trim().length > 0;
-  return hasStreet && (hasCity || hasZip);
+  
+  // Street must have both numbers and letters to be a valid address
+  // e.g., "123 Main St" is valid, but "123" or "Main St" alone are not ideal
+  const hasNumbers = /\d/.test(street);
+  const hasLetters = /[a-zA-Z]/.test(street);
+  const isValidStreet = street.length > 0 && hasNumbers && hasLetters;
+  
+  return isValidStreet && (hasCity || hasZip);
 };
 
 const ClientCard = ({ client, onSelect, onEdit }: {
