@@ -80,7 +80,8 @@ function ContractorCard({
   onViewDetails,
   isOwner,
   recommendationCount,
-  isPreferredVendor
+  isPreferredVendor,
+  distance
 }: { 
   contractor: ContractorWithRating; 
   onEdit: () => void; 
@@ -89,6 +90,7 @@ function ContractorCard({
   isOwner: boolean;
   recommendationCount: number;
   isPreferredVendor: boolean;
+  distance?: number | null;
 }) {
   const categoryLabel = CATEGORIES.find(c => c.value === contractor.category)?.label || contractor.category;
   const displayRating = contractor.averageRating ?? contractor.agentRating;
@@ -113,6 +115,12 @@ function ContractorCard({
                 <Badge variant="outline" className="text-green-600 border-green-600">
                   <Users className="h-3 w-3 mr-1" />
                   {recommendationCount} agent{recommendationCount !== 1 ? 's' : ''} recommend
+                </Badge>
+              )}
+              {distance !== undefined && distance !== null && (
+                <Badge variant="outline" className="text-blue-600 border-blue-600">
+                  <MapPin className="h-3 w-3 mr-1" />
+                  {distance} mi
                 </Badge>
               )}
             </div>
@@ -621,6 +629,8 @@ function ContractorDetail({
   );
 }
 
+type ContractorWithDistance = ContractorWithRating & { distance?: number | null };
+
 export default function ContractorsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -631,11 +641,51 @@ export default function ContractorsPage() {
   const [editingContractor, setEditingContractor] = useState<ContractorWithRating | null>(null);
   const [viewingContractor, setViewingContractor] = useState<ContractorWithRating | null>(null);
   const [recommendationCounts, setRecommendationCounts] = useState<Record<number, number>>({});
+  const [zipSearch, setZipSearch] = useState("");
+  const [searchRadius, setSearchRadius] = useState("20");
+  const [proximityEnabled, setProximityEnabled] = useState(false);
 
   const { data: contractors = [], isLoading } = useQuery<ContractorWithRating[]>({
     queryKey: ["/api/contractors"],
-    enabled: !!user
+    enabled: !!user && !proximityEnabled
   });
+
+  const { data: proximityData, isLoading: proximityLoading, refetch: refetchProximity } = useQuery<{
+    searchLocation: { lat: number; lon: number; zip: string };
+    radius: number;
+    contractors: ContractorWithDistance[];
+  }>({
+    queryKey: ["/api/contractors/proximity", zipSearch, searchRadius],
+    queryFn: async () => {
+      const res = await fetch(`/api/contractors/proximity?zip=${encodeURIComponent(zipSearch)}&radius=${searchRadius}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Search failed");
+      }
+      return res.json();
+    },
+    enabled: !!user && proximityEnabled && zipSearch.length === 5
+  });
+
+  const handleProximitySearch = () => {
+    if (zipSearch.length !== 5) {
+      toast({ title: "Please enter a valid 5-digit zip code", variant: "destructive" });
+      return;
+    }
+    setProximityEnabled(true);
+    refetchProximity();
+  };
+
+  const clearProximitySearch = () => {
+    setZipSearch("");
+    setProximityEnabled(false);
+  };
+
+  const displayContractors: ContractorWithDistance[] = proximityEnabled 
+    ? (proximityData?.contractors || [])
+    : contractors;
 
   // Fetch recommendation counts for all contractors
   const fetchRecommendationCounts = async (contractorsList: Contractor[]) => {
@@ -704,7 +754,7 @@ export default function ContractorsPage() {
     }
   });
 
-  const filteredContractors = contractors.filter((c) => {
+  const filteredContractors = displayContractors.filter((c) => {
     const matchesSearch = 
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (c.description?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
@@ -742,7 +792,7 @@ export default function ContractorsPage() {
         )}
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
+      <div className="flex flex-col md:flex-row gap-4 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -783,6 +833,49 @@ export default function ContractorsPage() {
         </div>
       </div>
 
+      <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-muted/50 rounded-lg">
+        <div className="flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Find by Location:</span>
+        </div>
+        <Input
+          placeholder="Enter zip code"
+          value={zipSearch}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '').slice(0, 5);
+            setZipSearch(val);
+            if (val.length < 5) setProximityEnabled(false);
+          }}
+          className="w-full md:w-[140px]"
+          maxLength={5}
+        />
+        <Select value={searchRadius} onValueChange={setSearchRadius}>
+          <SelectTrigger className="w-full md:w-[140px]">
+            <SelectValue placeholder="Radius" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="10">10 miles</SelectItem>
+            <SelectItem value="20">20 miles</SelectItem>
+            <SelectItem value="30">30 miles</SelectItem>
+            <SelectItem value="50">50 miles</SelectItem>
+            <SelectItem value="100">100 miles</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button onClick={handleProximitySearch} disabled={zipSearch.length !== 5 || proximityLoading}>
+          {proximityLoading ? "Searching..." : "Search Area"}
+        </Button>
+        {proximityEnabled && (
+          <Button variant="outline" onClick={clearProximitySearch}>
+            Clear
+          </Button>
+        )}
+        {proximityEnabled && proximityData && (
+          <span className="text-sm text-muted-foreground self-center">
+            {proximityData.contractors.length} contractor{proximityData.contractors.length !== 1 ? 's' : ''} within {proximityData.radius} miles
+          </span>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
@@ -815,6 +908,7 @@ export default function ContractorsPage() {
               isOwner={contractor.agentId === user.id}
               recommendationCount={recommendationCounts[contractor.id] || 0}
               isPreferredVendor={true}
+              distance={(contractor as ContractorWithDistance).distance}
             />
           ))}
         </div>
