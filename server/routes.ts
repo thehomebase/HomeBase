@@ -812,7 +812,18 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const contractors = await storage.getAllContractors();
-      res.json(contractors);
+      const contractorsWithRatings = await Promise.all(
+        contractors.map(async (contractor) => {
+          const reviews = await storage.getContractorReviews(contractor.id);
+          let averageRating: number | null = null;
+          if (reviews.length > 0) {
+            const total = reviews.reduce((sum, r) => sum + r.rating, 0);
+            averageRating = Math.round((total / reviews.length) * 10) / 10;
+          }
+          return { ...contractor, averageRating, reviewCount: reviews.length };
+        })
+      );
+      res.json(contractorsWithRatings);
     } catch (error) {
       console.error('Error fetching contractors:', error);
       res.status(500).json({ error: 'Failed to fetch contractors' });

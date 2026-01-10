@@ -12,6 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { type Contractor, type ContractorReview } from "@shared/schema";
+
+type ContractorWithRating = Contractor & {
+  averageRating?: number | null;
+  reviewCount?: number;
+};
 import { 
   Plus, Search, Star, Phone, Mail, Globe, MapPin, 
   Pencil, Trash2, ExternalLink, Building2, Award, ThumbsUp, Users,
@@ -77,7 +82,7 @@ function ContractorCard({
   recommendationCount,
   isPreferredVendor
 }: { 
-  contractor: Contractor; 
+  contractor: ContractorWithRating; 
   onEdit: () => void; 
   onDelete: () => void;
   onViewDetails: () => void;
@@ -86,6 +91,7 @@ function ContractorCard({
   isPreferredVendor: boolean;
 }) {
   const categoryLabel = CATEGORIES.find(c => c.value === contractor.category)?.label || contractor.category;
+  const displayRating = contractor.averageRating ?? contractor.agentRating;
   
   return (
     <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={onViewDetails} data-testid={`card-contractor-${contractor.id}`}>
@@ -124,10 +130,15 @@ function ContractorCard({
         </div>
       </CardHeader>
       <CardContent>
-        {contractor.agentRating && (
+        {displayRating && (
           <div className="flex items-center gap-2 mb-2">
-            <StarRating rating={contractor.agentRating} readonly />
-            <span className="text-sm text-muted-foreground">Agent Rating</span>
+            <div className="flex items-center gap-1">
+              <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+              <span className="font-medium">{displayRating.toFixed(1)}</span>
+            </div>
+            <span className="text-sm text-muted-foreground">
+              {contractor.reviewCount ? `(${contractor.reviewCount} review${contractor.reviewCount !== 1 ? 's' : ''})` : 'Rating'}
+            </span>
           </div>
         )}
         {contractor.description && (
@@ -189,7 +200,7 @@ function ContractorForm({
   onClose, 
   onSave 
 }: { 
-  contractor?: Contractor; 
+  contractor?: ContractorWithRating; 
   onClose: () => void; 
   onSave: (data: any) => void;
 }) {
@@ -348,7 +359,7 @@ function ContractorDetail({
   onClose,
   isOwner
 }: { 
-  contractor: Contractor; 
+  contractor: ContractorWithRating; 
   onClose: () => void;
   isOwner: boolean;
 }) {
@@ -439,10 +450,19 @@ function ContractorDetail({
               )}
             </div>
           </div>
-          {contractor.agentRating && (
+          {(contractor.averageRating || contractor.agentRating) && (
             <div className="text-right">
-              <StarRating rating={contractor.agentRating} readonly />
-              <span className="text-sm text-muted-foreground">Agent Rating</span>
+              <div className="flex items-center gap-1 justify-end">
+                <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                <span className="font-medium text-lg">
+                  {((contractor as ContractorWithRating).averageRating ?? contractor.agentRating)?.toFixed(1)}
+                </span>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {(contractor as ContractorWithRating).reviewCount 
+                  ? `${(contractor as ContractorWithRating).reviewCount} review${(contractor as ContractorWithRating).reviewCount !== 1 ? 's' : ''}`
+                  : 'Rating'}
+              </span>
             </div>
           )}
         </div>
@@ -608,11 +628,11 @@ export default function ContractorsPage() {
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [editingContractor, setEditingContractor] = useState<Contractor | null>(null);
-  const [viewingContractor, setViewingContractor] = useState<Contractor | null>(null);
+  const [editingContractor, setEditingContractor] = useState<ContractorWithRating | null>(null);
+  const [viewingContractor, setViewingContractor] = useState<ContractorWithRating | null>(null);
   const [recommendationCounts, setRecommendationCounts] = useState<Record<number, number>>({});
 
-  const { data: contractors = [], isLoading } = useQuery<Contractor[]>({
+  const { data: contractors = [], isLoading } = useQuery<ContractorWithRating[]>({
     queryKey: ["/api/contractors"],
     enabled: !!user
   });
@@ -855,10 +875,13 @@ export default function ContractorsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {contractor.agentRating ? (
+                      {(contractor.averageRating || contractor.agentRating) ? (
                         <div className="flex items-center gap-1">
                           <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                          <span>{contractor.agentRating}</span>
+                          <span>{(contractor.averageRating ?? contractor.agentRating)?.toFixed(1)}</span>
+                          {contractor.reviewCount && contractor.reviewCount > 0 && (
+                            <span className="text-muted-foreground text-xs">({contractor.reviewCount})</span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-muted-foreground">-</span>
