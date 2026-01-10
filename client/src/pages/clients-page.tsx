@@ -1003,16 +1003,48 @@ export default function ClientsPage() {
                       />
                       <FormField
                         control={form.control}
-                        name="status"
+                        name="labels"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Status</FormLabel>
+                            <FormLabel>Labels</FormLabel>
                             <FormControl>
-                              <select {...field}>
-                                <option value="active">Active</option>
-                                <option value="pending">Pending</option>
-                                <option value="inactive">Inactive</option>
-                              </select>
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap gap-2">
+                                  {(field.value || []).map((label: string, index: number) => (
+                                    <span
+                                      key={`${label}-${index}`}
+                                      className={`${getLabelColor(label, index)} inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium group`}
+                                    >
+                                      {label}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newLabels = (field.value || []).filter((_: string, i: number) => i !== index);
+                                          field.onChange(newLabels);
+                                        }}
+                                        className="hover:text-destructive"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                                <Input
+                                  placeholder="Type label and press Enter..."
+                                  className="w-full"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      const input = e.target as HTMLInputElement;
+                                      const newLabel = input.value.trim();
+                                      if (newLabel && !(field.value || []).includes(newLabel)) {
+                                        field.onChange([...(field.value || []), newLabel]);
+                                        input.value = '';
+                                      }
+                                    }
+                                  }}
+                                />
+                              </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
