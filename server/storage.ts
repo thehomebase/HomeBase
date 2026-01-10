@@ -1932,6 +1932,8 @@ export class DatabaseStorage implements IStorage {
       agentId: Number(row.agent_id),
       agentRating: row.agent_rating ? Number(row.agent_rating) : null,
       agentNotes: row.agent_notes ? String(row.agent_notes) : null,
+      latitude: row.latitude ? Number(row.latitude) : null,
+      longitude: row.longitude ? Number(row.longitude) : null,
       createdAt: row.created_at ? new Date(row.created_at) : null,
       updatedAt: row.updated_at ? new Date(row.updated_at) : null
     };

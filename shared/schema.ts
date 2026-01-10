@@ -128,6 +128,8 @@ export const contractors = pgTable("contractors", {
   agentId: integer("agent_id").notNull(),
   agentRating: integer("agent_rating"),
   agentNotes: text("agent_notes"),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
