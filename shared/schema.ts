@@ -124,11 +124,19 @@ export const contractors = pgTable("contractors", {
   zipCode: text("zip_code"),
   description: text("description"),
   googleMapsUrl: text("google_maps_url"),
+  yelpUrl: text("yelp_url"),
   agentId: integer("agent_id").notNull(),
   agentRating: integer("agent_rating"),
   agentNotes: text("agent_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
+});
+
+export const contractorRecommendations = pgTable("contractor_recommendations", {
+  id: serial("id").primaryKey(),
+  contractorId: integer("contractor_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow()
 });
 
 export const contractorReviews = pgTable("contractor_reviews", {
@@ -236,6 +244,10 @@ export const insertContractorReviewSchema = createInsertSchema(contractorReviews
   id: true,
   createdAt: true
 });
+export const insertContractorRecommendationSchema = createInsertSchema(contractorRecommendations).omit({
+  id: true,
+  createdAt: true
+});
 export const insertPropertyViewingSchema = createInsertSchema(propertyViewings).omit({
   id: true,
   createdAt: true,
@@ -269,6 +281,8 @@ export type Message = typeof messages.$inferSelect;
 export type Document = typeof documents.$inferSelect;
 export type Contractor = typeof contractors.$inferSelect;
 export type ContractorReview = typeof contractorReviews.$inferSelect;
+export type ContractorRecommendation = typeof contractorRecommendations.$inferSelect;
+export type InsertContractorRecommendation = z.infer<typeof insertContractorRecommendationSchema>;
 export type PropertyViewing = typeof propertyViewings.$inferSelect;
 export type PropertyFeedback = typeof propertyFeedback.$inferSelect;
 export type ShowingRequest = typeof showingRequests.$inferSelect;
