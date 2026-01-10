@@ -521,41 +521,80 @@ export default function MapPage() {
     }
   }, [transactionsWithCoords.length, viewingsWithCoords.length]);
 
-  // Geocode clients when switching to clients filter
+  // Geocode clients when switching to clients filter - with caching
   useEffect(() => {
     if (mapDisplayFilter !== "clients" || !isAgent || clients.length === 0) return;
+    
+    const CACHE_KEY = 'client_geocode_cache';
+    
+    const getCache = (): Record<string, { lat: number; lon: number }> => {
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        return cached ? JSON.parse(cached) : {};
+      } catch {
+        return {};
+      }
+    };
+    
+    const saveCache = (cache: Record<string, { lat: number; lon: number }>) => {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+      } catch {
+        // Ignore cache save errors
+      }
+    };
     
     const geocodeClients = async () => {
       setIsGeocodingClients(true);
       const geocodedClients: ClientWithCoords[] = [];
+      const cache = getCache();
+      const clientsToGeocode: { client: typeof clients[0]; address: string }[] = [];
       
+      // First pass: use cached coordinates where available
       for (const client of clients) {
-        // Build address from available fields
         const addressParts = [];
         if (client.street) addressParts.push(client.street);
         if (client.city) addressParts.push(client.city);
         if (client.zipCode) addressParts.push(client.zipCode);
         
-        // Skip clients without any address info
         if (addressParts.length === 0) {
           geocodedClients.push(client);
           continue;
         }
         
         const fullAddress = addressParts.join(", ");
+        const cacheKey = fullAddress.toLowerCase().trim();
+        
+        if (cache[cacheKey]) {
+          geocodedClients.push({
+            ...client,
+            latitude: cache[cacheKey].lat,
+            longitude: cache[cacheKey].lon
+          });
+        } else {
+          clientsToGeocode.push({ client, address: fullAddress });
+        }
+      }
+      
+      // Second pass: geocode uncached clients
+      for (const { client, address } of clientsToGeocode) {
+        const cacheKey = address.toLowerCase().trim();
         
         try {
           const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1&countrycodes=us`,
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=us`,
             { headers: { "Accept": "application/json" } }
           );
           const data = await response.json();
           
           if (data && data.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+            cache[cacheKey] = { lat, lon };
             geocodedClients.push({
               ...client,
-              latitude: parseFloat(data[0].lat),
-              longitude: parseFloat(data[0].lon)
+              latitude: lat,
+              longitude: lon
             });
           } else {
             geocodedClients.push(client);
@@ -568,6 +607,9 @@ export default function MapPage() {
           geocodedClients.push(client);
         }
       }
+      
+      // Save updated cache
+      saveCache(cache);
       
       setClientsWithCoords(geocodedClients);
       setIsGeocodingClients(false);
