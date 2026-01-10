@@ -361,18 +361,6 @@ const ClientDetailsPanel = ({
                   })}
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <select
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                  value={editingClient.status}
-                  onChange={(e) => handleUpdate('status', e.target.value)}
-                >
-                  <option value="active">Active</option>
-                  <option value="pending">Pending</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
             </div>
           </div>
         </div>
