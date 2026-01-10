@@ -24,7 +24,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check } from "lucide-react";
+import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check, Upload, FileSpreadsheet, Info } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -729,6 +729,48 @@ export default function ClientsPage() {
   };
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleImportClients = async () => {
+    if (!importFile) return;
+    
+    setIsImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      
+      const response = await fetch('/api/clients/import', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Import failed');
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      setIsImportDialogOpen(false);
+      setImportFile(null);
+      
+      toast({
+        title: "Import Complete",
+        description: result.message,
+      });
+    } catch (error) {
+      toast({
+        title: "Import Failed",
+        description: error instanceof Error ? error.message : "Failed to import clients",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -842,13 +884,92 @@ export default function ClientsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
             {user?.role === "agent" && (
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="whitespace-nowrap font-bold">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Client
-                  </Button>
-                </DialogTrigger>
+              <>
+                <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="whitespace-nowrap font-bold">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Import Clients from Spreadsheet</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div className="text-sm text-blue-800 dark:text-blue-200">
+                            <p className="font-medium mb-2">Spreadsheet Format Instructions:</p>
+                            <p className="mb-2">Your Excel file (.xlsx) or CSV should have these column headers:</p>
+                            <ul className="list-disc ml-4 space-y-1">
+                              <li><strong>First Name</strong> (required)</li>
+                              <li><strong>Last Name</strong> (required)</li>
+                              <li><strong>Email</strong></li>
+                              <li><strong>Phone</strong></li>
+                              <li><strong>Mobile</strong></li>
+                              <li><strong>Street</strong> (street address)</li>
+                              <li><strong>City</strong></li>
+                              <li><strong>Zip Code</strong></li>
+                              <li><strong>Type</strong> (seller, buyer, renter - comma-separated for multiple)</li>
+                              <li><strong>Labels</strong> (comma-separated, e.g. "VIP, First-time buyer")</li>
+                              <li><strong>Notes</strong></li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
+                        <FileSpreadsheet className="h-10 w-10 mx-auto text-gray-400 mb-3" />
+                        <input
+                          type="file"
+                          accept=".xlsx,.xls,.csv"
+                          onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                          className="hidden"
+                          id="import-file"
+                        />
+                        <label htmlFor="import-file" className="cursor-pointer">
+                          <span className="text-primary hover:underline font-medium">
+                            Click to select a file
+                          </span>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Excel (.xlsx, .xls) or CSV files supported
+                          </p>
+                        </label>
+                        {importFile && (
+                          <p className="mt-3 text-sm font-medium text-green-600 dark:text-green-400">
+                            Selected: {importFile.name}
+                          </p>
+                        )}
+                      </div>
+                      
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => {
+                          setIsImportDialogOpen(false);
+                          setImportFile(null);
+                        }}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={handleImportClients} 
+                          disabled={!importFile || isImporting}
+                          className="font-bold"
+                        >
+                          {isImporting ? "Importing..." : "Import Clients"}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="whitespace-nowrap font-bold">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Client
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add New Client</DialogTitle>
@@ -1058,6 +1179,7 @@ export default function ClientsPage() {
                   </Form>
                 </DialogContent>
               </Dialog>
+              </>
             )}
           </div>
         </div>

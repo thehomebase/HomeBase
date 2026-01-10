@@ -5,6 +5,10 @@ import { setupAuth } from "./auth";
 import { z } from "zod";
 import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema } from "@shared/schema";
 import ical from "ical-generator";
+import multer from "multer";
+import * as XLSX from "xlsx";
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Seller checklist items
 const SELLER_CHECKLIST_ITEMS = [
@@ -175,6 +179,102 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ 
         error: 'Failed to update client',
         details: errorMessage
+      });
+    }
+  });
+
+  // Client Excel Import
+  app.post("/api/clients/import", upload.single('file'), async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const data = XLSX.utils.sheet_to_json(worksheet) as Record<string, any>[];
+
+      if (data.length === 0) {
+        return res.status(400).json({ error: 'Spreadsheet is empty' });
+      }
+
+      const results = { success: 0, failed: 0, errors: [] as string[] };
+
+      for (const row of data) {
+        try {
+          // Map Excel columns to client fields (case-insensitive)
+          const getField = (names: string[]) => {
+            for (const name of names) {
+              const key = Object.keys(row).find(k => k.toLowerCase() === name.toLowerCase());
+              if (key && row[key]) return String(row[key]).trim();
+            }
+            return null;
+          };
+
+          const firstName = getField(['first name', 'firstname', 'first_name']);
+          const lastName = getField(['last name', 'lastname', 'last_name']);
+
+          if (!firstName || !lastName) {
+            results.failed++;
+            results.errors.push(`Row missing required first/last name`);
+            continue;
+          }
+
+          // Parse type field - can be comma-separated
+          const typeRaw = getField(['type', 'client type', 'clienttype']);
+          let types: ('seller' | 'buyer' | 'renter')[] = ['buyer'];
+          if (typeRaw) {
+            const parsedTypes = typeRaw.toLowerCase().split(',').map(t => t.trim());
+            const validTypes = parsedTypes.filter((t): t is 'seller' | 'buyer' | 'renter' => 
+              ['seller', 'buyer', 'renter'].includes(t)
+            );
+            if (validTypes.length > 0) types = validTypes;
+          }
+
+          // Parse labels - can be comma-separated
+          const labelsRaw = getField(['labels', 'tags', 'label']);
+          const labels: string[] = labelsRaw 
+            ? labelsRaw.split(',').map(l => l.trim()).filter(l => l.length > 0)
+            : [];
+
+          const clientData = {
+            firstName,
+            lastName,
+            email: getField(['email', 'e-mail', 'email address']),
+            phone: getField(['phone', 'phone number', 'telephone']),
+            mobilePhone: getField(['mobile', 'mobile phone', 'cell', 'cell phone']),
+            street: getField(['street', 'street address', 'address']),
+            city: getField(['city']),
+            zipCode: getField(['zip', 'zip code', 'zipcode', 'postal code']),
+            type: types,
+            status: 'active' as const,
+            notes: getField(['notes', 'note', 'comments']),
+            labels,
+            agentId: req.user.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          await storage.createClient(clientData);
+          results.success++;
+        } catch (err) {
+          results.failed++;
+          results.errors.push(err instanceof Error ? err.message : 'Unknown error');
+        }
+      }
+
+      res.json({
+        message: `Imported ${results.success} clients successfully${results.failed > 0 ? `, ${results.failed} failed` : ''}`,
+        ...results
+      });
+    } catch (error) {
+      console.error('Error importing clients:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to import clients'
       });
     }
   });
