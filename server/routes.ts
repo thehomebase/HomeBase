@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema } from "@shared/schema";
 import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -1695,6 +1695,45 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error deleting showing request:', error);
       res.status(500).json({ error: 'Failed to delete showing request' });
+    }
+  });
+
+  // Saved Properties
+  app.get("/api/saved-properties", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const properties = await storage.getSavedPropertiesByUser(req.user.id);
+      res.json(properties);
+    } catch (error) {
+      console.error('Error fetching saved properties:', error);
+      res.status(500).json({ error: 'Failed to fetch saved properties' });
+    }
+  });
+
+  app.post("/api/saved-properties", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const data = { ...req.body, userId: req.user.id };
+      const parsed = insertSavedPropertySchema.safeParse(data);
+      if (!parsed.success) {
+        return res.status(400).json(parsed.error);
+      }
+      const property = await storage.createSavedProperty(parsed.data);
+      res.status(201).json(property);
+    } catch (error) {
+      console.error('Error saving property:', error);
+      res.status(500).json({ error: 'Failed to save property' });
+    }
+  });
+
+  app.delete("/api/saved-properties/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      await storage.deleteSavedProperty(Number(req.params.id), req.user.id);
+      res.sendStatus(204);
+    } catch (error) {
+      console.error('Error deleting saved property:', error);
+      res.status(404).json({ error: 'Property not found' });
     }
   });
 

@@ -266,6 +266,24 @@ export const insertShowingRequestSchema = createInsertSchema(showingRequests).om
   updatedAt: true
 });
 
+export const savedProperties = pgTable("saved_properties", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  url: text("url").notNull(),
+  source: text("source").notNull(),
+  streetAddress: text("street_address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSavedPropertySchema = createInsertSchema(savedProperties).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
@@ -291,3 +309,5 @@ export type ShowingRequest = typeof showingRequests.$inferSelect;
 export type InsertPropertyViewing = z.infer<typeof insertPropertyViewingSchema>;
 export type InsertPropertyFeedback = z.infer<typeof insertPropertyFeedbackSchema>;
 export type InsertShowingRequest = z.infer<typeof insertShowingRequestSchema>;
+export type SavedProperty = typeof savedProperties.$inferSelect;
+export type InsertSavedProperty = z.infer<typeof insertSavedPropertySchema>;

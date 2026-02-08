@@ -15,10 +15,10 @@ interface StorageDocument {
 // Update Document type to use the imported one from schema.ts
 import {
   users, transactions, checklists, messages, clients, documents, contractors, contractorReviews,
-  propertyViewings, propertyFeedback, showingRequests,
+  propertyViewings, propertyFeedback, showingRequests, savedProperties,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
   type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
-  type ShowingRequest,
+  type ShowingRequest, type SavedProperty, type InsertSavedProperty,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -120,6 +120,11 @@ export interface IStorage {
   createShowingRequest(request: InsertShowingRequest): Promise<ShowingRequest>;
   updateShowingRequest(id: number, data: Partial<ShowingRequest>): Promise<ShowingRequest>;
   deleteShowingRequest(id: number): Promise<void>;
+
+  // Saved property operations
+  getSavedPropertiesByUser(userId: number): Promise<SavedProperty[]>;
+  createSavedProperty(property: InsertSavedProperty): Promise<SavedProperty>;
+  deleteSavedProperty(id: number, userId: number): Promise<void>;
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -2314,6 +2319,85 @@ export class DatabaseStorage implements IStorage {
       createdAt: row.created_at ? new Date(row.created_at) : null,
       updatedAt: row.updated_at ? new Date(row.updated_at) : null
     };
+  }
+
+  async getSavedPropertiesByUser(userId: number): Promise<SavedProperty[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, user_id as "userId", url, source, 
+               street_address as "streetAddress", city, state, 
+               zip_code as "zipCode", notes, created_at as "createdAt"
+        FROM saved_properties
+        WHERE user_id = ${userId}
+        ORDER BY created_at DESC
+      `);
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        userId: Number(row.userId),
+        url: String(row.url),
+        source: String(row.source),
+        streetAddress: row.streetAddress ? String(row.streetAddress) : null,
+        city: row.city ? String(row.city) : null,
+        state: row.state ? String(row.state) : null,
+        zipCode: row.zipCode ? String(row.zipCode) : null,
+        notes: row.notes ? String(row.notes) : null,
+        createdAt: row.createdAt ? new Date(row.createdAt) : null,
+      }));
+    } catch (error) {
+      console.error('Error in getSavedPropertiesByUser:', error);
+      return [];
+    }
+  }
+
+  async createSavedProperty(property: InsertSavedProperty): Promise<SavedProperty> {
+    try {
+      const [saved] = await db
+        .insert(savedProperties)
+        .values({
+          userId: property.userId,
+          url: property.url,
+          source: property.source,
+          streetAddress: property.streetAddress || null,
+          city: property.city || null,
+          state: property.state || null,
+          zipCode: property.zipCode || null,
+          notes: property.notes || null,
+          createdAt: new Date(),
+        })
+        .returning();
+
+      if (!saved) throw new Error('Failed to save property');
+
+      return {
+        id: Number(saved.id),
+        userId: Number(saved.userId),
+        url: String(saved.url),
+        source: String(saved.source),
+        streetAddress: saved.streetAddress ? String(saved.streetAddress) : null,
+        city: saved.city ? String(saved.city) : null,
+        state: saved.state ? String(saved.state) : null,
+        zipCode: saved.zipCode ? String(saved.zipCode) : null,
+        notes: saved.notes ? String(saved.notes) : null,
+        createdAt: saved.createdAt ? new Date(saved.createdAt) : null,
+      };
+    } catch (error) {
+      console.error('Error in createSavedProperty:', error);
+      throw error;
+    }
+  }
+
+  async deleteSavedProperty(id: number, userId: number): Promise<void> {
+    try {
+      const result = await db.execute(sql`
+        DELETE FROM saved_properties WHERE id = ${id} AND user_id = ${userId}
+      `);
+      if (result.rowCount === 0) {
+        throw new Error('Property not found or access denied');
+      }
+    } catch (error) {
+      console.error('Error in deleteSavedProperty:', error);
+      throw error;
+    }
   }
 
   private mapTransactionRow(row: any): Transaction {
