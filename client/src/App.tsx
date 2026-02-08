@@ -40,7 +40,8 @@ import {
   PanelLeftClose,
   PanelLeft,
   Wrench,
-  Map
+  Map,
+  Search
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -50,6 +51,7 @@ import MessagesPage from "./pages/messages-page";
 import ClientPage from "@/pages/client-page";
 import ContractorsPage from "@/pages/contractors-page";
 import MapPage from "@/pages/map-page";
+import PropertySearchPage from "@/pages/property-search-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -134,6 +136,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                         )}
                       </>
                     )}
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="Property Search">
+                        <Link href="/property-search" className="flex items-center gap-2">
+                          <Search className="h-4 w-4" />
+                          {isSidebarOpen && <span>Property Search</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild tooltip="Calendar">
                         <Link href="/calendar" className="flex items-center gap-2">
@@ -225,6 +235,9 @@ function Router() {
     <Switch>
       <Route path="/auth" component={AuthPage} />
       <Route path="/messages" component={MessagesPage} />
+      <Route path="/property-search">
+        <ProtectedRoute path="/property-search" component={PropertySearchPage} />
+      </Route>
       {isClient && <Route path="/glossary" component={GlossaryPage} />}
       <Route path="/calculators">
         <ProtectedRoute path="/calculators" component={CalculatorsPage} />
