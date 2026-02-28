@@ -879,7 +879,7 @@ export class DatabaseStorage implements IStorage {
 
   async createContact(data: any) {
     try {
-      if (!data.role || !data.firstName || !data.lastName || !data.email || !data.transactionId) {
+      if (!data.role || !data.firstName || !data.lastName || !data.transactionId) {
         throw new Error('Missing required fields');
       }
 
