@@ -178,10 +178,7 @@ function splitName(fullName: string): { firstName: string; lastName: string } {
   const parts = fullName.trim().split(/\s+/);
   if (parts.length === 0) return { firstName: "", lastName: "" };
   if (parts.length === 1) return { firstName: parts[0], lastName: "" };
-  if (parts.length === 2) return { firstName: parts[0], lastName: parts[1] };
-  const remaining = parts.slice(1).filter(p => !isMiddleInitial(p));
-  if (remaining.length === 0) return { firstName: parts[0], lastName: parts[parts.length - 1] };
-  return { firstName: parts[0], lastName: remaining.join(" ") };
+  return { firstName: parts[0], lastName: parts[parts.length - 1] };
 }
 
 function parseBrokerInfoFooter(footerText: string): ExtractedContactInfo[] {
@@ -611,9 +608,10 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
       const allSameLastName = parts.filter((_, i) => i % 2 === 0).every(p => p.trim() === firstPart);
       if (allSameLastName) {
         for (let j = 0; j < parts.length; j += 2) {
+          const firstNameParts = (parts[j + 1]?.trim() || "").split(/\s+/);
           results.push({
             role,
-            firstName: parts[j + 1]?.trim() || "",
+            firstName: firstNameParts[0] || "",
             lastName: parts[j]?.trim() || "",
             email: "",
             phone: "",
@@ -631,7 +629,7 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
         results.push({
           role,
           firstName: part0Words[0],
-          lastName: part0Words.slice(1).join(" "),
+          lastName: part0Words[part0Words.length - 1],
           email: "",
           phone: "",
           brokerage: "",
@@ -639,7 +637,7 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
         results.push({
           role,
           firstName: part1Words[0],
-          lastName: part1Words.slice(1).join(" "),
+          lastName: part1Words[part1Words.length - 1],
           email: "",
           phone: "",
           brokerage: "",
