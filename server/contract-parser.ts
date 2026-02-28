@@ -170,11 +170,18 @@ function findDateNear(text: string, searchTerms: string[], maxDistance: number =
   return null;
 }
 
+function isMiddleInitial(part: string): boolean {
+  return /^[A-Za-z]\.?$/.test(part);
+}
+
 function splitName(fullName: string): { firstName: string; lastName: string } {
   const parts = fullName.trim().split(/\s+/);
   if (parts.length === 0) return { firstName: "", lastName: "" };
   if (parts.length === 1) return { firstName: parts[0], lastName: "" };
-  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+  if (parts.length === 2) return { firstName: parts[0], lastName: parts[1] };
+  const remaining = parts.slice(1).filter(p => !isMiddleInitial(p));
+  if (remaining.length === 0) return { firstName: parts[0], lastName: parts[parts.length - 1] };
+  return { firstName: parts[0], lastName: remaining.join(" ") };
 }
 
 function parseBrokerInfoFooter(footerText: string): ExtractedContactInfo[] {
