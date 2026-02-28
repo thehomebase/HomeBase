@@ -206,33 +206,33 @@ function parseBrokerInfoFooter(footerText: string): ExtractedContactInfo[] {
   const licenseNumberPattern = /\d{6,7}$/;
   const brokeragePattern = /(?:realty|team|group|llc|inc|corp|associates|properties|real\s*estate|dba\s)/i;
 
-  let listingBrokerage = "";
-  let listingAgentName = "";
-  let listingAgentEmail = "";
-  let listingAgentPhone = "";
-
   let buyerBrokerage = "";
   let buyerAgentName = "";
   let buyerAgentEmail = "";
   let buyerAgentPhone = "";
 
-  let section: "unknown" | "listing" | "buyer" = "unknown";
-  let foundListingBrokerage = false;
-  let foundBuyerBrokerage = false;
+  let listingBrokerage = "";
+  let listingAgentName = "";
+  let listingAgentEmail = "";
+  let listingAgentPhone = "";
+
+  let section: "unknown" | "first" | "second" = "unknown";
+  let foundFirstBrokerage = false;
+  let foundSecondBrokerage = false;
 
   for (let i = 0; i < filteredLines.length; i++) {
     const line = filteredLines[i];
 
     if (brokeragePattern.test(line) && licenseNumberPattern.test(line)) {
-      if (!foundListingBrokerage) {
-        listingBrokerage = line.replace(/\s*\d{6,7}\s*$/, "").trim();
-        foundListingBrokerage = true;
-        section = "listing";
-        continue;
-      } else if (!foundBuyerBrokerage) {
+      if (!foundFirstBrokerage) {
         buyerBrokerage = line.replace(/\s*\d{6,7}\s*$/, "").trim();
-        foundBuyerBrokerage = true;
-        section = "buyer";
+        foundFirstBrokerage = true;
+        section = "first";
+        continue;
+      } else if (!foundSecondBrokerage) {
+        listingBrokerage = line.replace(/\s*\d{6,7}\s*$/, "").trim();
+        foundSecondBrokerage = true;
+        section = "second";
         continue;
       }
     }
@@ -241,12 +241,12 @@ function parseBrokerInfoFooter(footerText: string): ExtractedContactInfo[] {
     if (emailPhoneMatch) {
       const email = line.match(emailPattern)?.[0] || "";
       const phone = line.match(phonePattern)?.[0] || "";
-      if (section === "listing" && !listingAgentEmail) {
-        listingAgentEmail = email;
-        listingAgentPhone = phone;
-      } else if (section === "buyer" && !buyerAgentEmail) {
+      if (section === "first" && !buyerAgentEmail) {
         buyerAgentEmail = email;
         buyerAgentPhone = phone;
+      } else if (section === "second" && !listingAgentEmail) {
+        listingAgentEmail = email;
+        listingAgentPhone = phone;
       }
       continue;
     }
@@ -254,10 +254,10 @@ function parseBrokerInfoFooter(footerText: string): ExtractedContactInfo[] {
     if (licenseNumberPattern.test(line) && !brokeragePattern.test(line)) {
       const name = line.replace(/\s*\d{6,7}\s*$/, "").trim();
       if (name.length > 2 && name.length < 50) {
-        if (section === "listing" && !listingAgentName) {
-          listingAgentName = name;
-        } else if (section === "buyer" && !buyerAgentName) {
+        if (section === "first" && !buyerAgentName) {
           buyerAgentName = name;
+        } else if (section === "second" && !listingAgentName) {
+          listingAgentName = name;
         }
       }
       continue;
@@ -276,18 +276,18 @@ function parseBrokerInfoFooter(footerText: string): ExtractedContactInfo[] {
     }
   }
 
-  if (!foundListingBrokerage && !foundBuyerBrokerage) {
+  if (!foundFirstBrokerage && !foundSecondBrokerage) {
     let brokerageCount = 0;
     for (let i = 0; i < filteredLines.length; i++) {
       const line = filteredLines[i];
       if (brokeragePattern.test(line)) {
         brokerageCount++;
         if (brokerageCount === 1) {
-          section = "listing";
-          listingBrokerage = line.trim();
-        } else if (brokerageCount === 2) {
-          section = "buyer";
+          section = "first";
           buyerBrokerage = line.trim();
+        } else if (brokerageCount === 2) {
+          section = "second";
+          listingBrokerage = line.trim();
         }
       }
 
@@ -295,12 +295,12 @@ function parseBrokerInfoFooter(footerText: string): ExtractedContactInfo[] {
       if (ep) {
         const email = line.match(emailPattern)?.[0] || "";
         const phone = line.match(phonePattern)?.[0] || "";
-        if (section === "listing" && !listingAgentEmail) {
-          listingAgentEmail = email;
-          listingAgentPhone = phone;
-        } else if (section === "buyer" && !buyerAgentEmail) {
+        if (section === "first" && !buyerAgentEmail) {
           buyerAgentEmail = email;
           buyerAgentPhone = phone;
+        } else if (section === "second" && !listingAgentEmail) {
+          listingAgentEmail = email;
+          listingAgentPhone = phone;
         }
       }
     }
