@@ -6,9 +6,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Check, X, Shield, AlertTriangle, Loader2 } from "lucide-react";
+import { Upload, FileText, Check, X, Shield, AlertTriangle, Loader2, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { type Transaction } from "@shared/schema";
+import { Separator } from "@/components/ui/separator";
+
+interface ExtractedContactInfo {
+  role: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  brokerage: string;
+}
 
 interface ExtractedData {
   contractPrice: number | null;
@@ -24,6 +34,7 @@ interface ExtractedData {
   propertyAddress: string | null;
   buyerName: string | null;
   sellerName: string | null;
+  extractedContacts: ExtractedContactInfo[];
 }
 
 interface ContractUploadProps {
@@ -69,6 +80,7 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [showReview, setShowReview] = useState(false);
   const [selectedFields, setSelectedFields] = useState<Record<string, boolean>>({});
+  const [selectedContacts, setSelectedContacts] = useState<Record<number, boolean>>({});
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -93,6 +105,13 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
         initial[key] = val !== null && val !== undefined;
       }
       setSelectedFields(initial);
+      const contactInit: Record<number, boolean> = {};
+      if (data.extracted.extractedContacts) {
+        data.extracted.extractedContacts.forEach((_: ExtractedContactInfo, idx: number) => {
+          contactInit[idx] = true;
+        });
+      }
+      setSelectedContacts(contactInit);
       setShowReview(true);
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -111,9 +130,6 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId] });
-      setShowReview(false);
-      setExtractedData(null);
-      toast({ title: "Transaction updated", description: "Extracted contract data has been applied." });
     },
     onError: (error: Error) => {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
@@ -141,7 +157,31 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
     }
   };
 
-  const handleApply = () => {
+  const addContactsMutation = useMutation({
+    mutationFn: async (contacts: ExtractedContactInfo[]) => {
+      const results = [];
+      for (const contact of contacts) {
+        const response = await apiRequest("POST", "/api/contacts", {
+          transactionId,
+          role: contact.role,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          email: contact.email || "",
+          phone: contact.phone || "",
+          mobilePhone: "",
+        });
+        if (response.ok) {
+          results.push(await response.json());
+        }
+      }
+      return results;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts", transactionId] });
+    },
+  });
+
+  const handleApply = async () => {
     if (!extractedData) return;
 
     const updateData: Record<string, unknown> = {};
@@ -158,12 +198,28 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
       }
     }
 
-    if (Object.keys(updateData).length === 0) {
-      toast({ title: "No fields selected", description: "Select at least one field to apply.", variant: "destructive" });
+    const contactsToAdd = extractedData.extractedContacts?.filter(
+      (_, idx) => selectedContacts[idx]
+    ) || [];
+
+    if (Object.keys(updateData).length === 0 && contactsToAdd.length === 0) {
+      toast({ title: "Nothing selected", description: "Select at least one field or contact to apply.", variant: "destructive" });
       return;
     }
 
-    applyMutation.mutate(updateData as Partial<Transaction>);
+    try {
+      if (Object.keys(updateData).length > 0) {
+        await applyMutation.mutateAsync(updateData as Partial<Transaction>);
+      }
+      if (contactsToAdd.length > 0) {
+        await addContactsMutation.mutateAsync(contactsToAdd);
+      }
+      setShowReview(false);
+      setExtractedData(null);
+      toast({ title: "Applied successfully", description: `Updated transaction${contactsToAdd.length > 0 ? ` and added ${contactsToAdd.length} contact${contactsToAdd.length !== 1 ? "s" : ""}` : ""}.` });
+    } catch {
+      toast({ title: "Error", description: "Failed to apply some changes.", variant: "destructive" });
+    }
   };
 
   const toggleField = (key: string) => {
@@ -265,19 +321,58 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
                 </div>
               )}
 
-              {(extractedData.buyerName || extractedData.sellerName || extractedData.propertyAddress) && (
+              {extractedData.propertyAddress && (
                 <div className="p-3 bg-muted/50 rounded-lg space-y-1">
-                  <p className="text-sm font-medium">Reference Info (not applied to transaction):</p>
-                  {extractedData.propertyAddress && (
-                    <p className="text-sm text-muted-foreground">Address: {extractedData.propertyAddress}</p>
-                  )}
-                  {extractedData.buyerName && (
-                    <p className="text-sm text-muted-foreground">Buyer: {extractedData.buyerName}</p>
-                  )}
-                  {extractedData.sellerName && (
-                    <p className="text-sm text-muted-foreground">Seller: {extractedData.sellerName}</p>
-                  )}
+                  <p className="text-sm font-medium">Property Address:</p>
+                  <p className="text-sm text-muted-foreground">{extractedData.propertyAddress}</p>
                 </div>
+              )}
+
+              {extractedData.extractedContacts && extractedData.extractedContacts.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      <p className="text-sm font-medium">Extracted Contacts (will be added to Contacts tab)</p>
+                    </div>
+                    {extractedData.extractedContacts.map((contact, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                          selectedContacts[idx]
+                            ? "bg-primary/5 border-primary/30"
+                            : "bg-background border-border"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setSelectedContacts(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                          className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                            selectedContacts[idx]
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "border-muted-foreground/40"
+                          }`}
+                        >
+                          {selectedContacts[idx] && <Check className="h-3 w-3" />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium px-2 py-0.5 bg-muted rounded-full">{contact.role}</span>
+                            <span className="text-sm font-medium">{contact.firstName} {contact.lastName}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                            {contact.email && <p>Email: {contact.email}</p>}
+                            {contact.phone && <p>Phone: {contact.phone}</p>}
+                            {contact.brokerage && <p>Brokerage: {contact.brokerage}</p>}
+                            {!contact.email && !contact.phone && !contact.brokerage && <p>No additional details found</p>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Separator />
+                </>
               )}
 
               {TRANSACTION_FIELDS.map((key) => {
@@ -336,9 +431,9 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
             </Button>
             <Button
               onClick={handleApply}
-              disabled={applyMutation.isPending || extractedCount === 0}
+              disabled={applyMutation.isPending || addContactsMutation.isPending || (extractedCount === 0 && !extractedData?.extractedContacts?.some((_, idx) => selectedContacts[idx]))}
             >
-              {applyMutation.isPending ? (
+              {applyMutation.isPending || addContactsMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Applying...

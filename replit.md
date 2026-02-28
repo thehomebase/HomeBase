@@ -49,7 +49,9 @@ Preferred communication style: Simple, everyday language.
 - **Privacy**: Documents processed in-memory only — never written to disk or persistent storage. Buffer cleared immediately after parsing.
 - **Technology**: `pdf-parse` library for text extraction, regex pattern matching for field identification
 - **Extracted Fields**: contractPrice, earnestMoney, optionFee, downPayment, sellerConcessions, closingDate, optionPeriodExpiration, contractExecutionDate, financing, mlsNumber, buyerName, sellerName
-- **Workflow**: Upload PDF → extract text → pattern match → review extracted data → agent selects fields to apply → update transaction
+- **Contact Extraction**: Parses BROKER INFORMATION section to extract buyer agent, listing agent, buyer, and seller names/emails/phones/brokerages. Extracted contacts are shown in the review dialog and can be selectively added to the transaction's Contacts tab via `POST /api/contacts`.
+- **TREC Form Parsing**: Uses page-based footer block extraction strategy — TREC forms rendered through DocuSign/zipForm have filled form field values in separate blocks at the end of each page (after `TXR 1601` footer line), not inline with labels.
+- **Workflow**: Upload PDF → extract text → pattern match → review extracted data + contacts → agent selects fields/contacts to apply → update transaction + create contacts
 - **Access**: Agents only, scoped to their own transactions
 - **API Endpoint**: `POST /api/transactions/:id/parse-contract` (multipart form, field name: "contract")
 

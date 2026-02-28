@@ -1,5 +1,14 @@
 import { PDFParse } from "pdf-parse";
 
+export interface ExtractedContactInfo {
+  role: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  brokerage: string;
+}
+
 export interface ExtractedContractData {
   contractPrice: number | null;
   earnestMoney: number | null;
@@ -14,6 +23,7 @@ export interface ExtractedContractData {
   propertyAddress: string | null;
   buyerName: string | null;
   sellerName: string | null;
+  extractedContacts: ExtractedContactInfo[];
   rawTextPreview: string;
 }
 
@@ -151,6 +161,178 @@ function findDateNear(text: string, searchTerms: string[], maxDistance: number =
   return null;
 }
 
+function splitName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 0) return { firstName: "", lastName: "" };
+  if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+}
+
+function parseBrokerInfoFooter(footerText: string): ExtractedContactInfo[] {
+  const contacts: ExtractedContactInfo[] = [];
+  const lines = footerText.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+
+  const skipPatterns = [
+    /^TXR\s*1601/i,
+    /^Produced with/i,
+    /^TREC NO/i,
+    /^\d+$/,
+    /^X$/,
+    /^DocuSign/i,
+    /^\d+\s+of\s+\d+/,
+    /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/,
+    /^\d+%$/,
+  ];
+
+  const filteredLines: string[] = [];
+  for (const line of lines) {
+    const shouldSkip = skipPatterns.some(p => p.test(line));
+    if (!shouldSkip) {
+      filteredLines.push(line);
+    }
+  }
+
+  const addressLine = filteredLines.find(l =>
+    /\d+\s+[A-Za-z].*(?:Dr|St|Ave|Blvd|Ln|Rd|Ct|Way|Pl|Main)\b.*(?:Fort Worth|TX|Keller|Haslet|Dallas|Houston|Austin|Southlake)/i.test(l)
+  );
+  if (addressLine) {
+    const idx = filteredLines.indexOf(addressLine);
+    if (idx !== -1) filteredLines.splice(idx, 1);
+  }
+
+  const emailPhonePattern = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\s*\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}/;
+  const phonePattern = /\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}/;
+  const emailPattern = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+  const licenseNumberPattern = /\d{6,7}$/;
+  const brokeragePattern = /(?:realty|team|group|llc|inc|corp|associates|properties|real\s*estate|dba\s)/i;
+
+  let listingBrokerage = "";
+  let listingAgentName = "";
+  let listingAgentEmail = "";
+  let listingAgentPhone = "";
+
+  let buyerBrokerage = "";
+  let buyerAgentName = "";
+  let buyerAgentEmail = "";
+  let buyerAgentPhone = "";
+
+  let section: "unknown" | "listing" | "buyer" = "unknown";
+  let foundListingBrokerage = false;
+  let foundBuyerBrokerage = false;
+
+  for (let i = 0; i < filteredLines.length; i++) {
+    const line = filteredLines[i];
+
+    if (brokeragePattern.test(line) && licenseNumberPattern.test(line)) {
+      if (!foundListingBrokerage) {
+        listingBrokerage = line.replace(/\s*\d{6,7}\s*$/, "").trim();
+        foundListingBrokerage = true;
+        section = "listing";
+        continue;
+      } else if (!foundBuyerBrokerage) {
+        buyerBrokerage = line.replace(/\s*\d{6,7}\s*$/, "").trim();
+        foundBuyerBrokerage = true;
+        section = "buyer";
+        continue;
+      }
+    }
+
+    const emailPhoneMatch = line.match(emailPhonePattern);
+    if (emailPhoneMatch) {
+      const email = line.match(emailPattern)?.[0] || "";
+      const phone = line.match(phonePattern)?.[0] || "";
+      if (section === "listing" && !listingAgentEmail) {
+        listingAgentEmail = email;
+        listingAgentPhone = phone;
+      } else if (section === "buyer" && !buyerAgentEmail) {
+        buyerAgentEmail = email;
+        buyerAgentPhone = phone;
+      }
+      continue;
+    }
+
+    if (licenseNumberPattern.test(line) && !brokeragePattern.test(line)) {
+      const name = line.replace(/\s*\d{6,7}\s*$/, "").trim();
+      if (name.length > 2 && name.length < 50) {
+        if (section === "listing" && !listingAgentName) {
+          listingAgentName = name;
+        } else if (section === "buyer" && !buyerAgentName) {
+          buyerAgentName = name;
+        }
+      }
+      continue;
+    }
+
+    if (/^[A-Z][a-zA-Z]+\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?$/.test(line) && line.length < 40) {
+      continue;
+    }
+
+    const cityStateZip = /^[A-Za-z]+\s+[A-Za-z]{2}\s+\d{5}/;
+    if (cityStateZip.test(line)) {
+      continue;
+    }
+    if (phonePattern.test(line) && !emailPattern.test(line)) {
+      continue;
+    }
+  }
+
+  if (!foundListingBrokerage && !foundBuyerBrokerage) {
+    let brokerageCount = 0;
+    for (let i = 0; i < filteredLines.length; i++) {
+      const line = filteredLines[i];
+      if (brokeragePattern.test(line)) {
+        brokerageCount++;
+        if (brokerageCount === 1) {
+          section = "listing";
+          listingBrokerage = line.trim();
+        } else if (brokerageCount === 2) {
+          section = "buyer";
+          buyerBrokerage = line.trim();
+        }
+      }
+
+      const ep = line.match(emailPhonePattern);
+      if (ep) {
+        const email = line.match(emailPattern)?.[0] || "";
+        const phone = line.match(phonePattern)?.[0] || "";
+        if (section === "listing" && !listingAgentEmail) {
+          listingAgentEmail = email;
+          listingAgentPhone = phone;
+        } else if (section === "buyer" && !buyerAgentEmail) {
+          buyerAgentEmail = email;
+          buyerAgentPhone = phone;
+        }
+      }
+    }
+  }
+
+  if (listingAgentName || listingAgentEmail) {
+    const { firstName, lastName } = splitName(listingAgentName);
+    contacts.push({
+      role: "Listing Agent",
+      firstName,
+      lastName,
+      email: listingAgentEmail,
+      phone: listingAgentPhone,
+      brokerage: listingBrokerage,
+    });
+  }
+
+  if (buyerAgentName || buyerAgentEmail) {
+    const { firstName, lastName } = splitName(buyerAgentName);
+    contacts.push({
+      role: "Buyer Agent",
+      firstName,
+      lastName,
+      email: buyerAgentEmail,
+      phone: buyerAgentPhone,
+      brokerage: buyerBrokerage,
+    });
+  }
+
+  return contacts;
+}
+
 function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
   const extracted: ExtractedContractData = {
     contractPrice: null,
@@ -166,6 +348,7 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
     propertyAddress: null,
     buyerName: null,
     sellerName: null,
+    extractedContacts: [],
     rawTextPreview: text,
   };
 
@@ -259,6 +442,11 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
           }
         }
       }
+    }
+
+    if (lowerPage.includes("broker information") && (lowerPage.includes("listing broker") || lowerPage.includes("other broker"))) {
+      const brokerContacts = parseBrokerInfoFooter(footer);
+      extracted.extractedContacts.push(...brokerContacts);
     }
   }
 
@@ -379,6 +567,62 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
     const addrMatch = text.match(/(\d+\s+[A-Za-z]+(?:\s+[A-Za-z]+)*\s+(?:Dr|St|Ave|Blvd|Ln|Rd|Ct|Cir|Way|Pl)\b[^,\n]*\d{5})/i);
     if (addrMatch) {
       extracted.propertyAddress = addrMatch[1].trim();
+    }
+  }
+
+  if (extracted.buyerName) {
+    const hasExistingBuyer = extracted.extractedContacts.some(c => c.role === "Buyer");
+    if (!hasExistingBuyer) {
+      const parts = extracted.buyerName.split(/,\s*/);
+      if (parts.length >= 2) {
+        const { firstName, lastName } = splitName(parts[0]);
+        extracted.extractedContacts.unshift({
+          role: "Buyer",
+          firstName: lastName || firstName,
+          lastName: firstName && lastName ? firstName : "",
+          email: "",
+          phone: "",
+          brokerage: "",
+        });
+      } else {
+        const { firstName, lastName } = splitName(extracted.buyerName);
+        extracted.extractedContacts.unshift({
+          role: "Buyer",
+          firstName,
+          lastName,
+          email: "",
+          phone: "",
+          brokerage: "",
+        });
+      }
+    }
+  }
+
+  if (extracted.sellerName) {
+    const hasExistingSeller = extracted.extractedContacts.some(c => c.role === "Seller");
+    if (!hasExistingSeller) {
+      const parts = extracted.sellerName.split(/,\s*/);
+      if (parts.length >= 2) {
+        const { firstName, lastName } = splitName(parts[0]);
+        extracted.extractedContacts.unshift({
+          role: "Seller",
+          firstName: lastName || firstName,
+          lastName: firstName && lastName ? firstName : "",
+          email: "",
+          phone: "",
+          brokerage: "",
+        });
+      } else {
+        const { firstName, lastName } = splitName(extracted.sellerName);
+        extracted.extractedContacts.unshift({
+          role: "Seller",
+          firstName,
+          lastName,
+          email: "",
+          phone: "",
+          brokerage: "",
+        });
+      }
     }
   }
 
