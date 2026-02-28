@@ -210,19 +210,62 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
 
   const addContactsMutation = useMutation({
     mutationFn: async (contacts: ExtractedContactInfo[]) => {
+      const existingRes = await fetch(`/api/contacts/${transactionId}`, { credentials: "include" });
+      const existingContacts: { id: number; role: string; firstName: string; lastName: string }[] =
+        existingRes.ok ? await existingRes.json() : [];
+
       const results = [];
+      const usedIds = new Set<number>();
+
       for (const contact of contacts) {
-        const response = await apiRequest("POST", "/api/contacts", {
-          transactionId,
-          role: contact.role,
-          firstName: contact.firstName,
-          lastName: contact.lastName,
-          email: contact.email || "",
-          phone: contact.phone || "",
-          mobilePhone: "",
-        });
-        if (response.ok) {
-          results.push(await response.json());
+        const exactMatch = existingContacts.find(
+          (ec) =>
+            !usedIds.has(ec.id) &&
+            ec.role === contact.role &&
+            ec.firstName?.toLowerCase() === contact.firstName?.toLowerCase() &&
+            ec.lastName?.toLowerCase() === contact.lastName?.toLowerCase()
+        );
+
+        if (exactMatch) {
+          usedIds.add(exactMatch.id);
+          const response = await apiRequest("PATCH", `/api/contacts/${exactMatch.id}`, {
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+            email: contact.email || undefined,
+            phone: contact.phone || undefined,
+          });
+          if (response.ok) {
+            results.push(await response.json());
+          }
+        } else {
+          const roleMatch = existingContacts.find(
+            (ec) => !usedIds.has(ec.id) && ec.role === contact.role
+          );
+          if (roleMatch) {
+            usedIds.add(roleMatch.id);
+            const response = await apiRequest("PATCH", `/api/contacts/${roleMatch.id}`, {
+              firstName: contact.firstName,
+              lastName: contact.lastName,
+              email: contact.email || undefined,
+              phone: contact.phone || undefined,
+            });
+            if (response.ok) {
+              results.push(await response.json());
+            }
+          } else {
+            const response = await apiRequest("POST", "/api/contacts", {
+              transactionId,
+              role: contact.role,
+              firstName: contact.firstName,
+              lastName: contact.lastName,
+              email: contact.email || "",
+              phone: contact.phone || "",
+              mobilePhone: "",
+            });
+            if (response.ok) {
+              results.push(await response.json());
+            }
+          }
         }
       }
       return results;
@@ -273,7 +316,7 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
       setShowReview(false);
       setShowOverwriteConfirm(false);
       setExtractedData(null);
-      toast({ title: "Applied successfully", description: `Updated transaction${contactsToAdd.length > 0 ? ` and added ${contactsToAdd.length} contact${contactsToAdd.length !== 1 ? "s" : ""}` : ""}.` });
+      toast({ title: "Applied successfully", description: `Updated transaction${contactsToAdd.length > 0 ? ` and saved ${contactsToAdd.length} contact${contactsToAdd.length !== 1 ? "s" : ""}` : ""}.` });
     } catch {
       toast({ title: "Error", description: "Failed to apply some changes.", variant: "destructive" });
     }
