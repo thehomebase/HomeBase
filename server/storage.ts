@@ -936,16 +936,24 @@ export class DatabaseStorage implements IStorage {
 
   async updateContact(id: number, data: Partial<Contact>): Promise<Contact> {
     try {
+            const role = data.role ?? null;
+            const firstName = data.firstName ?? null;
+            const lastName = data.lastName ?? null;
+            const email = data.email ?? null;
+            const phone = data.phone ?? null;
+            const mobilePhone = data.mobilePhone ?? null;
+            const clientId = data.clientId ?? null;
+
             const result = await db.execute(sql`
         UPDATE contacts 
         SET 
-          role = COALESCE(${data.role}, role),
-          first_name = COALESCE(${data.firstName}, first_name),
-          last_name = COALESCE(${data.lastName}, last_name),
-          email = COALESCE(${data.email}, email),
-          phone = COALESCE(${data.phone}, phone),
-          mobile_phone = COALESCE(${data.mobilePhone}, mobile_phone),
-          client_id = COALESCE(${data.clientId}, client_id)
+          role = COALESCE(${role}, role),
+          first_name = COALESCE(${firstName}, first_name),
+          last_name = COALESCE(${lastName}, last_name),
+          email = COALESCE(${email}, email),
+          phone = COALESCE(${phone}, phone),
+          mobile_phone = COALESCE(${mobilePhone}, mobile_phone),
+          client_id = COALESCE(${clientId}, client_id)
         WHERE id = ${id}
         RETURNING *
       `);
