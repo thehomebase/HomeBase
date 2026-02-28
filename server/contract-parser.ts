@@ -1,4 +1,4 @@
-import * as pdfParse from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 
 export interface ExtractedContractData {
   contractPrice: number | null;
@@ -102,12 +102,14 @@ function findDateAfterPattern(text: string, patterns: RegExp[]): string | null {
 }
 
 export async function parseContract(buffer: Buffer): Promise<ExtractedContractData> {
-  const pdf = (pdfParse as any).default || pdfParse;
-  const data = await pdf(buffer);
-  const text = data.text;
+  const uint8 = new Uint8Array(buffer);
+  const parser = new PDFParse(uint8 as any);
+  await parser.load();
+  const pdfResult = await parser.getText();
+  const text = (pdfResult as any).text || "";
   const normalizedText = text.replace(/\s+/g, " ").replace(/\n+/g, " ");
 
-  const result: ExtractedContractData = {
+  const extracted: ExtractedContractData = {
     contractPrice: null,
     earnestMoney: null,
     optionFee: null,
@@ -124,58 +126,58 @@ export async function parseContract(buffer: Buffer): Promise<ExtractedContractDa
     rawTextPreview: text.substring(0, 500),
   };
 
-  result.contractPrice = findCurrencyAfterPattern(normalizedText, [
+  extracted.contractPrice = findCurrencyAfterPattern(normalizedText, [
     /(?:sales\s*price|purchase\s*price|contract\s*(?:sales?\s*)?price|total\s*(?:sales?\s*)?price)[:\s]*\$?\s*(?<amount>[\d,]+(?:\.\d{2})?)/i,
     /(?:price|amount)[:\s]*\$\s*(?<amount>[\d,]+(?:\.\d{2})?)/i,
     /\$\s*(?<amount>[\d,]+(?:\.\d{2})?)\s*(?:as\s*(?:the\s*)?(?:sales?|purchase|contract)\s*price)/i,
   ]);
 
-  result.earnestMoney = findCurrencyAfterPattern(normalizedText, [
+  extracted.earnestMoney = findCurrencyAfterPattern(normalizedText, [
     /(?:earnest\s*money)[:\s]*\$?\s*(?<amount>[\d,]+(?:\.\d{2})?)/i,
     /(?:earnest\s*money\s*deposit|emd)[:\s]*\$?\s*(?<amount>[\d,]+(?:\.\d{2})?)/i,
     /\$\s*(?<amount>[\d,]+(?:\.\d{2})?)\s*(?:as\s*earnest\s*money)/i,
   ]);
 
-  result.optionFee = findCurrencyAfterPattern(normalizedText, [
+  extracted.optionFee = findCurrencyAfterPattern(normalizedText, [
     /(?:option\s*(?:fee|money|consideration))[:\s]*\$?\s*(?<amount>[\d,]+(?:\.\d{2})?)/i,
     /\$\s*(?<amount>[\d,]+(?:\.\d{2})?)\s*(?:as\s*(?:the\s*)?option\s*(?:fee|money))/i,
   ]);
 
-  result.downPayment = findCurrencyAfterPattern(normalizedText, [
+  extracted.downPayment = findCurrencyAfterPattern(normalizedText, [
     /(?:down\s*payment)[:\s]*\$?\s*(?<amount>[\d,]+(?:\.\d{2})?)/i,
     /\$\s*(?<amount>[\d,]+(?:\.\d{2})?)\s*(?:as\s*(?:a\s*)?down\s*payment)/i,
   ]);
 
-  result.sellerConcessions = findCurrencyAfterPattern(normalizedText, [
+  extracted.sellerConcessions = findCurrencyAfterPattern(normalizedText, [
     /(?:seller\s*(?:'s?\s*)?concession(?:s)?)[:\s]*\$?\s*(?<amount>[\d,]+(?:\.\d{2})?)/i,
     /(?:seller\s*(?:contribution|credit)(?:s)?)[:\s]*\$?\s*(?<amount>[\d,]+(?:\.\d{2})?)/i,
     /\$\s*(?<amount>[\d,]+(?:\.\d{2})?)\s*(?:in\s*seller\s*concession)/i,
   ]);
 
-  result.closingDate = findDateAfterPattern(normalizedText, [
+  extracted.closingDate = findDateAfterPattern(normalizedText, [
     /(?:closing\s*(?:date|on|shall\s*be))[:\s]*(?<date>\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
     /(?:closing\s*(?:date|on|shall\s*be))[:\s]*(?<date>(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})/i,
     /(?:close\s*(?:on|by|before))[:\s]*(?<date>\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
   ]);
 
-  result.optionPeriodExpiration = findDateAfterPattern(normalizedText, [
+  extracted.optionPeriodExpiration = findDateAfterPattern(normalizedText, [
     /(?:option\s*period\s*(?:expir(?:es|ation)|ends?))[:\s]*(?<date>\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
     /(?:option\s*period)[:\s]*(?:.*?)(?:expir(?:es|ation)|ends?)[:\s]*(?<date>\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
   ]);
 
-  if (!result.optionPeriodExpiration) {
+  if (!extracted.optionPeriodExpiration) {
     const optionDaysMatch = normalizedText.match(
       /option\s*period.*?(\d+)\s*(?:calendar\s*)?days?\s*(?:after|from|following)/i
     );
-    if (optionDaysMatch && result.contractExecutionDate) {
+    if (optionDaysMatch && extracted.contractExecutionDate) {
       const days = parseInt(optionDaysMatch[1]);
-      const execDate = new Date(result.contractExecutionDate);
+      const execDate = new Date(extracted.contractExecutionDate);
       execDate.setDate(execDate.getDate() + days);
-      result.optionPeriodExpiration = execDate.toISOString();
+      extracted.optionPeriodExpiration = execDate.toISOString();
     }
   }
 
-  result.contractExecutionDate = findDateAfterPattern(normalizedText, [
+  extracted.contractExecutionDate = findDateAfterPattern(normalizedText, [
     /(?:(?:contract\s*)?(?:execution|effective)\s*date)[:\s]*(?<date>\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
     /(?:dated?|executed?\s*(?:on|this))[:\s]*(?<date>\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
     /(?:dated?|executed?\s*(?:on|this))[:\s]*(?<date>(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})/i,
@@ -191,7 +193,7 @@ export async function parseContract(buffer: Buffer): Promise<ExtractedContractDa
 
   for (const { pattern, type } of financingPatterns) {
     if (pattern.test(normalizedText)) {
-      result.financing = type;
+      extracted.financing = type;
       break;
     }
   }
@@ -200,22 +202,22 @@ export async function parseContract(buffer: Buffer): Promise<ExtractedContractDa
     /(?:MLS\s*(?:#|number|no\.?)?)[:\s]*(?<mls>[A-Z0-9\-]{4,15})/i
   );
   if (mlsMatch) {
-    result.mlsNumber = (mlsMatch.groups?.mls || mlsMatch[1] || "").trim();
+    extracted.mlsNumber = (mlsMatch.groups?.mls || mlsMatch[1] || "").trim();
   }
 
   const buyerMatch = normalizedText.match(
     /(?:buyer|purchaser)\s*(?:name)?[:\s]*["']?(?<name>[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})["']?/i
   );
   if (buyerMatch) {
-    result.buyerName = (buyerMatch.groups?.name || buyerMatch[1] || "").trim();
+    extracted.buyerName = (buyerMatch.groups?.name || buyerMatch[1] || "").trim();
   }
 
   const sellerMatch = normalizedText.match(
     /(?:seller|vendor)\s*(?:name)?[:\s]*["']?(?<name>[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})["']?/i
   );
   if (sellerMatch) {
-    result.sellerName = (sellerMatch.groups?.name || sellerMatch[1] || "").trim();
+    extracted.sellerName = (sellerMatch.groups?.name || sellerMatch[1] || "").trim();
   }
 
-  return result;
+  return extracted;
 }
