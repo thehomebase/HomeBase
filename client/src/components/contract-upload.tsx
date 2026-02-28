@@ -6,10 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Check, X, Shield, AlertTriangle, Loader2, Users } from "lucide-react";
+import { Upload, FileText, Check, X, Shield, AlertTriangle, Loader2, Users, Pencil, ArrowLeftRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { type Transaction } from "@shared/schema";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ExtractedContactInfo {
   role: string;
@@ -53,14 +60,22 @@ const FIELD_LABELS: Record<string, string> = {
   contractExecutionDate: "Contract Execution Date",
   financing: "Financing Type",
   mlsNumber: "MLS Number",
-  propertyAddress: "Property Address",
-  buyerName: "Buyer Name",
-  sellerName: "Seller Name",
 };
 
 const CURRENCY_FIELDS = ["contractPrice", "earnestMoney", "optionFee", "downPayment", "sellerConcessions"];
 const DATE_FIELDS = ["closingDate", "optionPeriodExpiration", "contractExecutionDate"];
 const TRANSACTION_FIELDS = ["contractPrice", "earnestMoney", "optionFee", "downPayment", "sellerConcessions", "closingDate", "optionPeriodExpiration", "contractExecutionDate", "financing", "mlsNumber"];
+
+const CONTACT_ROLES = [
+  "Buyer",
+  "Seller",
+  "Listing Agent",
+  "Buyer Agent",
+  "Lender",
+  "Escrow Officer",
+  "Home Inspector",
+  "Transaction Coordinator",
+];
 
 function formatValue(key: string, value: unknown): string {
   if (value === null || value === undefined) return "Not found";
@@ -73,6 +88,29 @@ function formatValue(key: string, value: unknown): string {
   return String(value);
 }
 
+function formatEditValue(key: string, value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (CURRENCY_FIELDS.includes(key)) return String(value);
+  if (DATE_FIELDS.includes(key)) {
+    const d = new Date(value as string);
+    return d.toISOString().split("T")[0];
+  }
+  return String(value);
+}
+
+function parseEditValue(key: string, value: string): unknown {
+  if (!value.trim()) return null;
+  if (CURRENCY_FIELDS.includes(key)) {
+    const num = parseFloat(value.replace(/[,$]/g, ""));
+    return isNaN(num) ? null : Math.round(num);
+  }
+  if (DATE_FIELDS.includes(key)) {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  return value;
+}
+
 export function ContractUpload({ transactionId, transaction }: ContractUploadProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,6 +119,9 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
   const [showReview, setShowReview] = useState(false);
   const [selectedFields, setSelectedFields] = useState<Record<string, boolean>>({});
   const [selectedContacts, setSelectedContacts] = useState<Record<number, boolean>>({});
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [editingContactIdx, setEditingContactIdx] = useState<number | null>(null);
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -226,6 +267,42 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
     setSelectedFields((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const startEditField = (key: string) => {
+    if (!extractedData) return;
+    const value = extractedData[key as keyof ExtractedData];
+    setEditingField(key);
+    setEditValue(formatEditValue(key, value));
+  };
+
+  const saveEditField = () => {
+    if (!extractedData || !editingField) return;
+    const parsed = parseEditValue(editingField, editValue);
+    setExtractedData({
+      ...extractedData,
+      [editingField]: parsed,
+    });
+    if (parsed !== null) {
+      setSelectedFields(prev => ({ ...prev, [editingField]: true }));
+    }
+    setEditingField(null);
+    setEditValue("");
+  };
+
+  const updateContact = (idx: number, field: keyof ExtractedContactInfo, value: string) => {
+    if (!extractedData) return;
+    const updated = [...extractedData.extractedContacts];
+    updated[idx] = { ...updated[idx], [field]: value };
+    setExtractedData({ ...extractedData, extractedContacts: updated });
+  };
+
+  const swapContactName = (idx: number) => {
+    if (!extractedData) return;
+    const updated = [...extractedData.extractedContacts];
+    const contact = updated[idx];
+    updated[idx] = { ...contact, firstName: contact.lastName, lastName: contact.firstName };
+    setExtractedData({ ...extractedData, extractedContacts: updated });
+  };
+
   const extractedCount = extractedData
     ? TRANSACTION_FIELDS.filter((k) => extractedData[k as keyof ExtractedData] !== null).length
     : 0;
@@ -304,19 +381,17 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
               Review Extracted Data
             </DialogTitle>
             <DialogDescription>
-              {extractedCount > 0
-                ? `Found ${extractedCount} field${extractedCount !== 1 ? "s" : ""}. Select which values to apply to this transaction.`
-                : "No data could be automatically extracted from this contract."}
+              Review and edit the extracted data. Click the pencil icon to make corrections before applying.
             </DialogDescription>
           </DialogHeader>
 
           {extractedData && (
             <div className="space-y-3 py-2">
-              {extractedCount === 0 && (
+              {extractedCount === 0 && (!extractedData.extractedContacts || extractedData.extractedContacts.length === 0) && (
                 <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
                   <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
                   <div className="text-sm text-yellow-700 dark:text-yellow-300">
-                    The parser could not find standard contract fields in this document. This may happen with non-standard contract formats, scanned documents, or image-based PDFs. You can still enter data manually using the edit button.
+                    The parser could not find standard contract fields in this document. This may happen with non-standard contract formats, scanned documents, or image-based PDFs.
                   </div>
                 </div>
               )}
@@ -339,34 +414,124 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
                     {extractedData.extractedContacts.map((contact, idx) => (
                       <div
                         key={idx}
-                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                        className={`p-3 rounded-lg border transition-colors ${
                           selectedContacts[idx]
                             ? "bg-primary/5 border-primary/30"
                             : "bg-background border-border"
                         }`}
                       >
-                        <button
-                          type="button"
-                          onClick={() => setSelectedContacts(prev => ({ ...prev, [idx]: !prev[idx] }))}
-                          className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                            selectedContacts[idx]
-                              ? "bg-primary border-primary text-primary-foreground"
-                              : "border-muted-foreground/40"
-                          }`}
-                        >
-                          {selectedContacts[idx] && <Check className="h-3 w-3" />}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium px-2 py-0.5 bg-muted rounded-full">{contact.role}</span>
-                            <span className="text-sm font-medium">{contact.firstName} {contact.lastName}</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                            {contact.email && <p>Email: {contact.email}</p>}
-                            {contact.phone && <p>Phone: {contact.phone}</p>}
-                            {contact.brokerage && <p>Brokerage: {contact.brokerage}</p>}
-                            {!contact.email && !contact.phone && !contact.brokerage && <p>No additional details found</p>}
-                          </div>
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedContacts(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                            className={`flex-shrink-0 w-5 h-5 mt-1 rounded border-2 flex items-center justify-center transition-colors ${
+                              selectedContacts[idx]
+                                ? "bg-primary border-primary text-primary-foreground"
+                                : "border-muted-foreground/40"
+                            }`}
+                          >
+                            {selectedContacts[idx] && <Check className="h-3 w-3" />}
+                          </button>
+
+                          {editingContactIdx === idx ? (
+                            <div className="flex-1 space-y-2">
+                              <div>
+                                <Label className="text-xs">Role</Label>
+                                <Select value={contact.role} onValueChange={(val) => updateContact(idx, "role", val)}>
+                                  <SelectTrigger className="h-8 text-sm">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {CONTACT_ROLES.map(role => (
+                                      <SelectItem key={role} value={role}>{role}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <div className="flex items-center justify-between">
+                                    <Label className="text-xs">First Name</Label>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-5 px-1 text-xs text-muted-foreground"
+                                      onClick={() => swapContactName(idx)}
+                                      title="Swap first and last name"
+                                    >
+                                      <ArrowLeftRight className="h-3 w-3 mr-1" />
+                                      Swap
+                                    </Button>
+                                  </div>
+                                  <Input
+                                    className="h-8 text-sm"
+                                    value={contact.firstName}
+                                    onChange={(e) => updateContact(idx, "firstName", e.target.value)}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Last Name</Label>
+                                  <Input
+                                    className="h-8 text-sm"
+                                    value={contact.lastName}
+                                    onChange={(e) => updateContact(idx, "lastName", e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <Label className="text-xs">Email</Label>
+                                  <Input
+                                    className="h-8 text-sm"
+                                    value={contact.email}
+                                    onChange={(e) => updateContact(idx, "email", e.target.value)}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Phone</Label>
+                                  <Input
+                                    className="h-8 text-sm"
+                                    value={contact.phone}
+                                    onChange={(e) => updateContact(idx, "phone", e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex justify-end">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs"
+                                  onClick={() => setEditingContactIdx(null)}
+                                >
+                                  Done
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium px-2 py-0.5 bg-muted rounded-full">{contact.role}</span>
+                                <span className="text-sm font-medium">{contact.firstName} {contact.lastName}</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 ml-auto"
+                                  onClick={() => setEditingContactIdx(idx)}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                {contact.email && <p>Email: {contact.email}</p>}
+                                {contact.phone && <p>Phone: {contact.phone}</p>}
+                                {contact.brokerage && <p>Brokerage: {contact.brokerage}</p>}
+                                {!contact.email && !contact.phone && !contact.brokerage && <p>No additional details found</p>}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -375,11 +540,17 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
                 </>
               )}
 
+              <div className="flex items-center gap-2 mb-1">
+                <FileText className="h-4 w-4" />
+                <p className="text-sm font-medium">Transaction Fields</p>
+              </div>
+
               {TRANSACTION_FIELDS.map((key) => {
                 const value = extractedData[key as keyof ExtractedData];
                 const currentValue = transaction[key as keyof Transaction];
                 const hasValue = value !== null && value !== undefined;
                 const hasExisting = currentValue !== null && currentValue !== undefined;
+                const isEditing = editingField === key;
 
                 return (
                   <div
@@ -405,20 +576,56 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
                         {selectedFields[key] && <Check className="h-3 w-3" />}
                       </button>
                     )}
-                    {!hasValue && <X className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                    {!hasValue && !isEditing && <X className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
 
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">{FIELD_LABELS[key]}</p>
-                      <p className={`text-sm ${hasValue ? "text-foreground" : "text-muted-foreground"}`}>
-                        {formatValue(key, value)}
-                      </p>
-                      {hasExisting && hasValue && (
-                        <p className="text-xs text-muted-foreground">
-                          Current: {formatValue(key, currentValue)}
-                          {selectedFields[key] && " (will be overwritten)"}
-                        </p>
+                      {isEditing ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <Input
+                            className="h-8 text-sm flex-1"
+                            type={DATE_FIELDS.includes(key) ? "date" : CURRENCY_FIELDS.includes(key) ? "number" : "text"}
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveEditField();
+                              if (e.key === "Escape") { setEditingField(null); setEditValue(""); }
+                            }}
+                            autoFocus
+                          />
+                          <Button type="button" size="sm" variant="outline" className="h-8" onClick={saveEditField}>
+                            <Check className="h-3 w-3" />
+                          </Button>
+                          <Button type="button" size="sm" variant="ghost" className="h-8" onClick={() => { setEditingField(null); setEditValue(""); }}>
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className={`text-sm ${hasValue ? "text-foreground" : "text-muted-foreground"}`}>
+                            {formatValue(key, value)}
+                          </p>
+                          {hasExisting && hasValue && (
+                            <p className="text-xs text-muted-foreground">
+                              Current: {formatValue(key, currentValue)}
+                              {selectedFields[key] && " (will be overwritten)"}
+                            </p>
+                          )}
+                        </>
                       )}
                     </div>
+
+                    {!isEditing && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 flex-shrink-0"
+                        onClick={() => startEditField(key)}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 );
               })}

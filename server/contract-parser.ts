@@ -371,14 +371,30 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
       }
 
       const footerLines = footer.split("\n").filter(l => l.trim().length > 0);
+      const nameLines: string[] = [];
+      const skipFooter = /TXR|TREC|Produced|zipForm|DocuSign|Envelope|Lone Wolf|www\./i;
+      const brokerLine = /REALTY|LLC|INC|TEAM|GROUP|BROKERAGE|DBA/i;
+      const numericOnly = /^[\d,.\s$%X]+$/;
+      const addressLike = /\d+\s+\w+.*(?:Dr|St|Ave|Blvd|Ln|Rd|Ct|Way|Pl|Main)\b/i;
       for (const line of footerLines) {
-        if (/^[A-Z][a-zA-Z]+(?:\s*,\s*[A-Z][a-zA-Z]+)+/.test(line.trim()) && !line.includes("REALTY") && !line.includes("LLC") && !line.includes("Produced") && !line.includes("TXR")) {
-          if (!extracted.sellerName && !extracted.buyerName) {
-            extracted.buyerName = line.trim();
-          } else if (!extracted.sellerName) {
-            extracted.sellerName = line.trim();
-          }
+        const trimmed = line.trim();
+        if (trimmed.length < 3 || trimmed.length > 80) continue;
+        if (skipFooter.test(trimmed)) continue;
+        if (brokerLine.test(trimmed)) continue;
+        if (numericOnly.test(trimmed)) continue;
+        if (addressLike.test(trimmed)) continue;
+        if (/^\d{5}/.test(trimmed)) continue;
+        if (/^(Fort Worth|Tarrant|Dallas|Houston|Austin|Keller)/i.test(trimmed)) continue;
+        if (/^(Phone|Fax|Email)/i.test(trimmed)) continue;
+        if (/^[A-Z][a-z]/.test(trimmed) || /^[A-Z]{2,}/.test(trimmed)) {
+          nameLines.push(trimmed);
         }
+      }
+      if (nameLines.length >= 2) {
+        extracted.buyerName = nameLines[0];
+        extracted.sellerName = nameLines[1];
+      } else if (nameLines.length === 1) {
+        extracted.buyerName = nameLines[0];
       }
     }
 
@@ -570,59 +586,66 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
     }
   }
 
-  if (extracted.buyerName) {
-    const hasExistingBuyer = extracted.extractedContacts.some(c => c.role === "Buyer");
-    if (!hasExistingBuyer) {
-      const parts = extracted.buyerName.split(/,\s*/);
-      if (parts.length >= 2) {
-        const { firstName, lastName } = splitName(parts[0]);
-        extracted.extractedContacts.unshift({
-          role: "Buyer",
-          firstName: lastName || firstName,
-          lastName: firstName && lastName ? firstName : "",
-          email: "",
-          phone: "",
-          brokerage: "",
-        });
-      } else {
-        const { firstName, lastName } = splitName(extracted.buyerName);
-        extracted.extractedContacts.unshift({
-          role: "Buyer",
-          firstName,
-          lastName,
+  function parseNameToContacts(rawName: string, role: string): ExtractedContactInfo[] {
+    const results: ExtractedContactInfo[] = [];
+    const parts = rawName.split(/,\s*/);
+
+    if (parts.length >= 4 && parts.length % 2 === 0) {
+      for (let j = 0; j < parts.length; j += 2) {
+        results.push({
+          role,
+          firstName: parts[j + 1]?.trim() || "",
+          lastName: parts[j]?.trim() || "",
           email: "",
           phone: "",
           brokerage: "",
         });
       }
+    } else if (parts.length === 2) {
+      results.push({
+        role,
+        firstName: parts[1].trim(),
+        lastName: parts[0].trim(),
+        email: "",
+        phone: "",
+        brokerage: "",
+      });
+    } else if (parts.length === 3) {
+      results.push({
+        role,
+        firstName: parts[1].trim(),
+        lastName: parts[0].trim(),
+        email: "",
+        phone: "",
+        brokerage: "",
+      });
+    } else {
+      const { firstName, lastName } = splitName(rawName);
+      results.push({
+        role,
+        firstName,
+        lastName,
+        email: "",
+        phone: "",
+        brokerage: "",
+      });
+    }
+    return results;
+  }
+
+  if (extracted.buyerName) {
+    const hasExistingBuyer = extracted.extractedContacts.some(c => c.role === "Buyer");
+    if (!hasExistingBuyer) {
+      const buyerContacts = parseNameToContacts(extracted.buyerName, "Buyer");
+      extracted.extractedContacts.unshift(...buyerContacts);
     }
   }
 
   if (extracted.sellerName) {
     const hasExistingSeller = extracted.extractedContacts.some(c => c.role === "Seller");
     if (!hasExistingSeller) {
-      const parts = extracted.sellerName.split(/,\s*/);
-      if (parts.length >= 2) {
-        const { firstName, lastName } = splitName(parts[0]);
-        extracted.extractedContacts.unshift({
-          role: "Seller",
-          firstName: lastName || firstName,
-          lastName: firstName && lastName ? firstName : "",
-          email: "",
-          phone: "",
-          brokerage: "",
-        });
-      } else {
-        const { firstName, lastName } = splitName(extracted.sellerName);
-        extracted.extractedContacts.unshift({
-          role: "Seller",
-          firstName,
-          lastName,
-          email: "",
-          phone: "",
-          brokerage: "",
-        });
-      }
+      const sellerContacts = parseNameToContacts(extracted.sellerName, "Seller");
+      extracted.extractedContacts.unshift(...sellerContacts);
     }
   }
 
