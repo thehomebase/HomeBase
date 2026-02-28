@@ -1168,14 +1168,14 @@ export class DatabaseStorage implements IStorage {
       // Convert all fields to their proper types
       if (data.name !== undefined) updateData.name = String(data.name);
       if (data.status !== undefined) updateData.status = data.status;
-      if (data.transactionId !== undefined) updateData.transaction_id = Number(data.transactionId);
+      if (data.transactionId !== undefined) updateData.transactionId = Number(data.transactionId);
       if (data.deadline !== undefined) updateData.deadline = data.deadline ? new Date(data.deadline) : null;
-      if (data.deadlineTime !== undefined) updateData.deadline_time = data.deadlineTime;
+      if (data.deadlineTime !== undefined) updateData.deadlineTime = data.deadlineTime;
       if (data.notes !== undefined) updateData.notes = data.notes;
-      if (data.clientId !== undefined) updateData.client_id = data.clientId ? Number(data.clientId) : null;
-      if ((data as any).signingUrl !== undefined) updateData.signing_url = (data as any).signingUrl || null;
-      if ((data as any).signingPlatform !== undefined) updateData.signing_platform = (data as any).signingPlatform || null;
-      updateData.updated_at = new Date();
+      if (data.clientId !== undefined) updateData.clientId = data.clientId ? Number(data.clientId) : null;
+      if ((data as any).signingUrl !== undefined) updateData.signingUrl = (data as any).signingUrl || null;
+      if ((data as any).signingPlatform !== undefined) updateData.signingPlatform = (data as any).signingPlatform || null;
+      updateData.updatedAt = new Date();
 
       const [doc] = await db
         .update(documents)
@@ -1353,14 +1353,14 @@ export class DatabaseStorage implements IStorage {
       // Convert all fields to their proper types
       if (data.name !== undefined) updateData.name = String(data.name);
       if (data.status !== undefined) updateData.status = data.status;
-      if (data.transactionId !== undefined) updateData.transaction_id = Number(data.transactionId);
+      if (data.transactionId !== undefined) updateData.transactionId = Number(data.transactionId);
       if (data.deadline !== undefined) updateData.deadline = data.deadline ? new Date(data.deadline) : null;
-      if (data.deadlineTime !== undefined) updateData.deadline_time = data.deadlineTime;
+      if (data.deadlineTime !== undefined) updateData.deadlineTime = data.deadlineTime;
       if (data.notes !== undefined) updateData.notes = data.notes;
-      if (data.clientId !== undefined) updateData.client_id = data.clientId ? Number(data.clientId) : null;
-      if ((data as any).signingUrl !== undefined) updateData.signing_url = (data as any).signingUrl || null;
-      if ((data as any).signingPlatform !== undefined) updateData.signing_platform = (data as any).signingPlatform || null;
-      updateData.updated_at = new Date();
+      if (data.clientId !== undefined) updateData.clientId = data.clientId ? Number(data.clientId) : null;
+      if ((data as any).signingUrl !== undefined) updateData.signingUrl = (data as any).signingUrl || null;
+      if ((data as any).signingPlatform !== undefined) updateData.signingPlatform = (data as any).signingPlatform || null;
+      updateData.updatedAt = new Date();
 
       const [doc] = await db
         .update(documents)
@@ -1706,14 +1706,14 @@ export class DatabaseStorage implements IStorage {
       // Convert all fields to their proper types
       if (data.name !== undefined) updateData.name = String(data.name);
       if (data.status !== undefined) updateData.status = data.status;
-      if (data.transactionId !== undefined) updateData.transaction_id = Number(data.transactionId);
+      if (data.transactionId !== undefined) updateData.transactionId = Number(data.transactionId);
       if (data.deadline !== undefined) updateData.deadline = data.deadline ? new Date(data.deadline) : null;
-      if (data.deadlineTime !== undefined) updateData.deadline_time = data.deadlineTime;
+      if (data.deadlineTime !== undefined) updateData.deadlineTime = data.deadlineTime;
       if (data.notes !== undefined) updateData.notes = data.notes;
-      if (data.clientId !== undefined) updateData.client_id = data.clientId ? Number(data.clientId) : null;
-      if ((data as any).signingUrl !== undefined) updateData.signing_url = (data as any).signingUrl || null;
-      if ((data as any).signingPlatform !== undefined) updateData.signing_platform = (data as any).signingPlatform || null;
-      updateData.updated_at = new Date();
+      if (data.clientId !== undefined) updateData.clientId = data.clientId ? Number(data.clientId) : null;
+      if ((data as any).signingUrl !== undefined) updateData.signingUrl = (data as any).signingUrl || null;
+      if ((data as any).signingPlatform !== undefined) updateData.signingPlatform = (data as any).signingPlatform || null;
+      updateData.updatedAt = new Date();
 
       const [doc] = await db
         .update(documents)
