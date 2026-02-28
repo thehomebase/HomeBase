@@ -7,6 +7,7 @@ import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, in
 import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
+import { parseContract } from "./contract-parser";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -1734,6 +1735,55 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error deleting saved property:', error);
       res.status(404).json({ error: 'Property not found' });
+    }
+  });
+
+  const contractUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype === 'application/pdf') {
+        cb(null, true);
+      } else {
+        cb(new Error('Only PDF files are accepted'));
+      }
+    }
+  });
+
+  app.post("/api/transactions/:id/parse-contract", contractUpload.single('contract'), async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== 'agent') return res.status(403).json({ error: 'Only agents can upload contracts' });
+
+    const transactionId = Number(req.params.id);
+    try {
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+      if (transaction.agentId !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized for this transaction' });
+      }
+    } catch {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No PDF file uploaded' });
+    }
+
+    try {
+      const extracted = await parseContract(req.file.buffer);
+      (req as any).file.buffer = Buffer.alloc(0);
+
+      const { rawTextPreview, ...fields } = extracted;
+
+      res.json({
+        extracted: fields,
+        message: 'Contract parsed successfully. Review the extracted data before applying to the transaction.',
+      });
+    } catch (error) {
+      console.error('Error parsing contract:', error);
+      res.status(422).json({ error: 'Failed to parse the contract. Please ensure it is a valid PDF document.' });
     }
   });
 

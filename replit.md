@@ -41,6 +41,17 @@ Preferred communication style: Simple, everyday language.
 - **Checklists**: Buyer/seller workflow checklists with phase-based items
 - **Contractors**: Service provider directory with reviews
 - **Messages**: In-app messaging between users
+- **Saved Properties**: User-saved property listings with URL-based address parsing
+
+### Contract Upload Feature
+- **Location**: `server/contract-parser.ts` (backend), `client/src/components/contract-upload.tsx` (frontend)
+- **Purpose**: Agents upload real estate contract PDFs to extract key data (purchase price, earnest money, dates, etc.)
+- **Privacy**: Documents processed in-memory only — never written to disk or persistent storage. Buffer cleared immediately after parsing.
+- **Technology**: `pdf-parse` library for text extraction, regex pattern matching for field identification
+- **Extracted Fields**: contractPrice, earnestMoney, optionFee, downPayment, sellerConcessions, closingDate, optionPeriodExpiration, contractExecutionDate, financing, mlsNumber, buyerName, sellerName
+- **Workflow**: Upload PDF → extract text → pattern match → review extracted data → agent selects fields to apply → update transaction
+- **Access**: Agents only, scoped to their own transactions
+- **API Endpoint**: `POST /api/transactions/:id/parse-contract` (multipart form, field name: "contract")
 
 ### Build and Development
 - **Development**: `npm run dev` runs tsx for hot-reloading TypeScript
