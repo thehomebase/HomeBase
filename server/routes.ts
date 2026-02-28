@@ -1777,9 +1777,9 @@ export function registerRoutes(app: Express): Server {
 
       const { rawTextPreview, ...fields } = extracted;
 
-      console.log('=== CONTRACT RAW TEXT PREVIEW ===');
-      console.log(rawTextPreview);
-      console.log('=== END RAW TEXT PREVIEW ===');
+      const fs = await import('fs');
+      fs.writeFileSync('/tmp/contract_debug.txt', rawTextPreview);
+      console.log('=== FULL CONTRACT TEXT WRITTEN TO /tmp/contract_debug.txt ===');
       console.log('=== EXTRACTED FIELDS ===');
       console.log(JSON.stringify(fields, null, 2));
 

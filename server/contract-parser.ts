@@ -58,20 +58,33 @@ function parseDate(dateStr: string): string | null {
   return null;
 }
 
-function findAllDollarAmounts(text: string): number[] {
-  const amounts: number[] = [];
-  const pattern = /\$\s*([\d,]+(?:\.\d{2})?)/g;
-  let match;
-  while ((match = pattern.exec(text)) !== null) {
-    const parsed = parseCurrency(match[1]);
-    if (parsed !== null && parsed > 0) {
-      amounts.push(parsed);
-    }
-  }
-  return amounts;
+function splitPages(text: string): string[] {
+  return text.split(/--\s*\d+\s*of\s*\d+\s*--/);
 }
 
-function findAllDates(text: string): string[] {
+function extractPageFooterBlock(pageText: string): string {
+  const lines = pageText.split("\n");
+  let footerStart = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/TXR\s*1601|Produced with Lone Wolf|zipForm|TREC NO\./i.test(lines[i])) {
+      if (footerStart === -1) footerStart = i;
+    }
+  }
+  if (footerStart === -1) return "";
+  return lines.slice(footerStart).join("\n");
+}
+
+function extractAllNumbers(text: string): number[] {
+  const numbers: number[] = [];
+  const matches = text.match(/[\d,]+\.\d{2}/g) || [];
+  for (const m of matches) {
+    const parsed = parseCurrency(m);
+    if (parsed !== null) numbers.push(parsed);
+  }
+  return numbers;
+}
+
+function extractAllDates(text: string): string[] {
   const dates: string[] = [];
   const patterns = [
     /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/g,
@@ -81,33 +94,29 @@ function findAllDates(text: string): string[] {
     let match;
     while ((match = pattern.exec(text)) !== null) {
       const parsed = parseDate(match[0]);
-      if (parsed) {
-        dates.push(parsed);
-      }
+      if (parsed) dates.push(parsed);
     }
   }
   return dates;
 }
 
-function findAmountNear(text: string, searchTerms: string[], maxDistance: number = 200): number | null {
+function findAmountNear(text: string, searchTerms: string[], maxDistance: number = 300): number | null {
   const lowerText = text.toLowerCase();
   for (const term of searchTerms) {
     const termLower = term.toLowerCase();
     let idx = lowerText.indexOf(termLower);
     while (idx !== -1) {
-      const searchArea = text.substring(idx, idx + maxDistance);
-      const amountMatch = searchArea.match(/\$\s*([\d,]+(?:\.\d{2})?)/);
+      const afterArea = text.substring(idx, idx + maxDistance);
+      const amountMatch = afterArea.match(/\$\s*([\d,]+(?:\.\d{2})?)/);
       if (amountMatch) {
         const parsed = parseCurrency(amountMatch[1]);
         if (parsed !== null && parsed > 0) {
           return parsed;
         }
       }
-      const beforeArea = text.substring(Math.max(0, idx - maxDistance), idx);
-      const beforeAmounts = [...beforeArea.matchAll(/\$\s*([\d,]+(?:\.\d{2})?)/g)];
-      if (beforeAmounts.length > 0) {
-        const lastAmount = beforeAmounts[beforeAmounts.length - 1];
-        const parsed = parseCurrency(lastAmount[1]);
+      const standaloneMatch = afterArea.match(/(?:^|\s)([\d,]+\.\d{2})(?:\s|$)/m);
+      if (standaloneMatch) {
+        const parsed = parseCurrency(standaloneMatch[1]);
         if (parsed !== null && parsed > 0) {
           return parsed;
         }
@@ -118,7 +127,7 @@ function findAmountNear(text: string, searchTerms: string[], maxDistance: number
   return null;
 }
 
-function findDateNear(text: string, searchTerms: string[], maxDistance: number = 200): string | null {
+function findDateNear(text: string, searchTerms: string[], maxDistance: number = 300): string | null {
   const lowerText = text.toLowerCase();
   for (const term of searchTerms) {
     const termLower = term.toLowerCase();
@@ -142,14 +151,7 @@ function findDateNear(text: string, searchTerms: string[], maxDistance: number =
   return null;
 }
 
-export async function parseContract(buffer: Buffer): Promise<ExtractedContractData> {
-  const uint8 = new Uint8Array(buffer);
-  const parser = new PDFParse(uint8 as any);
-  await parser.load();
-  const pdfResult = await parser.getText();
-  const text = (pdfResult as any).text || "";
-  const normalizedText = text.replace(/\s+/g, " ");
-
+function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
   const extracted: ExtractedContractData = {
     contractPrice: null,
     earnestMoney: null,
@@ -164,127 +166,180 @@ export async function parseContract(buffer: Buffer): Promise<ExtractedContractDa
     propertyAddress: null,
     buyerName: null,
     sellerName: null,
-    rawTextPreview: text.substring(0, 8000),
+    rawTextPreview: text,
   };
 
-  extracted.contractPrice = findAmountNear(normalizedText, [
-    "Sales Price (Sum of A and B)",
-    "Sales Price",
-    "sales price",
-    "purchase price",
-    "contract price",
-    "total price",
-    "Sum of A and B",
-  ]);
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i];
+    const footer = extractPageFooterBlock(page);
+    const footerNumbers = extractAllNumbers(footer);
+    const footerDates = extractAllDates(footer);
+    const lowerPage = page.toLowerCase();
 
-  extracted.earnestMoney = findAmountNear(normalizedText, [
-    "earnest money",
-    "earnest money deposit",
-    "EMD",
-    "as earnest money",
-    "Earnest Money",
-  ]);
+    if (lowerPage.includes("sales price") && lowerPage.includes("cash portion")) {
+      if (footerNumbers.length >= 3) {
+        extracted.contractPrice = footerNumbers[footerNumbers.length - 1];
+        if (footerNumbers.length >= 2) {
+          const sorted = [...footerNumbers].sort((a, b) => b - a);
+          extracted.contractPrice = sorted[0];
+        }
+      } else if (footerNumbers.length === 1) {
+        extracted.contractPrice = footerNumbers[0];
+      }
 
-  extracted.optionFee = findAmountNear(normalizedText, [
-    "option fee",
-    "option money",
-    "option consideration",
-    "Option Fee",
-  ]);
+      const footerLines = footer.split("\n").filter(l => l.trim().length > 0);
+      for (const line of footerLines) {
+        if (/^[A-Z][a-zA-Z]+(?:\s*,\s*[A-Z][a-zA-Z]+)+/.test(line.trim()) && !line.includes("REALTY") && !line.includes("LLC") && !line.includes("Produced") && !line.includes("TXR")) {
+          if (!extracted.sellerName && !extracted.buyerName) {
+            extracted.buyerName = line.trim();
+          } else if (!extracted.sellerName) {
+            extracted.sellerName = line.trim();
+          }
+        }
+      }
+    }
 
-  extracted.downPayment = findAmountNear(normalizedText, [
-    "down payment",
-    "Down Payment",
-    "cash down payment",
-  ]);
+    if (lowerPage.includes("earnest money") && lowerPage.includes("option fee") && lowerPage.includes("delivery of earnest money")) {
+      if (footerNumbers.length >= 2) {
+        const sorted = [...footerNumbers].sort((a, b) => b - a);
+        extracted.earnestMoney = sorted[0];
+        extracted.optionFee = sorted[1];
+      } else if (footerNumbers.length === 1) {
+        extracted.earnestMoney = footerNumbers[0];
+      }
 
-  extracted.sellerConcessions = findAmountNear(normalizedText, [
-    "seller concession",
-    "seller's concession",
-    "seller contribution",
-    "seller credit",
-    "Seller Concession",
-  ]);
+      const optionDaysMatch = footer.match(/\b(\d{1,3})\b/);
+      if (optionDaysMatch && parseInt(optionDaysMatch[1]) <= 30) {
+        const days = parseInt(optionDaysMatch[1]);
+        if (extracted.contractExecutionDate) {
+          const execDate = new Date(extracted.contractExecutionDate);
+          execDate.setDate(execDate.getDate() + days);
+          extracted.optionPeriodExpiration = execDate.toISOString();
+        }
+      }
+    }
 
-  extracted.closingDate = findDateNear(normalizedText, [
-    "closing date",
-    "close on or before",
-    "closing shall be",
-    "date of closing",
-    "Closing Date",
-    "closing on",
-  ]);
+    if (lowerPage.includes("closing") && lowerPage.includes("sale will be on or before")) {
+      if (footerDates.length > 0) {
+        extracted.closingDate = footerDates[0];
+      }
+      const footerLines = footer.split("\n").filter(l => l.trim().length > 0);
+      for (const line of footerLines) {
+        const dateMatch = line.match(/((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})/i);
+        if (dateMatch) {
+          const parsed = parseDate(dateMatch[1]);
+          if (parsed) {
+            extracted.closingDate = parsed;
+            break;
+          }
+        }
+        const numDateMatch = line.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
+        if (numDateMatch) {
+          const parsed = parseDate(numDateMatch[1]);
+          if (parsed) {
+            extracted.closingDate = parsed;
+            break;
+          }
+        }
+      }
+    }
 
-  extracted.optionPeriodExpiration = findDateNear(normalizedText, [
-    "option period",
-    "option period expir",
-    "option period ends",
-    "termination option",
-    "Option Period",
-  ]);
+    if (lowerPage.includes("executed the") && lowerPage.includes("effective date")) {
+      if (footerDates.length > 0) {
+        extracted.contractExecutionDate = footerDates[0];
+      }
+    }
 
-  if (!extracted.optionPeriodExpiration) {
-    const optionDaysMatch = normalizedText.match(
-      /option\s*period.*?(\d+)\s*(?:calendar\s*)?days?\b/i
-    );
-    if (optionDaysMatch) {
-      const execDateMatch = normalizedText.match(
-        /(?:effective\s*date|execution\s*date|executed?\s*(?:on|this))[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i
-      );
-      if (execDateMatch) {
-        const execDate = parseDate(execDateMatch[1]);
-        if (execDate) {
-          const days = parseInt(optionDaysMatch[1]);
-          const d = new Date(execDate);
-          d.setDate(d.getDate() + days);
-          extracted.optionPeriodExpiration = d.toISOString();
+    if (lowerPage.includes("seller concession") || lowerPage.includes("seller's concession") || lowerPage.includes("seller contribution")) {
+      if (footerNumbers.length > 0) {
+        for (const num of footerNumbers) {
+          if (num > 100 && num < (extracted.contractPrice || Infinity)) {
+            extracted.sellerConcessions = num;
+            break;
+          }
         }
       }
     }
   }
 
-  extracted.contractExecutionDate = findDateNear(normalizedText, [
-    "effective date",
-    "execution date",
-    "contract date",
-    "executed on",
-    "executed this",
-    "Effective Date",
-  ]);
-
   if (!extracted.contractExecutionDate) {
-    const topDate = text.substring(0, 300).match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
+    const topText = text.substring(0, 500);
+    const topDate = topText.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/);
     if (topDate) {
       extracted.contractExecutionDate = parseDate(topDate[1]);
     }
   }
 
-  const financingPatterns = [
-    { pattern: /\bconventional\b/i, type: "conventional" },
-    { pattern: /\bFHA\b/i, type: "fha" },
-    { pattern: /\bVA\b/i, type: "va" },
-    { pattern: /\bUSDA\b/i, type: "usda" },
-  ];
+  const normalizedText = text.replace(/\s+/g, " ");
+
+  if (!extracted.contractPrice) {
+    extracted.contractPrice = findAmountNear(normalizedText, [
+      "Sales Price (Sum of A and B)",
+      "Sales Price",
+      "purchase price",
+      "contract price",
+    ]);
+  }
+
+  if (!extracted.earnestMoney) {
+    extracted.earnestMoney = findAmountNear(normalizedText, [
+      "as earnest money",
+      "earnest money",
+    ]);
+  }
+
+  if (!extracted.optionFee) {
+    extracted.optionFee = findAmountNear(normalizedText, [
+      "as the Option Fee",
+      "option fee",
+    ]);
+  }
+
+  if (!extracted.closingDate) {
+    extracted.closingDate = findDateNear(normalizedText, [
+      "closing date",
+      "close on or before",
+      "closing shall be",
+    ]);
+  }
+
+  if (!extracted.contractExecutionDate) {
+    extracted.contractExecutionDate = findDateNear(normalizedText, [
+      "effective date",
+      "execution date",
+      "executed on",
+    ]);
+  }
 
   const financingSection = normalizedText.match(
     /(?:third\s*party\s*financing|financing\s*addendum|type\s*of\s*financing|loan\s*type)[^.]{0,500}/i
   );
   const financingText = financingSection ? financingSection[0] : normalizedText;
 
-  const cashPattern = /\b(?:cash\s*(?:purchase|sale|transaction)|all\s*cash|no\s*financing)\b/i;
-  if (cashPattern.test(financingText)) {
+  if (/\b(?:cash\s*(?:purchase|sale|transaction)|all\s*cash|no\s*financing)\b/i.test(financingText)) {
     extracted.financing = "cash";
-  } else {
-    for (const { pattern, type } of financingPatterns) {
-      if (pattern.test(financingText)) {
-        extracted.financing = type;
-        break;
+  } else if (/\bconventional\b/i.test(financingText)) {
+    extracted.financing = "conventional";
+  } else if (/\bFHA\b/.test(financingText)) {
+    extracted.financing = "fha";
+  } else if (/\bVA\b/.test(financingText) && /\b(?:loan|financing|mortgage)\b/i.test(financingText)) {
+    extracted.financing = "va";
+  } else if (/\bUSDA\b/i.test(financingText)) {
+    extracted.financing = "usda";
+  }
+
+  if (!extracted.financing) {
+    if (/\bFHA\b/.test(normalizedText) && !/FHA.*prohibit/i.test(normalizedText.substring(0, normalizedText.indexOf("FHA") + 200))) {
+      const fhaContexts = normalizedText.match(/\bFHA\b/g) || [];
+      const fhaInFinancing = normalizedText.match(/(?:third\s*party|financing|loan).*?\bFHA\b/i);
+      if (fhaInFinancing || fhaContexts.length >= 3) {
+        extracted.financing = "fha";
       }
     }
   }
 
   const mlsPatterns = [
-    /MLS\s*(?:#|number|no\.?|num)?[:\s]*([A-Z0-9][A-Z0-9\-]{3,14})/i,
+    /MLS\s*(?:#|number|no\.?|num)?[:\s]*([A-Z0-9][A-Z0-9\-]{5,14})/i,
     /MLS[:\s]+(\d{5,15})/i,
   ];
   for (const pattern of mlsPatterns) {
@@ -299,60 +354,71 @@ export async function parseContract(buffer: Buffer): Promise<ExtractedContractDa
     }
   }
 
-  const partyPattern = /PARTIES[:\s].*?(?:contract\s*are)\s+([A-Z][A-Za-z\s,.'"-]+?)\s*\(Seller\)\s*and\s+([A-Z][A-Za-z\s,.'"-]+?)\s*\(Buyer\)/i;
-  const partyMatch = normalizedText.match(partyPattern);
-  if (partyMatch) {
-    const seller = partyMatch[1].trim();
-    const buyer = partyMatch[2].trim();
-    if (seller.length > 2 && seller.length < 80) extracted.sellerName = seller;
-    if (buyer.length > 2 && buyer.length < 80) extracted.buyerName = buyer;
-  }
-
-  if (!extracted.buyerName) {
-    const buyerPatterns = [
-      /Buyer[:\s]+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})/,
-      /Purchaser[:\s]+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})/,
-    ];
-    for (const bp of buyerPatterns) {
-      const m = normalizedText.match(bp);
-      if (m) {
-        const name = m[1].trim();
-        const skipWords = ["agrees", "shall", "will", "may", "has", "and", "or"];
-        if (!skipWords.some(w => name.toLowerCase().startsWith(w))) {
-          extracted.buyerName = name;
-          break;
-        }
-      }
-    }
-  }
-
-  if (!extracted.sellerName) {
-    const sellerPatterns = [
-      /Seller[:\s]+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})/,
-      /Vendor[:\s]+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})/,
-    ];
-    for (const sp of sellerPatterns) {
-      const m = normalizedText.match(sp);
-      if (m) {
-        const name = m[1].trim();
-        const skipWords = ["agrees", "shall", "will", "may", "has", "and", "or", "is"];
-        if (!skipWords.some(w => name.toLowerCase().startsWith(w))) {
-          extracted.sellerName = name;
-          break;
-        }
-      }
+  if (!extracted.buyerName || !extracted.sellerName) {
+    const partyPattern = /PARTIES[:\s].*?(?:contract\s*are)\s+(.+?)\s*\(Seller\)\s*and\s+(.+?)\s*\(Buyer\)/i;
+    const partyMatch = normalizedText.match(partyPattern);
+    if (partyMatch) {
+      const seller = partyMatch[1].trim();
+      const buyer = partyMatch[2].trim();
+      if (!extracted.sellerName && seller.length > 2 && seller.length < 80) extracted.sellerName = seller;
+      if (!extracted.buyerName && buyer.length > 2 && buyer.length < 80) extracted.buyerName = buyer;
     }
   }
 
   const addressMatch = normalizedText.match(
-    /(?:known\s*as|property\s*address|address)[:\s]*([^,\n]{5,60}(?:,\s*[A-Za-z\s]+,\s*[A-Z]{2}\s*\d{5})?)/i
+    /(?:known\s*as|property\s*address)[:\s]*(\d+[^,\n]{3,55})/i
   );
   if (addressMatch) {
     const addr = addressMatch[1].trim();
-    if (addr.length > 5 && /\d/.test(addr)) {
+    if (addr.length > 5) {
       extracted.propertyAddress = addr;
     }
   }
 
+  if (!extracted.propertyAddress) {
+    const addrMatch = text.match(/(\d+\s+[A-Za-z]+(?:\s+[A-Za-z]+)*\s+(?:Dr|St|Ave|Blvd|Ln|Rd|Ct|Cir|Way|Pl)\b[^,\n]*\d{5})/i);
+    if (addrMatch) {
+      extracted.propertyAddress = addrMatch[1].trim();
+    }
+  }
+
+  if (extracted.optionPeriodExpiration === null && extracted.contractExecutionDate) {
+    const optionDaysMatch = normalizedText.match(
+      /(\d{1,2})\s*days?\s*after\s*the\s*effective\s*date.*?option\s*period/i
+    );
+    if (!optionDaysMatch) {
+      const altMatch = normalizedText.match(
+        /option\s*period.*?(\d{1,2})\s*days?\s*after/i
+      );
+      if (altMatch) {
+        const days = parseInt(altMatch[1]);
+        if (days > 0 && days <= 30) {
+          const execDate = new Date(extracted.contractExecutionDate);
+          execDate.setDate(execDate.getDate() + days);
+          extracted.optionPeriodExpiration = execDate.toISOString();
+        }
+      }
+    } else {
+      const days = parseInt(optionDaysMatch[1]);
+      if (days > 0 && days <= 30) {
+        const execDate = new Date(extracted.contractExecutionDate);
+        execDate.setDate(execDate.getDate() + days);
+        extracted.optionPeriodExpiration = execDate.toISOString();
+      }
+    }
+  }
+
   return extracted;
+}
+
+export async function parseContract(buffer: Buffer): Promise<ExtractedContractData> {
+  const uint8 = new Uint8Array(buffer);
+  const parser = new PDFParse(uint8 as any);
+  await parser.load();
+  const pdfResult = await parser.getText();
+  const text = (pdfResult as any).text || "";
+
+  const pages = splitPages(text);
+
+  return parseTRECForm(text, pages);
 }
