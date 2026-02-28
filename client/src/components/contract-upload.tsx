@@ -122,6 +122,16 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editingContactIdx, setEditingContactIdx] = useState<number | null>(null);
+  const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
+
+  const overwriteFields = extractedData
+    ? TRANSACTION_FIELDS.filter((key) => {
+        if (!selectedFields[key]) return false;
+        const newVal = extractedData[key as keyof ExtractedData];
+        const currentVal = transaction[key as keyof Transaction];
+        return newVal !== null && newVal !== undefined && currentVal !== null && currentVal !== undefined;
+      })
+    : [];
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -248,6 +258,11 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
       return;
     }
 
+    if (overwriteFields.length > 0 && !showOverwriteConfirm) {
+      setShowOverwriteConfirm(true);
+      return;
+    }
+
     try {
       if (Object.keys(updateData).length > 0) {
         await applyMutation.mutateAsync(updateData as Partial<Transaction>);
@@ -256,6 +271,7 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
         await addContactsMutation.mutateAsync(contactsToAdd);
       }
       setShowReview(false);
+      setShowOverwriteConfirm(false);
       setExtractedData(null);
       toast({ title: "Applied successfully", description: `Updated transaction${contactsToAdd.length > 0 ? ` and added ${contactsToAdd.length} contact${contactsToAdd.length !== 1 ? "s" : ""}` : ""}.` });
     } catch {
@@ -265,6 +281,7 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
 
   const toggleField = (key: string) => {
     setSelectedFields((prev) => ({ ...prev, [key]: !prev[key] }));
+    setShowOverwriteConfirm(false);
   };
 
   const startEditField = (key: string) => {
@@ -373,7 +390,7 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
         </CardContent>
       </Card>
 
-      <Dialog open={showReview} onOpenChange={setShowReview}>
+      <Dialog open={showReview} onOpenChange={(open) => { setShowReview(open); if (!open) setShowOverwriteConfirm(false); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -384,6 +401,19 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
               Review and edit the extracted data. Click the pencil icon to make corrections before applying.
             </DialogDescription>
           </DialogHeader>
+
+          {extractedData && overwriteFields.length > 0 && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-amber-700 dark:text-amber-300">
+                <span className="font-medium">Overwrite Warning:</span>{" "}
+                {overwriteFields.length} field{overwriteFields.length !== 1 ? "s" : ""} already{" "}
+                {overwriteFields.length !== 1 ? "have" : "has"} existing data that will be replaced:{" "}
+                {overwriteFields.map(k => FIELD_LABELS[k]).join(", ")}.
+                Uncheck any fields you don't want to change.
+              </div>
+            </div>
+          )}
 
           {extractedData && (
             <div className="space-y-3 py-2">
@@ -606,10 +636,13 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
                             {formatValue(key, value)}
                           </p>
                           {hasExisting && hasValue && (
-                            <p className="text-xs text-muted-foreground">
-                              Current: {formatValue(key, currentValue)}
-                              {selectedFields[key] && " (will be overwritten)"}
-                            </p>
+                            <div className={`flex items-center gap-1 mt-0.5 ${selectedFields[key] ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                              {selectedFields[key] && <AlertTriangle className="h-3 w-3 flex-shrink-0" />}
+                              <p className="text-xs">
+                                Current: {formatValue(key, currentValue)}
+                                {selectedFields[key] && " — will be overwritten"}
+                              </p>
+                            </div>
                           )}
                         </>
                       )}
@@ -632,26 +665,62 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
             </div>
           )}
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowReview(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleApply}
-              disabled={applyMutation.isPending || addContactsMutation.isPending || (extractedCount === 0 && !extractedData?.extractedContacts?.some((_, idx) => selectedContacts[idx]))}
-            >
-              {applyMutation.isPending || addContactsMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Applying...
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Apply Selected
-                </>
-              )}
-            </Button>
+          <DialogFooter>
+            {showOverwriteConfirm ? (
+              <div className="w-full space-y-3">
+                <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-amber-700 dark:text-amber-300">
+                    Are you sure? This will overwrite {overwriteFields.length} existing field{overwriteFields.length !== 1 ? "s" : ""}:{" "}
+                    <span className="font-medium">{overwriteFields.map(k => FIELD_LABELS[k]).join(", ")}</span>.
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setShowOverwriteConfirm(false)}>
+                    Go Back
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleApply}
+                    disabled={applyMutation.isPending || addContactsMutation.isPending}
+                  >
+                    {applyMutation.isPending || addContactsMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Applying...
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        Confirm Overwrite
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowReview(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleApply}
+                  disabled={applyMutation.isPending || addContactsMutation.isPending || (extractedCount === 0 && !extractedData?.extractedContacts?.some((_, idx) => selectedContacts[idx]))}
+                >
+                  {applyMutation.isPending || addContactsMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Applying...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Apply Selected
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
