@@ -123,7 +123,7 @@ export async function parseContract(buffer: Buffer): Promise<ExtractedContractDa
     propertyAddress: null,
     buyerName: null,
     sellerName: null,
-    rawTextPreview: text.substring(0, 500),
+    rawTextPreview: text.substring(0, 3000),
   };
 
   extracted.contractPrice = findCurrencyAfterPattern(normalizedText, [

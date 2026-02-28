@@ -1777,8 +1777,15 @@ export function registerRoutes(app: Express): Server {
 
       const { rawTextPreview, ...fields } = extracted;
 
+      console.log('=== CONTRACT RAW TEXT PREVIEW ===');
+      console.log(rawTextPreview);
+      console.log('=== END RAW TEXT PREVIEW ===');
+      console.log('=== EXTRACTED FIELDS ===');
+      console.log(JSON.stringify(fields, null, 2));
+
       res.json({
         extracted: fields,
+        rawTextPreview,
         message: 'Contract parsed successfully. Review the extracted data before applying to the transaction.',
       });
     } catch (error) {
