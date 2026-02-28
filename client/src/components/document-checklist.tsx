@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, ExternalLink, Link2 } from "lucide-react";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
@@ -33,6 +33,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 const statusColumns = [
   { key: 'not_applicable', label: 'Not Applicable', color: 'gray' },
@@ -40,6 +47,13 @@ const statusColumns = [
   { key: 'signed', label: 'Signed', color: 'blue' },
   { key: 'waiting_others', label: 'Waiting Others', color: 'yellow' },
   { key: 'complete', label: 'Complete', color: 'green' }
+] as const;
+
+const signingPlatforms = [
+  { key: 'docusign', label: 'DocuSign' },
+  { key: 'zipforms', label: 'zipForms' },
+  { key: 'dotloop', label: 'Dotloop' },
+  { key: 'other', label: 'Other' },
 ] as const;
 
 const defaultDocuments = [
@@ -60,10 +74,11 @@ interface Document {
   status: typeof statusColumns[number]['key'];
   transactionId: number;
   notes?: string;
+  signingUrl?: string | null;
+  signingPlatform?: string | null;
 }
 
 function getStatusColor(status: Document['status']) {
-  const statusConfig = statusColumns.find(col => col.key === status);
   return {
     'not_applicable': 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
     'waiting_signatures': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
@@ -73,20 +88,30 @@ function getStatusColor(status: Document['status']) {
   }[status] || 'bg-gray-100 text-gray-700';
 }
 
+function getPlatformLabel(platform: string | null | undefined): string {
+  if (!platform) return '';
+  const found = signingPlatforms.find(p => p.key === platform);
+  return found ? found.label : 'Signing Link';
+}
+
 function DocumentCard({ 
   document, 
   isDragging,
-  onUpdateNotes
+  onUpdateNotes,
+  onUpdateSigning
 }: { 
   document: Document; 
   isDragging?: boolean;
   onUpdateNotes: (id: string, notes: string) => void;
+  onUpdateSigning: (id: string, signingUrl: string, signingPlatform: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: document.id,
   });
   const [isEditing, setIsEditing] = useState(false);
   const [notes, setNotes] = useState(document.notes || '');
+  const [signingUrl, setSigningUrl] = useState(document.signingUrl || '');
+  const [signingPlatform, setSigningPlatform] = useState(document.signingPlatform || '');
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -108,12 +133,40 @@ function DocumentCard({
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
           <div className="font-medium text-sm mb-1">{document.name}</div>
-          <Badge variant="secondary" className={`${statusColor} text-xs`}>
-            {statusColumns.find(col => col.key === document.status)?.label}
-          </Badge>
+          <div className="flex items-center gap-1 flex-wrap">
+            <Badge variant="secondary" className={`${statusColor} text-xs`}>
+              {statusColumns.find(col => col.key === document.status)?.label}
+            </Badge>
+            {document.signingUrl && (
+              <Badge variant="outline" className="text-xs gap-1">
+                <Link2 className="h-3 w-3" />
+                {getPlatformLabel(document.signingPlatform)}
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          {document.notes && (
+          {document.signingUrl && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(document.signingUrl!, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="p-1 rounded hover:bg-primary/10 transition-colors"
+                  >
+                    <ExternalLink className="h-4 w-4 text-primary" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Open in {getPlatformLabel(document.signingPlatform) || 'signing platform'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {document.notes && !document.signingUrl && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger>
@@ -129,16 +182,63 @@ function DocumentCard({
       </div>
 
       {isEditing && (
-        <div className="mt-3 space-y-2" onClick={e => e.stopPropagation()}>
-          <Textarea
-            value={notes}
-            onChange={(e) => {
-              setNotes(e.target.value);
-              onUpdateNotes(document.id, e.target.value);
-            }}
-            className="text-sm min-h-[60px]"
-            placeholder="Add notes..."
-          />
+        <div className="mt-3 space-y-3" onClick={e => e.stopPropagation()}>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Signing Platform</label>
+            <Select 
+              value={signingPlatform || "none"} 
+              onValueChange={(val) => {
+                const newPlatform = val === "none" ? "" : val;
+                setSigningPlatform(newPlatform);
+                onUpdateSigning(document.id, signingUrl, newPlatform);
+              }}
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="Select platform..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {signingPlatforms.map(p => (
+                  <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Signing URL</label>
+            <div className="flex gap-1">
+              <Input
+                value={signingUrl}
+                onChange={(e) => setSigningUrl(e.target.value)}
+                onBlur={() => onUpdateSigning(document.id, signingUrl, signingPlatform)}
+                className="text-sm h-8 flex-1"
+                placeholder="Paste signing link..."
+              />
+              {signingUrl && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-2"
+                  onClick={() => window.open(signingUrl, '_blank', 'noopener,noreferrer')}
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Notes</label>
+            <Textarea
+              value={notes}
+              onChange={(e) => {
+                setNotes(e.target.value);
+                onUpdateNotes(document.id, e.target.value);
+              }}
+              className="text-sm min-h-[60px]"
+              placeholder="Add notes..."
+            />
+          </div>
         </div>
       )}
     </div>
@@ -149,12 +249,14 @@ function DroppableColumn({
   status, 
   documents,
   title,
-  onUpdateNotes
+  onUpdateNotes,
+  onUpdateSigning
 }: { 
   status: typeof statusColumns[number]['key'];
   documents: Document[];
   title: string;
   onUpdateNotes: (id: string, notes: string) => void;
+  onUpdateSigning: (id: string, signingUrl: string, signingPlatform: string) => void;
 }) {
   const { setNodeRef } = useDroppable({
     id: status,
@@ -181,6 +283,7 @@ function DroppableColumn({
               key={doc.id} 
               document={doc} 
               onUpdateNotes={onUpdateNotes}
+              onUpdateSigning={onUpdateSigning}
             />
           ))}
         </SortableContext>
@@ -230,15 +333,20 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   });
 
   const updateDocumentMutation = useMutation({
-    mutationFn: async ({ id, status, notes }: { 
+    mutationFn: async ({ id, status, notes, signingUrl, signingPlatform }: { 
       id: string; 
       status?: Document['status']; 
       notes?: string;
+      signingUrl?: string;
+      signingPlatform?: string;
     }) => {
-      const response = await apiRequest("PATCH", `/api/documents/${transactionId}/${id}`, { 
-        status,
-        notes: notes || null
-      });
+      const body: Record<string, any> = {};
+      if (status !== undefined) body.status = status;
+      if (notes !== undefined) body.notes = notes || null;
+      if (signingUrl !== undefined) body.signingUrl = signingUrl || null;
+      if (signingPlatform !== undefined) body.signingPlatform = signingPlatform || null;
+
+      const response = await apiRequest("PATCH", `/api/documents/${transactionId}/${id}`, body);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -248,13 +356,8 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       return response.json();
     },
     onMutate: async (variables) => {
-      // Cancel any outgoing refetches so they don't overwrite our optimistic update
       await queryClient.cancelQueries({ queryKey: ["/api/documents", transactionId] });
-
-      // Snapshot the previous value
       const previousDocuments = queryClient.getQueryData(["/api/documents", transactionId]);
-
-      // Optimistically update to the new value
       queryClient.setQueryData(["/api/documents", transactionId], (old: Document[] = []) => 
         old.map(doc => 
           doc.id === variables.id 
@@ -262,13 +365,10 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
             : doc
         )
       );
-
-      // Return a context object with the snapshotted value
       return { previousDocuments };
     },
-    onError: (error, variables, context) => {
+    onError: (error, _variables, context) => {
       console.error('Document update error:', error);
-      // Rollback to the previous value if there was an error
       if (context?.previousDocuments) {
         queryClient.setQueryData(["/api/documents", transactionId], context.previousDocuments);
       }
@@ -279,7 +379,6 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       });
     },
     onSettled: () => {
-      // Always refetch after error or success to ensure cache is in sync with server
       queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
     }
   });
@@ -334,7 +433,15 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   const handleUpdateNotes = (id: string, notes: string) => {
     updateDocumentMutation.mutate({
       id,
-      notes: notes || null
+      notes: notes || undefined
+    });
+  };
+
+  const handleUpdateSigning = (id: string, signingUrl: string, signingPlatform: string) => {
+    updateDocumentMutation.mutate({
+      id,
+      signingUrl: signingUrl || undefined,
+      signingPlatform: signingPlatform || undefined
     });
   };
 
@@ -377,6 +484,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                 title={column.label}
                 documents={documents.filter(doc => doc.status === column.key)}
                 onUpdateNotes={handleUpdateNotes}
+                onUpdateSigning={handleUpdateSigning}
               />
             ))}
           </div>

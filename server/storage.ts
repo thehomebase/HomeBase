@@ -1094,7 +1094,9 @@ export class DatabaseStorage implements IStorage {
           deadline,
           deadline_time as "deadlineTime",
           notes,
-          client_id as "clientId"
+          client_id as "clientId",
+          signing_url as "signingUrl",
+          signing_platform as "signingPlatform"
         FROM documents 
         WHERE transaction_id = ${transactionId}
         ORDER BY created_at ASC
@@ -1110,7 +1112,9 @@ export class DatabaseStorage implements IStorage {
         deadline: doc.deadline ? new Date(doc.deadline) : null,
         deadlineTime: doc.deadlineTime ? String(doc.deadlineTime) : null,
         notes: doc.notes ? String(doc.notes) : null,
-        clientId: doc.clientId ? Number(doc.clientId) : null
+        clientId: doc.clientId ? Number(doc.clientId) : null,
+        signingUrl: doc.signingUrl ? String(doc.signingUrl) : null,
+        signingPlatform: doc.signingPlatform ? String(doc.signingPlatform) : null
       }));
     } catch (error) {
       console.error('Error in getDocumentsByTransaction:', error);
@@ -1169,6 +1173,8 @@ export class DatabaseStorage implements IStorage {
       if (data.deadlineTime !== undefined) updateData.deadline_time = data.deadlineTime;
       if (data.notes !== undefined) updateData.notes = data.notes;
       if (data.clientId !== undefined) updateData.client_id = data.clientId ? Number(data.clientId) : null;
+      if ((data as any).signingUrl !== undefined) updateData.signing_url = (data as any).signingUrl || null;
+      if ((data as any).signingPlatform !== undefined) updateData.signing_platform = (data as any).signingPlatform || null;
       updateData.updated_at = new Date();
 
       const [doc] = await db
@@ -1191,7 +1197,9 @@ export class DatabaseStorage implements IStorage {
         createdAt: doc.createdAt ? new Date(doc.createdAt) : null,
         updatedAt: doc.updatedAt ? new Date(doc.updatedAt) : null,
         notes: doc.notes ? String(doc.notes) : null,
-        clientId: doc.clientId ? Number(doc.clientId) : null
+        clientId: doc.clientId ? Number(doc.clientId) : null,
+        signingUrl: (doc as any).signingUrl || null,
+        signingPlatform: (doc as any).signingPlatform || null
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
@@ -1350,6 +1358,8 @@ export class DatabaseStorage implements IStorage {
       if (data.deadlineTime !== undefined) updateData.deadline_time = data.deadlineTime;
       if (data.notes !== undefined) updateData.notes = data.notes;
       if (data.clientId !== undefined) updateData.client_id = data.clientId ? Number(data.clientId) : null;
+      if ((data as any).signingUrl !== undefined) updateData.signing_url = (data as any).signingUrl || null;
+      if ((data as any).signingPlatform !== undefined) updateData.signing_platform = (data as any).signingPlatform || null;
       updateData.updated_at = new Date();
 
       const [doc] = await db
@@ -1372,7 +1382,9 @@ export class DatabaseStorage implements IStorage {
         createdAt: doc.createdAt ? new Date(doc.createdAt) : null,
         updatedAt: doc.updatedAt ? new Date(doc.updatedAt) : null,
         notes: doc.notes ? String(doc.notes) : null,
-        clientId: doc.clientId ? Number(doc.clientId) : null
+        clientId: doc.clientId ? Number(doc.clientId) : null,
+        signingUrl: (doc as any).signingUrl || null,
+        signingPlatform: (doc as any).signingPlatform || null
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);
@@ -1620,7 +1632,9 @@ export class DatabaseStorage implements IStorage {
           deadline,
           deadline_time as "deadlineTime",
           notes,
-          client_id as "clientId"
+          client_id as "clientId",
+          signing_url as "signingUrl",
+          signing_platform as "signingPlatform"
         FROM documents 
         WHERE transaction_id = ${transactionId}
         ORDER BY created_at ASC
@@ -1636,7 +1650,9 @@ export class DatabaseStorage implements IStorage {
         deadline: doc.deadline ? new Date(doc.deadline) : null,
         deadlineTime: doc.deadlineTime ? String(doc.deadlineTime) : null,
         notes: doc.notes ? String(doc.notes) : null,
-        clientId: doc.clientId ? Number(doc.clientId) : null
+        clientId: doc.clientId ? Number(doc.clientId) : null,
+        signingUrl: doc.signingUrl ? String(doc.signingUrl) : null,
+        signingPlatform: doc.signingPlatform ? String(doc.signingPlatform) : null
       }));
     } catch (error) {
       console.error('Error in getDocumentsByTransaction:', error);
@@ -1695,6 +1711,8 @@ export class DatabaseStorage implements IStorage {
       if (data.deadlineTime !== undefined) updateData.deadline_time = data.deadlineTime;
       if (data.notes !== undefined) updateData.notes = data.notes;
       if (data.clientId !== undefined) updateData.client_id = data.clientId ? Number(data.clientId) : null;
+      if ((data as any).signingUrl !== undefined) updateData.signing_url = (data as any).signingUrl || null;
+      if ((data as any).signingPlatform !== undefined) updateData.signing_platform = (data as any).signingPlatform || null;
       updateData.updated_at = new Date();
 
       const [doc] = await db
@@ -1717,7 +1735,9 @@ export class DatabaseStorage implements IStorage {
         createdAt: doc.createdAt ? new Date(doc.createdAt) : null,
         updatedAt: doc.updatedAt ? new Date(doc.updatedAt) : null,
         notes: doc.notes ? String(doc.notes) : null,
-        clientId: doc.clientId ? Number(doc.clientId) : null
+        clientId: doc.clientId ? Number(doc.clientId) : null,
+        signingUrl: (doc as any).signingUrl || null,
+        signingPlatform: (doc as any).signingPlatform || null
       };
     } catch (error) {
       console.error('Error in updateDocument:', error);

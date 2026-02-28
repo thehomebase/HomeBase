@@ -108,7 +108,9 @@ export const documents = pgTable("documents", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   notes: text("notes"),
-  clientId: integer("client_id")
+  clientId: integer("client_id"),
+  signingUrl: text("signing_url"),
+  signingPlatform: text("signing_platform", { enum: ['docusign', 'zipforms', 'dotloop', 'other'] })
 });
 
 export const contractors = pgTable("contractors", {

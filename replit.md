@@ -55,6 +55,14 @@ Preferred communication style: Simple, everyday language.
 - **Access**: Agents only, scoped to their own transactions
 - **API Endpoint**: `POST /api/transactions/:id/parse-contract` (multipart form, field name: "contract")
 
+### Document Signing Links
+- **Location**: `client/src/components/document-checklist.tsx`
+- **Purpose**: Agents can attach signing platform URLs (DocuSign, zipForms, Dotloop, etc.) to any document in the Documents tab
+- **How it works**: Click a document card → select a signing platform → paste the signing URL → the document shows a link icon that opens the signing platform in a new tab
+- **Status Tracking**: Agents drag document cards between Kanban columns (Not Applicable → Waiting Signatures → Signed → Waiting Others → Complete) to track signing progress
+- **Privacy**: No documents are stored on the platform — only the external signing URL is saved. All signing/legal handling is done by the third-party platform
+- **Database Fields**: `signing_url` and `signing_platform` columns on the `documents` table
+
 ### Build and Development
 - **Development**: `npm run dev` runs tsx for hot-reloading TypeScript
 - **Production Build**: Vite builds frontend to `dist/public`, esbuild bundles server to `dist/index.js`
