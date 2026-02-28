@@ -391,10 +391,10 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
         }
       }
       if (nameLines.length >= 2) {
-        extracted.buyerName = nameLines[0];
-        extracted.sellerName = nameLines[1];
+        extracted.sellerName = nameLines[0];
+        extracted.buyerName = nameLines[1];
       } else if (nameLines.length === 1) {
-        extracted.buyerName = nameLines[0];
+        extracted.sellerName = nameLines[0];
       }
     }
 
@@ -591,45 +591,65 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
     const parts = rawName.split(/,\s*/);
 
     if (parts.length >= 4 && parts.length % 2 === 0) {
-      for (let j = 0; j < parts.length; j += 2) {
+      const firstPart = parts[0].trim();
+      const allSameLastName = parts.filter((_, i) => i % 2 === 0).every(p => p.trim() === firstPart);
+      if (allSameLastName) {
+        for (let j = 0; j < parts.length; j += 2) {
+          results.push({
+            role,
+            firstName: parts[j + 1]?.trim() || "",
+            lastName: parts[j]?.trim() || "",
+            email: "",
+            phone: "",
+            brokerage: "",
+          });
+        }
+        return results;
+      }
+    }
+
+    if (parts.length === 2) {
+      const part0Words = parts[0].trim().split(/\s+/);
+      const part1Words = parts[1].trim().split(/\s+/);
+      if (part0Words.length >= 2 && part1Words.length >= 2) {
         results.push({
           role,
-          firstName: parts[j + 1]?.trim() || "",
-          lastName: parts[j]?.trim() || "",
+          firstName: part0Words[0],
+          lastName: part0Words.slice(1).join(" "),
           email: "",
           phone: "",
           brokerage: "",
         });
+        results.push({
+          role,
+          firstName: part1Words[0],
+          lastName: part1Words.slice(1).join(" "),
+          email: "",
+          phone: "",
+          brokerage: "",
+        });
+        return results;
       }
-    } else if (parts.length === 2) {
       results.push({
         role,
-        firstName: parts[1].trim(),
-        lastName: parts[0].trim(),
+        firstName: parts[0].trim(),
+        lastName: parts[1].trim(),
         email: "",
         phone: "",
         brokerage: "",
       });
-    } else if (parts.length === 3) {
-      results.push({
-        role,
-        firstName: parts[1].trim(),
-        lastName: parts[0].trim(),
-        email: "",
-        phone: "",
-        brokerage: "",
-      });
-    } else {
-      const { firstName, lastName } = splitName(rawName);
-      results.push({
-        role,
-        firstName,
-        lastName,
-        email: "",
-        phone: "",
-        brokerage: "",
-      });
+      return results;
     }
+
+    const { firstName, lastName } = splitName(rawName);
+    results.push({
+      role,
+      firstName,
+      lastName,
+      email: "",
+      phone: "",
+      brokerage: "",
+    });
     return results;
   }
 
