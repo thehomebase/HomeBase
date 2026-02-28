@@ -576,6 +576,7 @@ export function registerRoutes(app: Express): Server {
         ...req.body,
         transactionId: Number(req.body.transactionId)
       };
+      console.log("Creating contact with data:", JSON.stringify(contactData));
 
       const contact = await storage.createContact(contactData);
       if (!contact) {

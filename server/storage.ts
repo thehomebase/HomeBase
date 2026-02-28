@@ -851,7 +851,7 @@ export class DatabaseStorage implements IStorage {
       return result.rows.map(row => ({
         id: row.id,
         role: row.role,
-        firstName: row.firstname,
+        firstName: row.first_name,
         lastName: row.last_name,
         email: row.email,
         phone: row.phone,

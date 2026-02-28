@@ -27,6 +27,15 @@ export interface ExtractedContractData {
   rawTextPreview: string;
 }
 
+function normalizeName(name: string): string {
+  if (!name) return name;
+  return name.split(/\s+/).map(word => {
+    if (word.length === 0) return word;
+    if (word.length <= 2 && word === word.toUpperCase()) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  }).join(" ");
+}
+
 function parseCurrency(value: string): number | null {
   const cleaned = value.replace(/[$,\s]/g, "");
   const num = parseFloat(cleaned);
@@ -694,6 +703,12 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
       }
     }
   }
+
+  extracted.extractedContacts = extracted.extractedContacts.map(c => ({
+    ...c,
+    firstName: normalizeName(c.firstName),
+    lastName: normalizeName(c.lastName),
+  }));
 
   return extracted;
 }
