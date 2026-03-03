@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Link, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare } from "lucide-react";
+import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Link, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -548,6 +548,7 @@ export default function PropertySearchPage() {
   const [searchParams, setSearchParams] = useState<Record<string, string> | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
+  const refreshFlagRef = useRef(false);
 
   const [saveUrl, setSaveUrl] = useState("");
   const [saveNotes, setSaveNotes] = useState("");
@@ -569,9 +570,13 @@ export default function PropertySearchPage() {
     apiCallsLimit: number;
   }>({
     queryKey: ["/api/rentcast/listings", searchParams],
-    queryFn: async () => {
+    queryFn: async ({ queryKey }) => {
       if (!searchParams) return { listings: [], fromCache: false, apiCallsUsed: 0, apiCallsLimit: 45 };
       const params = new URLSearchParams(searchParams);
+      if (refreshFlagRef.current) {
+        params.set("refresh", "true");
+        refreshFlagRef.current = false;
+      }
       const res = await apiRequest("GET", `/api/rentcast/listings?${params.toString()}`);
       if (!res.ok) {
         const err = await res.json();
@@ -925,10 +930,26 @@ export default function PropertySearchPage() {
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     {rentcastResults.fromCache && (
-                      <Badge variant="outline" className="text-xs gap-1">
-                        <Database className="h-3 w-3" />
-                        Cached
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Database className="h-3 w-3" />
+                          Cached
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 gap-1 text-xs"
+                          onClick={() => {
+                            refreshFlagRef.current = true;
+                            setSelectedListingIds(new Set());
+                            queryClient.invalidateQueries({ queryKey: ["/api/rentcast/listings", searchParams] });
+                          }}
+                          disabled={isSearching}
+                        >
+                          <RefreshCw className={`h-3 w-3 ${isSearching ? 'animate-spin' : ''}`} />
+                          Refresh
+                        </Button>
+                      </div>
                     )}
                     <div className="flex items-center border rounded-md">
                       <Button

@@ -1832,9 +1832,10 @@ export function registerRoutes(app: Express): Server {
     params.set("limit", String(limit || 20));
 
     const cacheKey = params.toString();
+    const forceRefresh = req.query.refresh === "true";
 
     const cached = rentcastCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_TTL) {
       return res.json({ listings: cached.data, fromCache: true, apiCallsUsed: monthlyCallCount, apiCallsLimit: MONTHLY_LIMIT });
     }
 
