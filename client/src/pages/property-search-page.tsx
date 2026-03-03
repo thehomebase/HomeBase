@@ -544,7 +544,7 @@ export default function PropertySearchPage() {
   const [rcMaxPrice, setRcMaxPrice] = useState("any");
   const [rcBeds, setRcBeds] = useState("any");
   const [rcBaths, setRcBaths] = useState("any");
-  const [rcLimit, setRcLimit] = useState("50");
+  const [rcLimit, setRcLimit] = useState("500");
 
   const [searchParams, setSearchParams] = useState<Record<string, string> | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
@@ -734,7 +734,7 @@ export default function PropertySearchPage() {
     setRcMaxPrice("any");
     setRcBeds("any");
     setRcBaths("any");
-    setRcLimit("50");
+    setRcLimit("500");
     setSearchParams(null);
   };
 
