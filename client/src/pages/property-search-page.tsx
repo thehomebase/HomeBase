@@ -3,25 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Link, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SavedProperty } from "@shared/schema";
-
-const PROPERTY_TYPES = [
-  { value: "any", label: "Any Type" },
-  { value: "Houses", label: "Houses" },
-  { value: "Condos", label: "Condos / Townhomes" },
-  { value: "Apartments", label: "Apartments" },
-  { value: "Manufactured", label: "Manufactured" },
-  { value: "Land", label: "Lots / Land" },
-];
 
 const RENTCAST_PROPERTY_TYPES = [
   { value: "any", label: "Any Type" },
@@ -47,47 +37,6 @@ const BATHS_OPTIONS = [
   { value: "2", label: "2+" },
   { value: "3", label: "3+" },
   { value: "4", label: "4+" },
-];
-
-const PRICE_MIN_OPTIONS = [
-  { value: "any", label: "No Min" },
-  { value: "50000", label: "$50,000" },
-  { value: "100000", label: "$100,000" },
-  { value: "150000", label: "$150,000" },
-  { value: "200000", label: "$200,000" },
-  { value: "250000", label: "$250,000" },
-  { value: "300000", label: "$300,000" },
-  { value: "400000", label: "$400,000" },
-  { value: "500000", label: "$500,000" },
-  { value: "600000", label: "$600,000" },
-  { value: "750000", label: "$750,000" },
-  { value: "1000000", label: "$1,000,000" },
-  { value: "1500000", label: "$1,500,000" },
-  { value: "2000000", label: "$2,000,000" },
-];
-
-const PRICE_MAX_OPTIONS = [
-  { value: "any", label: "No Max" },
-  { value: "100000", label: "$100,000" },
-  { value: "150000", label: "$150,000" },
-  { value: "200000", label: "$200,000" },
-  { value: "250000", label: "$250,000" },
-  { value: "300000", label: "$300,000" },
-  { value: "400000", label: "$400,000" },
-  { value: "500000", label: "$500,000" },
-  { value: "600000", label: "$600,000" },
-  { value: "750000", label: "$750,000" },
-  { value: "1000000", label: "$1,000,000" },
-  { value: "1500000", label: "$1,500,000" },
-  { value: "2000000", label: "$2,000,000" },
-  { value: "3000000", label: "$3,000,000" },
-  { value: "5000000", label: "$5,000,000" },
-];
-
-const LISTING_TYPE_OPTIONS = [
-  { value: "for_sale", label: "For Sale" },
-  { value: "for_rent", label: "For Rent" },
-  { value: "sold", label: "Recently Sold" },
 ];
 
 interface RentCastListing {
@@ -125,168 +74,6 @@ interface RentCastListing {
     phone?: string;
     email?: string;
   };
-}
-
-function buildZillowUrl(filters: {
-  location: string;
-  listingType: string;
-  propertyType: string;
-  minPrice: string;
-  maxPrice: string;
-  beds: string;
-  baths: string;
-}) {
-  const loc = filters.location.trim();
-  if (!loc) return null;
-
-  const slug = loc
-    .replace(/,\s*/g, "-")
-    .replace(/\s+/g, "-")
-    .replace(/[^a-zA-Z0-9\-]/g, "");
-
-  const basePath = `https://www.zillow.com/homes/${slug}_rb/`;
-
-  const filterState: Record<string, any> = {};
-
-  if (filters.listingType === "for_sale") {
-    filterState.sort = { value: "globalrelevanceex" };
-    filterState.isAllHomes = { value: true };
-  } else if (filters.listingType === "for_rent") {
-    filterState.isForRent = { value: true };
-    filterState.isForSaleByAgent = { value: false };
-    filterState.isForSaleByOwner = { value: false };
-    filterState.isNewConstruction = { value: false };
-    filterState.isComingSoon = { value: false };
-    filterState.isAuction = { value: false };
-    filterState.isForSaleForeclosure = { value: false };
-  } else if (filters.listingType === "sold") {
-    filterState.isRecentlySold = { value: true };
-    filterState.isForSaleByAgent = { value: false };
-    filterState.isForSaleByOwner = { value: false };
-    filterState.isNewConstruction = { value: false };
-    filterState.isComingSoon = { value: false };
-    filterState.isAuction = { value: false };
-    filterState.isForSaleForeclosure = { value: false };
-  }
-
-  if (filters.minPrice !== "any") {
-    filterState.price = { ...filterState.price, min: parseInt(filters.minPrice) };
-  }
-  if (filters.maxPrice !== "any") {
-    filterState.price = { ...filterState.price, max: parseInt(filters.maxPrice) };
-  }
-
-  if (filters.beds !== "any") {
-    filterState.beds = { min: parseInt(filters.beds) };
-  }
-
-  if (filters.baths !== "any") {
-    filterState.baths = { min: parseInt(filters.baths) };
-  }
-
-  if (filters.propertyType !== "any") {
-    const typeMap: Record<string, Record<string, { value: boolean }>> = {
-      Houses: { isMultiFamily: { value: false }, isApartment: { value: false }, isCondo: { value: false }, isManufactured: { value: false }, isLotLand: { value: false }, isTownhouse: { value: false } },
-      Condos: { isMultiFamily: { value: false }, isApartment: { value: false }, isCondo: { value: true }, isManufactured: { value: false }, isLotLand: { value: false } },
-      Apartments: { isApartment: { value: true }, isCondo: { value: false }, isManufactured: { value: false }, isLotLand: { value: false } },
-      Manufactured: { isManufactured: { value: true }, isApartment: { value: false }, isCondo: { value: false }, isLotLand: { value: false } },
-      Land: { isLotLand: { value: true }, isApartment: { value: false }, isCondo: { value: false }, isManufactured: { value: false } },
-    };
-    if (typeMap[filters.propertyType]) {
-      Object.assign(filterState, typeMap[filters.propertyType]);
-    }
-  }
-
-  const searchQueryState = {
-    pagination: {},
-    isMapVisible: true,
-    filterState,
-  };
-
-  const url = `${basePath}?searchQueryState=${encodeURIComponent(JSON.stringify(searchQueryState))}`;
-  return url;
-}
-
-function parsePropertyUrl(url: string): { source: string; streetAddress: string | null; city: string | null; state: string | null; zipCode: string | null } {
-  const result = { source: "other", streetAddress: null as string | null, city: null as string | null, state: null as string | null, zipCode: null as string | null };
-
-  try {
-    const parsed = new URL(url);
-
-    if (parsed.hostname.includes("zillow.com")) {
-      result.source = "zillow";
-      const match = parsed.pathname.match(/\/homedetails\/([^/]+)\//);
-      if (match) {
-        const parts = match[1].split("-");
-        const zipMatch = parts[parts.length - 1]?.match(/^\d{5}$/);
-        if (zipMatch) {
-          result.zipCode = zipMatch[0];
-          parts.pop();
-        }
-        const stateAbbrs = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"];
-        if (parts.length >= 2 && stateAbbrs.includes(parts[parts.length - 1]?.toUpperCase())) {
-          result.state = parts.pop()!.toUpperCase();
-        }
-        if (parts.length >= 2) {
-          const cityParts: string[] = [];
-          let foundCity = false;
-
-          let i = parts.length - 1;
-          while (i >= 0) {
-            const part = parts[i];
-            if (!foundCity && /^[A-Z][a-z]+$/.test(part)) {
-              cityParts.unshift(part);
-              i--;
-            } else {
-              foundCity = true;
-              break;
-            }
-          }
-
-          if (cityParts.length > 0 && i >= 0) {
-            result.city = cityParts.join(" ");
-            result.streetAddress = parts.slice(0, i + 1).join(" ");
-          } else {
-            result.streetAddress = parts.join(" ");
-          }
-        } else if (parts.length > 0) {
-          result.streetAddress = parts.join(" ");
-        }
-      }
-    } else if (parsed.hostname.includes("realtor.com")) {
-      result.source = "realtor";
-      const match = parsed.pathname.match(/\/realestateandhomes-detail\/([^/]+)/);
-      if (match) {
-        const slug = match[1];
-        const parts = slug.split("_");
-        if (parts.length >= 1) {
-          result.streetAddress = parts[0].replace(/-/g, " ");
-        }
-        if (parts.length >= 2) {
-          result.city = parts[1].replace(/-/g, " ");
-        }
-        if (parts.length >= 3) {
-          result.state = parts[2].toUpperCase();
-        }
-        if (parts.length >= 4) {
-          const zipMatch = parts[3].match(/^(\d{5})/);
-          if (zipMatch) result.zipCode = zipMatch[1];
-        }
-      }
-    } else if (parsed.hostname.includes("redfin.com")) {
-      result.source = "redfin";
-      const match = parsed.pathname.match(/\/([A-Z]{2})\/([^/]+)\/([^/]+)/);
-      if (match) {
-        result.state = match[1];
-        result.city = match[2].replace(/-/g, " ");
-        const street = match[3].replace(/-/g, " ");
-        result.streetAddress = street;
-      }
-    }
-  } catch {
-  }
-
-  return result;
 }
 
 function formatAddress(prop: SavedProperty): string {
@@ -570,14 +357,6 @@ function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll }: { 
 }
 
 export default function PropertySearchPage() {
-  const [location, setLocation] = useState("");
-  const [listingType, setListingType] = useState("for_sale");
-  const [propertyType, setPropertyType] = useState("any");
-  const [minPrice, setMinPrice] = useState("any");
-  const [maxPrice, setMaxPrice] = useState("any");
-  const [beds, setBeds] = useState("any");
-  const [baths, setBaths] = useState("any");
-
   const [rcLocation, setRcLocation] = useState("");
   const [rcPropertyType, setRcPropertyType] = useState("any");
   const [rcMinPrice, setRcMinPrice] = useState("any");
@@ -589,9 +368,6 @@ export default function PropertySearchPage() {
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
   const refreshFlagRef = useRef(false);
-
-  const [saveUrl, setSaveUrl] = useState("");
-  const [saveNotes, setSaveNotes] = useState("");
 
   const { toast } = useToast();
 
@@ -627,30 +403,6 @@ export default function PropertySearchPage() {
     enabled: !!searchParams,
     staleTime: 24 * 60 * 60 * 1000,
     retry: false,
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: async (data: { url: string; notes: string }) => {
-      const parsed = parsePropertyUrl(data.url);
-      await apiRequest("POST", "/api/saved-properties", {
-        url: data.url,
-        source: parsed.source,
-        streetAddress: parsed.streetAddress,
-        city: parsed.city,
-        state: parsed.state,
-        zipCode: parsed.zipCode,
-        notes: data.notes || null,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/saved-properties"] });
-      setSaveUrl("");
-      setSaveNotes("");
-      toast({ title: "Property saved!", description: "The listing has been added to your saved properties." });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to save property. Please try again.", variant: "destructive" });
-    },
   });
 
   const deleteMutation = useMutation({
@@ -723,13 +475,6 @@ export default function PropertySearchPage() {
     bulkSaveMutation.mutate(selected);
   };
 
-  const handleZillowSearch = () => {
-    const url = buildZillowUrl({ location, listingType, propertyType, minPrice, maxPrice, beds, baths });
-    if (url) {
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
-  };
-
   const handleRentCastSearch = () => {
     const loc = rcLocation.trim();
     if (!loc) return;
@@ -756,16 +501,6 @@ export default function PropertySearchPage() {
     setSelectedListingIds(new Set());
   };
 
-  const handleResetZillow = () => {
-    setLocation("");
-    setListingType("for_sale");
-    setPropertyType("any");
-    setMinPrice("any");
-    setMaxPrice("any");
-    setBeds("any");
-    setBaths("any");
-  };
-
   const handleResetRentCast = () => {
     setRcLocation("");
     setRcPropertyType("any");
@@ -776,22 +511,7 @@ export default function PropertySearchPage() {
     setSearchParams(null);
   };
 
-  const handleSaveProperty = () => {
-    const trimmed = saveUrl.trim();
-    if (!trimmed) return;
-    try {
-      new URL(trimmed);
-    } catch {
-      toast({ title: "Invalid URL", description: "Please paste a valid property listing URL.", variant: "destructive" });
-      return;
-    }
-    saveMutation.mutate({ url: trimmed, notes: saveNotes.trim() });
-  };
-
-  const isZillowSearchDisabled = !location.trim();
   const isRentCastSearchDisabled = !rcLocation.trim();
-  const previewParsed = saveUrl.trim() ? parsePropertyUrl(saveUrl.trim()) : null;
-  const previewAddress = previewParsed ? [previewParsed.streetAddress, previewParsed.city, previewParsed.state, previewParsed.zipCode].filter(Boolean).join(", ") : null;
   const apiStatus = rentcastStatus as { apiCallsUsed: number; apiCallsLimit: number } | undefined;
 
   return (
@@ -803,7 +523,7 @@ export default function PropertySearchPage() {
             Property Search
           </h1>
           <p className="text-muted-foreground mt-1">
-            Search for active listings or browse on Zillow, then save the ones you like.
+            Search for active listings, then save the ones you like.
           </p>
         </div>
         {apiStatus && (
@@ -814,13 +534,7 @@ export default function PropertySearchPage() {
         )}
       </div>
 
-      <Tabs defaultValue="rentcast" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="rentcast">Listing Search</TabsTrigger>
-          <TabsTrigger value="zillow">Zillow Search</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="rentcast" className="space-y-4">
+      <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -1073,198 +787,7 @@ export default function PropertySearchPage() {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-
-        <TabsContent value="zillow" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Home className="h-5 w-5" />
-                Search on Zillow
-              </CardTitle>
-              <CardDescription>
-                Set your filters and search on Zillow in a new tab.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="location" className="font-medium">Location</Label>
-                <Input
-                  id="location"
-                  placeholder="e.g. Austin TX, 90210, Miami Beach FL"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !isZillowSearchDisabled) handleZillowSearch();
-                  }}
-                  className="text-base"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="font-medium">Listing Type</Label>
-                <Select value={listingType} onValueChange={setListingType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {LISTING_TYPE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="font-medium flex items-center gap-1.5">
-                    <DollarSign className="h-4 w-4" />
-                    Min Price
-                  </Label>
-                  <Select value={minPrice} onValueChange={setMinPrice}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {PRICE_MIN_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="font-medium flex items-center gap-1.5">
-                    <DollarSign className="h-4 w-4" />
-                    Max Price
-                  </Label>
-                  <Select value={maxPrice} onValueChange={setMaxPrice}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {PRICE_MAX_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="font-medium flex items-center gap-1.5">
-                    <BedDouble className="h-4 w-4" />
-                    Bedrooms
-                  </Label>
-                  <Select value={beds} onValueChange={setBeds}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {BEDS_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="font-medium flex items-center gap-1.5">
-                    <Bath className="h-4 w-4" />
-                    Bathrooms
-                  </Label>
-                  <Select value={baths} onValueChange={setBaths}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {BATHS_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="font-medium flex items-center gap-1.5">
-                  <Building2 className="h-4 w-4" />
-                  Property Type
-                </Label>
-                <Select value={propertyType} onValueChange={setPropertyType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PROPERTY_TYPES.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <Button
-                  onClick={handleZillowSearch}
-                  disabled={isZillowSearchDisabled}
-                  className="flex-1 gap-2"
-                  size="lg"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Search on Zillow
-                </Button>
-                <Button onClick={handleResetZillow} variant="outline" size="lg">
-                  Reset Filters
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Heart className="h-5 w-5" />
-            Save a Property
-          </CardTitle>
-          <CardDescription>
-            Found a property you like? Paste the listing URL below and we'll save it for you.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="save-url" className="font-medium flex items-center gap-1.5">
-              <Link className="h-4 w-4" />
-              Listing URL
-            </Label>
-            <Input
-              id="save-url"
-              placeholder="Paste a Zillow, Realtor.com, or Redfin listing URL"
-              value={saveUrl}
-              onChange={(e) => setSaveUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && saveUrl.trim()) handleSaveProperty();
-              }}
-              className="text-base"
-            />
-            {previewAddress && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-                <MapPin className="h-4 w-4 shrink-0" />
-                <span>
-                  <span className="font-medium text-foreground">{previewAddress}</span>
-                  {previewParsed && <span className="ml-1.5">({getSourceLabel(previewParsed.source)})</span>}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="save-notes" className="font-medium">Notes (optional)</Label>
-            <Textarea
-              id="save-notes"
-              placeholder="e.g. Love the backyard, great school district"
-              value={saveNotes}
-              onChange={(e) => setSaveNotes(e.target.value)}
-              rows={2}
-            />
-          </div>
-          <Button
-            onClick={handleSaveProperty}
-            disabled={!saveUrl.trim() || saveMutation.isPending}
-            className="gap-2"
-          >
-            {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4" />}
-            Save Property
-          </Button>
-        </CardContent>
-      </Card>
+      </div>
 
       <Card>
         <CardHeader>
