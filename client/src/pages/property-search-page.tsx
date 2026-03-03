@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Link, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List } from "lucide-react";
+import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Link, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -336,15 +337,22 @@ function parseLocation(location: string): { city?: string; state?: string; zipCo
   return { city: trimmed };
 }
 
-function ListingCard({ listing }: { listing: RentCastListing }) {
+function ListingCard({ listing, isSelected, onToggleSelect }: { listing: RentCastListing; isSelected: boolean; onToggleSelect: (id: string) => void }) {
   const zillowSearchUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, '').replace(/\s+/g, '-'))}_rb/`;
 
   return (
-    <div className="border rounded-lg p-4 hover:bg-muted/30 transition-colors space-y-3">
+    <div className={`border rounded-lg p-4 hover:bg-muted/30 transition-colors space-y-3 ${isSelected ? 'ring-2 ring-primary border-primary' : ''}`}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm truncate">{listing.addressLine1}</h3>
-          <p className="text-sm text-muted-foreground">{listing.city}, {listing.state} {listing.zipCode}</p>
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect(listing.id)}
+            className="mt-0.5 shrink-0"
+          />
+          <div className="min-w-0">
+            <h3 className="font-semibold text-sm truncate">{listing.addressLine1}</h3>
+            <p className="text-sm text-muted-foreground">{listing.city}, {listing.state} {listing.zipCode}</p>
+          </div>
         </div>
         <div className="text-right shrink-0">
           <div className="font-bold text-lg text-primary">{formatPrice(listing.price)}</div>
@@ -429,12 +437,22 @@ function ListingCard({ listing }: { listing: RentCastListing }) {
   );
 }
 
-function ListingTable({ listings }: { listings: RentCastListing[] }) {
+function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll }: { listings: RentCastListing[]; selectedIds: Set<string>; onToggleSelect: (id: string) => void; onToggleAll: () => void }) {
+  const allSelected = listings.length > 0 && listings.every(l => selectedIds.has(l.id));
+  const someSelected = listings.some(l => selectedIds.has(l.id));
+
   return (
     <div className="overflow-x-auto border rounded-lg">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-muted/50 border-b">
+            <th className="px-3 py-2.5 w-10">
+              <Checkbox
+                checked={allSelected}
+                onCheckedChange={onToggleAll}
+                className={someSelected && !allSelected ? "opacity-60" : ""}
+              />
+            </th>
             <th className="text-left px-3 py-2.5 font-medium">Address</th>
             <th className="text-right px-3 py-2.5 font-medium">Price</th>
             <th className="text-center px-3 py-2.5 font-medium">Beds</th>
@@ -453,7 +471,13 @@ function ListingTable({ listings }: { listings: RentCastListing[] }) {
           {listings.map((listing, i) => {
             const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, '').replace(/\s+/g, '-'))}_rb/`;
             return (
-              <tr key={listing.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? '' : 'bg-muted/10'}`}>
+              <tr key={listing.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? '' : 'bg-muted/10'} ${selectedIds.has(listing.id) ? 'bg-primary/5' : ''}`}>
+                <td className="px-3 py-2.5">
+                  <Checkbox
+                    checked={selectedIds.has(listing.id)}
+                    onCheckedChange={() => onToggleSelect(listing.id)}
+                  />
+                </td>
                 <td className="px-3 py-2.5">
                   <div className="font-medium truncate max-w-[200px]">{listing.addressLine1}</div>
                   <div className="text-xs text-muted-foreground">{listing.city}, {listing.state} {listing.zipCode}</div>
@@ -523,6 +547,7 @@ export default function PropertySearchPage() {
 
   const [searchParams, setSearchParams] = useState<Record<string, string> | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
 
   const [saveUrl, setSaveUrl] = useState("");
   const [saveNotes, setSaveNotes] = useState("");
@@ -596,6 +621,63 @@ export default function PropertySearchPage() {
     },
   });
 
+  const filteredListings = (rentcastResults?.listings || []).filter(listing => {
+    const min = rcMinPrice !== "any" ? parseInt(rcMinPrice) : 0;
+    const max = rcMaxPrice !== "any" ? parseInt(rcMaxPrice) : Infinity;
+    if (listing.price < min || listing.price > max) return false;
+    if (rcBeds !== "any" && listing.bedrooms < parseInt(rcBeds)) return false;
+    if (rcBaths !== "any" && listing.bathrooms < parseInt(rcBaths)) return false;
+    return true;
+  });
+
+  const toggleSelectListing = (id: string) => {
+    setSelectedListingIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (filteredListings.every(l => selectedListingIds.has(l.id))) {
+      setSelectedListingIds(new Set());
+    } else {
+      setSelectedListingIds(new Set(filteredListings.map(l => l.id)));
+    }
+  };
+
+  const bulkSaveMutation = useMutation({
+    mutationFn: async (listings: RentCastListing[]) => {
+      for (const listing of listings) {
+        const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, '').replace(/\s+/g, '-'))}_rb/`;
+        await apiRequest("POST", "/api/saved-properties", {
+          url: zillowUrl,
+          source: "zillow",
+          streetAddress: listing.addressLine1,
+          city: listing.city,
+          state: listing.state,
+          zipCode: listing.zipCode,
+          notes: `${listing.propertyType || ''} · ${formatPrice(listing.price)} · ${listing.bedrooms}bd/${listing.bathrooms}ba · ${listing.squareFootage?.toLocaleString() || '?'} sqft`.trim(),
+        });
+      }
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-properties"] });
+      setSelectedListingIds(new Set());
+      toast({ title: "Saved!", description: `${variables.length} ${variables.length === 1 ? 'property' : 'properties'} added to your favorites.` });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save some properties. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const handleBulkSave = () => {
+    const selected = filteredListings.filter(l => selectedListingIds.has(l.id));
+    if (selected.length === 0) return;
+    bulkSaveMutation.mutate(selected);
+  };
+
   const handleZillowSearch = () => {
     const url = buildZillowUrl({ location, listingType, propertyType, minPrice, maxPrice, beds, baths });
     if (url) {
@@ -626,6 +708,7 @@ export default function PropertySearchPage() {
     params.limit = "20";
 
     setSearchParams(params);
+    setSelectedListingIds(new Set());
   };
 
   const handleResetZillow = () => {
@@ -832,11 +915,13 @@ export default function PropertySearchPage() {
           {rentcastResults && rentcastResults.listings.length > 0 && (
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <MapPin className="h-5 w-5" />
                     Results
-                    <span className="text-sm font-normal text-muted-foreground">({rentcastResults.listings.length} listings)</span>
+                    <span className="text-sm font-normal text-muted-foreground">
+                      ({filteredListings.length}{filteredListings.length !== rentcastResults.listings.length ? ` of ${rentcastResults.listings.length}` : ''} listings)
+                    </span>
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     {rentcastResults.fromCache && (
@@ -865,22 +950,58 @@ export default function PropertySearchPage() {
                     </div>
                   </div>
                 </div>
+                {selectedListingIds.size > 0 && (
+                  <div className="flex items-center gap-3 mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <CheckSquare className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-sm font-medium">
+                      {selectedListingIds.size} {selectedListingIds.size === 1 ? 'listing' : 'listings'} selected
+                    </span>
+                    <div className="flex items-center gap-2 ml-auto">
+                      <Button
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={handleBulkSave}
+                        disabled={bulkSaveMutation.isPending}
+                      >
+                        {bulkSaveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Heart className="h-3.5 w-3.5" />}
+                        Save to Favorites
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setSelectedListingIds(new Set())}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
                 {viewMode === "cards" ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {rentcastResults.listings.map((listing) => (
-                      <ListingCard key={listing.id} listing={listing} />
+                    {filteredListings.map((listing) => (
+                      <ListingCard
+                        key={listing.id}
+                        listing={listing}
+                        isSelected={selectedListingIds.has(listing.id)}
+                        onToggleSelect={toggleSelectListing}
+                      />
                     ))}
                   </div>
                 ) : (
-                  <ListingTable listings={rentcastResults.listings} />
+                  <ListingTable
+                    listings={filteredListings}
+                    selectedIds={selectedListingIds}
+                    onToggleSelect={toggleSelectListing}
+                    onToggleAll={toggleSelectAll}
+                  />
                 )}
               </CardContent>
             </Card>
           )}
 
-          {rentcastResults && rentcastResults.listings.length === 0 && searchParams && !isSearching && (
+          {filteredListings.length === 0 && searchParams && !isSearching && rentcastResults && (
             <Card>
               <CardContent className="pt-6">
                 <div className="text-center py-6 text-muted-foreground">
