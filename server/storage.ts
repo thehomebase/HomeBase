@@ -123,7 +123,9 @@ export interface IStorage {
 
   // Saved property operations
   getSavedPropertiesByUser(userId: number): Promise<SavedProperty[]>;
+  getShowingRequestedProperties(agentId: number): Promise<(SavedProperty & { clientName?: string })[]>;
   createSavedProperty(property: InsertSavedProperty): Promise<SavedProperty>;
+  updateSavedPropertyShowing(id: number, userId: number, showingRequested: boolean): Promise<void>;
   deleteSavedProperty(id: number, userId: number): Promise<void>;
 }
 
@@ -2354,7 +2356,8 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(sql`
         SELECT id, user_id as "userId", url, source, 
                street_address as "streetAddress", city, state, 
-               zip_code as "zipCode", notes, created_at as "createdAt"
+               zip_code as "zipCode", notes, showing_requested as "showingRequested",
+               created_at as "createdAt"
         FROM saved_properties
         WHERE user_id = ${userId}
         ORDER BY created_at DESC
@@ -2369,6 +2372,7 @@ export class DatabaseStorage implements IStorage {
         state: row.state ? String(row.state) : null,
         zipCode: row.zipCode ? String(row.zipCode) : null,
         notes: row.notes ? String(row.notes) : null,
+        showingRequested: Boolean(row.showingRequested),
         createdAt: row.createdAt ? new Date(row.createdAt) : null,
       }));
     } catch (error) {
@@ -2406,11 +2410,55 @@ export class DatabaseStorage implements IStorage {
         state: saved.state ? String(saved.state) : null,
         zipCode: saved.zipCode ? String(saved.zipCode) : null,
         notes: saved.notes ? String(saved.notes) : null,
+        showingRequested: Boolean(saved.showingRequested),
         createdAt: saved.createdAt ? new Date(saved.createdAt) : null,
       };
     } catch (error) {
       console.error('Error in createSavedProperty:', error);
       throw error;
+    }
+  }
+
+  async getShowingRequestedProperties(agentId: number): Promise<(SavedProperty & { clientName?: string })[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT sp.id, sp.user_id as "userId", sp.url, sp.source,
+               sp.street_address as "streetAddress", sp.city, sp.state,
+               sp.zip_code as "zipCode", sp.notes, sp.showing_requested as "showingRequested",
+               sp.created_at as "createdAt",
+               u.first_name || ' ' || u.last_name as "clientName"
+        FROM saved_properties sp
+        JOIN users u ON sp.user_id = u.id
+        WHERE u.agent_id = ${agentId} AND sp.showing_requested = true
+        ORDER BY sp.created_at DESC
+      `);
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        userId: Number(row.userId),
+        url: String(row.url),
+        source: String(row.source),
+        streetAddress: row.streetAddress ? String(row.streetAddress) : null,
+        city: row.city ? String(row.city) : null,
+        state: row.state ? String(row.state) : null,
+        zipCode: row.zipCode ? String(row.zipCode) : null,
+        notes: row.notes ? String(row.notes) : null,
+        showingRequested: Boolean(row.showingRequested),
+        createdAt: row.createdAt ? new Date(row.createdAt as string) : null,
+        clientName: row.clientName ? String(row.clientName) : undefined,
+      }));
+    } catch (error) {
+      console.error('Error in getShowingRequestedProperties:', error);
+      return [];
+    }
+  }
+
+  async updateSavedPropertyShowing(id: number, userId: number, showingRequested: boolean): Promise<void> {
+    const result = await db.execute(sql`
+      UPDATE saved_properties SET showing_requested = ${showingRequested}
+      WHERE id = ${id} AND user_id = ${userId}
+    `);
+    if (result.rowCount === 0) {
+      throw new Error('Property not found or access denied');
     }
   }
 

@@ -1728,6 +1728,33 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/saved-properties/showing-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const properties = await storage.getShowingRequestedProperties(req.user.id);
+      res.json(properties);
+    } catch (error) {
+      console.error('Error fetching showing requested properties:', error);
+      res.status(500).json({ error: 'Failed to fetch showing requested properties' });
+    }
+  });
+
+  app.patch("/api/saved-properties/:id/showing", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { showingRequested } = req.body;
+      if (typeof showingRequested !== "boolean") {
+        return res.status(400).json({ error: "showingRequested must be a boolean" });
+      }
+      await storage.updateSavedPropertyShowing(Number(req.params.id), req.user.id, showingRequested);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating showing request:', error);
+      res.status(404).json({ error: 'Property not found' });
+    }
+  });
+
   app.delete("/api/saved-properties/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {

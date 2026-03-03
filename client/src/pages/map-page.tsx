@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw, PanelRightClose, PanelRightOpen, X, Calendar, Clock, Bell, Check, XCircle, Route, Navigation, Square, CheckSquare, Edit2, Trash2, Ban, CheckCircle, MoreVertical } from "lucide-react";
+import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw, PanelRightClose, PanelRightOpen, X, Calendar, Clock, Bell, Check, XCircle, Route, Navigation, Square, CheckSquare, Edit2, Trash2, Ban, CheckCircle, MoreVertical, ExternalLink, Heart } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -95,7 +95,32 @@ const clientIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+const savedPropertyIcon = new L.Icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
 interface ClientWithCoords extends Client {
+  latitude?: number;
+  longitude?: number;
+}
+
+interface SavedPropertyWithCoords {
+  id: number;
+  userId: number;
+  url: string;
+  source: string;
+  streetAddress: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+  notes: string | null;
+  showingRequested: boolean;
+  clientName?: string;
   latitude?: number;
   longitude?: number;
 }
@@ -168,7 +193,7 @@ export default function MapPage() {
   const [selectedClientFilter, setSelectedClientFilter] = useState<number | "all">("all");
 
   // Map display filter (agents only)
-  const [mapDisplayFilter, setMapDisplayFilter] = useState<"showings" | "clients" | "listings">("showings");
+  const [mapDisplayFilter, setMapDisplayFilter] = useState<"showings" | "clients" | "listings" | "saved">("showings");
 
   // Client geocoding state
   const [clientsWithCoords, setClientsWithCoords] = useState<ClientWithCoords[]>([]);
@@ -191,6 +216,19 @@ export default function MapPage() {
   const { data: showingRequests = [] } = useQuery<ShowingRequest[]>({
     queryKey: ["/api/showing-requests"]
   });
+
+  const { data: savedShowingProperties = [] } = useQuery<SavedPropertyWithCoords[]>({
+    queryKey: ["/api/saved-properties/showing-requests"],
+    enabled: isAgent
+  });
+
+  const { data: mySavedProperties = [] } = useQuery<SavedPropertyWithCoords[]>({
+    queryKey: ["/api/saved-properties"],
+    enabled: !isAgent
+  });
+
+  const [savedPropsWithCoords, setSavedPropsWithCoords] = useState<SavedPropertyWithCoords[]>([]);
+  const [isGeocodingSaved, setIsGeocodingSaved] = useState(false);
 
   const pendingRequests = showingRequests.filter(r => 
     r.status === "pending" && 
@@ -627,6 +665,95 @@ export default function MapPage() {
 
   const clientsWithValidCoords = clientsWithCoords.filter(c => c.latitude && c.longitude);
 
+  const savedPropsSource = isAgent ? savedShowingProperties : mySavedProperties.filter(p => p.showingRequested);
+
+  useEffect(() => {
+    if (mapDisplayFilter !== "saved" || savedPropsSource.length === 0) return;
+
+    const CACHE_KEY = 'saved_property_geocode_cache';
+
+    const getCache = (): Record<string, { lat: number; lon: number }> => {
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        return cached ? JSON.parse(cached) : {};
+      } catch {
+        return {};
+      }
+    };
+
+    const saveCache = (cache: Record<string, { lat: number; lon: number }>) => {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+      } catch {}
+    };
+
+    const geocodeSavedProps = async () => {
+      setIsGeocodingSaved(true);
+      const geocoded: SavedPropertyWithCoords[] = [];
+      const cache = getCache();
+      const toGeocode: { prop: SavedPropertyWithCoords; address: string }[] = [];
+
+      for (const prop of savedPropsSource) {
+        const parts = [];
+        if (prop.streetAddress) parts.push(prop.streetAddress);
+        if (prop.city) parts.push(prop.city);
+        if (prop.state) parts.push(prop.state);
+        if (prop.zipCode) parts.push(prop.zipCode);
+
+        if (parts.length === 0) {
+          geocoded.push(prop);
+          continue;
+        }
+
+        const fullAddress = parts.join(", ");
+        const cacheKey = fullAddress.toLowerCase().trim();
+
+        if (cache[cacheKey]) {
+          geocoded.push({ ...prop, latitude: cache[cacheKey].lat, longitude: cache[cacheKey].lon });
+        } else {
+          toGeocode.push({ prop, address: fullAddress });
+        }
+      }
+
+      for (const { prop, address } of toGeocode) {
+        const cacheKey = address.toLowerCase().trim();
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=us`,
+            { headers: { "Accept": "application/json" } }
+          );
+          const data = await response.json();
+          if (data && data.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+            cache[cacheKey] = { lat, lon };
+            geocoded.push({ ...prop, latitude: lat, longitude: lon });
+          } else {
+            geocoded.push(prop);
+          }
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (error) {
+          console.error("Failed to geocode saved property:", prop.id, error);
+          geocoded.push(prop);
+        }
+      }
+
+      saveCache(cache);
+      setSavedPropsWithCoords(geocoded);
+      setIsGeocodingSaved(false);
+
+      const firstWithCoords = geocoded.find(p => p.latitude && p.longitude);
+      if (firstWithCoords && firstWithCoords.latitude && firstWithCoords.longitude) {
+        setMapCenter([firstWithCoords.latitude, firstWithCoords.longitude]);
+        setMapZoom(10);
+      }
+    };
+
+    geocodeSavedProps();
+  }, [mapDisplayFilter, savedPropsSource.length]);
+
+  const savedPropsWithValidCoords = savedPropsWithCoords.filter(p => p.latitude && p.longitude);
+
   return (
     <div style={{ position: "fixed", top: 0, left: "60px", right: 0, bottom: 0 }}>
       <MapContainer
@@ -674,6 +801,36 @@ export default function MapPage() {
             </Marker>
           </>
         )}
+
+        {mapDisplayFilter === "saved" && savedPropsWithValidCoords.map((prop) => (
+          <Marker key={`saved-${prop.id}`} position={[prop.latitude!, prop.longitude!]} icon={savedPropertyIcon}>
+            <Popup>
+              <div className="p-2 min-w-[200px]">
+                <h3 className="font-bold text-yellow-700">
+                  {prop.streetAddress || "Unknown Address"}
+                </h3>
+                <p className="text-sm text-gray-600">
+                  {[prop.city, prop.state, prop.zipCode].filter(Boolean).join(", ")}
+                </p>
+                {prop.clientName && (
+                  <p className="text-xs text-blue-600 mt-1">Requested by: {prop.clientName}</p>
+                )}
+                {prop.notes && <p className="text-sm mt-2 text-gray-500">{prop.notes}</p>}
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="secondary" className="text-xs">Showing Requested</Badge>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full mt-2"
+                  onClick={() => window.open(prop.url, "_blank", "noopener,noreferrer")}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" /> View Listing
+                </Button>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
 
         {isAgent && mapDisplayFilter === "listings" && transactionsWithCoords.map((tx) => (
           <Marker key={`tx-${tx.id}`} position={[tx.latitude!, tx.longitude!]} icon={transactionIcon}>
@@ -899,6 +1056,16 @@ export default function MapPage() {
             >
               <Home className="h-3 w-3 mr-1" /> Listings
             </Button>
+            <Button
+              size="sm"
+              variant={mapDisplayFilter === "saved" ? "default" : "ghost"}
+              className="h-7 text-xs"
+              onClick={() => setMapDisplayFilter("saved")}
+              data-testid="filter-saved"
+            >
+              <Heart className="h-3 w-3 mr-1" /> Saved
+              {isGeocodingSaved && <Loader2 className="h-3 w-3 ml-1 animate-spin" />}
+            </Button>
           </div>
         )}
         <div className="flex flex-wrap gap-2">
@@ -912,6 +1079,12 @@ export default function MapPage() {
             <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
               <MapPin className="h-3 w-3 text-blue-600" />
               {viewingsWithCoords.length} showings
+            </Badge>
+          )}
+          {isAgent && mapDisplayFilter === "saved" && (
+            <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
+              <Heart className="h-3 w-3 text-yellow-600" />
+              {savedPropsWithValidCoords.length} saved properties
             </Badge>
           )}
           {isAgent && mapDisplayFilter === "clients" && (

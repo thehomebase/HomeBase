@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Eye } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -453,6 +453,24 @@ export default function PropertySearchPage() {
     },
   });
 
+  const showingToggleMutation = useMutation({
+    mutationFn: async ({ id, showingRequested }: { id: number; showingRequested: boolean }) => {
+      await apiRequest("PATCH", `/api/saved-properties/${id}/showing`, { showingRequested });
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-properties"] });
+      toast({
+        title: variables.showingRequested ? "Showing Requested" : "Showing Removed",
+        description: variables.showingRequested
+          ? "This property has been submitted for a showing request. Your agent will see it on the map."
+          : "Showing request removed for this property.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update showing request.", variant: "destructive" });
+    },
+  });
+
   const filteredListings = (rentcastResults?.listings || []).filter(listing => {
     const min = rcMinPrice !== "any" ? parseInt(rcMinPrice) : 0;
     const max = rcMaxPrice !== "any" ? parseInt(rcMaxPrice) : Infinity;
@@ -864,6 +882,16 @@ export default function PropertySearchPage() {
                     {prop.notes && <p className="text-sm text-muted-foreground ml-6">{prop.notes}</p>}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant={prop.showingRequested ? "default" : "outline"}
+                      size="sm"
+                      className={`h-8 text-xs ${prop.showingRequested ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+                      onClick={() => showingToggleMutation.mutate({ id: prop.id, showingRequested: !prop.showingRequested })}
+                      disabled={showingToggleMutation.isPending}
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      {prop.showingRequested ? "Showing Requested" : "Request Showing"}
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

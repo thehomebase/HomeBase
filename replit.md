@@ -90,6 +90,14 @@ Preferred communication style: Simple, everyday language.
 - **Filters**: city, state, zipCode, minPrice, maxPrice, bedrooms, bathrooms, propertyType, status
 - **Frontend**: Tabbed UI with "Listing Search" (RentCast) and "Zillow Search" tabs. Results shown inline with property details, agent info, and "View on Zillow" links.
 
+### Showing Request from Saved Properties
+- **Location**: `client/src/pages/property-search-page.tsx` (toggle button), `client/src/pages/map-page.tsx` (map display), `server/routes.ts` (API), `server/storage.ts` (storage)
+- **Purpose**: Clients can mark saved properties as "Request Showing" — these appear as gold markers on the map page for both the client and their agent
+- **Database**: `showing_requested` boolean column on `saved_properties` table
+- **API Endpoints**: `PATCH /api/saved-properties/:id/showing` (toggle), `GET /api/saved-properties/showing-requests` (agent view — returns all showing-requested properties from their clients)
+- **Map Integration**: "Saved" filter tab on map page with geocoded markers (Nominatim/OSM), localStorage caching for coordinates
+- **Workflow**: Client saves property → clicks "Request Showing" → property appears on map under "Saved" tab → agent sees it with client name attribution
+
 ### Environment Variables Required
 - `DATABASE_URL`: PostgreSQL connection string (required)
 - `REPL_ID`: Used as session secret in Replit environment

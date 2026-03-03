@@ -278,6 +278,7 @@ export const savedProperties = pgTable("saved_properties", {
   state: text("state"),
   zipCode: text("zip_code"),
   notes: text("notes"),
+  showingRequested: boolean("showing_requested").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
