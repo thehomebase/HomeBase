@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Link, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler } from "lucide-react";
+import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Link, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -429,6 +429,82 @@ function ListingCard({ listing }: { listing: RentCastListing }) {
   );
 }
 
+function ListingTable({ listings }: { listings: RentCastListing[] }) {
+  return (
+    <div className="overflow-x-auto border rounded-lg">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-muted/50 border-b">
+            <th className="text-left px-3 py-2.5 font-medium">Address</th>
+            <th className="text-right px-3 py-2.5 font-medium">Price</th>
+            <th className="text-center px-3 py-2.5 font-medium">Beds</th>
+            <th className="text-center px-3 py-2.5 font-medium">Baths</th>
+            <th className="text-right px-3 py-2.5 font-medium hidden sm:table-cell">Sqft</th>
+            <th className="text-left px-3 py-2.5 font-medium hidden md:table-cell">Type</th>
+            <th className="text-center px-3 py-2.5 font-medium hidden md:table-cell">Year</th>
+            <th className="text-center px-3 py-2.5 font-medium hidden lg:table-cell">DOM</th>
+            <th className="text-left px-3 py-2.5 font-medium hidden lg:table-cell">Agent</th>
+            <th className="text-left px-3 py-2.5 font-medium hidden lg:table-cell">MLS#</th>
+            <th className="text-center px-3 py-2.5 font-medium">Status</th>
+            <th className="px-3 py-2.5 font-medium w-10"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {listings.map((listing, i) => {
+            const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, '').replace(/\s+/g, '-'))}_rb/`;
+            return (
+              <tr key={listing.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? '' : 'bg-muted/10'}`}>
+                <td className="px-3 py-2.5">
+                  <div className="font-medium truncate max-w-[200px]">{listing.addressLine1}</div>
+                  <div className="text-xs text-muted-foreground">{listing.city}, {listing.state} {listing.zipCode}</div>
+                </td>
+                <td className="px-3 py-2.5 text-right font-semibold text-primary whitespace-nowrap">
+                  {formatPrice(listing.price)}
+                </td>
+                <td className="px-3 py-2.5 text-center">{listing.bedrooms || '—'}</td>
+                <td className="px-3 py-2.5 text-center">{listing.bathrooms || '—'}</td>
+                <td className="px-3 py-2.5 text-right hidden sm:table-cell whitespace-nowrap">
+                  {listing.squareFootage ? listing.squareFootage.toLocaleString() : '—'}
+                </td>
+                <td className="px-3 py-2.5 hidden md:table-cell text-muted-foreground text-xs">
+                  {listing.propertyType || '—'}
+                </td>
+                <td className="px-3 py-2.5 text-center hidden md:table-cell text-muted-foreground">
+                  {listing.yearBuilt || '—'}
+                </td>
+                <td className="px-3 py-2.5 text-center hidden lg:table-cell text-muted-foreground">
+                  {listing.daysOnMarket}
+                </td>
+                <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-muted-foreground truncate max-w-[140px]">
+                  {listing.listingAgent?.name || '—'}
+                </td>
+                <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-muted-foreground">
+                  {listing.mlsNumber || '—'}
+                </td>
+                <td className="px-3 py-2.5 text-center">
+                  <Badge variant={listing.status === "Active" ? "default" : "secondary"} className="text-xs">
+                    {listing.status}
+                  </Badge>
+                </td>
+                <td className="px-3 py-2.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => window.open(zillowUrl, "_blank", "noopener,noreferrer")}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function PropertySearchPage() {
   const [location, setLocation] = useState("");
   const [listingType, setListingType] = useState("for_sale");
@@ -446,6 +522,7 @@ export default function PropertySearchPage() {
   const [rcBaths, setRcBaths] = useState("any");
 
   const [searchParams, setSearchParams] = useState<Record<string, string> | null>(null);
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
   const [saveUrl, setSaveUrl] = useState("");
   const [saveNotes, setSaveNotes] = useState("");
@@ -590,7 +667,7 @@ export default function PropertySearchPage() {
   const apiStatus = rentcastStatus as { apiCallsUsed: number; apiCallsLimit: number } | undefined;
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -768,15 +845,37 @@ export default function PropertySearchPage() {
                         Cached
                       </Badge>
                     )}
+                    <div className="flex items-center border rounded-md">
+                      <Button
+                        variant={viewMode === "cards" ? "default" : "ghost"}
+                        size="sm"
+                        className="h-8 px-2 rounded-r-none"
+                        onClick={() => setViewMode("cards")}
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === "table" ? "default" : "ghost"}
+                        size="sm"
+                        className="h-8 px-2 rounded-l-none"
+                        onClick={() => setViewMode("table")}
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {rentcastResults.listings.map((listing) => (
-                    <ListingCard key={listing.id} listing={listing} />
-                  ))}
-                </div>
+                {viewMode === "cards" ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {rentcastResults.listings.map((listing) => (
+                      <ListingCard key={listing.id} listing={listing} />
+                    ))}
+                  </div>
+                ) : (
+                  <ListingTable listings={rentcastResults.listings} />
+                )}
               </CardContent>
             </Card>
           )}
