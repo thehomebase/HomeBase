@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Link, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw } from "lucide-react";
+import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Link, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -437,9 +437,49 @@ function ListingCard({ listing, isSelected, onToggleSelect }: { listing: RentCas
   );
 }
 
+type SortKey = "price" | "bedrooms" | "bathrooms" | "squareFootage" | "yearBuilt" | "daysOnMarket" | null;
+type SortDir = "asc" | "desc";
+
+function SortIcon({ columnKey, sortKey, sortDir }: { columnKey: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+  if (sortKey !== columnKey) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
+  return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+}
+
 function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll }: { listings: RentCastListing[]; selectedIds: Set<string>; onToggleSelect: (id: string) => void; onToggleAll: () => void }) {
   const allSelected = listings.length > 0 && listings.every(l => selectedIds.has(l.id));
   const someSelected = listings.some(l => selectedIds.has(l.id));
+  const [sortKey, setSortKey] = useState<SortKey>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const sortedListings = [...listings].sort((a, b) => {
+    if (!sortKey) return 0;
+    const valA = a[sortKey] ?? 0;
+    const valB = b[sortKey] ?? 0;
+    if (valA < valB) return sortDir === "asc" ? -1 : 1;
+    if (valA > valB) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const thSortable = (label: string, key: SortKey, align: string, extraClass = "") => (
+    <th
+      className={`${align} px-3 py-2.5 font-medium cursor-pointer select-none hover:bg-muted/80 transition-colors ${extraClass}`}
+      onClick={() => handleSort(key)}
+    >
+      <span className={`inline-flex items-center gap-1 ${align === "text-right" ? "justify-end" : align === "text-center" ? "justify-center" : ""}`}>
+        {label}
+        <SortIcon columnKey={key} sortKey={sortKey} sortDir={sortDir} />
+      </span>
+    </th>
+  );
 
   return (
     <div className="overflow-x-auto border rounded-lg">
@@ -454,13 +494,13 @@ function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll }: { 
               />
             </th>
             <th className="text-left px-3 py-2.5 font-medium">Address</th>
-            <th className="text-right px-3 py-2.5 font-medium">Price</th>
-            <th className="text-center px-3 py-2.5 font-medium">Beds</th>
-            <th className="text-center px-3 py-2.5 font-medium">Baths</th>
-            <th className="text-right px-3 py-2.5 font-medium hidden sm:table-cell">Sqft</th>
+            {thSortable("Price", "price", "text-right")}
+            {thSortable("Beds", "bedrooms", "text-center")}
+            {thSortable("Baths", "bathrooms", "text-center")}
+            {thSortable("Sqft", "squareFootage", "text-right", "hidden sm:table-cell")}
             <th className="text-left px-3 py-2.5 font-medium hidden md:table-cell">Type</th>
-            <th className="text-center px-3 py-2.5 font-medium hidden md:table-cell">Year</th>
-            <th className="text-center px-3 py-2.5 font-medium hidden lg:table-cell">DOM</th>
+            {thSortable("Year", "yearBuilt", "text-center", "hidden md:table-cell")}
+            {thSortable("DOM", "daysOnMarket", "text-center", "hidden lg:table-cell")}
             <th className="text-left px-3 py-2.5 font-medium hidden lg:table-cell">Agent</th>
             <th className="text-left px-3 py-2.5 font-medium hidden lg:table-cell">MLS#</th>
             <th className="text-center px-3 py-2.5 font-medium">Status</th>
@@ -468,7 +508,7 @@ function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll }: { 
           </tr>
         </thead>
         <tbody>
-          {listings.map((listing, i) => {
+          {sortedListings.map((listing, i) => {
             const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, '').replace(/\s+/g, '-'))}_rb/`;
             return (
               <tr key={listing.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? '' : 'bg-muted/10'} ${selectedIds.has(listing.id) ? 'bg-primary/5' : ''}`}>
@@ -544,7 +584,6 @@ export default function PropertySearchPage() {
   const [rcMaxPrice, setRcMaxPrice] = useState("any");
   const [rcBeds, setRcBeds] = useState("any");
   const [rcBaths, setRcBaths] = useState("any");
-  const [rcLimit, setRcLimit] = useState("500");
 
   const [searchParams, setSearchParams] = useState<Record<string, string> | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
@@ -711,7 +750,7 @@ export default function PropertySearchPage() {
     if (rcBaths !== "any") params.bathrooms = rcBaths;
     if (rcPropertyType !== "any") params.propertyType = rcPropertyType;
     params.status = "Active";
-    params.limit = rcLimit;
+    params.limit = "500";
 
     setSearchParams(params);
     setSelectedListingIds(new Set());
@@ -734,7 +773,6 @@ export default function PropertySearchPage() {
     setRcMaxPrice("any");
     setRcBeds("any");
     setRcBaths("any");
-    setRcLimit("500");
     setSearchParams(null);
   };
 
@@ -879,22 +917,6 @@ export default function PropertySearchPage() {
                       {RENTCAST_PROPERTY_TYPES.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="font-medium flex items-center gap-1.5">
-                    <List className="h-4 w-4" />
-                    Max Results
-                  </Label>
-                  <Select value={rcLimit} onValueChange={setRcLimit}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                      <SelectItem value="200">200</SelectItem>
-                      <SelectItem value="500">500</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
