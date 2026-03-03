@@ -1829,7 +1829,8 @@ export function registerRoutes(app: Express): Server {
     if (bathrooms && bathrooms !== "any") params.set("bathrooms", String(bathrooms));
     if (propertyType && propertyType !== "any") params.set("propertyType", String(propertyType));
     if (status) params.set("status", String(status));
-    params.set("limit", String(limit || 20));
+    const parsedLimit = Math.min(Math.max(parseInt(String(limit)) || 50, 1), 500);
+    params.set("limit", String(parsedLimit));
 
     const cacheKey = params.toString();
     const forceRefresh = req.query.refresh === "true";

@@ -544,6 +544,7 @@ export default function PropertySearchPage() {
   const [rcMaxPrice, setRcMaxPrice] = useState("any");
   const [rcBeds, setRcBeds] = useState("any");
   const [rcBaths, setRcBaths] = useState("any");
+  const [rcLimit, setRcLimit] = useState("50");
 
   const [searchParams, setSearchParams] = useState<Record<string, string> | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
@@ -710,7 +711,7 @@ export default function PropertySearchPage() {
     if (rcBaths !== "any") params.bathrooms = rcBaths;
     if (rcPropertyType !== "any") params.propertyType = rcPropertyType;
     params.status = "Active";
-    params.limit = "20";
+    params.limit = rcLimit;
 
     setSearchParams(params);
     setSelectedListingIds(new Set());
@@ -733,6 +734,7 @@ export default function PropertySearchPage() {
     setRcMaxPrice("any");
     setRcBeds("any");
     setRcBaths("any");
+    setRcLimit("50");
     setSearchParams(null);
   };
 
@@ -877,6 +879,22 @@ export default function PropertySearchPage() {
                       {RENTCAST_PROPERTY_TYPES.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    <List className="h-4 w-4" />
+                    Max Results
+                  </Label>
+                  <Select value={rcLimit} onValueChange={setRcLimit}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                      <SelectItem value="200">200</SelectItem>
+                      <SelectItem value="500">500</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
