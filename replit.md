@@ -80,9 +80,19 @@ Preferred communication style: Simple, everyday language.
 ### Third-Party Integrations
 - **Google Cloud Local Auth**: Package present for potential Google OAuth integration
 - **iCal Generator**: For calendar event export functionality
+- **RentCast API**: Property listing search for active sales. Uses `RENTCAST_API_KEY` env var.
+
+### RentCast Property Search
+- **Location**: `server/routes.ts` (backend endpoints), `client/src/pages/property-search-page.tsx` (frontend)
+- **API Endpoints**: `GET /api/rentcast/listings` (search with filters), `GET /api/rentcast/status` (usage stats)
+- **Caching**: In-memory cache with 24-hour TTL per unique search query to minimize API calls
+- **Rate Limiting**: Soft limit of 45 calls/month (buffer under 50 plan limit). Counter resets monthly.
+- **Filters**: city, state, zipCode, minPrice, maxPrice, bedrooms, bathrooms, propertyType, status
+- **Frontend**: Tabbed UI with "Listing Search" (RentCast) and "Zillow Search" tabs. Results shown inline with property details, agent info, and "View on Zillow" links.
 
 ### Environment Variables Required
 - `DATABASE_URL`: PostgreSQL connection string (required)
 - `REPL_ID`: Used as session secret in Replit environment
+- `RENTCAST_API_KEY`: RentCast API key for property listing search
 - `PORT`: Server port (defaults to 3000 in development, 80 in production on Replit)
 - `NODE_ENV`: Environment mode (development/production)

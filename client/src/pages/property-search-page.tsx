@@ -5,10 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Link, Loader2, MapPin } from "lucide-react";
+import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Link, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SavedProperty } from "@shared/schema";
 
 const PROPERTY_TYPES = [
@@ -18,6 +20,15 @@ const PROPERTY_TYPES = [
   { value: "Apartments", label: "Apartments" },
   { value: "Manufactured", label: "Manufactured" },
   { value: "Land", label: "Lots / Land" },
+];
+
+const RENTCAST_PROPERTY_TYPES = [
+  { value: "any", label: "Any Type" },
+  { value: "Single Family", label: "Single Family" },
+  { value: "Condo", label: "Condo" },
+  { value: "Townhouse", label: "Townhouse" },
+  { value: "Multi-Family", label: "Multi-Family" },
+  { value: "Land", label: "Land" },
 ];
 
 const BEDS_OPTIONS = [
@@ -77,6 +88,43 @@ const LISTING_TYPE_OPTIONS = [
   { value: "for_rent", label: "For Rent" },
   { value: "sold", label: "Recently Sold" },
 ];
+
+interface RentCastListing {
+  id: string;
+  formattedAddress: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  county?: string;
+  latitude: number;
+  longitude: number;
+  propertyType: string;
+  bedrooms: number;
+  bathrooms: number;
+  squareFootage: number;
+  lotSize?: number;
+  yearBuilt?: number;
+  hoa?: { fee: number };
+  status: string;
+  price: number;
+  listingType: string;
+  listedDate: string;
+  daysOnMarket: number;
+  mlsName?: string;
+  mlsNumber?: string;
+  listingAgent?: {
+    name: string;
+    phone?: string;
+    email?: string;
+  };
+  listingOffice?: {
+    name: string;
+    phone?: string;
+    email?: string;
+  };
+}
 
 function buildZillowUrl(filters: {
   location: string;
@@ -180,9 +228,7 @@ function parsePropertyUrl(url: string): { source: string; streetAddress: string 
         }
         if (parts.length >= 2) {
           const cityParts: string[] = [];
-          const streetParts: string[] = [];
           let foundCity = false;
-          const streetPattern = /^\d+|^[A-Z][a-z]+$/;
 
           let i = parts.length - 1;
           while (i >= 0) {
@@ -237,7 +283,6 @@ function parsePropertyUrl(url: string): { source: string; streetAddress: string 
       }
     }
   } catch {
-    // invalid URL
   }
 
   return result;
@@ -261,6 +306,129 @@ function getSourceLabel(source: string): string {
   }
 }
 
+function formatPrice(price: number): string {
+  if (price >= 1000000) return `$${(price / 1000000).toFixed(price % 1000000 === 0 ? 0 : 1)}M`;
+  if (price >= 1000) return `$${(price / 1000).toFixed(0)}K`;
+  return `$${price.toLocaleString()}`;
+}
+
+function formatDate(dateStr: string): string {
+  try {
+    return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return dateStr;
+  }
+}
+
+function parseLocation(location: string): { city?: string; state?: string; zipCode?: string } {
+  const trimmed = location.trim();
+  if (/^\d{5}$/.test(trimmed)) {
+    return { zipCode: trimmed };
+  }
+  const parts = trimmed.split(/[,\s]+/).filter(Boolean);
+  const stateAbbrs = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"];
+  if (parts.length >= 2) {
+    const lastPart = parts[parts.length - 1].toUpperCase();
+    if (stateAbbrs.includes(lastPart)) {
+      return { city: parts.slice(0, -1).join(" "), state: lastPart };
+    }
+  }
+  return { city: trimmed };
+}
+
+function ListingCard({ listing }: { listing: RentCastListing }) {
+  const zillowSearchUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, '').replace(/\s+/g, '-'))}_rb/`;
+
+  return (
+    <div className="border rounded-lg p-4 hover:bg-muted/30 transition-colors space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-sm truncate">{listing.addressLine1}</h3>
+          <p className="text-sm text-muted-foreground">{listing.city}, {listing.state} {listing.zipCode}</p>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="font-bold text-lg text-primary">{formatPrice(listing.price)}</div>
+          <Badge variant={listing.status === "Active" ? "default" : "secondary"} className="text-xs">
+            {listing.status}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+        {listing.bedrooms > 0 && (
+          <span className="flex items-center gap-1">
+            <BedDouble className="h-3.5 w-3.5" />
+            {listing.bedrooms} bed
+          </span>
+        )}
+        {listing.bathrooms > 0 && (
+          <span className="flex items-center gap-1">
+            <Bath className="h-3.5 w-3.5" />
+            {listing.bathrooms} bath
+          </span>
+        )}
+        {listing.squareFootage > 0 && (
+          <span className="flex items-center gap-1">
+            <Ruler className="h-3.5 w-3.5" />
+            {listing.squareFootage.toLocaleString()} sqft
+          </span>
+        )}
+        {listing.yearBuilt && (
+          <span className="flex items-center gap-1">
+            <Building2 className="h-3.5 w-3.5" />
+            Built {listing.yearBuilt}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <Calendar className="h-3 w-3" />
+          Listed {formatDate(listing.listedDate)}
+        </span>
+        <span>·</span>
+        <span>{listing.daysOnMarket} days on market</span>
+        {listing.propertyType && (
+          <>
+            <span>·</span>
+            <span>{listing.propertyType}</span>
+          </>
+        )}
+        {listing.hoa?.fee && (
+          <>
+            <span>·</span>
+            <span>HOA ${listing.hoa.fee}/mo</span>
+          </>
+        )}
+      </div>
+
+      {listing.listingAgent && (
+        <div className="text-xs text-muted-foreground border-t pt-2">
+          <span className="font-medium">Agent:</span> {listing.listingAgent.name}
+          {listing.listingOffice && <span> · {listing.listingOffice.name}</span>}
+        </div>
+      )}
+
+      <div className="flex gap-2 pt-1">
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-xs gap-1"
+          onClick={() => window.open(zillowSearchUrl, "_blank", "noopener,noreferrer")}
+        >
+          <ExternalLink className="h-3 w-3" />
+          View on Zillow
+        </Button>
+        {listing.mlsNumber && (
+          <Badge variant="outline" className="text-xs">
+            MLS# {listing.mlsNumber}
+          </Badge>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PropertySearchPage() {
   const [location, setLocation] = useState("");
   const [listingType, setListingType] = useState("for_sale");
@@ -270,6 +438,15 @@ export default function PropertySearchPage() {
   const [beds, setBeds] = useState("any");
   const [baths, setBaths] = useState("any");
 
+  const [rcLocation, setRcLocation] = useState("");
+  const [rcPropertyType, setRcPropertyType] = useState("any");
+  const [rcMinPrice, setRcMinPrice] = useState("any");
+  const [rcMaxPrice, setRcMaxPrice] = useState("any");
+  const [rcBeds, setRcBeds] = useState("any");
+  const [rcBaths, setRcBaths] = useState("any");
+
+  const [searchParams, setSearchParams] = useState<Record<string, string> | null>(null);
+
   const [saveUrl, setSaveUrl] = useState("");
   const [saveNotes, setSaveNotes] = useState("");
 
@@ -277,6 +454,32 @@ export default function PropertySearchPage() {
 
   const { data: savedProperties = [], isLoading: isLoadingSaved } = useQuery<SavedProperty[]>({
     queryKey: ["/api/saved-properties"],
+  });
+
+  const { data: rentcastStatus } = useQuery({
+    queryKey: ["/api/rentcast/status"],
+  });
+
+  const { data: rentcastResults, isLoading: isSearching, isError: isSearchError, error: searchError } = useQuery<{
+    listings: RentCastListing[];
+    fromCache: boolean;
+    apiCallsUsed: number;
+    apiCallsLimit: number;
+  }>({
+    queryKey: ["/api/rentcast/listings", searchParams],
+    queryFn: async () => {
+      if (!searchParams) return { listings: [], fromCache: false, apiCallsUsed: 0, apiCallsLimit: 45 };
+      const params = new URLSearchParams(searchParams);
+      const res = await apiRequest("GET", `/api/rentcast/listings?${params.toString()}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Search failed");
+      }
+      return res.json();
+    },
+    enabled: !!searchParams,
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: false,
   });
 
   const saveMutation = useMutation({
@@ -316,14 +519,39 @@ export default function PropertySearchPage() {
     },
   });
 
-  const handleSearch = () => {
+  const handleZillowSearch = () => {
     const url = buildZillowUrl({ location, listingType, propertyType, minPrice, maxPrice, beds, baths });
     if (url) {
       window.open(url, "_blank", "noopener,noreferrer");
     }
   };
 
-  const handleReset = () => {
+  const handleRentCastSearch = () => {
+    const loc = rcLocation.trim();
+    if (!loc) return;
+
+    const parsed = parseLocation(loc);
+    const params: Record<string, string> = {};
+
+    if (parsed.zipCode) {
+      params.zipCode = parsed.zipCode;
+    } else {
+      if (parsed.city) params.city = parsed.city;
+      if (parsed.state) params.state = parsed.state;
+    }
+
+    if (rcMinPrice !== "any") params.minPrice = rcMinPrice;
+    if (rcMaxPrice !== "any") params.maxPrice = rcMaxPrice;
+    if (rcBeds !== "any") params.bedrooms = rcBeds;
+    if (rcBaths !== "any") params.bathrooms = rcBaths;
+    if (rcPropertyType !== "any") params.propertyType = rcPropertyType;
+    params.status = "Active";
+    params.limit = "20";
+
+    setSearchParams(params);
+  };
+
+  const handleResetZillow = () => {
     setLocation("");
     setListingType("for_sale");
     setPropertyType("any");
@@ -331,6 +559,16 @@ export default function PropertySearchPage() {
     setMaxPrice("any");
     setBeds("any");
     setBaths("any");
+  };
+
+  const handleResetRentCast = () => {
+    setRcLocation("");
+    setRcPropertyType("any");
+    setRcMinPrice("any");
+    setRcMaxPrice("any");
+    setRcBeds("any");
+    setRcBaths("any");
+    setSearchParams(null);
   };
 
   const handleSaveProperty = () => {
@@ -345,180 +583,350 @@ export default function PropertySearchPage() {
     saveMutation.mutate({ url: trimmed, notes: saveNotes.trim() });
   };
 
-  const isSearchDisabled = !location.trim();
+  const isZillowSearchDisabled = !location.trim();
+  const isRentCastSearchDisabled = !rcLocation.trim();
   const previewParsed = saveUrl.trim() ? parsePropertyUrl(saveUrl.trim()) : null;
   const previewAddress = previewParsed ? [previewParsed.streetAddress, previewParsed.city, previewParsed.state, previewParsed.zipCode].filter(Boolean).join(", ") : null;
+  const apiStatus = rentcastStatus as { apiCallsUsed: number; apiCallsLimit: number } | undefined;
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Search className="h-6 w-6" />
-          Property Search
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Find properties on Zillow, then save the ones you like here.
-        </p>
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Search className="h-6 w-6" />
+            Property Search
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Search for active listings or browse on Zillow, then save the ones you like.
+          </p>
+        </div>
+        {apiStatus && (
+          <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+            <Database className="h-3.5 w-3.5" />
+            <span>API: {apiStatus.apiCallsUsed}/{apiStatus.apiCallsLimit} calls used this month</span>
+          </div>
+        )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Home className="h-5 w-5" />
-            Search Filters
-          </CardTitle>
-          <CardDescription>
-            Enter a city, neighborhood, ZIP code, or address to get started.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="location" className="font-medium">Location</Label>
-            <Input
-              id="location"
-              placeholder="e.g. Austin TX, 90210, Miami Beach FL"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !isSearchDisabled) handleSearch();
-              }}
-              className="text-base"
-            />
-          </div>
+      <Tabs defaultValue="rentcast" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="rentcast">Listing Search</TabsTrigger>
+          <TabsTrigger value="zillow">Zillow Search</TabsTrigger>
+        </TabsList>
 
-          <div className="space-y-2">
-            <Label className="font-medium">Listing Type</Label>
-            <Select value={listingType} onValueChange={setListingType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LISTING_TYPE_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <TabsContent value="rentcast" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Home className="h-5 w-5" />
+                Search Active Listings
+              </CardTitle>
+              <CardDescription>
+                Search for properties currently on the market. Enter a city and state (e.g. "Fort Worth TX") or a ZIP code.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="rc-location" className="font-medium">Location</Label>
+                <Input
+                  id="rc-location"
+                  placeholder="e.g. Fort Worth TX, 76244, Austin TX"
+                  value={rcLocation}
+                  onChange={(e) => setRcLocation(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !isRentCastSearchDisabled) handleRentCastSearch();
+                  }}
+                  className="text-base"
+                />
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="font-medium flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4" />
-                Min Price
-              </Label>
-              <Select value={minPrice} onValueChange={setMinPrice}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRICE_MIN_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    <DollarSign className="h-4 w-4" />
+                    Min Price
+                  </Label>
+                  <Select value={rcMinPrice} onValueChange={setRcMinPrice}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PRICE_MIN_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    <DollarSign className="h-4 w-4" />
+                    Max Price
+                  </Label>
+                  <Select value={rcMaxPrice} onValueChange={setRcMaxPrice}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PRICE_MAX_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    <BedDouble className="h-4 w-4" />
+                    Bedrooms
+                  </Label>
+                  <Select value={rcBeds} onValueChange={setRcBeds}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BEDS_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    <Bath className="h-4 w-4" />
+                    Bathrooms
+                  </Label>
+                  <Select value={rcBaths} onValueChange={setRcBaths}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BATHS_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    <Building2 className="h-4 w-4" />
+                    Property Type
+                  </Label>
+                  <Select value={rcPropertyType} onValueChange={setRcPropertyType}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {RENTCAST_PROPERTY_TYPES.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button
+                  onClick={handleRentCastSearch}
+                  disabled={isRentCastSearchDisabled || isSearching}
+                  className="flex-1 gap-2"
+                  size="lg"
+                >
+                  {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  Search Listings
+                </Button>
+                <Button onClick={handleResetRentCast} variant="outline" size="lg">
+                  Reset Filters
+                </Button>
+              </div>
+
+              {apiStatus && (
+                <div className="sm:hidden flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+                  <Database className="h-3.5 w-3.5" />
+                  <span>API: {apiStatus.apiCallsUsed}/{apiStatus.apiCallsLimit} calls used this month</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {isSearchError && (
+            <Card className="border-destructive">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle className="h-5 w-5" />
+                  <span className="font-medium">{(searchError as Error)?.message || "Search failed"}</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {rentcastResults && rentcastResults.listings.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <MapPin className="h-5 w-5" />
+                    Results
+                    <span className="text-sm font-normal text-muted-foreground">({rentcastResults.listings.length} listings)</span>
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    {rentcastResults.fromCache && (
+                      <Badge variant="outline" className="text-xs gap-1">
+                        <Database className="h-3 w-3" />
+                        Cached
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {rentcastResults.listings.map((listing) => (
+                    <ListingCard key={listing.id} listing={listing} />
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="font-medium flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4" />
-                Max Price
-              </Label>
-              <Select value={maxPrice} onValueChange={setMaxPrice}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRICE_MAX_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="font-medium flex items-center gap-1.5">
-                <BedDouble className="h-4 w-4" />
-                Bedrooms
-              </Label>
-              <Select value={beds} onValueChange={setBeds}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BEDS_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="font-medium flex items-center gap-1.5">
-                <Bath className="h-4 w-4" />
-                Bathrooms
-              </Label>
-              <Select value={baths} onValueChange={setBaths}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BATHS_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          {rentcastResults && rentcastResults.listings.length === 0 && searchParams && !isSearching && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-6 text-muted-foreground">
+                  <Home className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                  <p className="font-medium">No listings found</p>
+                  <p className="text-sm mt-1">Try adjusting your filters or searching a different location.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
 
-          <div className="space-y-2">
-            <Label className="font-medium flex items-center gap-1.5">
-              <Building2 className="h-4 w-4" />
-              Property Type
-            </Label>
-            <Select value={propertyType} onValueChange={setPropertyType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PROPERTY_TYPES.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <TabsContent value="zillow" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Home className="h-5 w-5" />
+                Search on Zillow
+              </CardTitle>
+              <CardDescription>
+                Set your filters and search on Zillow in a new tab.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="location" className="font-medium">Location</Label>
+                <Input
+                  id="location"
+                  placeholder="e.g. Austin TX, 90210, Miami Beach FL"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !isZillowSearchDisabled) handleZillowSearch();
+                  }}
+                  className="text-base"
+                />
+              </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <Button
-              onClick={handleSearch}
-              disabled={isSearchDisabled}
-              className="flex-1 gap-2"
-              size="lg"
-            >
-              <ExternalLink className="h-4 w-4" />
-              Search on Zillow
-            </Button>
-            <Button
-              onClick={handleReset}
-              variant="outline"
-              size="lg"
-            >
-              Reset Filters
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              <div className="space-y-2">
+                <Label className="font-medium">Listing Type</Label>
+                <Select value={listingType} onValueChange={setListingType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {LISTING_TYPE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    <DollarSign className="h-4 w-4" />
+                    Min Price
+                  </Label>
+                  <Select value={minPrice} onValueChange={setMinPrice}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PRICE_MIN_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    <DollarSign className="h-4 w-4" />
+                    Max Price
+                  </Label>
+                  <Select value={maxPrice} onValueChange={setMaxPrice}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PRICE_MAX_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    <BedDouble className="h-4 w-4" />
+                    Bedrooms
+                  </Label>
+                  <Select value={beds} onValueChange={setBeds}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BEDS_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    <Bath className="h-4 w-4" />
+                    Bathrooms
+                  </Label>
+                  <Select value={baths} onValueChange={setBaths}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BATHS_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-medium flex items-center gap-1.5">
+                  <Building2 className="h-4 w-4" />
+                  Property Type
+                </Label>
+                <Select value={propertyType} onValueChange={setPropertyType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PROPERTY_TYPES.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button
+                  onClick={handleZillowSearch}
+                  disabled={isZillowSearchDisabled}
+                  className="flex-1 gap-2"
+                  size="lg"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Search on Zillow
+                </Button>
+                <Button onClick={handleResetZillow} variant="outline" size="lg">
+                  Reset Filters
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Card>
         <CardHeader>
@@ -599,7 +1007,7 @@ export default function PropertySearchPage() {
             <div className="text-center py-8 text-muted-foreground">
               <Home className="h-10 w-10 mx-auto mb-3 opacity-40" />
               <p className="font-medium">No saved properties yet</p>
-              <p className="text-sm mt-1">Search on Zillow, find a property you like, and paste the URL above to save it.</p>
+              <p className="text-sm mt-1">Search for listings above, then paste the URL to save it.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -610,38 +1018,30 @@ export default function PropertySearchPage() {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <MapPin className="h-4 w-4 text-primary shrink-0" />
+                      <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
                       <span className="font-medium text-sm truncate">{formatAddress(prop)}</span>
+                      <Badge variant="outline" className="text-xs shrink-0">{getSourceLabel(prop.source)}</Badge>
                     </div>
-                    {prop.notes && (
-                      <p className="text-sm text-muted-foreground ml-6 mb-1">{prop.notes}</p>
-                    )}
-                    <div className="flex items-center gap-3 ml-6">
-                      <a
-                        href={prop.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        View on {getSourceLabel(prop.source)}
-                      </a>
-                      {prop.createdAt && (
-                        <span className="text-xs text-muted-foreground">
-                          Saved {new Date(prop.createdAt).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
+                    {prop.notes && <p className="text-sm text-muted-foreground ml-6">{prop.notes}</p>}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => deleteMutation.mutate(prop.id)}
-                    disabled={deleteMutation.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => window.open(prop.url, "_blank", "noopener,noreferrer")}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => deleteMutation.mutate(prop.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -649,22 +1049,8 @@ export default function PropertySearchPage() {
         </CardContent>
       </Card>
 
-      <div className="text-center space-y-2 py-4">
-        <p className="text-xs text-muted-foreground">
-          Search powered by{" "}
-          <a
-            href="https://www.zillow.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-blue-600 hover:underline"
-          >
-            Zillow&reg;
-          </a>
-        </p>
-        <p className="text-xs text-muted-foreground max-w-md mx-auto">
-          Clicking "Search on Zillow" will open Zillow.com in a new tab with your selected filters applied.
-          All listing data and search results are provided by Zillow.
-        </p>
+      <div className="text-center text-xs text-muted-foreground pb-4">
+        <p>Listing data provided by RentCast. Results are cached for 24 hours to conserve API usage.</p>
       </div>
     </div>
   );

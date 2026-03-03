@@ -82,3 +82,8 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "nodemon"
+
+[userenv]
+
+[userenv.shared]
+RENTCAST_API_KEY = "ef761ba76a2a4d158e8f925850ab6e18"

@@ -1795,6 +1795,100 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // RentCast property search with caching
+  const rentcastCache = new Map<string, { data: any; timestamp: number }>();
+  const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+  let monthlyCallCount = 0;
+  let monthlyCallResetDate = new Date();
+  const MONTHLY_LIMIT = 45; // leave buffer under 50
+
+  function resetMonthlyCounterIfNeeded() {
+    const now = new Date();
+    if (now.getMonth() !== monthlyCallResetDate.getMonth() || now.getFullYear() !== monthlyCallResetDate.getFullYear()) {
+      monthlyCallCount = 0;
+      monthlyCallResetDate = now;
+    }
+  }
+
+  app.get("/api/rentcast/listings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    const { city, state, zipCode, minPrice, maxPrice, bedrooms, bathrooms, propertyType, status, limit } = req.query;
+
+    if (!city && !zipCode) {
+      return res.status(400).json({ error: "Please provide a city or ZIP code" });
+    }
+
+    const params = new URLSearchParams();
+    if (city) params.set("city", String(city));
+    if (state) params.set("state", String(state));
+    if (zipCode) params.set("zipCode", String(zipCode));
+    if (minPrice && minPrice !== "any") params.set("minPrice", String(minPrice));
+    if (maxPrice && maxPrice !== "any") params.set("maxPrice", String(maxPrice));
+    if (bedrooms && bedrooms !== "any") params.set("bedrooms", String(bedrooms));
+    if (bathrooms && bathrooms !== "any") params.set("bathrooms", String(bathrooms));
+    if (propertyType && propertyType !== "any") params.set("propertyType", String(propertyType));
+    if (status) params.set("status", String(status));
+    params.set("limit", String(limit || 20));
+
+    const cacheKey = params.toString();
+
+    const cached = rentcastCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return res.json({ listings: cached.data, fromCache: true, apiCallsUsed: monthlyCallCount, apiCallsLimit: MONTHLY_LIMIT });
+    }
+
+    resetMonthlyCounterIfNeeded();
+    if (monthlyCallCount >= MONTHLY_LIMIT) {
+      return res.status(429).json({
+        error: `Monthly API limit reached (${MONTHLY_LIMIT} calls). Resets next month. Try a cached search or adjust filters.`,
+        apiCallsUsed: monthlyCallCount,
+        apiCallsLimit: MONTHLY_LIMIT
+      });
+    }
+
+    try {
+      const apiKey = process.env.RENTCAST_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "RentCast API key not configured" });
+      }
+
+      const url = `https://api.rentcast.io/v1/listings/sale?${params.toString()}`;
+      console.log(`RentCast API call #${monthlyCallCount + 1}: ${url}`);
+
+      const response = await fetch(url, {
+        headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("RentCast API error:", response.status, errorText);
+        return res.status(response.status).json({ error: `RentCast API error: ${response.statusText}` });
+      }
+
+      const data = await response.json();
+      monthlyCallCount++;
+
+      rentcastCache.set(cacheKey, { data, timestamp: Date.now() });
+
+      res.json({ listings: data, fromCache: false, apiCallsUsed: monthlyCallCount, apiCallsLimit: MONTHLY_LIMIT });
+    } catch (error) {
+      console.error("RentCast API fetch error:", error);
+      res.status(500).json({ error: "Failed to fetch listings from RentCast" });
+    }
+  });
+
+  app.get("/api/rentcast/status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    resetMonthlyCounterIfNeeded();
+    res.json({
+      apiCallsUsed: monthlyCallCount,
+      apiCallsLimit: MONTHLY_LIMIT,
+      cacheEntries: rentcastCache.size,
+      resetDate: new Date(monthlyCallResetDate.getFullYear(), monthlyCallResetDate.getMonth() + 1, 1).toISOString()
+    });
+  });
+
   // Simple ping endpoint for health checks
   app.get("/ping", (req, res) => {
     res.json({ 
