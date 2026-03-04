@@ -120,4 +120,5 @@ Preferred communication style: Simple, everyday language.
 - `NODE_ENV`: Environment mode (development/production)
 
 ### Integration Notes
-- **Twilio** (SMS) and **SendGrid** (email) integrations are NOT yet connected. The communications feature is fully built but won't send messages until credentials are provided. User dismissed the Replit integration proposals — can either re-propose later or have user provide API keys manually as secrets.
+- **Twilio** (SMS): Connected — credentials stored as secrets (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`). SMS sending is fully operational.
+- **SendGrid** (email): NOT yet connected. Email feature is built but won't send until `SENDGRID_API_KEY` is provided.
