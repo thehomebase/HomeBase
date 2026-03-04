@@ -118,3 +118,6 @@ Preferred communication style: Simple, everyday language.
 - `SENDGRID_FROM_EMAIL`: Email address to send from (optional, defaults to noreply@homebase.app)
 - `PORT`: Server port (defaults to 3000 in development, 80 in production on Replit)
 - `NODE_ENV`: Environment mode (development/production)
+
+### Integration Notes
+- **Twilio** (SMS) and **SendGrid** (email) integrations are NOT yet connected. The communications feature is fully built but won't send messages until credentials are provided. User dismissed the Replit integration proposals — can either re-propose later or have user provide API keys manually as secrets.
