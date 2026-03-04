@@ -98,9 +98,23 @@ Preferred communication style: Simple, everyday language.
 - **Map Integration**: "Saved" filter tab on map page with geocoded markers (Nominatim/OSM), localStorage caching for coordinates
 - **Workflow**: Client saves property → clicks "Request Showing" → property appears on map under "Saved" tab → agent sees it with client name attribution
 
+### Client Communications (SMS/Email via Twilio + SendGrid)
+- **Location**: `server/twilio-service.ts`, `server/sendgrid-service.ts`, `client/src/components/client-contact-dialog.tsx`, `client/src/pages/clients-page.tsx`
+- **Purpose**: Agents can send SMS and email to clients directly from the platform, with all message delivery handled by third-party services (Twilio for SMS, SendGrid for email) to offload legal/compliance responsibility
+- **Database**: `communications` table logs message metadata (type, status, externalId) — content is stored for history but delivery/compliance is managed by Twilio/SendGrid
+- **API Endpoints**: `GET /api/communications/status` (check integration availability), `GET /api/communications/:clientId` (history), `POST /api/communications/sms` (send SMS), `POST /api/communications/email` (send email)
+- **Integrations Required**: Twilio connector (SMS/voice), SendGrid connector (email) — both available as Replit integrations
+- **Frontend**: Contact dialog accessible from Client Details panel → "Contact" button → tabbed dialog with SMS, Email, and History tabs
+- **Privacy**: Platform only stores metadata/logs. Message delivery, opt-outs, and compliance are handled entirely by Twilio/SendGrid
+
 ### Environment Variables Required
 - `DATABASE_URL`: PostgreSQL connection string (required)
 - `REPL_ID`: Used as session secret in Replit environment
 - `RENTCAST_API_KEY`: RentCast API key for property listing search
+- `TWILIO_ACCOUNT_SID`: Twilio account SID (for SMS)
+- `TWILIO_AUTH_TOKEN`: Twilio auth token (for SMS)
+- `TWILIO_PHONE_NUMBER`: Twilio phone number to send SMS from
+- `SENDGRID_API_KEY`: SendGrid API key (for email)
+- `SENDGRID_FROM_EMAIL`: Email address to send from (optional, defaults to noreply@homebase.app)
 - `PORT`: Server port (defaults to 3000 in development, 80 in production on Replit)
 - `NODE_ENV`: Environment mode (development/production)

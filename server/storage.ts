@@ -15,10 +15,11 @@ interface StorageDocument {
 // Update Document type to use the imported one from schema.ts
 import {
   users, transactions, checklists, messages, clients, documents, contractors, contractorReviews,
-  propertyViewings, propertyFeedback, showingRequests, savedProperties,
+  propertyViewings, propertyFeedback, showingRequests, savedProperties, communications,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
   type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
   type ShowingRequest, type SavedProperty, type InsertSavedProperty,
+  type Communication, type InsertCommunication,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -61,6 +62,7 @@ export interface IStorage {
 
   // Other existing operations...
   sessionStore: session.Store;
+  getClient(id: number): Promise<Client | undefined>;
   getClientsByAgent(agentId: number): Promise<Client[]>;
   createClient(insertClient: InsertClient): Promise<Client>;
   updateClient(id: number, data: Partial<Client>): Promise<Client>;
@@ -127,6 +129,10 @@ export interface IStorage {
   createSavedProperty(property: InsertSavedProperty): Promise<SavedProperty>;
   updateSavedPropertyShowing(id: number, userId: number, showingRequested: boolean): Promise<void>;
   deleteSavedProperty(id: number, userId: number): Promise<void>;
+
+  // Communication operations
+  getCommunicationsByClient(clientId: number, agentId: number): Promise<Communication[]>;
+  createCommunication(comm: InsertCommunication): Promise<Communication>;
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -978,6 +984,43 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error in updateContact:', error);
       throw error;
+    }
+  }
+
+  async getClient(id: number): Promise<Client | undefined> {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          id, first_name as "firstName", last_name as "lastName",
+          email, phone, mobile_phone as "mobilePhone", address, street, city,
+          zip_code as "zipCode", type, status, notes, labels,
+          agent_id as "agentId", created_at as "createdAt", updated_at as "updatedAt"
+        FROM clients WHERE id = ${id} LIMIT 1
+      `);
+      if (result.rows.length === 0) return undefined;
+      const row = result.rows[0];
+      return {
+        id: Number(row.id),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        email: row.email ? String(row.email) : null,
+        phone: row.phone ? String(row.phone) : null,
+        mobilePhone: row.mobilePhone ? String(row.mobilePhone) : null,
+        address: row.address ? String(row.address) : null,
+        street: row.street ? String(row.street) : null,
+        city: row.city ? String(row.city) : null,
+        zipCode: row.zipCode ? String(row.zipCode) : null,
+        type: Array.isArray(row.type) ? row.type : [String(row.type).replace(/[{}]/g, '')],
+        status: String(row.status),
+        notes: row.notes ? String(row.notes) : null,
+        labels: Array.isArray(row.labels) ? row.labels : [],
+        agentId: Number(row.agentId),
+        createdAt: new Date(row.createdAt as string),
+        updatedAt: new Date(row.updatedAt as string),
+      };
+    } catch (error) {
+      console.error('Error in getClient:', error);
+      return undefined;
     }
   }
 
@@ -2474,6 +2517,61 @@ export class DatabaseStorage implements IStorage {
       console.error('Error in deleteSavedProperty:', error);
       throw error;
     }
+  }
+
+  async getCommunicationsByClient(clientId: number, agentId: number): Promise<Communication[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, client_id as "clientId", agent_id as "agentId", type, subject, content,
+               status, external_id as "externalId", created_at as "createdAt"
+        FROM communications
+        WHERE client_id = ${clientId} AND agent_id = ${agentId}
+        ORDER BY created_at DESC
+        LIMIT 50
+      `);
+      return result.rows.map(row => ({
+        id: Number(row.id),
+        clientId: Number(row.clientId),
+        agentId: Number(row.agentId),
+        type: String(row.type),
+        subject: row.subject ? String(row.subject) : null,
+        content: row.content ? String(row.content) : null,
+        status: String(row.status),
+        externalId: row.externalId ? String(row.externalId) : null,
+        createdAt: row.createdAt ? new Date(row.createdAt as string) : null,
+      }));
+    } catch (error) {
+      console.error('Error in getCommunicationsByClient:', error);
+      return [];
+    }
+  }
+
+  async createCommunication(comm: InsertCommunication): Promise<Communication> {
+    const [created] = await db
+      .insert(communications)
+      .values({
+        clientId: comm.clientId,
+        agentId: comm.agentId,
+        type: comm.type,
+        subject: comm.subject || null,
+        content: comm.content || null,
+        status: comm.status || "sent",
+        externalId: comm.externalId || null,
+        createdAt: new Date(),
+      })
+      .returning();
+    if (!created) throw new Error('Failed to create communication record');
+    return {
+      id: Number(created.id),
+      clientId: Number(created.clientId),
+      agentId: Number(created.agentId),
+      type: String(created.type),
+      subject: created.subject ? String(created.subject) : null,
+      content: created.content ? String(created.content) : null,
+      status: String(created.status),
+      externalId: created.externalId ? String(created.externalId) : null,
+      createdAt: created.createdAt ? new Date(created.createdAt) : null,
+    };
   }
 
   private mapTransactionRow(row: any): Transaction {

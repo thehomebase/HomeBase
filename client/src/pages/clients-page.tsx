@@ -24,7 +24,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check, Upload, FileSpreadsheet, Info, AlertTriangle } from "lucide-react";
+import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check, Upload, FileSpreadsheet, Info, AlertTriangle, MessageSquare } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -52,6 +52,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import ClientContactDialog from "@/components/client-contact-dialog";
 
 
 type SortConfig = {
@@ -203,12 +204,14 @@ const ClientDetailsPanel = ({
   client,
   isOpen,
   onClose,
-  onUpdate
+  onUpdate,
+  onContact
 }: {
   client: Client | null;
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (updatedClient: Client) => Promise<void>;
+  onContact?: (client: Client) => void;
 }) => {
   const [editingClient, setEditingClient] = useState<Client | null>(client);
   const { toast } = useToast();
@@ -289,6 +292,19 @@ const ClientDetailsPanel = ({
         <SheetHeader className="space-y-4">
           <SheetTitle>Client Details</SheetTitle>
         </SheetHeader>
+
+        {onContact && (
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => onContact(editingClient)}
+            >
+              <MessageSquare className="h-4 w-4" />
+              Contact {editingClient.firstName}
+            </Button>
+          </div>
+        )}
 
         <div className="space-y-6 mt-6">
           {/* Basic Information */}
@@ -775,6 +791,7 @@ export default function ClientsPage() {
   const [clientToDelete, setClientToDelete] = useState<number | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [labelFilterOpen, setLabelFilterOpen] = useState(false);
+  const [contactClient, setContactClient] = useState<Client | null>(null);
 
   const handleClientUpdate = async (updatedClient: Client) => {
     try {
@@ -1370,6 +1387,12 @@ export default function ClientsPage() {
         isOpen={!!selectedClient}
         onClose={() => setSelectedClient(null)}
         onUpdate={handleClientUpdate}
+        onContact={(client) => { setSelectedClient(null); setContactClient(client); }}
+      />
+      <ClientContactDialog
+        client={contactClient}
+        open={!!contactClient}
+        onOpenChange={(open) => { if (!open) setContactClient(null); }}
       />
       <AlertDialog open={clientToDelete !== null} onOpenChange={() => setClientToDelete(null)}>
         <AlertDialogContent>

@@ -3,11 +3,13 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema } from "@shared/schema";
 import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
+import { sendSMS, isTwilioConfigured } from "./twilio-service";
+import { sendEmail, isSendGridConfigured } from "./sendgrid-service";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -1916,6 +1918,132 @@ export function registerRoutes(app: Express): Server {
       cacheEntries: rentcastCache.size,
       resetDate: new Date(monthlyCallResetDate.getFullYear(), monthlyCallResetDate.getMonth() + 1, 1).toISOString()
     });
+  });
+
+  app.get("/api/communications/status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const [twilioReady, sendgridReady] = await Promise.all([
+        isTwilioConfigured(),
+        isSendGridConfigured(),
+      ]);
+      res.json({ twilio: twilioReady, sendgrid: sendgridReady });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check communication status" });
+    }
+  });
+
+  app.get("/api/communications/:clientId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const clientId = Number(req.params.clientId);
+      const client = await storage.getClient(clientId);
+      if (!client || client.agentId !== req.user.id) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      const comms = await storage.getCommunicationsByClient(clientId, req.user.id);
+      res.json(comms);
+    } catch (error) {
+      console.error("Error fetching communications:", error);
+      res.status(500).json({ error: "Failed to fetch communications" });
+    }
+  });
+
+  app.post("/api/communications/sms", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const schema = z.object({
+        clientId: z.number(),
+        content: z.string().min(1).max(1600),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
+      }
+      const { clientId, content } = parsed.data;
+
+      const client = await storage.getClient(clientId);
+      if (!client || client.agentId !== req.user.id) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      const phone = client.mobilePhone || client.phone;
+      if (!phone) {
+        return res.status(400).json({ error: "Client has no phone number on file" });
+      }
+
+      const result = await sendSMS(phone, content);
+
+      const comm = await storage.createCommunication({
+        clientId,
+        agentId: req.user.id,
+        type: "sms",
+        content,
+        status: result.success ? "sent" : "failed",
+        externalId: result.externalId || null,
+        subject: null,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error, communication: comm });
+      }
+
+      res.json(comm);
+    } catch (error) {
+      console.error("Error sending SMS:", error);
+      res.status(500).json({ error: "Failed to send SMS" });
+    }
+  });
+
+  app.post("/api/communications/email", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const schema = z.object({
+        clientId: z.number(),
+        subject: z.string().min(1),
+        content: z.string().min(1),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
+      }
+      const { clientId, subject, content } = parsed.data;
+
+      const client = await storage.getClient(clientId);
+      if (!client || client.agentId !== req.user.id) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      if (!client.email) {
+        return res.status(400).json({ error: "Client has no email address on file" });
+      }
+
+      const agentName = `${req.user.firstName} ${req.user.lastName}`;
+      const result = await sendEmail(client.email, subject, content, undefined, agentName);
+
+      const comm = await storage.createCommunication({
+        clientId,
+        agentId: req.user.id,
+        type: "email",
+        subject,
+        content,
+        status: result.success ? "sent" : "failed",
+        externalId: result.externalId || null,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error, communication: comm });
+      }
+
+      res.json(comm);
+    } catch (error) {
+      console.error("Error sending email:", error);
+      res.status(500).json({ error: "Failed to send email" });
+    }
   });
 
   // Simple ping endpoint for health checks
