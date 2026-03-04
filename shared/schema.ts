@@ -282,6 +282,26 @@ export const savedProperties = pgTable("saved_properties", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const communications = pgTable("communications", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  type: text("type").notNull(), // 'email', 'sms', 'call'
+  subject: text("subject"),
+  content: text("content"),
+  status: text("status").notNull().default("sent"),
+  externalId: text("external_id"), // ID from Twilio/SendGrid
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCommunicationSchema = createInsertSchema(communications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type Communication = typeof communications.$inferSelect;
+export type InsertCommunication = z.infer<typeof insertCommunicationSchema>;
+
 export const insertSavedPropertySchema = createInsertSchema(savedProperties).omit({
   id: true,
   createdAt: true,
