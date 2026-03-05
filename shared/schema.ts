@@ -389,6 +389,29 @@ export const emailTracking = pgTable("email_tracking", {
   openCount: integer("open_count").notNull().default(0),
 });
 
+export const cmaReports = pgTable("cma_reports", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  subjectAddress: text("subject_address").notNull(),
+  subjectCity: text("subject_city").notNull(),
+  subjectState: text("subject_state").notNull(),
+  subjectZip: text("subject_zip").notNull(),
+  subjectBeds: integer("subject_beds"),
+  subjectBaths: integer("subject_baths"),
+  subjectSqft: integer("subject_sqft"),
+  subjectPrice: integer("subject_price"),
+  subjectYearBuilt: integer("subject_year_built"),
+  comps: json("comps").notNull().default([]),
+  notes: text("notes"),
+  shareToken: text("share_token").notNull().unique(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertCmaReportSchema = createInsertSchema(cmaReports).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertEmailTrackingSchema = createInsertSchema(emailTracking).omit({
   id: true,
   sentAt: true,
@@ -433,3 +456,5 @@ export type EmailSnippet = typeof emailSnippets.$inferSelect;
 export type InsertEmailSnippet = z.infer<typeof insertEmailSnippetSchema>;
 export type EmailTracking = typeof emailTracking.$inferSelect;
 export type InsertEmailTracking = z.infer<typeof insertEmailTrackingSchema>;
+export type CmaReport = typeof cmaReports.$inferSelect;
+export type InsertCmaReport = z.infer<typeof insertCmaReportSchema>;

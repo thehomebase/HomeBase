@@ -34,6 +34,10 @@ import {
   Trash2,
   Moon,
   Sun,
+  AlertTriangle,
+  AlertCircle,
+  ChevronRight,
+  X,
 } from "lucide-react";
 import { NavTabs } from "@/components/ui/nav-tabs";
 import { KanbanBoard } from "@/components/kanban-board";
@@ -155,6 +159,46 @@ export default function TransactionsPage() {
     staleTime: 5 * 60 * 1000,
     retry: false, // Don't retry on failure
   });
+
+  interface AlertEvent {
+    id: string;
+    event: string;
+    date: string | null;
+    status: string;
+    riskLevel: "none" | "low" | "medium" | "high" | "critical";
+    message: string;
+    daysRemaining: number | null;
+    category: string;
+  }
+
+  interface TransactionAlert {
+    transactionId: number;
+    streetName: string;
+    alerts: AlertEvent[];
+  }
+
+  const { data: alertsData = [], isLoading: alertsLoading } = useQuery<TransactionAlert[]>({
+    queryKey: ["/api/alerts"],
+    queryFn: async () => {
+      try {
+        if (!user || user.role !== "agent") return [];
+        const response = await apiRequest("GET", "/api/alerts");
+        return response.json();
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!user && user.role === "agent",
+    staleTime: 2 * 60 * 1000,
+    retry: false,
+  });
+
+  const [alertsDismissed, setAlertsDismissed] = useState(false);
+
+  const totalAlerts = alertsData.reduce((sum, t) => sum + t.alerts.length, 0);
+  const criticalCount = alertsData.reduce((sum, t) => sum + t.alerts.filter(a => a.riskLevel === "critical").length, 0);
+  const highCount = alertsData.reduce((sum, t) => sum + t.alerts.filter(a => a.riskLevel === "high").length, 0);
+  const mediumCount = alertsData.reduce((sum, t) => sum + t.alerts.filter(a => a.riskLevel === "medium").length, 0);
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: z.infer<typeof createTransactionSchema>) => {
@@ -517,6 +561,72 @@ export default function TransactionsPage() {
           </div>
         </div>
         
+        {user?.role === "agent" && !alertsDismissed && totalAlerts > 0 && (
+          <div className="w-full mt-4">
+            <div className={cn(
+              "rounded-lg border p-4",
+              criticalCount > 0 ? "border-red-500/50 bg-red-50 dark:bg-red-950/20" :
+              highCount > 0 ? "border-orange-500/50 bg-orange-50 dark:bg-orange-950/20" :
+              "border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20"
+            )}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  {criticalCount > 0 ? (
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  ) : (
+                    <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                  )}
+                  <span className="font-semibold text-sm">
+                    {totalAlerts} alert{totalAlerts !== 1 ? "s" : ""} across {alertsData.length} transaction{alertsData.length !== 1 ? "s" : ""}
+                  </span>
+                  <div className="flex gap-1.5 ml-2">
+                    {criticalCount > 0 && (
+                      <span className="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
+                        {criticalCount} overdue
+                      </span>
+                    )}
+                    {highCount > 0 && (
+                      <span className="inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-900/40 px-2 py-0.5 text-xs font-medium text-orange-700 dark:text-orange-300">
+                        {highCount} urgent
+                      </span>
+                    )}
+                    {mediumCount > 0 && (
+                      <span className="inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/40 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:text-yellow-300">
+                        {mediumCount} approaching
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => setAlertsDismissed(true)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {alertsData.map((txAlert) => (
+                  <div
+                    key={txAlert.transactionId}
+                    className="flex items-center justify-between rounded-md bg-background/60 px-3 py-2 cursor-pointer hover:bg-background/80 transition-colors"
+                    onClick={() => setLocation(`/transactions/${txAlert.transactionId}`)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-sm">{txAlert.streetName}</span>
+                      <span className="text-muted-foreground text-xs ml-2">
+                        {txAlert.alerts.length} alert{txAlert.alerts.length !== 1 ? "s" : ""}:
+                        {" "}{txAlert.alerts.map(a => a.message).join("; ")}
+                      </span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
 

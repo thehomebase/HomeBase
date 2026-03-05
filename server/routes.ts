@@ -2542,6 +2542,161 @@ export function registerRoutes(app: Express): Server {
     res.json(tracking);
   });
 
+  // Transaction Timeline & Risk Alerts
+  app.get("/api/transactions/:id/timeline", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      const transactionId = parseInt(req.params.id);
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) return res.sendStatus(404);
+      const isAgent = transaction.agentId === req.user.id;
+      const isClient = req.user.clientRecordId && (
+        transaction.clientId === req.user.clientRecordId ||
+        transaction.secondaryClientId === req.user.clientRecordId
+      );
+      const isParticipant = Array.isArray(transaction.participants) &&
+        transaction.participants.some((p: any) => p.userId === req.user!.id);
+      if (!isAgent && !isClient && !isParticipant) return res.sendStatus(403);
+      const { generateTransactionTimeline } = await import("./timeline-service");
+      const timeline = await generateTransactionTimeline(transactionId);
+      res.json(timeline);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/alerts", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const { generateAgentAlerts } = await import("./timeline-service");
+      const alerts = await generateAgentAlerts(req.user.id);
+      res.json(alerts);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Client Portal - My Transaction
+  app.get("/api/client/my-transaction", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      let transaction = null;
+      if (req.user.claimedTransactionId) {
+        transaction = await storage.getTransaction(req.user.claimedTransactionId);
+      }
+      if (!transaction && req.user.clientRecordId) {
+        const allTransactions = await storage.getTransactionsByUser(req.user.agentId || 0);
+        transaction = allTransactions.find(t =>
+          t.clientId === req.user!.clientRecordId || t.secondaryClientId === req.user!.clientRecordId
+        );
+      }
+      if (!transaction) {
+        return res.json(null);
+      }
+      const documents = await storage.getDocumentsByTransaction(transaction.id);
+      let checklist = await storage.getChecklist(transaction.id, "buyer");
+      if (!checklist) {
+        checklist = await storage.getChecklist(transaction.id, "seller");
+      }
+      const { generateTransactionTimeline } = await import("./timeline-service");
+      let timeline = null;
+      try {
+        timeline = await generateTransactionTimeline(transaction.id);
+      } catch (e) {}
+      res.json({ transaction, documents, checklist, timeline });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // CMA Reports
+  app.get("/api/cma", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const reports = await storage.getCmaReportsByAgent(req.user.id);
+      res.json(reports);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/cma", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const { subjectAddress, subjectCity, subjectState, subjectZip } = req.body;
+      if (!subjectAddress || !subjectCity || !subjectState || !subjectZip) {
+        return res.status(400).json({ error: "Subject property address, city, state, and zip are required" });
+      }
+      const crypto = await import("crypto");
+      const shareToken = crypto.randomBytes(16).toString("hex");
+      const report = await storage.createCmaReport({
+        ...req.body,
+        agentId: req.user.id,
+        shareToken,
+      });
+      res.json(report);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/cma/share/:shareToken", async (req, res) => {
+    try {
+      const report = await storage.getCmaReportByShareToken(req.params.shareToken);
+      if (!report) return res.sendStatus(404);
+      const agent = await storage.getUser(report.agentId);
+      res.json({
+        report,
+        agent: agent ? { firstName: agent.firstName, lastName: agent.lastName, email: agent.email } : null,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/cma/:id", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      const report = await storage.getCmaReport(parseInt(req.params.id));
+      if (!report) return res.sendStatus(404);
+      if (report.agentId !== req.user.id) return res.sendStatus(403);
+      res.json(report);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/cma/:id", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const report = await storage.getCmaReport(parseInt(req.params.id));
+      if (!report) return res.sendStatus(404);
+      if (report.agentId !== req.user.id) return res.sendStatus(403);
+      const updated = await storage.updateCmaReport(parseInt(req.params.id), req.body);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/cma/:id", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const report = await storage.getCmaReport(parseInt(req.params.id));
+      if (!report) return res.sendStatus(404);
+      if (report.agentId !== req.user.id) return res.sendStatus(403);
+      await storage.deleteCmaReport(parseInt(req.params.id));
+      res.sendStatus(204);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Simple ping endpoint for health checks
   app.get("/ping", (req, res) => {
     res.json({ 

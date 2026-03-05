@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -12,6 +12,7 @@ import { ProgressChecklist } from "@/components/progress-checklist";
 import { DocumentChecklist } from "@/components/document-checklist";
 import { TransactionContacts } from "@/components/transaction-contacts";
 import { ContractUpload } from "@/components/contract-upload";
+import { TransactionTimeline } from "@/components/transaction-timeline";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -313,6 +314,10 @@ export default function TransactionPage() {
             <UserPlus className="h-4 w-4 mr-2" />
             Contacts
           </TabsTrigger>
+          <TabsTrigger value="timeline">
+            <Clock className="h-4 w-4 mr-2" />
+            Timeline
+          </TabsTrigger>
           <TabsTrigger value="contract-upload">
             <Upload className="h-4 w-4 mr-2" />
             Contract Upload
@@ -329,6 +334,10 @@ export default function TransactionPage() {
 
         <TabsContent value="contacts">
           <TransactionContacts transactionId={parsedId} />
+        </TabsContent>
+
+        <TabsContent value="timeline">
+          <TransactionTimeline transactionId={parsedId} />
         </TabsContent>
 
         <TabsContent value="contract-upload">
