@@ -329,6 +329,7 @@ export default function MailPage() {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [compose, setCompose] = useState<ComposeState>(emptyCompose);
   const [showCc, setShowCc] = useState(false);
+  const [quotedHtml, setQuotedHtml] = useState("");
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pages, setPages] = useState<{ token: string | undefined }[]>([
@@ -449,16 +450,18 @@ export default function MailPage() {
   function resetCompose() {
     setCompose(emptyCompose);
     setShowCc(false);
+    setQuotedHtml("");
     setAttachments([]);
     editor?.commands.clearContent();
   }
 
-  function openCompose(initial?: { to?: string; cc?: string; subject?: string; body?: string }) {
+  function openCompose(initial?: { to?: string; cc?: string; subject?: string; quoted?: string }) {
     setCompose({ to: initial?.to || "", cc: initial?.cc || "", subject: initial?.subject || "" });
     setShowCc(!!(initial?.cc));
+    setQuotedHtml(initial?.quoted || "");
     setAttachments([]);
     setTimeout(() => {
-      editor?.commands.setContent(initial?.body ? `<p></p>${initial.body}` : "<p></p>");
+      editor?.commands.setContent("<p></p>");
       editor?.commands.focus("start");
     }, 50);
     setViewMode("compose");
@@ -477,30 +480,35 @@ export default function MailPage() {
   function handleReply(msg: GmailMessageDetail) {
     const fromEmail = msg.from?.match(/<([^>]+)>/)?.[1] || msg.from;
     const reSubject = msg.subject?.startsWith("Re:") ? msg.subject : `Re: ${msg.subject}`;
-    const quoted = `<br><br><div style="border-left: 2px solid #ccc; padding-left: 12px; margin-left: 4px; color: #666;">` +
+    const quoted = `<div style="border-left: 2px solid #ccc; padding-left: 12px; margin-left: 4px; color: #666;">` +
       `<p style="margin: 0 0 4px;"><strong>On ${msg.date}, ${msg.from} wrote:</strong></p>` +
       `${msg.body}</div>`;
-    openCompose({ to: fromEmail, subject: reSubject, body: quoted });
+    openCompose({ to: fromEmail, subject: reSubject, quoted });
   }
 
   function handleForward(msg: GmailMessageDetail) {
     const fwdSubject = msg.subject?.startsWith("Fwd:") ? msg.subject : `Fwd: ${msg.subject}`;
-    const fwdBody = `<br><br><div style="border-left: 2px solid #ccc; padding-left: 12px; margin-left: 4px; color: #666;">` +
+    const quoted = `<div style="border-left: 2px solid #ccc; padding-left: 12px; margin-left: 4px; color: #666;">` +
       `<p style="margin: 0 0 4px;"><strong>---------- Forwarded message ----------</strong></p>` +
       `<p style="margin: 0;">From: ${msg.from}<br>To: ${msg.to}<br>Date: ${msg.date}<br>Subject: ${msg.subject}</p>` +
       `<br>${msg.body}</div>`;
-    openCompose({ subject: fwdSubject, body: fwdBody });
+    openCompose({ subject: fwdSubject, quoted });
   }
 
   function handleSend() {
     const editorHtml = editor?.getHTML() || "";
-    if (!compose.to || !compose.subject || !editorHtml.replace(/<[^>]*>/g, "").trim()) {
+    const hasEditorContent = !!editorHtml.replace(/<[^>]*>/g, "").trim();
+    const hasQuotedContent = !!quotedHtml;
+    if (!compose.to || !compose.subject || (!hasEditorContent && !hasQuotedContent)) {
       toast({ title: "Please fill in To, Subject, and Body", variant: "destructive" });
       return;
     }
     let fullBody = editorHtml;
     if (signature) {
       fullBody += `<br><br><div>--<br>${signature}</div>`;
+    }
+    if (quotedHtml) {
+      fullBody += `<br><br>${quotedHtml}`;
     }
     const formData = new FormData();
     formData.append("to", compose.to.trim());
@@ -666,21 +674,40 @@ export default function MailPage() {
               <EditorContent editor={editor} />
             </div>
 
-            {signature && (
-              <div className="px-4 py-3 border-b bg-muted/10">
-                <p className="text-xs text-muted-foreground mb-2">Your signature will be included:</p>
-                <div className="border-t pt-2 text-sm text-muted-foreground">
-                  <p className="mb-1">--</p>
-                  <div
-                    dangerouslySetInnerHTML={{
-                      __html: DOMPurify.sanitize(signature, {
-                        USE_PROFILES: { html: true },
-                        ADD_TAGS: ["img"],
-                        ADD_ATTR: ["src", "alt", "width", "height", "style", "target", "href"],
-                      }),
-                    }}
-                  />
-                </div>
+            {(signature || quotedHtml) && (
+              <div className="px-4 py-3 border-b bg-muted/10 space-y-3">
+                {signature && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Your signature will be included:</p>
+                    <div className="border-t pt-2 text-sm text-muted-foreground">
+                      <p className="mb-1">--</p>
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: DOMPurify.sanitize(signature, {
+                            USE_PROFILES: { html: true },
+                            ADD_TAGS: ["img"],
+                            ADD_ATTR: ["src", "alt", "width", "height", "style", "target", "href"],
+                          }),
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+                {quotedHtml && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Previous messages:</p>
+                    <div
+                      className="text-sm overflow-auto max-h-[300px]"
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(quotedHtml, {
+                          USE_PROFILES: { html: true },
+                          ADD_TAGS: ["img"],
+                          ADD_ATTR: ["src", "alt", "width", "height", "style", "target", "href"],
+                        }),
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
