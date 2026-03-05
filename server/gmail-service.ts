@@ -184,6 +184,139 @@ export async function sendGmailEmail(
   }
 }
 
+export async function getGmailInbox(
+  userId: number,
+  options: { maxResults?: number; pageToken?: string; query?: string; label?: string } = {}
+): Promise<{ messages: any[]; nextPageToken?: string; resultSizeEstimate?: number; error?: string }> {
+  try {
+    const auth = await getAuthenticatedClient(userId);
+    if (!auth) {
+      return { messages: [], error: "Gmail not connected" };
+    }
+
+    const gmail = google.gmail({ version: "v1", auth: auth.client });
+    const { maxResults = 25, pageToken, query, label } = options;
+
+    const listParams: any = {
+      userId: "me",
+      maxResults,
+    };
+    if (pageToken) listParams.pageToken = pageToken;
+    if (query) listParams.q = query;
+    if (label) {
+      listParams.labelIds = [label];
+    }
+
+    const listResult = await gmail.users.messages.list(listParams);
+
+    if (!listResult.data.messages || listResult.data.messages.length === 0) {
+      return { messages: [], resultSizeEstimate: 0 };
+    }
+
+    const messages = await Promise.all(
+      listResult.data.messages.map(async (msg) => {
+        const detail = await gmail.users.messages.get({
+          userId: "me",
+          id: msg.id!,
+          format: "metadata",
+          metadataHeaders: ["From", "To", "Subject", "Date"],
+        });
+
+        const headers = detail.data.payload?.headers || [];
+        const getHeader = (name: string) =>
+          headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value || "";
+
+        return {
+          id: detail.data.id,
+          threadId: detail.data.threadId,
+          from: getHeader("From"),
+          to: getHeader("To"),
+          subject: getHeader("Subject"),
+          date: getHeader("Date"),
+          snippet: detail.data.snippet || "",
+          labelIds: detail.data.labelIds || [],
+          isUnread: (detail.data.labelIds || []).includes("UNREAD"),
+        };
+      })
+    );
+
+    return {
+      messages,
+      nextPageToken: listResult.data.nextPageToken || undefined,
+      resultSizeEstimate: listResult.data.resultSizeEstimate || undefined,
+    };
+  } catch (error: any) {
+    console.error("Gmail inbox fetch error:", error);
+    return { messages: [], error: error.message || "Failed to fetch inbox" };
+  }
+}
+
+export async function getGmailMessageDetail(
+  userId: number,
+  messageId: string
+): Promise<{ message: any | null; error?: string }> {
+  try {
+    const auth = await getAuthenticatedClient(userId);
+    if (!auth) {
+      return { message: null, error: "Gmail not connected" };
+    }
+
+    const gmail = google.gmail({ version: "v1", auth: auth.client });
+
+    const detail = await gmail.users.messages.get({
+      userId: "me",
+      id: messageId,
+      format: "full",
+    });
+
+    const headers = detail.data.payload?.headers || [];
+    const getHeader = (name: string) =>
+      headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value || "";
+
+    function extractBody(payload: any): { html: string; text: string } {
+      let html = "";
+      let text = "";
+
+      if (payload.mimeType === "text/html" && payload.body?.data) {
+        html = Buffer.from(payload.body.data, "base64url").toString("utf-8");
+      } else if (payload.mimeType === "text/plain" && payload.body?.data) {
+        text = Buffer.from(payload.body.data, "base64url").toString("utf-8");
+      }
+
+      if (payload.parts) {
+        for (const part of payload.parts) {
+          const sub = extractBody(part);
+          if (sub.html) html = sub.html;
+          if (sub.text && !text) text = sub.text;
+        }
+      }
+
+      return { html, text };
+    }
+
+    const { html, text } = extractBody(detail.data.payload);
+
+    return {
+      message: {
+        id: detail.data.id,
+        threadId: detail.data.threadId,
+        from: getHeader("From"),
+        to: getHeader("To"),
+        cc: getHeader("Cc"),
+        subject: getHeader("Subject"),
+        date: getHeader("Date"),
+        snippet: detail.data.snippet || "",
+        labelIds: detail.data.labelIds || [],
+        body: html || text.replace(/\n/g, "<br>"),
+        isHtml: !!html,
+      },
+    };
+  } catch (error: any) {
+    console.error("Gmail message detail error:", error);
+    return { message: null, error: error.message || "Failed to fetch message" };
+  }
+}
+
 export async function getGmailMessages(
   userId: number,
   clientEmail: string,

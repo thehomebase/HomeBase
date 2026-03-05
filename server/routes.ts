@@ -9,7 +9,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
-import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages } from "./gmail-service";
+import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail } from "./gmail-service";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -2110,6 +2110,40 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error("Error fetching Gmail messages:", error);
       res.status(500).json({ error: error.message || "Failed to fetch messages" });
+    }
+  });
+
+  app.get("/api/gmail/inbox", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const { pageToken, q, label, maxResults } = req.query;
+      const parsedMax = maxResults ? Math.min(Number(maxResults), 50) : 25;
+      const result = await getGmailInbox(req.user.id, {
+        pageToken: pageToken as string | undefined,
+        query: q as string | undefined,
+        label: label as string | undefined,
+        maxResults: parsedMax,
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching Gmail inbox:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch inbox" });
+    }
+  });
+
+  app.get("/api/gmail/message/:messageId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const result = await getGmailMessageDetail(req.user.id, req.params.messageId);
+      if (!result.message) {
+        return res.status(404).json({ error: result.error || "Message not found" });
+      }
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching Gmail message detail:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch message" });
     }
   });
 

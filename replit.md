@@ -126,6 +126,7 @@ Preferred communication style: Simple, everyday language.
   - `GET /api/gmail/messages/:clientId` — fetch Gmail conversation history with a client
 - **Gmail OAuth Flow**: Agent clicks "Connect Gmail" → redirected to Google consent → tokens stored → emails sent from agent's own address
 - **Frontend**: Contact dialog with SMS, Email (Gmail), and History tabs. History shows both platform activity logs and real Gmail conversation threads.
+- **Mail Page**: Dedicated sidebar page (`/mail`) showing agent's full Gmail inbox with pagination (25 per page), search, sent/received filters, and click-to-read full email content. Uses DOMPurify for safe HTML rendering. API: `GET /api/gmail/inbox` (paginated list), `GET /api/gmail/message/:messageId` (full message detail with HTML body).
 - **Privacy**: SMS delivery handled by platform Twilio account. Emails sent through agent's own Gmail — platform only stores metadata logs, not message content.
 
 ### Environment Variables Required
