@@ -1,0 +1,53 @@
+To retrieve properties that have sold (i.e., those with a recorded sale in public records, often indicated by a non-null lastSalePrice, lastSaleDate, and/or entries in the saleHistory array), use the RentCast /properties endpoint (GET /properties). This endpoint pulls from property records, which include historical sale data, and supports filtering for recently sold ones via the saleDateRange parameter.
+There is no direct "status=sold" filter like you might see in active listings endpoints (e.g., /listings/sale uses status for active/inactive listings). Instead, sold status is inferred from the presence of sale history data, and you filter by recency using saleDateRange.
+Key Endpoint
+
+URL: https://api.rentcast.io/v1/properties
+Method: GET
+Authentication: Include your API key in the header: X-Api-Key: YOUR_API_KEY
+
+Main Parameter for Sold Properties: saleDateRange
+
+Description: Filters properties based on days since last sold (minimum 1 day). It looks for properties where the lastSaleDate falls within the specified window from today.
+Type/Format:
+Single value: e.g., 180 → properties sold in the last 180 days (≈6 months).
+Range (min-max): e.g., 90:365 → sold between 90 and 365 days ago.
+(Updated in 2025 releases to support colon-separated min:max.)
+
+Use case: This is the primary way to get "recently sold" or "sold" comps/address lists.
+
+Combine with Location Filters (Required for Meaningful Results)
+You must provide at least one location parameter to avoid overly broad queries:
+
+address: Full street address (e.g., "123 Main St, Austin, TX") — but for sold comps, better to use area searches.
+city, state, zipCode: e.g., city=Austin&state=TX&zipCode=78701
+Or geographic: latitude, longitude, radius (in miles) for a circular area search.
+
+Other Useful Filters to Refine Sold Results
+
+propertyType: e.g., Single Family|Condo (pipe-separated for multiple).
+bedrooms, bathrooms, squareFeet (min:max ranges supported, e.g., bedrooms:3:5).
+price (but this is for assessed/estimated value; sold price is in response fields).
+Pagination: limit (max results per page, e.g., 50), offset.
+
+Example API Calls for Sold Properties
+
+Recently sold in the last 6 months in a zip code (common for comps):textGET https://api.rentcast.io/v1/properties?zipCode=90210&saleDateRange=180&limit=20
+Sold in the last 90–180 days in a city/state:textGET https://api.rentcast.io/v1/properties?city=Beverly Hills&state=CA&saleDateRange=90:180&propertyType=Single Family&bedrooms=3:5
+Around a specific address (e.g., for comps near a subject property):textGET https://api.rentcast.io/v1/properties?address=123 Main St, Austin, TX&saleDateRange=365&radius=5(This finds sold properties within 5 miles that sold in the last year.)
+
+What the Response Looks Like for Sold Properties
+Each returned property object includes:
+
+lastSalePrice: The most recent sold price (e.g., 750000).
+lastSaleDate: ISO date of last sale (e.g., "2025-11-15T00:00:00.000Z").
+saleHistory: Array of past transactions with dates and prices.
+Other fields: address, bedrooms, bathrooms, squareFeet, propertyType, etc.
+
+If no recent sale exists, lastSalePrice/lastSaleDate may be null or absent — so filter via saleDateRange ensures you get only those with recent sold status.
+Alternative/Related Endpoints
+
+For valuation-based sold comps: Use the AVM endpoint (/avm) or /valuation — pass an address, and the response includes a comparables array with recently sold properties (their sold prices, dates, etc.) used in the estimate. No direct saleDateRange, but comps are typically recent sold.
+Active for-sale listings (not sold) use /listings/sale with status=active (or inactive), but that's listings, not completed sales.
+
+For full/current details (parameters can evolve), check the official docs at https://developers.rentcast.io/reference/property-records (especially the search queries section). Test with their free tier/sandbox if available. If you're building comp tools, combining /properties with saleDateRange + location is the go-to for sold addresses.

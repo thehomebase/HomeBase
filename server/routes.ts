@@ -1916,6 +1916,96 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/rentcast/sold", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    const { city, state, zipCode, bedroomsMin, saleDateRange, limit } = req.query;
+
+    if (!city && !zipCode) {
+      return res.status(400).json({ error: "Please provide a city or ZIP code" });
+    }
+
+    const params = new URLSearchParams();
+    if (city) params.set("city", String(city));
+    if (state) params.set("state", String(state));
+    if (zipCode) params.set("zipCode", String(zipCode));
+    if (bedroomsMin) params.set("bedrooms", String(bedroomsMin));
+    params.set("saleDateRange", String(saleDateRange || "365"));
+    const parsedLimit = Math.min(Math.max(parseInt(String(limit)) || 50, 1), 500);
+    params.set("limit", String(parsedLimit));
+
+    const cacheKey = "sold_" + params.toString();
+    const forceRefresh = req.query.refresh === "true";
+
+    const cached = rentcastCache.get(cacheKey);
+    if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return res.json({ listings: cached.data, fromCache: true, apiCallsUsed: monthlyCallCount, apiCallsLimit: MONTHLY_LIMIT });
+    }
+
+    resetMonthlyCounterIfNeeded();
+    if (monthlyCallCount >= MONTHLY_LIMIT) {
+      return res.status(429).json({
+        error: `Monthly API limit reached (${MONTHLY_LIMIT} calls). Resets next month.`,
+        apiCallsUsed: monthlyCallCount,
+        apiCallsLimit: MONTHLY_LIMIT
+      });
+    }
+
+    try {
+      const apiKey = process.env.RENTCAST_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "RentCast API key not configured" });
+      }
+
+      const url = `https://api.rentcast.io/v1/properties?${params.toString()}`;
+      console.log(`RentCast API call #${monthlyCallCount + 1} (sold): ${url}`);
+
+      const response = await fetch(url, {
+        headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("RentCast sold API error:", response.status, errorText);
+        return res.status(response.status).json({ error: `RentCast API error: ${response.statusText}` });
+      }
+
+      const data = await response.json();
+      monthlyCallCount++;
+      console.log(`RentCast sold returned ${Array.isArray(data) ? data.length : 'non-array'} properties`);
+
+      const normalized = (Array.isArray(data) ? data : []).filter((p: any) => p.lastSalePrice).map((p: any) => ({
+        id: p.id || `sold-${p.addressLine1}-${p.lastSaleDate}`,
+        formattedAddress: p.formattedAddress || `${p.addressLine1 || ""}, ${p.city || ""}, ${p.state || ""} ${p.zipCode || ""}`.trim(),
+        addressLine1: p.addressLine1 || "",
+        city: p.city || "",
+        state: p.state || "",
+        zipCode: p.zipCode || "",
+        price: p.lastSalePrice,
+        bedrooms: p.bedrooms || 0,
+        bathrooms: p.bathrooms || 0,
+        squareFootage: p.squareFootage || 0,
+        propertyType: p.propertyType || "",
+        yearBuilt: p.yearBuilt || null,
+        daysOnMarket: 0,
+        status: "Sold",
+        latitude: p.latitude || 0,
+        longitude: p.longitude || 0,
+        lotSize: p.lotSize || null,
+        features: p.features || [],
+        lastSaleDate: p.lastSaleDate || null,
+        lastSalePrice: p.lastSalePrice || null,
+      }));
+
+      rentcastCache.set(cacheKey, { data: normalized, timestamp: Date.now() });
+
+      res.json({ listings: normalized, fromCache: false, apiCallsUsed: monthlyCallCount, apiCallsLimit: MONTHLY_LIMIT });
+    } catch (error) {
+      console.error("RentCast sold API fetch error:", error);
+      res.status(500).json({ error: "Failed to fetch sold properties from RentCast" });
+    }
+  });
+
   app.get("/api/rentcast/property", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 

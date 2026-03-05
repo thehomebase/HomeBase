@@ -36,6 +36,8 @@ interface RentCastListing {
   longitude: number;
   lotSize?: number;
   features?: string[];
+  lastSaleDate?: string;
+  lastSalePrice?: number;
 }
 
 interface CompData {
@@ -302,7 +304,7 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
   }>({
     queryKey: ["/api/rentcast/listings", searchParams],
     queryFn: async () => {
-      if (!searchParams) return { listings: [], fromCache: false };
+      if (!searchParams || searchParams.__soldOnly) return { listings: [], fromCache: false };
       const params = new URLSearchParams(searchParams);
       const res = await apiRequest("GET", `/api/rentcast/listings?${params.toString()}`);
       return res.json();
@@ -462,28 +464,44 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
     baseParams.limit = "100";
 
     const activeStatuses = Array.from(searchStatuses);
-    const firstStatus = activeStatuses[0] || "Active";
-    setSearchParams({ ...baseParams, status: firstStatus });
+    const listingStatuses = activeStatuses.filter(s => s !== "Sold");
+    const hasSold = activeStatuses.includes("Sold");
+
+    if (listingStatuses.length > 0) {
+      setSearchParams({ ...baseParams, status: listingStatuses[0] });
+    } else {
+      setSearchParams({ __soldOnly: "true" });
+    }
     setSelectedListingIds(new Set());
     setExtraListings([]);
 
-    if (activeStatuses.length > 1) {
-      const additionalStatuses = activeStatuses.slice(1);
-      additionalStatuses.forEach(status => {
+    const fetchExtra = (url: string) => {
+      fetch(url, { credentials: "include" })
+        .then(r => r.json())
+        .then(data => {
+          if (data.listings?.length > 0) {
+            setExtraListings(prev => {
+              const existingIds = new Set(prev.map(l => l.id));
+              const newOnes = data.listings.filter((l: RentCastListing) => !existingIds.has(l.id));
+              return [...prev, ...newOnes];
+            });
+          }
+        })
+        .catch(() => {});
+    };
+
+    if (listingStatuses.length > 1) {
+      listingStatuses.slice(1).forEach(status => {
         const params = new URLSearchParams({ ...baseParams, status });
-        fetch(`/api/rentcast/listings?${params.toString()}`, { credentials: "include" })
-          .then(r => r.json())
-          .then(data => {
-            if (data.listings?.length > 0) {
-              setExtraListings(prev => {
-                const existingIds = new Set(prev.map(l => l.id));
-                const newOnes = data.listings.filter((l: RentCastListing) => !existingIds.has(l.id));
-                return [...prev, ...newOnes];
-              });
-            }
-          })
-          .catch(() => {});
+        fetchExtra(`/api/rentcast/listings?${params.toString()}`);
       });
+    }
+
+    if (hasSold) {
+      const soldParams = new URLSearchParams(baseParams);
+      soldParams.delete("status");
+      soldParams.set("saleDateRange", "365");
+      fetchExtra(`/api/rentcast/sold?${soldParams.toString()}`);
     }
   };
 
@@ -756,7 +774,7 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
                 {[
                   { label: "Active", value: "Active" },
                   { label: "Pending", value: "Pending" },
-                  { label: "Sold", value: "Closed" },
+                  { label: "Sold", value: "Sold" },
                 ].map(({ label, value }) => (
                   <label key={value} className="flex items-center gap-1.5 text-sm cursor-pointer">
                     <Checkbox
@@ -1035,7 +1053,7 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
                           <td className="px-2 py-2 font-medium truncate">{listing.formattedAddress || listing.addressLine1}</td>
                           <td className="px-2 py-2 text-center">
                             <Badge variant={listing.status === "Active" ? "default" : listing.status === "Pending" ? "secondary" : "outline"} className="text-xs px-1.5 py-0">
-                              {listing.status === "Closed" ? "Sold" : listing.status}
+                              {listing.status}
                             </Badge>
                           </td>
                           <td className="px-2 py-2 text-right font-semibold text-primary">{formatPrice(listing.price)}</td>
@@ -1044,7 +1062,11 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
                           <td className="px-2 py-2 text-right">{listing.squareFootage > 0 ? listing.squareFootage.toLocaleString() : "—"}</td>
                           <td className="px-2 py-2 text-right">{pricePerSqft > 0 ? `$${pricePerSqft}` : "—"}</td>
                           <td className="px-2 py-2 text-center">{listing.yearBuilt || "—"}</td>
-                          <td className="px-2 py-2 text-center">{listing.daysOnMarket}</td>
+                          <td className="px-2 py-2 text-center">
+                            {listing.status === "Sold" && listing.lastSaleDate
+                              ? new Date(listing.lastSaleDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                              : listing.daysOnMarket || "—"}
+                          </td>
                           <td className="px-2 py-2 text-right">{listing.lotSize ? (listing.lotSize / 43560).toFixed(2) : "—"}</td>
                           <td className="px-2 py-2 text-center">
                             {hasPool(listing)
