@@ -542,7 +542,8 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                 <select
                   value={filterPropertyType}
                   onChange={e => setFilterPropertyType(e.target.value)}
-                  className="h-9 rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="h-9 rounded-md border border-input bg-background text-foreground px-3 pr-8 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
                 >
                   <option value="all">All Types</option>
                   <option value="Single Family">Single Family</option>
