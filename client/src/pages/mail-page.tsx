@@ -414,7 +414,7 @@ export default function MailPage() {
       if (!res.ok) throw new Error("Failed to fetch tracking data");
       return res.json();
     },
-    enabled: !!gmailConnected && viewMode === "tracking",
+    enabled: !!gmailConnected,
     staleTime: 30 * 1000,
   });
 
@@ -1244,6 +1244,11 @@ export default function MailPage() {
               const isToday = new Date().toDateString() === msgDate.toDateString();
               const isThisYear = new Date().getFullYear() === msgDate.getFullYear();
 
+              const trackingRecord = isFromAgent
+                ? (trackingQuery.data || []).find((t) => t.gmailMessageId === msg.id)
+                : undefined;
+              const wasOpened = trackingRecord && trackingRecord.openCount > 0;
+
               return (
                 <div key={msg.id} onClick={() => openDetail(msg.id)}
                   className={`flex items-start gap-3 p-3 hover:bg-muted/50 border-b last:border-b-0 cursor-pointer transition-colors ${
@@ -1251,7 +1256,11 @@ export default function MailPage() {
                   }`}>
                   <div className="mt-1">
                     {isFromAgent ? (
-                      <Send className="h-4 w-4 text-blue-500" />
+                      wasOpened ? (
+                        <Eye className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Send className="h-4 w-4 text-blue-500" />
+                      )
                     ) : (
                       <Inbox className="h-4 w-4 text-purple-500" />
                     )}
