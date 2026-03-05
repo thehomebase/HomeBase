@@ -487,83 +487,95 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
           </TabsContent>
 
           <TabsContent value="history" className="mt-4">
-            {gmailConnected && gmailMessages?.messages && gmailMessages.messages.length > 0 && (
-              <div className="space-y-3 mb-4">
-                <h4 className="text-sm font-medium text-muted-foreground">Gmail Conversations</h4>
-                <div className="space-y-2 max-h-[250px] overflow-y-auto">
-                  {gmailMessages.messages.map((msg: any) => {
-                    const isFromAgent = msg.from?.includes(gmailEmail || "");
-                    return (
-                      <div key={msg.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                        <div className="mt-0.5">
-                          <Mail className={`h-4 w-4 ${isFromAgent ? "text-blue-600" : "text-purple-600"}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant="outline" className="text-xs">
-                              {isFromAgent ? "SENT" : "RECEIVED"}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground ml-auto">
-                              {msg.date ? format(new Date(msg.date), "MMM d, h:mm a") : ""}
-                            </span>
-                          </div>
-                          {msg.subject && (
-                            <p className="text-sm font-medium truncate">{msg.subject}</p>
-                          )}
-                          <p className="text-sm text-muted-foreground line-clamp-2">{msg.snippet}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {(() => {
+              const items: Array<{
+                id: string;
+                type: "email" | "sms";
+                direction: "sent" | "received" | "failed";
+                subject?: string;
+                preview?: string;
+                date: Date;
+              }> = [];
 
-            <h4 className="text-sm font-medium text-muted-foreground mb-3">Platform Activity</h4>
-            {history.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Clock className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                <p className="text-sm">No communication history yet</p>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                {history.map((comm) => (
-                  <div key={comm.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                    <div className="mt-0.5">
-                      {comm.type === "sms" ? (
-                        <MessageSquare className="h-4 w-4 text-blue-600" />
-                      ) : (
-                        <Mail className="h-4 w-4 text-purple-600" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="outline" className="text-xs">
-                          {comm.type.toUpperCase()}
-                        </Badge>
-                        <Badge
-                          variant={comm.status === "sent" ? "default" : "destructive"}
-                          className="text-xs"
-                        >
-                          {comm.status === "sent" ? (
-                            <><CheckCircle className="h-3 w-3 mr-1" /> Sent</>
-                          ) : (
-                            <><XCircle className="h-3 w-3 mr-1" /> Failed</>
-                          )}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground ml-auto">
-                          {comm.createdAt ? format(new Date(comm.createdAt), "MMM d, h:mm a") : ""}
-                        </span>
-                      </div>
-                      {comm.subject && (
-                        <p className="text-sm font-medium truncate">{comm.subject}</p>
-                      )}
-                      <p className="text-sm text-muted-foreground line-clamp-2">{comm.content}</p>
-                    </div>
+              (gmailMessages?.messages || []).forEach((msg: any) => {
+                const isFromAgent = msg.from?.includes(gmailEmail || "");
+                items.push({
+                  id: `gmail-${msg.id}`,
+                  type: "email",
+                  direction: isFromAgent ? "sent" : "received",
+                  subject: msg.subject || undefined,
+                  preview: msg.snippet || undefined,
+                  date: msg.date ? new Date(msg.date) : new Date(),
+                });
+              });
+
+              history.forEach((comm) => {
+                const isDuplicate = comm.type === "email" && comm.externalId &&
+                  items.some((item) => item.id === `gmail-${comm.externalId}`);
+                if (isDuplicate) return;
+
+                items.push({
+                  id: `platform-${comm.id}`,
+                  type: comm.type as "email" | "sms",
+                  direction: comm.status === "sent" ? "sent" : "failed",
+                  subject: comm.subject || undefined,
+                  preview: comm.content || undefined,
+                  date: comm.createdAt ? new Date(comm.createdAt) : new Date(),
+                });
+              });
+
+              items.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+              if (items.length === 0) {
+                return (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Clock className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">No communication history yet</p>
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              }
+
+              return (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {items.map((item) => (
+                    <div key={item.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                      <div className="mt-0.5">
+                        {item.type === "sms" ? (
+                          <MessageSquare className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <Mail className={`h-4 w-4 ${item.direction === "received" ? "text-purple-600" : "text-blue-600"}`} />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="text-xs">
+                            {item.type === "sms" ? "SMS" : "EMAIL"}
+                          </Badge>
+                          {item.direction === "failed" ? (
+                            <Badge variant="destructive" className="text-xs">
+                              <XCircle className="h-3 w-3 mr-1" /> Failed
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              {item.direction === "sent" ? "Sent" : "Received"}
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            {format(item.date, "MMM d, h:mm a")}
+                          </span>
+                        </div>
+                        {item.subject && (
+                          <p className="text-sm font-medium truncate">{item.subject}</p>
+                        )}
+                        {item.preview && (
+                          <p className="text-sm text-muted-foreground line-clamp-2">{item.preview}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </TabsContent>
         </Tabs>
       </DialogContent>
