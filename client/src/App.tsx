@@ -43,7 +43,8 @@ import {
   PanelLeft,
   Wrench,
   Map,
-  Search
+  Search,
+  Mail
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -54,6 +55,7 @@ import ClientPage from "@/pages/client-page";
 import ContractorsPage from "@/pages/contractors-page";
 import MapPage from "@/pages/map-page";
 import PropertySearchPage from "@/pages/property-search-page";
+import MailPage from "@/pages/mail-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -162,6 +164,16 @@ function Layout({ children }: { children: React.ReactNode }) {
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
+                    {user?.role === "agent" && (
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Mail">
+                          <Link href="/mail" className="flex items-center gap-2">
+                            <Mail className="h-4 w-4" />
+                            {isSidebarOpen && <span>Mail</span>}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )}
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild tooltip="Calculators">
                         <Link href="/calculators" className="flex items-center gap-2">
@@ -272,6 +284,9 @@ function Router() {
           </Route>
           <Route path="/map">
             <ProtectedRoute path="/map" component={MapPage} />
+          </Route>
+          <Route path="/mail">
+            <ProtectedRoute path="/mail" component={MailPage} />
           </Route>
           <Route path="/">
             <ProtectedRoute path="/" component={TransactionsPage} />
