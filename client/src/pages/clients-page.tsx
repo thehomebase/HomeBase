@@ -793,6 +793,19 @@ export default function ClientsPage() {
   const [labelFilterOpen, setLabelFilterOpen] = useState(false);
   const [contactClient, setContactClient] = useState<Client | null>(null);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gmailParam = params.get("gmail");
+    if (gmailParam === "connected") {
+      toast({ title: "Gmail Connected", description: "Your Gmail account has been linked successfully." });
+      window.history.replaceState({}, "", window.location.pathname);
+      queryClient.invalidateQueries({ queryKey: ["/api/communications/status"] });
+    } else if (gmailParam === "error") {
+      toast({ title: "Gmail Connection Failed", description: "There was an issue connecting your Gmail. Please try again.", variant: "destructive" });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   const handleClientUpdate = async (updatedClient: Client) => {
     try {
       // Ensure labels is always an array and contains only valid string values

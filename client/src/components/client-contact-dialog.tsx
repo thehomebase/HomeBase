@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, MessageSquare, Loader2, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { Mail, MessageSquare, Loader2, CheckCircle, XCircle, Clock, AlertTriangle, Link2, Unlink } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -26,7 +26,7 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
   const [emailContent, setEmailContent] = useState("");
   const [activeTab, setActiveTab] = useState("sms");
 
-  const { data: commStatus } = useQuery<{ twilio: boolean; sendgrid: boolean }>({
+  const { data: commStatus } = useQuery<{ twilio: boolean; gmail: { connected: boolean; email?: string } }>({
     queryKey: ["/api/communications/status"],
     enabled: open,
   });
@@ -34,6 +34,11 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
   const { data: history = [] } = useQuery<Communication[]>({
     queryKey: ["/api/communications", client?.id],
     enabled: open && !!client?.id,
+  });
+
+  const { data: gmailMessages } = useQuery<{ messages: any[] }>({
+    queryKey: ["/api/gmail/messages", client?.id],
+    enabled: open && !!client?.id && !!commStatus?.gmail?.connected && activeTab === "history",
   });
 
   const smsMutation = useMutation({
@@ -70,6 +75,7 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/communications", client?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/gmail/messages", client?.id] });
       setEmailSubject("");
       setEmailContent("");
       toast({ title: "Email Sent", description: `Email sent to ${client?.firstName} ${client?.lastName}` });
@@ -77,7 +83,45 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
     onError: (error: any) => {
       toast({
         title: "Email Failed",
-        description: error.message || "Failed to send email. Make sure SendGrid is configured.",
+        description: error.message || "Failed to send email.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const connectGmailMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("GET", "/api/gmail/auth-url");
+      if (!res.ok) throw new Error("Failed to get auth URL");
+      const data = await res.json();
+      return data.url;
+    },
+    onSuccess: (url: string) => {
+      window.location.href = url;
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Failed to start Gmail connection.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const disconnectGmailMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/gmail/disconnect");
+      if (!res.ok) throw new Error("Failed to disconnect");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/communications/status"] });
+      toast({ title: "Gmail Disconnected", description: "Your Gmail account has been unlinked." });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Disconnect Failed",
+        description: error.message || "Failed to disconnect Gmail.",
         variant: "destructive",
       });
     },
@@ -105,6 +149,8 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
   if (!client) return null;
 
   const phone = client.mobilePhone || client.phone;
+  const gmailConnected = commStatus?.gmail?.connected;
+  const gmailEmail = commStatus?.gmail?.email;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -135,7 +181,7 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
                 <div className="text-sm">
                   <p className="font-medium text-amber-800 dark:text-amber-200">Twilio not connected</p>
                   <p className="text-amber-600 dark:text-amber-400 mt-1">
-                    SMS messaging requires Twilio integration. Connect your Twilio account to send text messages.
+                    SMS messaging requires Twilio integration. Contact your administrator to enable SMS.
                   </p>
                 </div>
               </div>
@@ -172,63 +218,131 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
           </TabsContent>
 
           <TabsContent value="email" className="space-y-4 mt-4">
-            {!commStatus?.sendgrid && (
-              <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
-                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-                <div className="text-sm">
-                  <p className="font-medium text-amber-800 dark:text-amber-200">SendGrid not connected</p>
-                  <p className="text-amber-600 dark:text-amber-400 mt-1">
-                    Email messaging requires SendGrid integration. Connect your SendGrid account to send emails.
-                  </p>
+            {!gmailConnected ? (
+              <div className="space-y-4">
+                <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <Mail className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-800 dark:text-blue-200">Connect your Gmail</p>
+                    <p className="text-blue-600 dark:text-blue-400 mt-1">
+                      Link your Google account to send and receive emails directly from this platform.
+                      Emails will be sent from your personal Gmail address.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => connectGmailMutation.mutate()}
+                  disabled={connectGmailMutation.isPending}
+                  className="w-full"
+                  variant="outline"
+                >
+                  {connectGmailMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
+                  ) : (
+                    <><Link2 className="h-4 w-4 mr-2" /> Connect Gmail Account</>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between p-2 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-green-800 dark:text-green-200">
+                      Connected as <strong>{gmailEmail}</strong>
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => disconnectGmailMutation.mutate()}
+                    disabled={disconnectGmailMutation.isPending}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 px-2"
+                  >
+                    <Unlink className="h-3 w-3 mr-1" /> Disconnect
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>To</Label>
+                  <Input value={client.email || "No email address"} disabled className="bg-muted" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Subject</Label>
+                  <Input
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    placeholder="Email subject..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Message</Label>
+                  <Textarea
+                    value={emailContent}
+                    onChange={(e) => setEmailContent(e.target.value)}
+                    placeholder="Type your email message..."
+                    rows={6}
+                  />
+                </div>
+
+                <Button
+                  onClick={handleSendEmail}
+                  disabled={!emailSubject.trim() || !emailContent.trim() || !client.email || emailMutation.isPending}
+                  className="w-full"
+                >
+                  {emailMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
+                  ) : (
+                    <><Mail className="h-4 w-4 mr-2" /> Send Email</>
+                  )}
+                </Button>
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-4">
+            {gmailConnected && gmailMessages?.messages && gmailMessages.messages.length > 0 && (
+              <div className="space-y-3 mb-4">
+                <h4 className="text-sm font-medium text-muted-foreground">Gmail Conversations</h4>
+                <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                  {gmailMessages.messages.map((msg: any) => {
+                    const isFromAgent = msg.from?.includes(gmailEmail || "");
+                    return (
+                      <div key={msg.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                        <div className="mt-0.5">
+                          <Mail className={`h-4 w-4 ${isFromAgent ? "text-blue-600" : "text-purple-600"}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="outline" className="text-xs">
+                              {isFromAgent ? "SENT" : "RECEIVED"}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground ml-auto">
+                              {msg.date ? format(new Date(msg.date), "MMM d, h:mm a") : ""}
+                            </span>
+                          </div>
+                          {msg.subject && (
+                            <p className="text-sm font-medium truncate">{msg.subject}</p>
+                          )}
+                          <p className="text-sm text-muted-foreground line-clamp-2">{msg.snippet}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label>To</Label>
-              <Input value={client.email || "No email address"} disabled className="bg-muted" />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Subject</Label>
-              <Input
-                value={emailSubject}
-                onChange={(e) => setEmailSubject(e.target.value)}
-                placeholder="Email subject..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Message</Label>
-              <Textarea
-                value={emailContent}
-                onChange={(e) => setEmailContent(e.target.value)}
-                placeholder="Type your email message..."
-                rows={6}
-              />
-            </div>
-
-            <Button
-              onClick={handleSendEmail}
-              disabled={!emailSubject.trim() || !emailContent.trim() || !client.email || emailMutation.isPending}
-              className="w-full"
-            >
-              {emailMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
-              ) : (
-                <><Mail className="h-4 w-4 mr-2" /> Send Email</>
-              )}
-            </Button>
-          </TabsContent>
-
-          <TabsContent value="history" className="mt-4">
+            <h4 className="text-sm font-medium text-muted-foreground mb-3">Platform Activity</h4>
             {history.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Clock className="h-8 w-8 mx-auto mb-2 opacity-40" />
                 <p className="text-sm">No communication history yet</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              <div className="space-y-3 max-h-[300px] overflow-y-auto">
                 {history.map((comm) => (
                   <div key={comm.id} className="flex items-start gap-3 p-3 border rounded-lg">
                     <div className="mt-0.5">

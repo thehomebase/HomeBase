@@ -9,7 +9,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
 import { sendSMS, isTwilioConfigured } from "./twilio-service";
-import { sendEmail, isSendGridConfigured } from "./sendgrid-service";
+import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages } from "./gmail-service";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -1924,13 +1924,92 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (req.user.role !== "agent") return res.sendStatus(403);
     try {
-      const [twilioReady, sendgridReady] = await Promise.all([
+      const [twilioReady, gmailStatus] = await Promise.all([
         isTwilioConfigured(),
-        isSendGridConfigured(),
+        getGmailStatus(req.user.id),
       ]);
-      res.json({ twilio: twilioReady, sendgrid: sendgridReady });
+      res.json({ twilio: twilioReady, gmail: gmailStatus });
     } catch (error) {
       res.status(500).json({ error: "Failed to check communication status" });
+    }
+  });
+
+  app.get("/api/gmail/auth-url", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const crypto = await import("crypto");
+      const nonce = crypto.randomBytes(32).toString("hex");
+      (req.session as any).gmailOAuthState = nonce;
+      (req.session as any).gmailOAuthUserId = req.user.id;
+      const url = getAuthUrl(nonce);
+      res.json({ url });
+    } catch (error: any) {
+      console.error("Error generating Gmail auth URL:", error);
+      res.status(500).json({ error: error.message || "Failed to generate auth URL" });
+    }
+  });
+
+  app.get("/api/gmail/callback", async (req, res) => {
+    const code = req.query.code as string;
+    const state = req.query.state as string;
+    const domains = process.env.REPLIT_DOMAINS || "";
+    const domain = domains.split(",")[0];
+    const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+
+    if (!code || !state) {
+      return res.redirect(`${baseUrl}/clients?gmail=error`);
+    }
+
+    const sessionState = (req.session as any).gmailOAuthState;
+    const userId = (req.session as any).gmailOAuthUserId;
+
+    if (!sessionState || !userId || state !== sessionState) {
+      console.error("Gmail OAuth state mismatch or missing session data");
+      return res.redirect(`${baseUrl}/clients?gmail=error`);
+    }
+
+    delete (req.session as any).gmailOAuthState;
+    delete (req.session as any).gmailOAuthUserId;
+
+    try {
+      await handleCallback(code, userId);
+      res.redirect(`${baseUrl}/clients?gmail=connected`);
+    } catch (error: any) {
+      console.error("Gmail callback error:", error);
+      res.redirect(`${baseUrl}/clients?gmail=error`);
+    }
+  });
+
+  app.post("/api/gmail/disconnect", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      await disconnectGmail(req.user.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error disconnecting Gmail:", error);
+      res.status(500).json({ error: "Failed to disconnect Gmail" });
+    }
+  });
+
+  app.get("/api/gmail/messages/:clientId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const clientId = Number(req.params.clientId);
+      const client = await storage.getClient(clientId);
+      if (!client || client.agentId !== req.user.id) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      if (!client.email) {
+        return res.status(400).json({ error: "Client has no email address on file" });
+      }
+      const result = await getGmailMessages(req.user.id, client.email);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching Gmail messages:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch messages" });
     }
   });
 
@@ -2022,8 +2101,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Client has no email address on file" });
       }
 
-      const agentName = `${req.user.firstName} ${req.user.lastName}`;
-      const result = await sendEmail(client.email, subject, content, undefined, agentName);
+      const result = await sendGmailEmail(req.user.id, client.email, subject, content);
 
       const comm = await storage.createCommunication({
         clientId,
@@ -2032,7 +2110,7 @@ export function registerRoutes(app: Express): Server {
         subject,
         content,
         status: result.success ? "sent" : "failed",
-        externalId: result.externalId || null,
+        externalId: result.messageId || null,
       });
 
       if (!result.success) {

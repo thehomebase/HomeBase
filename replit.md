@@ -98,14 +98,22 @@ Preferred communication style: Simple, everyday language.
 - **Map Integration**: "Saved" filter tab on map page with geocoded markers (Nominatim/OSM), localStorage caching for coordinates
 - **Workflow**: Client saves property → clicks "Request Showing" → property appears on map under "Saved" tab → agent sees it with client name attribution
 
-### Client Communications (SMS/Email via Twilio + SendGrid)
-- **Location**: `server/twilio-service.ts`, `server/sendgrid-service.ts`, `client/src/components/client-contact-dialog.tsx`, `client/src/pages/clients-page.tsx`
-- **Purpose**: Agents can send SMS and email to clients directly from the platform, with all message delivery handled by third-party services (Twilio for SMS, SendGrid for email) to offload legal/compliance responsibility
-- **Database**: `communications` table logs message metadata (type, status, externalId) — content is stored for history but delivery/compliance is managed by Twilio/SendGrid
-- **API Endpoints**: `GET /api/communications/status` (check integration availability), `GET /api/communications/:clientId` (history), `POST /api/communications/sms` (send SMS), `POST /api/communications/email` (send email)
-- **Integrations Required**: Twilio connector (SMS/voice), SendGrid connector (email) — both available as Replit integrations
-- **Frontend**: Contact dialog accessible from Client Details panel → "Contact" button → tabbed dialog with SMS, Email, and History tabs
-- **Privacy**: Platform only stores metadata/logs. Message delivery, opt-outs, and compliance are handled entirely by Twilio/SendGrid
+### Client Communications (SMS via Twilio + Email via Gmail OAuth)
+- **Location**: `server/twilio-service.ts`, `server/gmail-service.ts`, `client/src/components/client-contact-dialog.tsx`, `client/src/pages/clients-page.tsx`
+- **Purpose**: Agents can send SMS and email to clients directly from the platform. SMS goes through platform-level Twilio. Email goes through each agent's own linked Gmail account via Google OAuth, minimizing platform liability.
+- **Database**: `communications` table logs message metadata (type, status, externalId). `google_tokens` table stores per-agent OAuth tokens (access_token, refresh_token, token_expiry, linked email).
+- **API Endpoints**:
+  - `GET /api/communications/status` — check Twilio + Gmail connection status
+  - `GET /api/communications/:clientId` — platform activity history
+  - `POST /api/communications/sms` — send SMS via Twilio
+  - `POST /api/communications/email` — send email via agent's Gmail
+  - `GET /api/gmail/auth-url` — get Google OAuth consent URL
+  - `GET /api/gmail/callback` — handle OAuth callback, store tokens
+  - `POST /api/gmail/disconnect` — remove linked Gmail
+  - `GET /api/gmail/messages/:clientId` — fetch Gmail conversation history with a client
+- **Gmail OAuth Flow**: Agent clicks "Connect Gmail" → redirected to Google consent → tokens stored → emails sent from agent's own address
+- **Frontend**: Contact dialog with SMS, Email (Gmail), and History tabs. History shows both platform activity logs and real Gmail conversation threads.
+- **Privacy**: SMS delivery handled by Twilio. Emails sent through agent's own Gmail — platform only stores metadata logs, not email content. Google handles delivery/compliance.
 
 ### Environment Variables Required
 - `DATABASE_URL`: PostgreSQL connection string (required)
@@ -114,11 +122,12 @@ Preferred communication style: Simple, everyday language.
 - `TWILIO_ACCOUNT_SID`: Twilio account SID (for SMS)
 - `TWILIO_AUTH_TOKEN`: Twilio auth token (for SMS)
 - `TWILIO_PHONE_NUMBER`: Twilio phone number to send SMS from
-- `SENDGRID_API_KEY`: SendGrid API key (for email)
-- `SENDGRID_FROM_EMAIL`: Email address to send from (optional, defaults to noreply@homebase.app)
+- `GOOGLE_CLIENT_ID`: Google OAuth client ID (for Gmail integration)
+- `GOOGLE_CLIENT_SECRET`: Google OAuth client secret (for Gmail integration)
 - `PORT`: Server port (defaults to 3000 in development, 80 in production on Replit)
 - `NODE_ENV`: Environment mode (development/production)
 
 ### Integration Notes
 - **Twilio** (SMS): Connected — credentials stored as secrets (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`). SMS sending is fully operational.
-- **SendGrid** (email): NOT yet connected. Email feature is built but won't send until `SENDGRID_API_KEY` is provided.
+- **Gmail** (email): Connected — Google OAuth credentials stored as secrets (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`). Each agent links their own Gmail account. While the Google Cloud project is in "Testing" mode, agent Gmail addresses must be added as test users in the Google Cloud Console consent screen settings.
+- **SendGrid**: Removed — replaced by Gmail OAuth for agent-level email.
