@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -180,6 +180,11 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
   const [subjectCoords, setSubjectCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isGeocodingSubject, setIsGeocodingSubject] = useState(false);
   const [isLookingUpSubject, setIsLookingUpSubject] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState<Array<{ display: string; street: string; city: string; state: string; zip: string; lat: number; lng: number }>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [addressQuery, setAddressQuery] = useState("");
+  const addressDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addressWrapperRef = useRef<HTMLDivElement>(null);
   const [filterPropertyType, setFilterPropertyType] = useState("all");
   const [filterSqftRange, setFilterSqftRange] = useState<[number, number]>([0, 10000]);
   const [filterLotRange, setFilterLotRange] = useState<[number, number]>([0, 20]);
@@ -195,6 +200,69 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
     staleTime: 0,
     refetchOnMount: "always" as const,
   });
+
+  useEffect(() => {
+    if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current);
+    if (addressQuery.length < 3) {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    addressDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressQuery)}&limit=5&addressdetails=1&countrycodes=us`,
+          { headers: { "User-Agent": "HomeBase-CRM/1.0" } }
+        );
+        const data = await res.json();
+        const suggestions = data
+          .filter((r: any) => r.address?.house_number && r.address?.road)
+          .map((r: any) => {
+            const a = r.address;
+            const street = `${a.house_number || ""} ${a.road || ""}`.trim();
+            const city = a.city || a.town || a.village || a.hamlet || "";
+            const state = a.state || "";
+            const zip = a.postcode || "";
+            return {
+              display: r.display_name,
+              street,
+              city,
+              state,
+              zip,
+              lat: parseFloat(r.lat),
+              lng: parseFloat(r.lon),
+            };
+          });
+        setAddressSuggestions(suggestions);
+        setShowSuggestions(suggestions.length > 0);
+      } catch {
+        setAddressSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 350);
+    return () => { if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current); };
+  }, [addressQuery]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addressWrapperRef.current && !addressWrapperRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectAddressSuggestion = (suggestion: typeof addressSuggestions[0]) => {
+    setSubjectAddress(suggestion.street);
+    setSubjectCity(suggestion.city);
+    setSubjectState(suggestion.state);
+    setSubjectZip(suggestion.zip);
+    setSubjectCoords({ lat: suggestion.lat, lng: suggestion.lng });
+    setShowSuggestions(false);
+    setAddressQuery("");
+    lookupSubjectProperty({ address: suggestion.street, city: suggestion.city, state: suggestion.state, zip: suggestion.zip });
+  };
 
   const populateFromReport = (report: CmaReport) => {
     setSubjectAddress(report.subjectAddress);
@@ -269,11 +337,11 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
     }
   };
 
-  const lookupSubjectProperty = async () => {
-    const addr = subjectAddress.trim();
-    const city = subjectCity.trim();
-    const state = subjectState.trim();
-    const zip = subjectZip.trim();
+  const lookupSubjectProperty = async (overrides?: { address: string; city: string; state: string; zip: string }) => {
+    const addr = (overrides?.address ?? subjectAddress).trim();
+    const city = (overrides?.city ?? subjectCity).trim();
+    const state = (overrides?.state ?? subjectState).trim();
+    const zip = (overrides?.zip ?? subjectZip).trim();
     if (!addr) {
       toast({ title: "Enter an address", description: "Type the subject property street address first.", variant: "destructive" });
       return;
@@ -287,7 +355,7 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
       const res = await apiRequest("GET", `/api/rentcast/property?${params.toString()}`);
       const { property } = await res.json();
       if (!property) {
-        toast({ title: "Property not found", description: "Could not find data for that address. Try adding the city and state, or fill in the details manually.", variant: "destructive" });
+        toast({ title: "Property not found in RentCast", description: "Address fields have been filled from the suggestion. Beds, baths, sqft, etc. can be entered manually." });
         return;
       }
       if (property.city) setSubjectCity(property.city);
@@ -303,8 +371,7 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
       }
       toast({ title: "Property data loaded", description: "Fields have been auto-filled. You can edit any value as needed." });
     } catch (err: any) {
-      const msg = err?.message || "Failed to look up property";
-      toast({ title: "Lookup failed", description: msg, variant: "destructive" });
+      toast({ title: "RentCast lookup unavailable", description: "Address fields filled from suggestion. You can enter the remaining details manually." });
     } finally {
       setIsLookingUpSubject(false);
     }
@@ -475,7 +542,35 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
             <div className="md:col-span-2 lg:col-span-3">
               <Label>Address</Label>
               <div className="flex gap-2">
-                <Input value={subjectAddress} onChange={e => { setSubjectAddress(e.target.value); setSubjectCoords(null); }} placeholder="123 Main St" className="flex-1" />
+                <div className="relative flex-1" ref={addressWrapperRef}>
+                  <Input
+                    value={subjectAddress}
+                    onChange={e => {
+                      setSubjectAddress(e.target.value);
+                      setAddressQuery(e.target.value);
+                      setSubjectCoords(null);
+                    }}
+                    onFocus={() => { if (addressSuggestions.length > 0) setShowSuggestions(true); }}
+                    placeholder="Start typing an address..."
+                    autoComplete="off"
+                  />
+                  {showSuggestions && addressSuggestions.length > 0 && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {addressSuggestions.map((s, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className="w-full text-left px-3 py-2.5 text-sm hover:bg-accent hover:text-accent-foreground transition-colors border-b last:border-0 border-border/50"
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => selectAddressSuggestion(s)}
+                        >
+                          <div className="font-medium">{s.street}</div>
+                          <div className="text-xs text-muted-foreground">{[s.city, s.state, s.zip].filter(Boolean).join(", ")}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
