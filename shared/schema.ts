@@ -361,6 +361,42 @@ export const insertGoogleTokenSchema = createInsertSchema(googleTokens).omit({
 export type GoogleToken = typeof googleTokens.$inferSelect;
 export type InsertGoogleToken = z.infer<typeof insertGoogleTokenSchema>;
 
+export const emailSnippets = pgTable("email_snippets", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEmailSnippetSchema = createInsertSchema(emailSnippets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const emailTracking = pgTable("email_tracking", {
+  id: serial("id").primaryKey(),
+  trackingId: text("tracking_id").notNull().unique(),
+  userId: integer("user_id").notNull(),
+  gmailMessageId: text("gmail_message_id"),
+  recipientEmail: text("recipient_email").notNull(),
+  subject: text("subject").notNull(),
+  sentAt: timestamp("sent_at").defaultNow(),
+  firstOpenedAt: timestamp("first_opened_at"),
+  lastOpenedAt: timestamp("last_opened_at"),
+  openCount: integer("open_count").notNull().default(0),
+});
+
+export const insertEmailTrackingSchema = createInsertSchema(emailTracking).omit({
+  id: true,
+  sentAt: true,
+  firstOpenedAt: true,
+  lastOpenedAt: true,
+  openCount: true,
+});
+
 export const insertSavedPropertySchema = createInsertSchema(savedProperties).omit({
   id: true,
   createdAt: true,
@@ -393,3 +429,7 @@ export type InsertPropertyFeedback = z.infer<typeof insertPropertyFeedbackSchema
 export type InsertShowingRequest = z.infer<typeof insertShowingRequestSchema>;
 export type SavedProperty = typeof savedProperties.$inferSelect;
 export type InsertSavedProperty = z.infer<typeof insertSavedPropertySchema>;
+export type EmailSnippet = typeof emailSnippets.$inferSelect;
+export type InsertEmailSnippet = z.infer<typeof insertEmailSnippetSchema>;
+export type EmailTracking = typeof emailTracking.$inferSelect;
+export type InsertEmailTracking = z.infer<typeof insertEmailTrackingSchema>;

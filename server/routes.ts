@@ -10,6 +10,7 @@ import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, type EmailAttachment } from "./gmail-service";
+import { randomUUID } from "crypto";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -2402,10 +2403,29 @@ export function registerRoutes(app: Express): Server {
         content: f.buffer,
       }));
 
-      const result = await sendGmailEmail(req.user.id, to, subject, body, cc || undefined, attachments.length > 0 ? attachments : undefined);
+      const trackingId = randomUUID();
+      const domains = process.env.REPLIT_DOMAINS || "";
+      const domain = domains.split(",")[0];
+      const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+      const trackingPixel = `<img src="${baseUrl}/api/track/${trackingId}.png" width="1" height="1" style="display:none" alt="" />`;
+      const trackedBody = body + trackingPixel;
+
+      const result = await sendGmailEmail(req.user.id, to, subject, trackedBody, cc || undefined, attachments.length > 0 ? attachments : undefined);
 
       if (!result.success) {
         return res.status(400).json({ error: result.error });
+      }
+
+      try {
+        await storage.createEmailTracking({
+          trackingId,
+          userId: req.user.id,
+          gmailMessageId: result.messageId || null,
+          recipientEmail: to,
+          subject,
+        });
+      } catch (trackErr) {
+        console.error("Failed to save tracking record:", trackErr);
       }
 
       res.json({ success: true, messageId: result.messageId });
@@ -2413,6 +2433,76 @@ export function registerRoutes(app: Express): Server {
       console.error("Error sending email via Gmail:", error);
       res.status(500).json({ error: error.message || "Failed to send email" });
     }
+  });
+
+  // ============ Email Snippets ============
+  app.get("/api/snippets", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    const snippets = await storage.getSnippetsByUser(req.user.id);
+    res.json(snippets);
+  });
+
+  app.post("/api/snippets", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    const schema = z.object({
+      title: z.string().min(1, "Title is required"),
+      body: z.string().min(1, "Body is required"),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+    const snippet = await storage.createSnippet({ userId: req.user.id, title: parsed.data.title, body: parsed.data.body });
+    res.json(snippet);
+  });
+
+  app.patch("/api/snippets/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    const id = parseInt(req.params.id);
+    const existing = await storage.getSnippet(id);
+    if (!existing || existing.userId !== req.user.id) return res.sendStatus(404);
+    const schema = z.object({
+      title: z.string().min(1).optional(),
+      body: z.string().min(1).optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+    const updated = await storage.updateSnippet(id, parsed.data);
+    res.json(updated);
+  });
+
+  app.delete("/api/snippets/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    const id = parseInt(req.params.id);
+    const existing = await storage.getSnippet(id);
+    if (!existing || existing.userId !== req.user.id) return res.sendStatus(404);
+    await storage.deleteSnippet(id);
+    res.json({ success: true });
+  });
+
+  // ============ Email Tracking ============
+  app.get("/api/track/:trackingId.png", async (req, res) => {
+    const { trackingId } = req.params;
+    try {
+      await storage.recordEmailOpen(trackingId);
+    } catch (e) {
+      // silently fail — don't break image loading
+    }
+    const pixel = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64"
+    );
+    res.set({ "Content-Type": "image/png", "Content-Length": pixel.length.toString(), "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate", "Pragma": "no-cache", "Expires": "0" });
+    res.end(pixel);
+  });
+
+  app.get("/api/email-tracking", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    const tracking = await storage.getEmailTrackingByUser(req.user.id);
+    res.json(tracking);
   });
 
   // Simple ping endpoint for health checks

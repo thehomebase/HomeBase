@@ -16,11 +16,14 @@ interface StorageDocument {
 import {
   users, transactions, checklists, messages, clients, documents, contractors, contractorReviews,
   propertyViewings, propertyFeedback, showingRequests, savedProperties, communications, smsOptOuts,
+  emailSnippets, emailTracking,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
   type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
   type ShowingRequest, type SavedProperty, type InsertSavedProperty,
   type Communication, type InsertCommunication,
   type AgentPhoneNumber,
+  type EmailSnippet, type InsertEmailSnippet,
+  type EmailTracking, type InsertEmailTracking,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -149,6 +152,20 @@ export interface IStorage {
   saveAgentPhoneNumber(data: { userId: number; phoneNumber: string; twilioSid: string; areaCode?: string; friendlyName?: string }): Promise<AgentPhoneNumber>;
   deleteAgentPhoneNumber(userId: number): Promise<void>;
   getAgentByPhoneNumber(phoneNumber: string): Promise<AgentPhoneNumber | null>;
+
+  // Email snippets
+  getSnippetsByUser(userId: number): Promise<EmailSnippet[]>;
+  getSnippet(id: number): Promise<EmailSnippet | undefined>;
+  createSnippet(snippet: InsertEmailSnippet): Promise<EmailSnippet>;
+  updateSnippet(id: number, data: Partial<EmailSnippet>): Promise<EmailSnippet>;
+  deleteSnippet(id: number): Promise<void>;
+
+  // Email tracking
+  createEmailTracking(tracking: InsertEmailTracking): Promise<EmailTracking>;
+  getEmailTracking(trackingId: string): Promise<EmailTracking | undefined>;
+  recordEmailOpen(trackingId: string): Promise<void>;
+  getEmailTrackingByUser(userId: number): Promise<EmailTracking[]>;
+  updateEmailTrackingMessageId(trackingId: string, gmailMessageId: string): Promise<void>;
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -2728,6 +2745,133 @@ export class DatabaseStorage implements IStorage {
       console.error('Error getting agent by phone number:', error);
       return null;
     }
+  }
+
+  // Email snippets
+  async getSnippetsByUser(userId: number): Promise<EmailSnippet[]> {
+    const result = await db.execute(
+      sql`SELECT * FROM email_snippets WHERE user_id = ${userId} ORDER BY updated_at DESC`
+    );
+    return (result.rows || []).map((row: any) => ({
+      id: Number(row.id),
+      userId: Number(row.user_id),
+      title: String(row.title),
+      body: String(row.body),
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null,
+    }));
+  }
+
+  async getSnippet(id: number): Promise<EmailSnippet | undefined> {
+    const result = await db.execute(
+      sql`SELECT * FROM email_snippets WHERE id = ${id} LIMIT 1`
+    );
+    if (!result.rows?.length) return undefined;
+    const row = result.rows[0] as any;
+    return {
+      id: Number(row.id),
+      userId: Number(row.user_id),
+      title: String(row.title),
+      body: String(row.body),
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null,
+    };
+  }
+
+  async createSnippet(snippet: InsertEmailSnippet): Promise<EmailSnippet> {
+    const result = await db.execute(
+      sql`INSERT INTO email_snippets (user_id, title, body) VALUES (${snippet.userId}, ${snippet.title}, ${snippet.body}) RETURNING *`
+    );
+    const row = result.rows[0] as any;
+    return {
+      id: Number(row.id),
+      userId: Number(row.user_id),
+      title: String(row.title),
+      body: String(row.body),
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null,
+    };
+  }
+
+  async updateSnippet(id: number, data: Partial<EmailSnippet>): Promise<EmailSnippet> {
+    const sets: string[] = [];
+    const values: any[] = [];
+    if (data.title !== undefined) { sets.push("title"); values.push(data.title); }
+    if (data.body !== undefined) { sets.push("body"); values.push(data.body); }
+    await db.execute(
+      sql`UPDATE email_snippets SET title = COALESCE(${data.title ?? null}, title), body = COALESCE(${data.body ?? null}, body), updated_at = NOW() WHERE id = ${id}`
+    );
+    const result = await db.execute(sql`SELECT * FROM email_snippets WHERE id = ${id} LIMIT 1`);
+    const row = result.rows[0] as any;
+    return {
+      id: Number(row.id),
+      userId: Number(row.user_id),
+      title: String(row.title),
+      body: String(row.body),
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null,
+    };
+  }
+
+  async deleteSnippet(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM email_snippets WHERE id = ${id}`);
+  }
+
+  // Email tracking
+  async createEmailTracking(tracking: InsertEmailTracking): Promise<EmailTracking> {
+    const result = await db.execute(
+      sql`INSERT INTO email_tracking (tracking_id, user_id, gmail_message_id, recipient_email, subject)
+          VALUES (${tracking.trackingId}, ${tracking.userId}, ${tracking.gmailMessageId ?? null}, ${tracking.recipientEmail}, ${tracking.subject})
+          RETURNING *`
+    );
+    const row = result.rows[0] as any;
+    return this.mapEmailTrackingRow(row);
+  }
+
+  async getEmailTracking(trackingId: string): Promise<EmailTracking | undefined> {
+    const result = await db.execute(
+      sql`SELECT * FROM email_tracking WHERE tracking_id = ${trackingId} LIMIT 1`
+    );
+    if (!result.rows?.length) return undefined;
+    return this.mapEmailTrackingRow(result.rows[0] as any);
+  }
+
+  async recordEmailOpen(trackingId: string): Promise<void> {
+    await db.execute(sql`
+      UPDATE email_tracking
+      SET open_count = open_count + 1,
+          last_opened_at = NOW(),
+          first_opened_at = COALESCE(first_opened_at, NOW())
+      WHERE tracking_id = ${trackingId}
+    `);
+  }
+
+  async getEmailTrackingByUser(userId: number): Promise<EmailTracking[]> {
+    const result = await db.execute(
+      sql`SELECT * FROM email_tracking WHERE user_id = ${userId} ORDER BY sent_at DESC LIMIT 100`
+    );
+    return (result.rows || []).map((row: any) => this.mapEmailTrackingRow(row));
+  }
+
+  async updateEmailTrackingMessageId(trackingId: string, gmailMessageId: string): Promise<void> {
+    await db.execute(
+      sql`UPDATE email_tracking SET gmail_message_id = ${gmailMessageId} WHERE tracking_id = ${trackingId}`
+    );
+  }
+
+  private mapEmailTrackingRow(row: any): EmailTracking {
+    return {
+      id: Number(row.id),
+      trackingId: String(row.tracking_id),
+      userId: Number(row.user_id),
+      gmailMessageId: row.gmail_message_id ? String(row.gmail_message_id) : null,
+      recipientEmail: String(row.recipient_email),
+      subject: String(row.subject),
+      sentAt: row.sent_at ? new Date(row.sent_at) : null,
+      firstOpenedAt: row.first_opened_at ? new Date(row.first_opened_at) : null,
+      lastOpenedAt: row.last_opened_at ? new Date(row.last_opened_at) : null,
+      openCount: Number(row.open_count),
+    };
   }
 
   private mapTransactionRow(row: any): Transaction {

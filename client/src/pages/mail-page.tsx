@@ -19,7 +19,8 @@ import {
   Bold, Italic, Underline, Strikethrough, List, ListOrdered,
   AlignLeft, AlignCenter, AlignRight, Link as LinkIcon,
   Highlighter, Undo2, Redo2, Paperclip, FileIcon, XCircle,
-  Type, Heading1, Heading2, Quote, Minus
+  Type, Heading1, Heading2, Quote, Minus,
+  FileText, Eye, EyeOff, Trash2, Pencil, Plus, BarChart3, Clock, CheckCircle2
 } from "lucide-react";
 import { format } from "date-fns";
 import DOMPurify from "dompurify";
@@ -58,7 +59,29 @@ interface InboxResponse {
   error?: string;
 }
 
-type ViewMode = "inbox" | "compose" | "detail";
+interface EmailSnippet {
+  id: number;
+  userId: number;
+  title: string;
+  body: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+interface EmailTrackingRecord {
+  id: number;
+  trackingId: string;
+  userId: number;
+  gmailMessageId: string | null;
+  recipientEmail: string;
+  subject: string;
+  sentAt: string | null;
+  firstOpenedAt: string | null;
+  lastOpenedAt: string | null;
+  openCount: number;
+}
+
+type ViewMode = "inbox" | "compose" | "detail" | "snippets" | "tracking";
 
 interface ComposeState {
   to: string;
@@ -379,6 +402,79 @@ export default function MailPage() {
 
   const signature = signatureQuery.data?.signature || "";
 
+  const snippetsQuery = useQuery<EmailSnippet[]>({
+    queryKey: ["/api/snippets"],
+    enabled: !!gmailConnected,
+  });
+
+  const trackingQuery = useQuery<EmailTrackingRecord[]>({
+    queryKey: ["/api/email-tracking"],
+    queryFn: async () => {
+      const res = await fetch("/api/email-tracking", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch tracking data");
+      return res.json();
+    },
+    enabled: !!gmailConnected && viewMode === "tracking",
+    staleTime: 30 * 1000,
+  });
+
+  const [snippetEditing, setSnippetEditing] = useState<EmailSnippet | null>(null);
+  const [snippetForm, setSnippetForm] = useState({ title: "", body: "" });
+  const [showSnippetPicker, setShowSnippetPicker] = useState(false);
+
+  const snippetCreateMutation = useMutation({
+    mutationFn: async (data: { title: string; body: string }) => {
+      const res = await fetch("/api/snippets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create snippet");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Snippet created" });
+      queryClient.invalidateQueries({ queryKey: ["/api/snippets"] });
+      setSnippetForm({ title: "", body: "" });
+      setSnippetEditing(null);
+    },
+  });
+
+  const snippetUpdateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { title: string; body: string } }) => {
+      const res = await fetch(`/api/snippets/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update snippet");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Snippet updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/snippets"] });
+      setSnippetForm({ title: "", body: "" });
+      setSnippetEditing(null);
+    },
+  });
+
+  const snippetDeleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/snippets/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete snippet");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Snippet deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/snippets"] });
+    },
+  });
+
   const labelMap: Record<string, string> = {
     all: "",
     sent: "SENT",
@@ -668,7 +764,53 @@ export default function MailPage() {
               </div>
             </div>
 
-            <EditorToolbar editor={editor} />
+            <div className="flex items-center border-b">
+              <div className="flex-1">
+                <EditorToolbar editor={editor} />
+              </div>
+              <div className="relative px-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button"
+                        onClick={() => setShowSnippetPicker(!showSnippetPicker)}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border hover:bg-muted transition-colors">
+                        <FileText className="h-3.5 w-3.5" /> Snippets
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Insert a saved template</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {showSnippetPicker && (
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-background border rounded-lg shadow-lg w-64 max-h-[300px] overflow-auto">
+                    <div className="p-2 border-b">
+                      <p className="text-xs font-medium text-muted-foreground">Insert snippet</p>
+                    </div>
+                    {(snippetsQuery.data || []).length === 0 ? (
+                      <div className="p-3 text-center text-xs text-muted-foreground">
+                        No snippets yet.
+                        <button className="block mx-auto mt-1 text-primary underline"
+                          onClick={() => { setShowSnippetPicker(false); setViewMode("snippets"); }}>
+                          Create one
+                        </button>
+                      </div>
+                    ) : (
+                      (snippetsQuery.data || []).map((s) => (
+                        <button key={s.id}
+                          className="w-full text-left px-3 py-2 hover:bg-muted border-b last:border-b-0 transition-colors"
+                          onClick={() => {
+                            editor?.chain().focus().insertContent(s.body).run();
+                            setShowSnippetPicker(false);
+                          }}>
+                          <p className="text-sm font-medium truncate">{s.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">{s.body.replace(/<[^>]*>/g, "").slice(0, 60)}</p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
 
             <div className="border-b">
               <EditorContent editor={editor} />
@@ -766,6 +908,184 @@ export default function MailPage() {
     );
   }
 
+  if (viewMode === "snippets") {
+    const snippets = snippetsQuery.data || [];
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <Button variant="ghost" size="sm" className="mb-4" onClick={backToInbox}>
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back to inbox
+        </Button>
+
+        <Card>
+          <CardContent className="p-6">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <FileText className="h-5 w-5" /> Email Snippets
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Create reusable templates you can insert into any email with two clicks.
+            </p>
+
+            <div className="border rounded-lg p-4 mb-4 space-y-3">
+              <h3 className="text-sm font-medium">
+                {snippetEditing ? "Edit Snippet" : "New Snippet"}
+              </h3>
+              <Input
+                placeholder="Snippet title (e.g., Showing Confirmation)"
+                value={snippetForm.title}
+                onChange={(e) => setSnippetForm((f) => ({ ...f, title: e.target.value }))}
+              />
+              <textarea
+                className="w-full min-h-[120px] px-3 py-2 text-sm border rounded-md bg-background resize-y"
+                placeholder="Snippet body — paste or type your template text here..."
+                value={snippetForm.body}
+                onChange={(e) => setSnippetForm((f) => ({ ...f, body: e.target.value }))}
+              />
+              <div className="flex gap-2">
+                <Button size="sm"
+                  disabled={!snippetForm.title.trim() || !snippetForm.body.trim()}
+                  onClick={() => {
+                    if (snippetEditing) {
+                      snippetUpdateMutation.mutate({ id: snippetEditing.id, data: snippetForm });
+                    } else {
+                      snippetCreateMutation.mutate(snippetForm);
+                    }
+                  }}>
+                  {snippetEditing ? "Update" : "Save"} Snippet
+                </Button>
+                {snippetEditing && (
+                  <Button variant="ghost" size="sm" onClick={() => {
+                    setSnippetEditing(null);
+                    setSnippetForm({ title: "", body: "" });
+                  }}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {snippetsQuery.isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : snippets.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No snippets yet. Create your first one above.</p>
+            ) : (
+              <div className="space-y-2">
+                {snippets.map((s) => (
+                  <div key={s.id} className="border rounded-lg p-3 flex items-start gap-3">
+                    <FileText className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{s.title}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                        {s.body.replace(/<[^>]*>/g, "").slice(0, 120)}
+                      </p>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-7 w-7"
+                        onClick={() => {
+                          setSnippetEditing(s);
+                          setSnippetForm({ title: s.title, body: s.body });
+                        }}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"
+                        onClick={() => snippetDeleteMutation.mutate(s.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (viewMode === "tracking") {
+    const records = trackingQuery.data || [];
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <Button variant="ghost" size="sm" className="mb-4" onClick={backToInbox}>
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back to inbox
+        </Button>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" /> Read Receipts
+              </h2>
+              <Button variant="outline" size="sm" onClick={() => trackingQuery.refetch()}
+                disabled={trackingQuery.isFetching}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${trackingQuery.isFetching ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Track when recipients open your emails. A notification appears when they view your message.
+            </p>
+
+            {trackingQuery.isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : records.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No tracked emails yet. All emails sent from here automatically include read tracking.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {records.map((r) => (
+                  <div key={r.id} className="border rounded-lg p-3 flex items-start gap-3">
+                    <div className="mt-0.5">
+                      {r.openCount > 0 ? (
+                        <Eye className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">{r.subject}</p>
+                        {r.openCount > 0 && (
+                          <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
+                            <CheckCircle2 className="h-3 w-3" /> Read
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        To: {r.recipientEmail}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Sent: {r.sentAt ? format(new Date(r.sentAt), "MMM d, h:mm a") : "—"}
+                        </span>
+                        {r.openCount > 0 && (
+                          <>
+                            <span className="flex items-center gap-1">
+                              <Eye className="h-3 w-3" />
+                              First opened: {r.firstOpenedAt ? format(new Date(r.firstOpenedAt), "MMM d, h:mm a") : "—"}
+                            </span>
+                            <span>
+                              Opened {r.openCount} time{r.openCount !== 1 ? "s" : ""}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (viewMode === "detail") {
     const msg = messageQuery.data?.message;
     return (
@@ -837,6 +1157,12 @@ export default function MailPage() {
         <div className="flex gap-2">
           <Button size="sm" onClick={() => openCompose()}>
             <PenSquare className="h-4 w-4 mr-2" /> Compose
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setViewMode("snippets")}>
+            <FileText className="h-4 w-4 mr-2" /> Snippets
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setViewMode("tracking")}>
+            <Eye className="h-4 w-4 mr-2" /> Tracking
           </Button>
           <Button variant="outline" size="sm"
             onClick={() => inboxQuery.refetch()} disabled={inboxQuery.isFetching}>
