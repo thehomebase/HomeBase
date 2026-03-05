@@ -100,24 +100,22 @@ Preferred communication style: Simple, everyday language.
 
 ### Client Communications (SMS via Twilio + Email via Gmail OAuth)
 - **Location**: `server/twilio-service.ts`, `server/gmail-service.ts`, `client/src/components/client-contact-dialog.tsx`, `client/src/pages/clients-page.tsx`
-- **Purpose**: Agents can send SMS and email to clients directly from the platform. SMS goes through each agent's own Twilio account (per-agent model). Email goes through each agent's own linked Gmail account via Google OAuth. Platform minimizes liability by acting as the interface, not the sender.
-- **Database**: `communications` table logs message metadata (type, status, externalId). `google_tokens` table stores per-agent OAuth tokens (access_token, refresh_token, token_expiry, linked email). `sms_opt_outs` table stores phone numbers that have opted out via STOP keyword. `twilio_credentials` table stores per-agent Twilio credentials (account_sid, auth_token, phone_number).
+- **Purpose**: Agents can send SMS and email to clients directly from the platform. SMS goes through the platform's Twilio account (shared). Email goes through each agent's own linked Gmail account via Google OAuth.
+- **Database**: `communications` table logs message metadata (type, status, externalId). `google_tokens` table stores per-agent OAuth tokens (access_token, refresh_token, token_expiry, linked email). `sms_opt_outs` table stores phone numbers that have opted out via STOP keyword.
+- **SMS Model**: Platform-level Twilio account — all agents share the platform's Twilio credentials (env vars). Agents just open the contact dialog and send. No setup required per agent.
 - **SMS Compliance & Safety**:
-  - **Per-agent Twilio**: Each agent links their own Twilio account with their own phone number. All SMS responsibility falls on the individual agent, not the platform.
   - **Opt-out handling**: When a recipient replies STOP/UNSUBSCRIBE/CANCEL/END/QUIT, their number is added to the opt-out list. Agents cannot send SMS to opted-out numbers. Replying START/YES/UNSTOP re-subscribes.
   - **Rate limiting**: 200 messages per agent per day, 50 unique recipients per agent per day. Agents can still message contacts they've already texted today even after hitting the unique recipient limit.
   - **Content filtering**: Messages are scanned for threatening/dangerous language before sending. Blocked messages show an error.
   - **Blocked numbers**: Emergency numbers (911, etc.) and short codes cannot be messaged.
-  - **Webhook**: `POST /api/twilio/webhook` receives incoming SMS from Twilio, processes opt-out/opt-in keywords automatically. Validates request signatures using per-agent auth tokens.
-  - **Frontend**: SMS tab shows "Connect Twilio" form when not connected, daily usage counters (messages sent / limit, unique contacts / limit) when connected.
+  - **Webhook**: `POST /api/twilio/webhook` receives incoming SMS from Twilio, processes opt-out/opt-in keywords automatically. Validates request signatures using platform auth token.
+  - **Frontend**: SMS tab shows compose form with daily usage counters (messages sent / limit, unique contacts / limit). Shows unavailable message if Twilio env vars are not set.
 - **API Endpoints**:
   - `GET /api/communications/status` — check Twilio + Gmail connection status
   - `GET /api/communications/:clientId` — platform activity history
-  - `POST /api/communications/sms` — send SMS via agent's Twilio (checks opt-out + rate limits)
+  - `POST /api/communications/sms` — send SMS via platform Twilio (checks opt-out + rate limits)
   - `POST /api/communications/email` — send email via agent's Gmail
   - `GET /api/sms/limits` — get current agent's daily SMS usage and limits
-  - `POST /api/twilio/connect` — link agent's Twilio credentials (validates before saving)
-  - `POST /api/twilio/disconnect` — remove agent's Twilio credentials
   - `POST /api/twilio/webhook` — Twilio incoming SMS webhook (handles STOP/START)
   - `GET /api/gmail/auth-url` — get Google OAuth consent URL
   - `GET /api/gmail/callback` — handle OAuth callback, store tokens
@@ -125,7 +123,7 @@ Preferred communication style: Simple, everyday language.
   - `GET /api/gmail/messages/:clientId` — fetch Gmail conversation history with a client
 - **Gmail OAuth Flow**: Agent clicks "Connect Gmail" → redirected to Google consent → tokens stored → emails sent from agent's own address
 - **Frontend**: Contact dialog with SMS, Email (Gmail), and History tabs. History shows both platform activity logs and real Gmail conversation threads.
-- **Privacy**: SMS delivery handled by each agent's own Twilio account. Emails sent through agent's own Gmail — platform only stores metadata logs, not message content. Each agent is responsible for their own communications compliance.
+- **Privacy**: SMS delivery handled by platform Twilio account. Emails sent through agent's own Gmail — platform only stores metadata logs, not message content.
 
 ### Environment Variables Required
 - `DATABASE_URL`: PostgreSQL connection string (required)

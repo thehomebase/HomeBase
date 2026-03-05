@@ -49,31 +49,35 @@ export function containsThreateningContent(message: string): { flagged: boolean;
   return { flagged: false };
 }
 
-const agentClients = new Map<string, any>();
-
-async function getAgentTwilioClient(accountSid: string, authToken: string) {
-  const key = accountSid;
-  if (agentClients.has(key)) {
-    return agentClients.get(key);
-  }
-  const twilio = await import('twilio');
-  const client = twilio.default(accountSid, authToken);
-  agentClients.set(key, client);
-  return client;
+export function isTwilioConfigured(): boolean {
+  return !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER);
 }
 
-export async function sendSMSWithCredentials(
-  accountSid: string,
-  authToken: string,
-  fromNumber: string,
+export function getTwilioPhoneNumber(): string {
+  return normalizePhoneNumber(process.env.TWILIO_PHONE_NUMBER || '');
+}
+
+let twilioClient: any = null;
+
+async function getClient() {
+  if (twilioClient) return twilioClient;
+  const twilio = await import('twilio');
+  twilioClient = twilio.default(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
+  return twilioClient;
+}
+
+export async function sendSMS(
   to: string,
   body: string
 ): Promise<{ success: boolean; externalId?: string; error?: string }> {
   try {
-    const client = await getAgentTwilioClient(accountSid, authToken);
+    if (!isTwilioConfigured()) {
+      return { success: false, error: "Twilio is not configured. Platform admin needs to set up Twilio credentials." };
+    }
 
+    const client = await getClient();
     const formattedTo = normalizePhoneNumber(to);
-    const formattedFrom = normalizePhoneNumber(fromNumber);
+    const formattedFrom = getTwilioPhoneNumber();
 
     console.log(`Sending SMS: from=${formattedFrom} to=${formattedTo} body_length=${body.length}`);
 
@@ -91,33 +95,9 @@ export async function sendSMSWithCredentials(
   }
 }
 
-export async function verifyTwilioCredentials(
-  accountSid: string,
-  authToken: string,
-  phoneNumber: string
-): Promise<{ valid: boolean; error?: string }> {
+export async function validateTwilioWebhook(req: any, url: string): Promise<boolean> {
   try {
-    const twilio = await import('twilio');
-    const client = twilio.default(accountSid, authToken);
-    await client.api.accounts(accountSid).fetch();
-
-    const formatted = normalizePhoneNumber(phoneNumber);
-    const numbers = await client.incomingPhoneNumbers.list({ phoneNumber: formatted, limit: 1 });
-    if (numbers.length === 0) {
-      return { valid: false, error: "The phone number was not found in your Twilio account. Make sure you've purchased this number." };
-    }
-
-    return { valid: true };
-  } catch (error: any) {
-    if (error.code === 20003) {
-      return { valid: false, error: "Invalid Account SID or Auth Token. Please double-check your Twilio credentials." };
-    }
-    return { valid: false, error: error.message || "Failed to verify Twilio credentials." };
-  }
-}
-
-export async function validateTwilioWebhook(req: any, url: string, authToken: string): Promise<boolean> {
-  try {
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (!authToken) return false;
 
     const signature = req.headers['x-twilio-signature'];

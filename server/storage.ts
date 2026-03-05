@@ -15,12 +15,11 @@ interface StorageDocument {
 // Update Document type to use the imported one from schema.ts
 import {
   users, transactions, checklists, messages, clients, documents, contractors, contractorReviews,
-  propertyViewings, propertyFeedback, showingRequests, savedProperties, communications, smsOptOuts, twilioCredentials,
+  propertyViewings, propertyFeedback, showingRequests, savedProperties, communications, smsOptOuts,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
   type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
   type ShowingRequest, type SavedProperty, type InsertSavedProperty,
   type Communication, type InsertCommunication,
-  type TwilioCredential, type InsertTwilioCredential,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -144,11 +143,6 @@ export interface IStorage {
   getSmsSentCountToday(agentId: number): Promise<number>;
   getUniqueRecipientsToday(agentId: number): Promise<number>;
 
-  // Twilio credentials (per-agent)
-  getTwilioCredentials(userId: number): Promise<TwilioCredential | null>;
-  saveTwilioCredentials(creds: InsertTwilioCredential): Promise<TwilioCredential>;
-  deleteTwilioCredentials(userId: number): Promise<void>;
-  getTwilioCredentialsByPhone(phoneNumber: string): Promise<TwilioCredential | null>;
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -2648,78 +2642,6 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error getting unique recipients:', error);
       return 0;
-    }
-  }
-
-  async getTwilioCredentials(userId: number): Promise<TwilioCredential | null> {
-    try {
-      const result = await db.execute(
-        sql`SELECT * FROM twilio_credentials WHERE user_id = ${userId} LIMIT 1`
-      );
-      if (!result.rows?.length) return null;
-      const row = result.rows[0] as any;
-      return {
-        id: Number(row.id),
-        userId: Number(row.user_id),
-        accountSid: String(row.account_sid),
-        authToken: String(row.auth_token),
-        phoneNumber: String(row.phone_number),
-        createdAt: row.created_at ? new Date(row.created_at) : null,
-        updatedAt: row.updated_at ? new Date(row.updated_at) : null,
-      };
-    } catch (error) {
-      console.error('Error getting Twilio credentials:', error);
-      return null;
-    }
-  }
-
-  async saveTwilioCredentials(creds: InsertTwilioCredential): Promise<TwilioCredential> {
-    const result = await db.execute(
-      sql`INSERT INTO twilio_credentials (user_id, account_sid, auth_token, phone_number)
-          VALUES (${creds.userId}, ${creds.accountSid}, ${creds.authToken}, ${creds.phoneNumber})
-          ON CONFLICT (user_id) DO UPDATE SET
-            account_sid = ${creds.accountSid},
-            auth_token = ${creds.authToken},
-            phone_number = ${creds.phoneNumber},
-            updated_at = NOW()
-          RETURNING *`
-    );
-    const row = result.rows[0] as any;
-    return {
-      id: Number(row.id),
-      userId: Number(row.user_id),
-      accountSid: String(row.account_sid),
-      authToken: String(row.auth_token),
-      phoneNumber: String(row.phone_number),
-      createdAt: row.created_at ? new Date(row.created_at) : null,
-      updatedAt: row.updated_at ? new Date(row.updated_at) : null,
-    };
-  }
-
-  async deleteTwilioCredentials(userId: number): Promise<void> {
-    await db.execute(sql`DELETE FROM twilio_credentials WHERE user_id = ${userId}`);
-  }
-
-  async getTwilioCredentialsByPhone(phoneNumber: string): Promise<TwilioCredential | null> {
-    try {
-      const normalized = this.normalizePhone(phoneNumber);
-      const result = await db.execute(
-        sql`SELECT * FROM twilio_credentials WHERE phone_number = ${normalized} LIMIT 1`
-      );
-      if (!result.rows?.length) return null;
-      const row = result.rows[0] as any;
-      return {
-        id: Number(row.id),
-        userId: Number(row.user_id),
-        accountSid: String(row.account_sid),
-        authToken: String(row.auth_token),
-        phoneNumber: String(row.phone_number),
-        createdAt: row.created_at ? new Date(row.created_at) : null,
-        updatedAt: row.updated_at ? new Date(row.updated_at) : null,
-      };
-    } catch (error) {
-      console.error('Error getting Twilio credentials by phone:', error);
-      return null;
     }
   }
 

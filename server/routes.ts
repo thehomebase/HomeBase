@@ -8,7 +8,7 @@ import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
-import { sendSMSWithCredentials, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, verifyTwilioCredentials } from "./twilio-service";
+import { sendSMS, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages } from "./gmail-service";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -1924,65 +1924,14 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (req.user.role !== "agent") return res.sendStatus(403);
     try {
-      const [twilioCreds, gmailStatus] = await Promise.all([
-        storage.getTwilioCredentials(req.user.id),
-        getGmailStatus(req.user.id),
-      ]);
+      const gmailStatus = await getGmailStatus(req.user.id);
       res.json({
-        twilio: !!twilioCreds,
-        twilioPhone: twilioCreds?.phoneNumber || null,
+        twilio: isTwilioConfigured(),
+        twilioPhone: isTwilioConfigured() ? getTwilioPhoneNumber() : null,
         gmail: gmailStatus,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to check communication status" });
-    }
-  });
-
-  app.post("/api/twilio/connect", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
-    try {
-      const schema = z.object({
-        accountSid: z.string().min(1, "Account SID is required"),
-        authToken: z.string().min(1, "Auth Token is required"),
-        phoneNumber: z.string().min(1, "Phone number is required"),
-      });
-      const parsed = schema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
-      }
-
-      const { accountSid, authToken, phoneNumber } = parsed.data;
-      const normalized = normalizePhoneNumber(phoneNumber);
-
-      const verification = await verifyTwilioCredentials(accountSid, authToken, normalized);
-      if (!verification.valid) {
-        return res.status(400).json({ error: verification.error });
-      }
-
-      const saved = await storage.saveTwilioCredentials({
-        userId: req.user.id,
-        accountSid,
-        authToken,
-        phoneNumber: normalized,
-      });
-
-      res.json({ success: true, phoneNumber: saved.phoneNumber });
-    } catch (error) {
-      console.error("Error connecting Twilio:", error);
-      res.status(500).json({ error: "Failed to connect Twilio account" });
-    }
-  });
-
-  app.post("/api/twilio/disconnect", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
-    try {
-      await storage.deleteTwilioCredentials(req.user.id);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error disconnecting Twilio:", error);
-      res.status(500).json({ error: "Failed to disconnect Twilio account" });
     }
   });
 
@@ -2099,9 +2048,8 @@ export function registerRoutes(app: Express): Server {
       }
       const { clientId, content } = parsed.data;
 
-      const twilioCreds = await storage.getTwilioCredentials(req.user.id);
-      if (!twilioCreds) {
-        return res.status(400).json({ error: "Twilio not connected. Please connect your Twilio account in the SMS tab to send messages." });
+      if (!isTwilioConfigured()) {
+        return res.status(400).json({ error: "SMS is not available. Please contact your platform administrator." });
       }
 
       const client = await storage.getClient(clientId);
@@ -2145,13 +2093,7 @@ export function registerRoutes(app: Express): Server {
         }
       }
 
-      const result = await sendSMSWithCredentials(
-        twilioCreds.accountSid,
-        twilioCreds.authToken,
-        twilioCreds.phoneNumber,
-        phone,
-        content
-      );
+      const result = await sendSMS(phone, content);
 
       const comm = await storage.createCommunication({
         clientId,
@@ -2176,22 +2118,15 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/twilio/webhook", async (req, res) => {
     try {
-      const { From, Body, To } = req.body;
-      if (!From || !Body || !To) {
+      const { From, Body } = req.body;
+      if (!From || !Body) {
         return res.status(400).send('<Response></Response>');
       }
 
-      const normalizedTo = normalizePhoneNumber(To);
-      const agentCreds = await storage.getTwilioCredentialsByPhone(normalizedTo);
-      if (!agentCreds) {
-        console.warn(`Twilio webhook: no agent found for number ${normalizedTo}`);
-        return res.status(403).send('<Response></Response>');
-      }
-
       const webhookUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
-      const isValid = await validateTwilioWebhook(req, webhookUrl, agentCreds.authToken);
+      const isValid = await validateTwilioWebhook(req, webhookUrl);
       if (!isValid) {
-        console.warn(`Twilio webhook: rejected invalid signature for agent ${agentCreds.userId}`);
+        console.warn('Twilio webhook: rejected invalid signature');
         return res.status(403).send('<Response></Response>');
       }
 
