@@ -298,13 +298,13 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
     },
   });
 
-  const { data: searchResults, isLoading: isSearching } = useQuery<{
+  const { data: searchResults, isLoading: isListingsSearching } = useQuery<{
     listings: RentCastListing[];
     fromCache: boolean;
   }>({
     queryKey: ["/api/rentcast/listings", searchParams],
     queryFn: async () => {
-      if (!searchParams || searchParams.__soldOnly) return { listings: [], fromCache: false };
+      if (!searchParams) return { listings: [], fromCache: false };
       const params = new URLSearchParams(searchParams);
       const res = await apiRequest("GET", `/api/rentcast/listings?${params.toString()}`);
       return res.json();
@@ -314,13 +314,17 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
   });
 
   const [extraListings, setExtraListings] = useState<RentCastListing[]>([]);
+  const [isSoldSearching, setIsSoldSearching] = useState(false);
+  const isSearching = isListingsSearching || isSoldSearching;
+  const [hasSearched, setHasSearched] = useState(false);
   const listings = useMemo(() => {
-    const primary = searchResults?.listings || [];
+    if (!hasSearched) return [];
+    const primary = searchParams ? (searchResults?.listings || []) : [];
     if (extraListings.length === 0) return primary;
     const existingIds = new Set(primary.map(l => l.id));
     const merged = [...primary, ...extraListings.filter(l => !existingIds.has(l.id))];
     return merged;
-  }, [searchResults, extraListings]);
+  }, [searchResults, extraListings, searchParams, hasSearched]);
 
   const haversineDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 3958.8;
@@ -330,8 +334,12 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }, []);
 
-  const hasPool = useCallback((listing: RentCastListing) =>
-    (listing.features || []).some((f: string) => /pool/i.test(f)), []);
+  const hasPool = useCallback((listing: RentCastListing) => {
+    const features = listing.features;
+    if (Array.isArray(features)) return features.some((f: string) => /pool/i.test(String(f)));
+    if (features && typeof features === "object") return !!(features as any).pool;
+    return false;
+  }, []);
 
   const filteredListings = useMemo(() => {
     const radiusMax = filterRadiusMax ? parseFloat(filterRadiusMax) : null;
@@ -470,24 +478,31 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
     if (listingStatuses.length > 0) {
       setSearchParams({ ...baseParams, status: listingStatuses[0] });
     } else {
-      setSearchParams({ __soldOnly: "true" });
+      setSearchParams(null);
     }
     setSelectedListingIds(new Set());
     setExtraListings([]);
+    setHasSearched(true);
 
     const fetchExtra = (url: string) => {
       fetch(url, { credentials: "include" })
-        .then(r => r.json())
+        .then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
         .then(data => {
-          if (data.listings?.length > 0) {
+          const items = Array.isArray(data?.listings) ? data.listings : [];
+          if (items.length > 0) {
             setExtraListings(prev => {
-              const existingIds = new Set(prev.map(l => l.id));
-              const newOnes = data.listings.filter((l: RentCastListing) => !existingIds.has(l.id));
+              const existingIds = new Set(prev.map((l: RentCastListing) => l.id));
+              const newOnes = items.filter((l: RentCastListing) => l.id && !existingIds.has(l.id));
               return [...prev, ...newOnes];
             });
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.error("fetchExtra error:", err);
+        });
     };
 
     if (listingStatuses.length > 1) {
@@ -498,10 +513,31 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
     }
 
     if (hasSold) {
+      setIsSoldSearching(true);
       const soldParams = new URLSearchParams(baseParams);
       soldParams.delete("status");
       soldParams.set("saleDateRange", "365");
-      fetchExtra(`/api/rentcast/sold?${soldParams.toString()}`);
+      fetch(`/api/rentcast/sold?${soldParams.toString()}`, { credentials: "include" })
+        .then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
+        .then(data => {
+          const items = Array.isArray(data?.listings) ? data.listings : [];
+          if (items.length > 0) {
+            setExtraListings(prev => {
+              const existingIds = new Set(prev.map((l: RentCastListing) => l.id));
+              const newOnes = items.filter((l: RentCastListing) => l.id && !existingIds.has(l.id));
+              return [...prev, ...newOnes];
+            });
+          }
+        })
+        .catch((err) => {
+          console.error("Sold search error:", err);
+        })
+        .finally(() => {
+          setIsSoldSearching(false);
+        });
     }
   };
 

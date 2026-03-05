@@ -1974,6 +1974,19 @@ export function registerRoutes(app: Express): Server {
       monthlyCallCount++;
       console.log(`RentCast sold returned ${Array.isArray(data) ? data.length : 'non-array'} properties`);
 
+      const normalizeFeatures = (features: any): string[] => {
+        if (Array.isArray(features)) return features;
+        if (features && typeof features === "object") {
+          const result: string[] = [];
+          for (const [key, value] of Object.entries(features)) {
+            if (value === true) result.push(key);
+            else if (typeof value === "string" && value) result.push(`${key}: ${value}`);
+          }
+          return result;
+        }
+        return [];
+      };
+
       const normalized = (Array.isArray(data) ? data : []).filter((p: any) => p.lastSalePrice).map((p: any) => ({
         id: p.id || `sold-${p.addressLine1}-${p.lastSaleDate}`,
         formattedAddress: p.formattedAddress || `${p.addressLine1 || ""}, ${p.city || ""}, ${p.state || ""} ${p.zipCode || ""}`.trim(),
@@ -1992,7 +2005,7 @@ export function registerRoutes(app: Express): Server {
         latitude: p.latitude || 0,
         longitude: p.longitude || 0,
         lotSize: p.lotSize || null,
-        features: p.features || [],
+        features: normalizeFeatures(p.features),
         lastSaleDate: p.lastSaleDate || null,
         lastSalePrice: p.lastSalePrice || null,
       }));
