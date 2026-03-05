@@ -555,7 +555,7 @@ export default function MapDrawSearch() {
           </Label>
           <Select value={minPrice} onValueChange={setMinPrice}>
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[1100]">
               {PRICE_MIN_OPTIONS.map((o) => (
                 <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
               ))}
@@ -568,7 +568,7 @@ export default function MapDrawSearch() {
           </Label>
           <Select value={maxPrice} onValueChange={setMaxPrice}>
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[1100]">
               {PRICE_MAX_OPTIONS.map((o) => (
                 <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
               ))}
@@ -581,7 +581,7 @@ export default function MapDrawSearch() {
           </Label>
           <Select value={beds} onValueChange={setBeds}>
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[1100]">
               {BEDS_OPTIONS.map((o) => (
                 <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
               ))}
@@ -594,7 +594,7 @@ export default function MapDrawSearch() {
           </Label>
           <Select value={propertyType} onValueChange={setPropertyType}>
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[1100]">
               {PROPERTY_TYPES.map((o) => (
                 <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
               ))}
