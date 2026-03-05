@@ -190,7 +190,7 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
   const [filterLotMax, setFilterLotMax] = useState("");
   const [filterRadiusMax, setFilterRadiusMax] = useState("");
   const [filterPool, setFilterPool] = useState("all");
-  const [searchStatuses, setSearchStatuses] = useState<Set<string>>(new Set(["Active", "Pending", "Sold"]));
+  const [searchStatuses, setSearchStatuses] = useState<Set<string>>(new Set(["Active"]));
   const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
 
   const { isLoading: isLoadingReport } = useQuery<CmaReport>({
@@ -311,7 +311,14 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
     staleTime: 24 * 60 * 60 * 1000,
   });
 
-  const listings = searchResults?.listings || [];
+  const [extraListings, setExtraListings] = useState<RentCastListing[]>([]);
+  const listings = useMemo(() => {
+    const primary = searchResults?.listings || [];
+    if (extraListings.length === 0) return primary;
+    const existingIds = new Set(primary.map(l => l.id));
+    const merged = [...primary, ...extraListings.filter(l => !existingIds.has(l.id))];
+    return merged;
+  }, [searchResults, extraListings]);
 
   const geocodeSubject = async () => {
     const addr = subjectAddress.trim();
@@ -381,29 +388,48 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
   };
 
   const handleSearchComps = () => {
-    const params: Record<string, string> = {};
+    const baseParams: Record<string, string> = {};
     const city = searchCity || subjectCity;
     const state = searchState || subjectState;
     const zip = searchZip || subjectZip;
 
     if (zip) {
-      params.zipCode = zip;
+      baseParams.zipCode = zip;
     } else if (city) {
-      params.city = city;
-      if (state) params.state = state;
+      baseParams.city = city;
+      if (state) baseParams.state = state;
     } else {
       toast({ title: "Enter a location", description: "Provide a city or ZIP code to search comps.", variant: "destructive" });
       return;
     }
 
-    if (subjectBeds) params.bedroomsMin = String(Math.max(1, parseInt(subjectBeds) - 1));
+    if (subjectBeds) baseParams.bedroomsMin = String(Math.max(1, parseInt(subjectBeds) - 1));
+    baseParams.limit = "100";
+
     const activeStatuses = Array.from(searchStatuses);
-    if (activeStatuses.length === 1) {
-      params.status = activeStatuses[0];
-    }
-    params.limit = "100";
-    setSearchParams(params);
+    const firstStatus = activeStatuses[0] || "Active";
+    setSearchParams({ ...baseParams, status: firstStatus });
     setSelectedListingIds(new Set());
+    setExtraListings([]);
+
+    if (activeStatuses.length > 1) {
+      const additionalStatuses = activeStatuses.slice(1);
+      additionalStatuses.forEach(status => {
+        const params = new URLSearchParams({ ...baseParams, status });
+        fetch(`/api/rentcast/listings?${params.toString()}`, { credentials: "include" })
+          .then(r => r.json())
+          .then(data => {
+            if (data.listings?.length > 0) {
+              setExtraListings(prev => {
+                const existingIds = new Set(prev.map(l => l.id));
+                const newOnes = data.listings.filter((l: RentCastListing) => !existingIds.has(l.id));
+                return [...prev, ...newOnes];
+              });
+            }
+          })
+          .catch(() => {});
+      });
+    }
   };
 
   const addSelectedComps = () => {
@@ -672,24 +698,28 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
             <div>
               <Label>Status</Label>
               <div className="flex items-center gap-3 h-9">
-                {["Active", "Pending", "Sold"].map(status => (
-                  <label key={status} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                {[
+                  { label: "Active", value: "Active" },
+                  { label: "Pending", value: "Pending" },
+                  { label: "Sold", value: "Inactive" },
+                ].map(({ label, value }) => (
+                  <label key={value} className="flex items-center gap-1.5 text-sm cursor-pointer">
                     <Checkbox
-                      checked={searchStatuses.has(status)}
+                      checked={searchStatuses.has(value)}
                       onCheckedChange={(checked) => {
                         setSearchStatuses(prev => {
                           const next = new Set(prev);
                           if (checked) {
-                            next.add(status);
+                            next.add(value);
                           } else {
-                            next.delete(status);
+                            next.delete(value);
                             if (next.size === 0) return prev;
                           }
                           return next;
                         });
                       }}
                     />
-                    {status}
+                    {label}
                   </label>
                 ))}
               </div>
@@ -902,23 +932,26 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
                     : `${listings.length} properties found`}
                 </p>
                 <div className="flex items-center gap-2">
-                  {selectedListingIds.size > 0 && (
-                    <Button
-                      size="sm"
-                      variant={narrowed ? "default" : "outline"}
-                      onClick={() => setNarrowed(!narrowed)}
-                      className="gap-1"
-                    >
-                      {narrowed ? <X className="h-3.5 w-3.5" /> : <Filter className="h-3.5 w-3.5" />}
-                      {narrowed ? "Show All" : `Narrow to ${selectedListingIds.size} Selected`}
-                    </Button>
-                  )}
-                  {selectedListingIds.size > 0 && (
-                    <Button size="sm" onClick={addSelectedComps} className="gap-1">
-                      <Plus className="h-4 w-4" />
-                      Add {selectedListingIds.size} Selected
-                    </Button>
-                  )}
+                  {selectedListingIds.size > 0 && (() => {
+                    const visibleSelectedCount = poolFiltered.filter(l => selectedListingIds.has(l.id)).length;
+                    return (
+                      <>
+                        <Button
+                          size="sm"
+                          variant={narrowed ? "default" : "outline"}
+                          onClick={() => setNarrowed(!narrowed)}
+                          className="gap-1"
+                        >
+                          {narrowed ? <X className="h-3.5 w-3.5" /> : <Filter className="h-3.5 w-3.5" />}
+                          {narrowed ? "Show All" : `Narrow to ${visibleSelectedCount} Selected`}
+                        </Button>
+                        <Button size="sm" onClick={addSelectedComps} className="gap-1">
+                          <Plus className="h-4 w-4" />
+                          Add {visibleSelectedCount} Selected
+                        </Button>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
               <div className="max-h-[400px] overflow-y-auto border rounded-lg">
@@ -1001,7 +1034,7 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
                           <td className="px-2 py-2 font-medium truncate">{listing.formattedAddress || listing.addressLine1}</td>
                           <td className="px-2 py-2 text-center">
                             <Badge variant={listing.status === "Active" ? "default" : listing.status === "Pending" ? "secondary" : "outline"} className="text-xs px-1.5 py-0">
-                              {listing.status}
+                              {listing.status === "Inactive" ? "Sold" : listing.status}
                             </Badge>
                           </td>
                           <td className="px-2 py-2 text-right font-semibold text-primary">{formatPrice(listing.price)}</td>
