@@ -53,40 +53,22 @@ const SQFT_MIN_OPTIONS = [
   { value: "5000", label: "5,000+" },
 ];
 
-const PRICE_MIN_OPTIONS = [
-  { value: "any", label: "No Min" },
-  { value: "50000", label: "$50,000" },
-  { value: "100000", label: "$100,000" },
-  { value: "150000", label: "$150,000" },
-  { value: "200000", label: "$200,000" },
-  { value: "250000", label: "$250,000" },
-  { value: "300000", label: "$300,000" },
-  { value: "400000", label: "$400,000" },
-  { value: "500000", label: "$500,000" },
-  { value: "600000", label: "$600,000" },
-  { value: "750000", label: "$750,000" },
-  { value: "1000000", label: "$1,000,000" },
-  { value: "1500000", label: "$1,500,000" },
-  { value: "2000000", label: "$2,000,000" },
+const STATUS_OPTIONS = [
+  { value: "Active", label: "Active" },
+  { value: "Pending", label: "Pending" },
+  { value: "Sold", label: "Sold" },
 ];
 
-const PRICE_MAX_OPTIONS = [
-  { value: "any", label: "No Max" },
-  { value: "100000", label: "$100,000" },
-  { value: "150000", label: "$150,000" },
-  { value: "200000", label: "$200,000" },
-  { value: "250000", label: "$250,000" },
-  { value: "300000", label: "$300,000" },
-  { value: "400000", label: "$400,000" },
-  { value: "500000", label: "$500,000" },
-  { value: "600000", label: "$600,000" },
-  { value: "750000", label: "$750,000" },
-  { value: "1000000", label: "$1,000,000" },
-  { value: "1500000", label: "$1,500,000" },
-  { value: "2000000", label: "$2,000,000" },
-  { value: "3000000", label: "$3,000,000" },
-  { value: "5000000", label: "$5,000,000" },
-];
+function formatPriceInput(value: string): string {
+  const digits = value.replace(/[^\d]/g, "");
+  if (!digits) return "";
+  return "$" + parseInt(digits).toLocaleString();
+}
+
+function parsePriceInput(value: string): string {
+  const digits = value.replace(/[^\d]/g, "");
+  return digits || "";
+}
 
 interface RentCastListing {
   id: string;
@@ -409,12 +391,13 @@ function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll }: { 
 export default function PropertySearchPage() {
   const [rcLocation, setRcLocation] = useState("");
   const [rcPropertyType, setRcPropertyType] = useState("any");
-  const [rcMinPrice, setRcMinPrice] = useState("any");
-  const [rcMaxPrice, setRcMaxPrice] = useState("any");
+  const [rcMinPrice, setRcMinPrice] = useState("");
+  const [rcMaxPrice, setRcMaxPrice] = useState("");
   const [rcBeds, setRcBeds] = useState("any");
   const [rcBaths, setRcBaths] = useState("any");
   const [rcMinSqft, setRcMinSqft] = useState("any");
   const [rcPool, setRcPool] = useState("any");
+  const [rcStatus, setRcStatus] = useState("Active");
 
   const [searchParams, setSearchParams] = useState<Record<string, string> | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
@@ -489,9 +472,10 @@ export default function PropertySearchPage() {
   });
 
   const filteredListings = (rentcastResults?.listings || []).filter(listing => {
-    const min = rcMinPrice !== "any" ? parseInt(rcMinPrice) : 0;
-    const max = rcMaxPrice !== "any" ? parseInt(rcMaxPrice) : Infinity;
-    if (listing.price < min || listing.price > max) return false;
+    const minP = parsePriceInput(rcMinPrice);
+    const maxP = parsePriceInput(rcMaxPrice);
+    if (minP && listing.price < parseInt(minP)) return false;
+    if (maxP && listing.price > parseInt(maxP)) return false;
     if (rcBeds !== "any" && listing.bedrooms < parseInt(rcBeds)) return false;
     if (rcBaths !== "any" && listing.bathrooms < parseInt(rcBaths)) return false;
     if (rcMinSqft !== "any" && (listing.squareFootage || 0) < parseInt(rcMinSqft)) return false;
@@ -562,12 +546,14 @@ export default function PropertySearchPage() {
       if (parsed.state) params.state = parsed.state;
     }
 
-    if (rcMinPrice !== "any") params.minPrice = rcMinPrice;
-    if (rcMaxPrice !== "any") params.maxPrice = rcMaxPrice;
+    const minP = parsePriceInput(rcMinPrice);
+    const maxP = parsePriceInput(rcMaxPrice);
+    if (minP) params.minPrice = minP;
+    if (maxP) params.maxPrice = maxP;
     if (rcBeds !== "any") params.bedroomsMin = rcBeds;
     if (rcBaths !== "any") params.bathroomsMin = rcBaths;
     if (rcPropertyType !== "any") params.propertyType = rcPropertyType;
-    params.status = "Active";
+    params.status = rcStatus;
     params.limit = "500";
 
     setSearchParams(params);
@@ -577,12 +563,13 @@ export default function PropertySearchPage() {
   const handleResetRentCast = () => {
     setRcLocation("");
     setRcPropertyType("any");
-    setRcMinPrice("any");
-    setRcMaxPrice("any");
+    setRcMinPrice("");
+    setRcMaxPrice("");
     setRcBeds("any");
     setRcBaths("any");
     setRcMinSqft("any");
     setRcPool("any");
+    setRcStatus("Active");
     setSearchParams(null);
   };
 
@@ -650,7 +637,7 @@ export default function PropertySearchPage() {
                 Search Active Listings
               </CardTitle>
               <CardDescription>
-                Search for properties currently on the market. Enter a city and state (e.g. "Fort Worth TX") or a ZIP code.
+                Search for active, pending, or sold properties. Enter a city and state (e.g. "Fort Worth TX") or a ZIP code.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -668,30 +655,37 @@ export default function PropertySearchPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label className="font-medium flex items-center gap-1.5">
                     <DollarSign className="h-4 w-4" />
                     Min Price
                   </Label>
-                  <Select value={rcMinPrice} onValueChange={setRcMinPrice}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {PRICE_MIN_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    placeholder="No Min"
+                    value={formatPriceInput(rcMinPrice)}
+                    onChange={(e) => setRcMinPrice(parsePriceInput(e.target.value))}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="font-medium flex items-center gap-1.5">
                     <DollarSign className="h-4 w-4" />
                     Max Price
                   </Label>
-                  <Select value={rcMaxPrice} onValueChange={setRcMaxPrice}>
+                  <Input
+                    placeholder="No Max"
+                    value={formatPriceInput(rcMaxPrice)}
+                    onChange={(e) => setRcMaxPrice(parsePriceInput(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    Status
+                  </Label>
+                  <Select value={rcStatus} onValueChange={setRcStatus}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {PRICE_MAX_OPTIONS.map((opt) => (
+                      {STATUS_OPTIONS.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                       ))}
                     </SelectContent>

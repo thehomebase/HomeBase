@@ -6,6 +6,7 @@ import "leaflet-draw/dist/leaflet.draw.css";
 import "leaflet-draw";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,28 +42,22 @@ interface RentCastListing {
   features?: string[];
 }
 
-const PRICE_MIN_OPTIONS = [
-  { value: "any", label: "No Min" },
-  { value: "100000", label: "$100K" },
-  { value: "200000", label: "$200K" },
-  { value: "300000", label: "$300K" },
-  { value: "400000", label: "$400K" },
-  { value: "500000", label: "$500K" },
-  { value: "750000", label: "$750K" },
-  { value: "1000000", label: "$1M" },
+const STATUS_OPTIONS = [
+  { value: "Active", label: "Active" },
+  { value: "Pending", label: "Pending" },
+  { value: "Sold", label: "Sold" },
 ];
 
-const PRICE_MAX_OPTIONS = [
-  { value: "any", label: "No Max" },
-  { value: "200000", label: "$200K" },
-  { value: "300000", label: "$300K" },
-  { value: "400000", label: "$400K" },
-  { value: "500000", label: "$500K" },
-  { value: "750000", label: "$750K" },
-  { value: "1000000", label: "$1M" },
-  { value: "2000000", label: "$2M" },
-  { value: "5000000", label: "$5M" },
-];
+function formatPriceInput(value: string): string {
+  const digits = value.replace(/[^\d]/g, "");
+  if (!digits) return "";
+  return "$" + parseInt(digits).toLocaleString();
+}
+
+function parsePriceInput(value: string): string {
+  const digits = value.replace(/[^\d]/g, "");
+  return digits || "";
+}
 
 const BEDS_OPTIONS = [
   { value: "any", label: "Any" },
@@ -471,21 +466,23 @@ export default function MapDrawSearch() {
   const [apiCallsUsed, setApiCallsUsed] = useState(0);
   const [apiCallsLimit, setApiCallsLimit] = useState(45);
 
-  const [minPrice, setMinPrice] = useState("any");
-  const [maxPrice, setMaxPrice] = useState("any");
+  const [minPriceInput, setMinPriceInput] = useState("");
+  const [maxPriceInput, setMaxPriceInput] = useState("");
   const [beds, setBeds] = useState("any");
   const [propertyType, setPropertyType] = useState("any");
   const [minSqft, setMinSqft] = useState("any");
   const [poolFilter, setPoolFilter] = useState("any");
+  const [statusFilter, setStatusFilter] = useState("Active");
 
   const { toast } = useToast();
 
   const filteredListings = allListings.filter((listing) => {
     if (!drawnPolygon) return true;
     if (!pointInPolygon(listing.latitude, listing.longitude, drawnPolygon)) return false;
-    const min = minPrice !== "any" ? parseInt(minPrice) : 0;
-    const max = maxPrice !== "any" ? parseInt(maxPrice) : Infinity;
-    if (listing.price < min || listing.price > max) return false;
+    const minP = parsePriceInput(minPriceInput);
+    const maxP = parsePriceInput(maxPriceInput);
+    if (minP && listing.price < parseInt(minP)) return false;
+    if (maxP && listing.price > parseInt(maxP)) return false;
     if (beds !== "any" && listing.bedrooms < parseInt(beds)) return false;
     if (propertyType !== "any" && listing.propertyType !== propertyType) return false;
     if (minSqft !== "any" && (listing.squareFootage || 0) < parseInt(minSqft)) return false;
@@ -534,10 +531,12 @@ export default function MapDrawSearch() {
       for (const zip of zips) {
         const params = new URLSearchParams();
         params.set("zipCode", zip);
-        params.set("status", "Active");
+        params.set("status", statusFilter);
         params.set("limit", "500");
-        if (minPrice !== "any") params.set("minPrice", minPrice);
-        if (maxPrice !== "any") params.set("maxPrice", maxPrice);
+        const minP = parsePriceInput(minPriceInput);
+        const maxP = parsePriceInput(maxPriceInput);
+        if (minP) params.set("minPrice", minP);
+        if (maxP) params.set("maxPrice", maxP);
         if (beds !== "any") params.set("bedroomsMin", beds);
         if (propertyType !== "any") params.set("propertyType", propertyType);
 
@@ -619,32 +618,28 @@ export default function MapDrawSearch() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 relative z-[1001]">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 relative z-[1001]">
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
             <DollarSign className="h-3 w-3" /> Min Price
           </Label>
-          <Select value={minPrice} onValueChange={setMinPrice}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent className="z-[1100]">
-              {PRICE_MIN_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input
+            className="h-8 text-xs"
+            placeholder="No Min"
+            value={formatPriceInput(minPriceInput)}
+            onChange={(e) => setMinPriceInput(parsePriceInput(e.target.value))}
+          />
         </div>
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
             <DollarSign className="h-3 w-3" /> Max Price
           </Label>
-          <Select value={maxPrice} onValueChange={setMaxPrice}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent className="z-[1100]">
-              {PRICE_MAX_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input
+            className="h-8 text-xs"
+            placeholder="No Max"
+            value={formatPriceInput(maxPriceInput)}
+            onChange={(e) => setMaxPriceInput(parsePriceInput(e.target.value))}
+          />
         </div>
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
@@ -693,6 +688,17 @@ export default function MapDrawSearch() {
               <SelectItem value="any">Either</SelectItem>
               <SelectItem value="yes">Pool</SelectItem>
               <SelectItem value="no">No Pool</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs flex items-center gap-1">Status</Label>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent className="z-[1100]">
+              {STATUS_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
