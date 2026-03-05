@@ -294,14 +294,22 @@ const ClientDetailsPanel = ({
         </SheetHeader>
 
         {onContact && (
-          <div className="mt-4">
+          <div className="mt-4 flex gap-2">
             <Button
-              variant="outline"
-              className="w-full gap-2"
+              variant="default"
+              className="flex-1 gap-2"
               onClick={() => onContact(editingClient)}
             >
               <MessageSquare className="h-4 w-4" />
-              Contact {editingClient.firstName}
+              SMS
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 gap-2"
+              onClick={() => onContact(editingClient)}
+            >
+              <Mail className="h-4 w-4" />
+              Email
             </Button>
           </div>
         )}
