@@ -310,6 +310,25 @@ export const smsOptOuts = pgTable("sms_opt_outs", {
 
 export type SmsOptOut = typeof smsOptOuts.$inferSelect;
 
+export const twilioCredentials = pgTable("twilio_credentials", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  accountSid: text("account_sid").notNull(),
+  authToken: text("auth_token").notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTwilioCredentialSchema = createInsertSchema(twilioCredentials).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type TwilioCredential = typeof twilioCredentials.$inferSelect;
+export type InsertTwilioCredential = z.infer<typeof insertTwilioCredentialSchema>;
+
 export const googleTokens = pgTable("google_tokens", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().unique(),

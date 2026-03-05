@@ -1,5 +1,3 @@
-let twilioClient: any = null;
-
 const BLOCKED_NUMBERS = new Set([
   '911', '112', '999',
   '311', '411', '511', '611', '711', '811',
@@ -23,23 +21,6 @@ const BLOCKED_PATTERNS = [
   /\b(burn\s+down|set\s+fire|arson)\b/i,
 ];
 
-export function containsThreateningContent(message: string): { flagged: boolean; reason?: string } {
-  for (const pattern of BLOCKED_PATTERNS) {
-    if (pattern.test(message)) {
-      return { flagged: true, reason: "Message contains language that may be perceived as threatening or harmful." };
-    }
-  }
-  return { flagged: false };
-}
-
-export function isBlockedNumber(phone: string): boolean {
-  const digits = phone.replace(/\D/g, '');
-  if (BLOCKED_NUMBERS.has(digits)) return true;
-  if (digits.length <= 3) return true;
-  if (digits.length < 7) return true;
-  return false;
-}
-
 export function normalizePhoneNumber(phone: string): string {
   const digits = phone.replace(/\D/g, '');
   if (digits.length === 10) {
@@ -51,35 +32,45 @@ export function normalizePhoneNumber(phone: string): string {
   return `+${digits}`;
 }
 
-async function getTwilioClient() {
-  try {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-    if (!accountSid || !authToken) {
-      return null;
-    }
-    if (!twilioClient) {
-      const twilio = await import('twilio');
-      twilioClient = twilio.default(accountSid, authToken);
-    }
-    return twilioClient;
-  } catch (error) {
-    console.error('Failed to initialize Twilio client:', error);
-    return null;
-  }
+export function isBlockedNumber(phone: string): boolean {
+  const digits = phone.replace(/\D/g, '');
+  if (BLOCKED_NUMBERS.has(digits)) return true;
+  if (digits.length <= 3) return true;
+  if (digits.length < 7) return true;
+  return false;
 }
 
-export async function sendSMS(to: string, body: string): Promise<{ success: boolean; externalId?: string; error?: string }> {
-  const client = await getTwilioClient();
-  if (!client) {
-    return { success: false, error: "Twilio not configured. Please connect Twilio integration." };
-  }
-
-  try {
-    const fromNumber = process.env.TWILIO_PHONE_NUMBER;
-    if (!fromNumber) {
-      return { success: false, error: "Twilio phone number not configured (TWILIO_PHONE_NUMBER)." };
+export function containsThreateningContent(message: string): { flagged: boolean; reason?: string } {
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(message)) {
+      return { flagged: true, reason: "Message contains language that may be perceived as threatening or harmful." };
     }
+  }
+  return { flagged: false };
+}
+
+const agentClients = new Map<string, any>();
+
+async function getAgentTwilioClient(accountSid: string, authToken: string) {
+  const key = accountSid;
+  if (agentClients.has(key)) {
+    return agentClients.get(key);
+  }
+  const twilio = await import('twilio');
+  const client = twilio.default(accountSid, authToken);
+  agentClients.set(key, client);
+  return client;
+}
+
+export async function sendSMSWithCredentials(
+  accountSid: string,
+  authToken: string,
+  fromNumber: string,
+  to: string,
+  body: string
+): Promise<{ success: boolean; externalId?: string; error?: string }> {
+  try {
+    const client = await getAgentTwilioClient(accountSid, authToken);
 
     const formattedTo = normalizePhoneNumber(to);
     const formattedFrom = normalizePhoneNumber(fromNumber);
@@ -100,13 +91,33 @@ export async function sendSMS(to: string, body: string): Promise<{ success: bool
   }
 }
 
-export async function isTwilioConfigured(): Promise<boolean> {
-  return !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER);
+export async function verifyTwilioCredentials(
+  accountSid: string,
+  authToken: string,
+  phoneNumber: string
+): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const twilio = await import('twilio');
+    const client = twilio.default(accountSid, authToken);
+    await client.api.accounts(accountSid).fetch();
+
+    const formatted = normalizePhoneNumber(phoneNumber);
+    const numbers = await client.incomingPhoneNumbers.list({ phoneNumber: formatted, limit: 1 });
+    if (numbers.length === 0) {
+      return { valid: false, error: "The phone number was not found in your Twilio account. Make sure you've purchased this number." };
+    }
+
+    return { valid: true };
+  } catch (error: any) {
+    if (error.code === 20003) {
+      return { valid: false, error: "Invalid Account SID or Auth Token. Please double-check your Twilio credentials." };
+    }
+    return { valid: false, error: error.message || "Failed to verify Twilio credentials." };
+  }
 }
 
-export async function validateTwilioWebhook(req: any, url: string): Promise<boolean> {
+export async function validateTwilioWebhook(req: any, url: string, authToken: string): Promise<boolean> {
   try {
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
     if (!authToken) return false;
 
     const signature = req.headers['x-twilio-signature'];

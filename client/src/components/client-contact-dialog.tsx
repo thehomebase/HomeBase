@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, MessageSquare, Loader2, CheckCircle, XCircle, Clock, AlertTriangle, Link2, Unlink, ShieldAlert } from "lucide-react";
+import { Mail, MessageSquare, Loader2, CheckCircle, XCircle, Clock, AlertTriangle, Link2, Unlink, ShieldAlert, Phone } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -25,8 +25,12 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
   const [emailSubject, setEmailSubject] = useState("");
   const [emailContent, setEmailContent] = useState("");
   const [activeTab, setActiveTab] = useState("sms");
+  const [twilioAccountSid, setTwilioAccountSid] = useState("");
+  const [twilioAuthToken, setTwilioAuthToken] = useState("");
+  const [twilioPhoneNumber, setTwilioPhoneNumber] = useState("");
+  const [showTwilioSetup, setShowTwilioSetup] = useState(false);
 
-  const { data: commStatus } = useQuery<{ twilio: boolean; gmail: { connected: boolean; email?: string } }>({
+  const { data: commStatus } = useQuery<{ twilio: boolean; twilioPhone?: string; gmail: { connected: boolean; email?: string } }>({
     queryKey: ["/api/communications/status"],
     enabled: open,
   });
@@ -133,6 +137,63 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
     },
   });
 
+  const connectTwilioMutation = useMutation({
+    mutationFn: async (data: { accountSid: string; authToken: string; phoneNumber: string }) => {
+      const res = await apiRequest("POST", "/api/twilio/connect", data);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to connect Twilio");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/communications/status"] });
+      setTwilioAccountSid("");
+      setTwilioAuthToken("");
+      setTwilioPhoneNumber("");
+      setShowTwilioSetup(false);
+      toast({ title: "Twilio Connected", description: "Your Twilio account has been linked. You can now send SMS." });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Failed to connect Twilio account.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const disconnectTwilioMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/twilio/disconnect");
+      if (!res.ok) throw new Error("Failed to disconnect");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/communications/status"] });
+      toast({ title: "Twilio Disconnected", description: "Your Twilio account has been unlinked." });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Disconnect Failed",
+        description: error.message || "Failed to disconnect Twilio.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleConnectTwilio = () => {
+    if (!twilioAccountSid.trim() || !twilioAuthToken.trim() || !twilioPhoneNumber.trim()) {
+      toast({ title: "Missing fields", description: "Please fill in all Twilio fields.", variant: "destructive" });
+      return;
+    }
+    connectTwilioMutation.mutate({
+      accountSid: twilioAccountSid.trim(),
+      authToken: twilioAuthToken.trim(),
+      phoneNumber: twilioPhoneNumber.trim(),
+    });
+  };
+
   const handleSendSMS = () => {
     if (!client || !smsContent.trim()) return;
     const phone = client.mobilePhone || client.phone;
@@ -181,53 +242,123 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
           </TabsList>
 
           <TabsContent value="sms" className="space-y-4 mt-4">
-            {!commStatus?.twilio && (
-              <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
-                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-                <div className="text-sm">
-                  <p className="font-medium text-amber-800 dark:text-amber-200">Twilio not connected</p>
-                  <p className="text-amber-600 dark:text-amber-400 mt-1">
-                    SMS messaging requires Twilio integration. Contact your administrator to enable SMS.
-                  </p>
+            {!commStatus?.twilio ? (
+              <div className="space-y-4">
+                <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <Phone className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-800 dark:text-blue-200">Connect your Twilio account</p>
+                    <p className="text-blue-600 dark:text-blue-400 mt-1">
+                      Link your own Twilio account to send SMS to clients. Messages will be sent from your phone number.
+                    </p>
+                  </div>
                 </div>
+
+                {!showTwilioSetup ? (
+                  <Button onClick={() => setShowTwilioSetup(true)} className="w-full" variant="outline">
+                    <Link2 className="h-4 w-4 mr-2" /> Connect Twilio Account
+                  </Button>
+                ) : (
+                  <div className="space-y-3 border rounded-lg p-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Account SID</Label>
+                      <Input
+                        value={twilioAccountSid}
+                        onChange={(e) => setTwilioAccountSid(e.target.value)}
+                        placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Auth Token</Label>
+                      <Input
+                        type="password"
+                        value={twilioAuthToken}
+                        onChange={(e) => setTwilioAuthToken(e.target.value)}
+                        placeholder="Your auth token"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Phone Number</Label>
+                      <Input
+                        value={twilioPhoneNumber}
+                        onChange={(e) => setTwilioPhoneNumber(e.target.value)}
+                        placeholder="(817) 518-3845"
+                        className="text-sm"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Find these in your <a href="https://console.twilio.com" target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Twilio Console</a> dashboard.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button onClick={handleConnectTwilio} disabled={connectTwilioMutation.isPending} className="flex-1">
+                        {connectTwilioMutation.isPending ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verifying...</>
+                        ) : (
+                          "Connect"
+                        )}
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowTwilioSetup(false)} className="flex-1">Cancel</Button>
+                    </div>
+                  </div>
+                )}
               </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between p-2 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Sending from {commStatus.twilioPhone}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => disconnectTwilioMutation.mutate()}
+                    disabled={disconnectTwilioMutation.isPending}
+                    className="text-xs text-muted-foreground h-7"
+                  >
+                    <Unlink className="h-3 w-3 mr-1" /> Disconnect
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>To</Label>
+                  <Input value={phone || "No phone number"} disabled className="bg-muted" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Message</Label>
+                  <Textarea
+                    value={smsContent}
+                    onChange={(e) => setSmsContent(e.target.value)}
+                    placeholder="Type your text message..."
+                    rows={4}
+                    maxLength={1600}
+                  />
+                  <p className="text-xs text-muted-foreground text-right">{smsContent.length}/1600</p>
+                </div>
+
+                {smsLimits && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                    <span>{smsLimits.dailySent}/{smsLimits.dailyLimit} messages today</span>
+                    <span>{smsLimits.uniqueRecipients}/{smsLimits.uniqueRecipientsLimit} contacts today</span>
+                  </div>
+                )}
+
+                <Button
+                  onClick={handleSendSMS}
+                  disabled={!smsContent.trim() || !phone || smsMutation.isPending}
+                  className="w-full"
+                >
+                  {smsMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
+                  ) : (
+                    <><MessageSquare className="h-4 w-4 mr-2" /> Send SMS</>
+                  )}
+                </Button>
+              </>
             )}
-
-            <div className="space-y-2">
-              <Label>To</Label>
-              <Input value={phone || "No phone number"} disabled className="bg-muted" />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Message</Label>
-              <Textarea
-                value={smsContent}
-                onChange={(e) => setSmsContent(e.target.value)}
-                placeholder="Type your text message..."
-                rows={4}
-                maxLength={1600}
-              />
-              <p className="text-xs text-muted-foreground text-right">{smsContent.length}/1600</p>
-            </div>
-
-            {smsLimits && (
-              <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-                <span>{smsLimits.dailySent}/{smsLimits.dailyLimit} messages today</span>
-                <span>{smsLimits.uniqueRecipients}/{smsLimits.uniqueRecipientsLimit} contacts today</span>
-              </div>
-            )}
-
-            <Button
-              onClick={handleSendSMS}
-              disabled={!smsContent.trim() || !phone || smsMutation.isPending}
-              className="w-full"
-            >
-              {smsMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
-              ) : (
-                <><MessageSquare className="h-4 w-4 mr-2" /> Send SMS</>
-              )}
-            </Button>
           </TabsContent>
 
           <TabsContent value="email" className="space-y-4 mt-4">
