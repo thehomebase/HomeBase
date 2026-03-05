@@ -15,7 +15,7 @@ interface StorageDocument {
 // Update Document type to use the imported one from schema.ts
 import {
   users, transactions, checklists, messages, clients, documents, contractors, contractorReviews,
-  propertyViewings, propertyFeedback, showingRequests, savedProperties, communications,
+  propertyViewings, propertyFeedback, showingRequests, savedProperties, communications, smsOptOuts,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
   type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
   type ShowingRequest, type SavedProperty, type InsertSavedProperty,
@@ -133,6 +133,15 @@ export interface IStorage {
   // Communication operations
   getCommunicationsByClient(clientId: number, agentId: number): Promise<Communication[]>;
   createCommunication(comm: InsertCommunication): Promise<Communication>;
+
+  // SMS opt-out operations
+  isPhoneOptedOut(phoneNumber: string): Promise<boolean>;
+  addOptOut(phoneNumber: string): Promise<void>;
+  removeOptOut(phoneNumber: string): Promise<void>;
+
+  // SMS rate limiting
+  getSmsSentCountToday(agentId: number): Promise<number>;
+  getUniqueRecipientsToday(agentId: number): Promise<number>;
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -2572,6 +2581,74 @@ export class DatabaseStorage implements IStorage {
       externalId: created.externalId ? String(created.externalId) : null,
       createdAt: created.createdAt ? new Date(created.createdAt) : null,
     };
+  }
+
+  async isPhoneOptedOut(phoneNumber: string): Promise<boolean> {
+    try {
+      const normalized = this.normalizePhone(phoneNumber);
+      const result = await db.execute(
+        sql`SELECT id FROM sms_opt_outs WHERE phone_number = ${normalized} LIMIT 1`
+      );
+      return (result.rows?.length ?? 0) > 0;
+    } catch (error) {
+      console.error('Error checking opt-out status:', error);
+      return false;
+    }
+  }
+
+  async addOptOut(phoneNumber: string): Promise<void> {
+    try {
+      const normalized = this.normalizePhone(phoneNumber);
+      await db.execute(
+        sql`INSERT INTO sms_opt_outs (phone_number) VALUES (${normalized}) ON CONFLICT (phone_number) DO NOTHING`
+      );
+      console.log(`Phone ${normalized} added to opt-out list`);
+    } catch (error) {
+      console.error('Error adding opt-out:', error);
+    }
+  }
+
+  async removeOptOut(phoneNumber: string): Promise<void> {
+    try {
+      const normalized = this.normalizePhone(phoneNumber);
+      await db.execute(
+        sql`DELETE FROM sms_opt_outs WHERE phone_number = ${normalized}`
+      );
+      console.log(`Phone ${normalized} removed from opt-out list`);
+    } catch (error) {
+      console.error('Error removing opt-out:', error);
+    }
+  }
+
+  async getSmsSentCountToday(agentId: number): Promise<number> {
+    try {
+      const result = await db.execute(
+        sql`SELECT COUNT(*) as count FROM communications WHERE agent_id = ${agentId} AND type = 'sms' AND status = 'sent' AND created_at >= CURRENT_DATE`
+      );
+      return Number(result.rows?.[0]?.count ?? 0);
+    } catch (error) {
+      console.error('Error getting SMS count:', error);
+      return 0;
+    }
+  }
+
+  async getUniqueRecipientsToday(agentId: number): Promise<number> {
+    try {
+      const result = await db.execute(
+        sql`SELECT COUNT(DISTINCT client_id) as count FROM communications WHERE agent_id = ${agentId} AND type = 'sms' AND status = 'sent' AND created_at >= CURRENT_DATE`
+      );
+      return Number(result.rows?.[0]?.count ?? 0);
+    } catch (error) {
+      console.error('Error getting unique recipients:', error);
+      return 0;
+    }
+  }
+
+  private normalizePhone(phone: string): string {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 10) return `+1${digits}`;
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+    return `+${digits}`;
   }
 
   private mapTransactionRow(row: any): Transaction {

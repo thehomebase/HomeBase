@@ -101,12 +101,19 @@ Preferred communication style: Simple, everyday language.
 ### Client Communications (SMS via Twilio + Email via Gmail OAuth)
 - **Location**: `server/twilio-service.ts`, `server/gmail-service.ts`, `client/src/components/client-contact-dialog.tsx`, `client/src/pages/clients-page.tsx`
 - **Purpose**: Agents can send SMS and email to clients directly from the platform. SMS goes through platform-level Twilio. Email goes through each agent's own linked Gmail account via Google OAuth, minimizing platform liability.
-- **Database**: `communications` table logs message metadata (type, status, externalId). `google_tokens` table stores per-agent OAuth tokens (access_token, refresh_token, token_expiry, linked email).
+- **Database**: `communications` table logs message metadata (type, status, externalId). `google_tokens` table stores per-agent OAuth tokens (access_token, refresh_token, token_expiry, linked email). `sms_opt_outs` table stores phone numbers that have opted out via STOP keyword.
+- **SMS Compliance & Safety**:
+  - **Opt-out handling**: When a recipient replies STOP/UNSUBSCRIBE/CANCEL/END/QUIT, their number is added to the opt-out list. Agents cannot send SMS to opted-out numbers. Replying START/YES/UNSTOP re-subscribes.
+  - **Rate limiting**: 200 messages per agent per day, 50 unique recipients per agent per day. Agents can still message contacts they've already texted today even after hitting the unique recipient limit.
+  - **Webhook**: `POST /api/twilio/webhook` receives incoming SMS from Twilio, processes opt-out/opt-in keywords automatically.
+  - **Frontend**: SMS tab shows daily usage counters (messages sent / limit, unique contacts / limit).
 - **API Endpoints**:
   - `GET /api/communications/status` — check Twilio + Gmail connection status
   - `GET /api/communications/:clientId` — platform activity history
-  - `POST /api/communications/sms` — send SMS via Twilio
+  - `POST /api/communications/sms` — send SMS via Twilio (checks opt-out + rate limits)
   - `POST /api/communications/email` — send email via agent's Gmail
+  - `GET /api/sms/limits` — get current agent's daily SMS usage and limits
+  - `POST /api/twilio/webhook` — Twilio incoming SMS webhook (handles STOP/START)
   - `GET /api/gmail/auth-url` — get Google OAuth consent URL
   - `GET /api/gmail/callback` — handle OAuth callback, store tokens
   - `POST /api/gmail/disconnect` — remove linked Gmail

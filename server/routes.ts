@@ -8,7 +8,7 @@ import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
-import { sendSMS, isTwilioConfigured } from "./twilio-service";
+import { sendSMS, isTwilioConfigured, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages } from "./gmail-service";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -2030,6 +2030,9 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  const SMS_DAILY_LIMIT = 200;
+  const SMS_UNIQUE_RECIPIENTS_LIMIT = 50;
+
   app.post("/api/communications/sms", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (req.user.role !== "agent") return res.sendStatus(403);
@@ -2054,6 +2057,28 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Client has no phone number on file" });
       }
 
+      const isOptedOut = await storage.isPhoneOptedOut(phone);
+      if (isOptedOut) {
+        return res.status(403).json({ error: "This number has opted out of SMS messages. You cannot send texts to this number." });
+      }
+
+      const [dailyCount, uniqueRecipients] = await Promise.all([
+        storage.getSmsSentCountToday(req.user.id),
+        storage.getUniqueRecipientsToday(req.user.id),
+      ]);
+
+      if (dailyCount >= SMS_DAILY_LIMIT) {
+        return res.status(429).json({ error: `Daily SMS limit reached (${SMS_DAILY_LIMIT} messages per day). Please try again tomorrow.` });
+      }
+
+      if (uniqueRecipients >= SMS_UNIQUE_RECIPIENTS_LIMIT) {
+        const existingComms = await storage.getCommunicationsByClient(clientId, req.user.id);
+        const hasSentToday = existingComms.some(c => c.type === 'sms' && c.status === 'sent' && c.createdAt && new Date(c.createdAt).toDateString() === new Date().toDateString());
+        if (!hasSentToday) {
+          return res.status(429).json({ error: `You've reached the limit of ${SMS_UNIQUE_RECIPIENTS_LIMIT} unique contacts per day. You can still message contacts you've already texted today.` });
+        }
+      }
+
       const result = await sendSMS(phone, content);
 
       const comm = await storage.createCommunication({
@@ -2074,6 +2099,64 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error sending SMS:", error);
       res.status(500).json({ error: "Failed to send SMS" });
+    }
+  });
+
+  app.post("/api/twilio/webhook", async (req, res) => {
+    try {
+      const webhookUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+      const isValid = await validateTwilioWebhook(req, webhookUrl);
+      if (!isValid) {
+        console.warn('Twilio webhook: rejected invalid request');
+        return res.status(403).send('<Response></Response>');
+      }
+
+      const { From, Body } = req.body;
+      if (!From || !Body) {
+        return res.status(400).send('<Response></Response>');
+      }
+
+      const normalizedFrom = normalizePhoneNumber(From);
+      console.log(`Incoming SMS from ${normalizedFrom}: "${Body.trim()}"`);
+
+      if (isOptOutMessage(Body)) {
+        await storage.addOptOut(normalizedFrom);
+        console.log(`Opt-out processed for ${normalizedFrom}`);
+        res.type('text/xml').send('<Response><Message>You have been unsubscribed and will no longer receive SMS messages from us. Reply START to re-subscribe.</Message></Response>');
+        return;
+      }
+
+      if (isOptInMessage(Body)) {
+        await storage.removeOptOut(normalizedFrom);
+        console.log(`Opt-in processed for ${normalizedFrom}`);
+        res.type('text/xml').send('<Response><Message>You have been re-subscribed and may receive SMS messages from us again. Reply STOP to unsubscribe.</Message></Response>');
+        return;
+      }
+
+      res.type('text/xml').send('<Response></Response>');
+    } catch (error) {
+      console.error("Error processing Twilio webhook:", error);
+      res.type('text/xml').send('<Response></Response>');
+    }
+  });
+
+  app.get("/api/sms/limits", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const [dailyCount, uniqueRecipients] = await Promise.all([
+        storage.getSmsSentCountToday(req.user.id),
+        storage.getUniqueRecipientsToday(req.user.id),
+      ]);
+      res.json({
+        dailySent: dailyCount,
+        dailyLimit: SMS_DAILY_LIMIT,
+        uniqueRecipients,
+        uniqueRecipientsLimit: SMS_UNIQUE_RECIPIENTS_LIMIT,
+      });
+    } catch (error) {
+      console.error("Error fetching SMS limits:", error);
+      res.status(500).json({ error: "Failed to fetch SMS limits" });
     }
   });
 

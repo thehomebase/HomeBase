@@ -302,6 +302,14 @@ export const insertCommunicationSchema = createInsertSchema(communications).omit
 export type Communication = typeof communications.$inferSelect;
 export type InsertCommunication = z.infer<typeof insertCommunicationSchema>;
 
+export const smsOptOuts = pgTable("sms_opt_outs", {
+  id: serial("id").primaryKey(),
+  phoneNumber: text("phone_number").notNull().unique(),
+  optedOutAt: timestamp("opted_out_at").defaultNow(),
+});
+
+export type SmsOptOut = typeof smsOptOuts.$inferSelect;
+
 export const googleTokens = pgTable("google_tokens", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().unique(),

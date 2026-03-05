@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, MessageSquare, Loader2, CheckCircle, XCircle, Clock, AlertTriangle, Link2, Unlink } from "lucide-react";
+import { Mail, MessageSquare, Loader2, CheckCircle, XCircle, Clock, AlertTriangle, Link2, Unlink, ShieldAlert } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +41,11 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
     enabled: open && !!client?.id && !!commStatus?.gmail?.connected && activeTab === "history",
   });
 
+  const { data: smsLimits } = useQuery<{ dailySent: number; dailyLimit: number; uniqueRecipients: number; uniqueRecipientsLimit: number }>({
+    queryKey: ["/api/sms/limits"],
+    enabled: open && activeTab === "sms",
+  });
+
   const smsMutation = useMutation({
     mutationFn: async (data: { clientId: number; content: string }) => {
       const res = await apiRequest("POST", "/api/communications/sms", data);
@@ -52,6 +57,7 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/communications", client?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sms/limits"] });
       setSmsContent("");
       toast({ title: "SMS Sent", description: `Text message sent to ${client?.firstName} ${client?.lastName}` });
     },
@@ -203,6 +209,13 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
               />
               <p className="text-xs text-muted-foreground text-right">{smsContent.length}/1600</p>
             </div>
+
+            {smsLimits && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                <span>{smsLimits.dailySent}/{smsLimits.dailyLimit} messages today</span>
+                <span>{smsLimits.uniqueRecipients}/{smsLimits.uniqueRecipientsLimit} contacts today</span>
+              </div>
+            )}
 
             <Button
               onClick={handleSendSMS}
