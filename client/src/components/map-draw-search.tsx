@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Loader2, Trash2, Search, MapPin, BedDouble, Bath, Ruler, Building2,
-  DollarSign, ExternalLink, Heart, AlertTriangle, Info, ArrowUp, ArrowDown, ArrowUpDown
+  DollarSign, ExternalLink, Heart, AlertTriangle, Info, ArrowUp, ArrowDown, ArrowUpDown, CheckSquare
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -258,15 +259,16 @@ function SortIcon({ columnKey, sortKey, sortDir }: { columnKey: SortKey; sortKey
 
 function MapSearchResultsTable({
   listings,
-  onSave,
+  onBulkSave,
   isSaving,
 }: {
   listings: RentCastListing[];
-  onSave: (listing: RentCastListing) => void;
+  onBulkSave: (listings: RentCastListing[]) => void;
   isSaving: boolean;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -286,12 +288,40 @@ function MapSearchResultsTable({
     return 0;
   });
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (listings.every((l) => selectedIds.has(l.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(listings.map((l) => l.id)));
+    }
+  };
+
+  const allSelected = listings.length > 0 && listings.every((l) => selectedIds.has(l.id));
+  const someSelected = listings.some((l) => selectedIds.has(l.id));
+
+  const handleBulkSave = () => {
+    const selected = listings.filter((l) => selectedIds.has(l.id));
+    if (selected.length > 0) {
+      onBulkSave(selected);
+      setSelectedIds(new Set());
+    }
+  };
+
   const thSortable = (label: string, key: SortKey, align: string, extraClass = "") => (
     <th
-      className={`${align} px-2 py-2 font-medium cursor-pointer select-none hover:bg-muted/80 transition-colors text-xs ${extraClass}`}
+      className={`${align} px-2 py-2 font-medium cursor-pointer select-none hover:bg-muted/80 transition-colors ${extraClass}`}
       onClick={() => handleSort(key)}
     >
-      <span className={`inline-flex items-center gap-0.5 ${align === "text-right" ? "justify-end" : align === "text-center" ? "justify-center" : ""}`}>
+      <span className={`inline-flex items-center gap-1 ${align === "text-right" ? "justify-end" : align === "text-center" ? "justify-center" : ""}`}>
         {label}
         <SortIcon columnKey={key} sortKey={sortKey} sortDir={sortDir} />
       </span>
@@ -301,72 +331,112 @@ function MapSearchResultsTable({
   return (
     <Card>
       <CardContent className="pt-4">
-        <div className="text-sm font-medium mb-3 flex items-center gap-2">
-          <MapPin className="h-4 w-4" />
-          Listings in Area ({listings.length})
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-medium flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            Listings in Area ({listings.length})
+          </div>
         </div>
-        <div className="border rounded-lg max-h-[500px] overflow-y-auto">
-          <table className="w-full text-xs table-fixed">
+
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-3 mb-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+            <CheckSquare className="h-4 w-4 text-primary shrink-0" />
+            <span className="text-sm font-medium">
+              {selectedIds.size} {selectedIds.size === 1 ? "listing" : "listings"} selected
+            </span>
+            <div className="flex items-center gap-2 ml-auto">
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={handleBulkSave}
+                disabled={isSaving}
+              >
+                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Heart className="h-3.5 w-3.5" />}
+                Save to Favorites
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-x-auto border rounded-lg max-h-[500px] overflow-y-auto">
+          <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-background">
               <tr className="bg-muted/50 border-b">
-                <th className="text-left px-2 py-2 font-medium text-xs w-[30%]">Address</th>
+                <th className="px-2 py-2 w-8">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={toggleAll}
+                    className={someSelected && !allSelected ? "opacity-60" : ""}
+                  />
+                </th>
+                <th className="text-left px-2 py-2 font-medium">Address</th>
                 {thSortable("Price", "price", "text-right")}
-                {thSortable("Bd", "bedrooms", "text-center")}
-                {thSortable("Ba", "bathrooms", "text-center")}
-                {thSortable("Sqft", "squareFootage", "text-right")}
-                {thSortable("Yr", "yearBuilt", "text-center")}
-                {thSortable("DOM", "daysOnMarket", "text-center")}
-                <th className="px-2 py-2 font-medium text-xs text-center w-[52px]"></th>
+                {thSortable("Beds", "bedrooms", "text-center")}
+                {thSortable("Baths", "bathrooms", "text-center")}
+                {thSortable("Sqft", "squareFootage", "text-right", "hidden sm:table-cell")}
+                {thSortable("Year", "yearBuilt", "text-center", "hidden md:table-cell")}
+                {thSortable("DOM", "daysOnMarket", "text-center", "hidden md:table-cell")}
+                <th className="text-left px-2 py-2 font-medium hidden lg:table-cell">Agent</th>
+                <th className="text-left px-2 py-2 font-medium hidden lg:table-cell">MLS#</th>
+                <th className="px-2 py-2 w-8"></th>
               </tr>
             </thead>
             <tbody>
               {sortedListings.map((listing, i) => {
                 const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, "").replace(/\s+/g, "-"))}_rb/`;
+                const isSelected = selectedIds.has(listing.id);
                 return (
                   <tr
                     key={listing.id || listing.formattedAddress}
-                    className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "" : "bg-muted/10"}`}
+                    className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "" : "bg-muted/10"} ${isSelected ? "bg-primary/5" : ""}`}
                   >
-                    <td className="px-2 py-1.5">
-                      <div className="font-medium truncate">{listing.addressLine1}</div>
-                      <div className="text-[10px] text-muted-foreground truncate">{listing.city}, {listing.state} {listing.zipCode}</div>
+                    <td className="px-2 py-2">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelect(listing.id)}
+                      />
                     </td>
-                    <td className="px-2 py-1.5 text-right font-semibold text-primary whitespace-nowrap">
+                    <td className="px-2 py-2">
+                      <div className="font-medium truncate max-w-[180px]">{listing.addressLine1}</div>
+                      <div className="text-xs text-muted-foreground">{listing.city}, {listing.state} {listing.zipCode}</div>
+                    </td>
+                    <td className="px-2 py-2 text-right font-semibold text-primary whitespace-nowrap">
                       {formatPrice(listing.price)}
                     </td>
-                    <td className="px-2 py-1.5 text-center">{listing.bedrooms || "—"}</td>
-                    <td className="px-2 py-1.5 text-center">{listing.bathrooms || "—"}</td>
-                    <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                    <td className="px-2 py-2 text-center">{listing.bedrooms || "—"}</td>
+                    <td className="px-2 py-2 text-center">{listing.bathrooms || "—"}</td>
+                    <td className="px-2 py-2 text-right hidden sm:table-cell whitespace-nowrap">
                       {listing.squareFootage ? listing.squareFootage.toLocaleString() : "—"}
                     </td>
-                    <td className="px-2 py-1.5 text-center text-muted-foreground">
+                    <td className="px-2 py-2 text-center hidden md:table-cell text-muted-foreground">
                       {listing.yearBuilt || "—"}
                     </td>
-                    <td className="px-2 py-1.5 text-center text-muted-foreground">
+                    <td className="px-2 py-2 text-center hidden md:table-cell text-muted-foreground">
                       {listing.daysOnMarket}
                     </td>
-                    <td className="px-1 py-1.5">
-                      <div className="flex items-center gap-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => onSave(listing)}
-                          disabled={isSaving}
-                          title="Save to favorites"
-                        >
-                          <Heart className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => window.open(zillowUrl, "_blank", "noopener,noreferrer")}
-                          title="View on Zillow"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                        </Button>
-                      </div>
+                    <td className="px-2 py-2 hidden lg:table-cell text-xs text-muted-foreground truncate max-w-[120px]">
+                      {listing.listingAgent?.name || "—"}
+                    </td>
+                    <td className="px-2 py-2 hidden lg:table-cell text-xs text-muted-foreground">
+                      {listing.mlsNumber || "—"}
+                    </td>
+                    <td className="px-2 py-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => window.open(zillowUrl, "_blank", "noopener,noreferrer")}
+                        title="View on Zillow"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Button>
                     </td>
                   </tr>
                 );
@@ -498,25 +568,27 @@ export default function MapDrawSearch() {
     }
   };
 
-  const saveMutation = useMutation({
-    mutationFn: async (listing: RentCastListing) => {
-      const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, "").replace(/\s+/g, "-"))}_rb/`;
-      await apiRequest("POST", "/api/saved-properties", {
-        url: zillowUrl,
-        source: "zillow",
-        streetAddress: listing.addressLine1,
-        city: listing.city,
-        state: listing.state,
-        zipCode: listing.zipCode,
-        notes: `${listing.propertyType || ""} · ${formatPrice(listing.price)} · ${listing.bedrooms}bd/${listing.bathrooms}ba · ${listing.squareFootage?.toLocaleString() || "?"} sqft`.trim(),
-      });
+  const bulkSaveMutation = useMutation({
+    mutationFn: async (listings: RentCastListing[]) => {
+      for (const listing of listings) {
+        const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, "").replace(/\s+/g, "-"))}_rb/`;
+        await apiRequest("POST", "/api/saved-properties", {
+          url: zillowUrl,
+          source: "zillow",
+          streetAddress: listing.addressLine1,
+          city: listing.city,
+          state: listing.state,
+          zipCode: listing.zipCode,
+          notes: `${listing.propertyType || ""} · ${formatPrice(listing.price)} · ${listing.bedrooms}bd/${listing.bathrooms}ba · ${listing.squareFootage?.toLocaleString() || "?"} sqft`.trim(),
+        });
+      }
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/saved-properties"] });
-      toast({ title: "Saved!", description: "Property added to your favorites." });
+      toast({ title: "Saved!", description: `${variables.length} ${variables.length === 1 ? "property" : "properties"} added to your favorites.` });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to save property.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to save properties.", variant: "destructive" });
     },
   });
 
@@ -633,7 +705,7 @@ export default function MapDrawSearch() {
                     <span className="text-gray-400">·</span>
                     <button
                       className="text-green-600 underline text-xs"
-                      onClick={() => saveMutation.mutate(listing)}
+                      onClick={() => bulkSaveMutation.mutate([listing])}
                     >
                       Save
                     </button>
@@ -715,8 +787,8 @@ export default function MapDrawSearch() {
       {filteredListings.length > 0 && (
         <MapSearchResultsTable
           listings={filteredListings}
-          onSave={(listing) => saveMutation.mutate(listing)}
-          isSaving={saveMutation.isPending}
+          onBulkSave={(selected) => bulkSaveMutation.mutate(selected)}
+          isSaving={bulkSaveMutation.isPending}
         />
       )}
     </div>
