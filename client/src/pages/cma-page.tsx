@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   BarChart3, Plus, ArrowLeft, Search, Save, Share2, Printer, Trash2,
   Home, MapPin, BedDouble, Bath, Ruler, Calendar, DollarSign, Building2,
-  Loader2, Copy, Edit, TrendingUp, TrendingDown, ArrowUpDown, ArrowUp, ArrowDown, Filter, X
+  Loader2, Copy, Edit, TrendingUp, TrendingDown, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, ExternalLink
 } from "lucide-react";
 import type { CmaReport } from "@shared/schema";
 
@@ -576,6 +576,7 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                       <th className="px-3 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[8%]" onClick={() => handleSort("dom")}>
                         <span className="inline-flex items-center justify-center">DOM<SortIcon col="dom" /></span>
                       </th>
+                      <th className="px-3 py-2 w-10"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -606,6 +607,20 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                           <td className="px-3 py-2 text-right">{pricePerSqft > 0 ? `$${pricePerSqft}` : "—"}</td>
                           <td className="px-3 py-2 text-center">{listing.yearBuilt || "—"}</td>
                           <td className="px-3 py-2 text-center">{listing.daysOnMarket}</td>
+                          <td className="px-3 py-2 text-center">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const addr = (listing.formattedAddress || listing.addressLine1 || "").replace(/[,#]/g, "").replace(/\s+/g, "-");
+                                window.open(`https://www.zillow.com/homes/${encodeURIComponent(addr)}_rb/`, "_blank", "noopener,noreferrer");
+                              }}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
                         </tr>
                       );
                     })}
