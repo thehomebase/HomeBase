@@ -50,7 +50,7 @@ export function containsThreateningContent(message: string): { flagged: boolean;
 }
 
 export function isTwilioConfigured(): boolean {
-  return !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER);
+  return !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
 }
 
 export function getTwilioPhoneNumber(): string {
@@ -66,18 +66,19 @@ async function getClient() {
   return twilioClient;
 }
 
-export async function sendSMS(
+export async function sendSMSFromNumber(
+  fromNumber: string,
   to: string,
   body: string
 ): Promise<{ success: boolean; externalId?: string; error?: string }> {
   try {
     if (!isTwilioConfigured()) {
-      return { success: false, error: "Twilio is not configured. Platform admin needs to set up Twilio credentials." };
+      return { success: false, error: "Twilio is not configured." };
     }
 
     const client = await getClient();
     const formattedTo = normalizePhoneNumber(to);
-    const formattedFrom = getTwilioPhoneNumber();
+    const formattedFrom = normalizePhoneNumber(fromNumber);
 
     console.log(`Sending SMS: from=${formattedFrom} to=${formattedTo} body_length=${body.length}`);
 
@@ -92,6 +93,116 @@ export async function sendSMS(
   } catch (error: any) {
     console.error('Twilio SMS error:', error.message || error);
     return { success: false, error: error.message || 'Failed to send SMS' };
+  }
+}
+
+export async function sendSMS(
+  to: string,
+  body: string
+): Promise<{ success: boolean; externalId?: string; error?: string }> {
+  if (!process.env.TWILIO_PHONE_NUMBER) {
+    return { success: false, error: "No platform phone number configured." };
+  }
+  return sendSMSFromNumber(process.env.TWILIO_PHONE_NUMBER, to, body);
+}
+
+export async function searchAvailableNumbers(areaCode?: string): Promise<{
+  success: boolean;
+  numbers?: Array<{ phoneNumber: string; friendlyName: string; locality: string; region: string }>;
+  error?: string;
+}> {
+  try {
+    if (!isTwilioConfigured()) {
+      return { success: false, error: "Twilio is not configured." };
+    }
+
+    const client = await getClient();
+    const searchParams: any = {
+      smsEnabled: true,
+      voiceEnabled: true,
+      limit: 10,
+    };
+
+    if (areaCode) {
+      searchParams.areaCode = areaCode;
+    }
+
+    const numbers = await client.availablePhoneNumbers('US').local.list(searchParams);
+
+    return {
+      success: true,
+      numbers: numbers.map((n: any) => ({
+        phoneNumber: n.phoneNumber,
+        friendlyName: n.friendlyName,
+        locality: n.locality || '',
+        region: n.region || '',
+      })),
+    };
+  } catch (error: any) {
+    console.error('Error searching available numbers:', error.message);
+    return { success: false, error: error.message || 'Failed to search numbers' };
+  }
+}
+
+export async function purchasePhoneNumber(phoneNumber: string): Promise<{
+  success: boolean;
+  sid?: string;
+  phoneNumber?: string;
+  friendlyName?: string;
+  error?: string;
+}> {
+  try {
+    if (!isTwilioConfigured()) {
+      return { success: false, error: "Twilio is not configured." };
+    }
+
+    const client = await getClient();
+
+    const domains = process.env.REPLIT_DOMAINS || '';
+    const domain = domains.split(',')[0];
+    const webhookUrl = domain ? `https://${domain}/api/twilio/webhook` : undefined;
+
+    const purchaseParams: any = {
+      phoneNumber,
+      smsMethod: 'POST',
+    };
+
+    if (webhookUrl) {
+      purchaseParams.smsUrl = webhookUrl;
+    }
+
+    const purchased = await client.incomingPhoneNumbers.create(purchaseParams);
+
+    console.log(`Phone number purchased: ${purchased.phoneNumber} (SID: ${purchased.sid})`);
+    return {
+      success: true,
+      sid: purchased.sid,
+      phoneNumber: purchased.phoneNumber,
+      friendlyName: purchased.friendlyName,
+    };
+  } catch (error: any) {
+    console.error('Error purchasing phone number:', error.message);
+    return { success: false, error: error.message || 'Failed to purchase phone number' };
+  }
+}
+
+export async function releasePhoneNumber(twilioSid: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    if (!isTwilioConfigured()) {
+      return { success: false, error: "Twilio is not configured." };
+    }
+
+    const client = await getClient();
+    await client.incomingPhoneNumbers(twilioSid).remove();
+
+    console.log(`Phone number released: SID ${twilioSid}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error releasing phone number:', error.message);
+    return { success: false, error: error.message || 'Failed to release phone number' };
   }
 }
 

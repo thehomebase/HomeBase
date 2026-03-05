@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, MessageSquare, Loader2, CheckCircle, XCircle, Clock, AlertTriangle, Link2, Unlink } from "lucide-react";
+import { Mail, MessageSquare, Loader2, CheckCircle, XCircle, Clock, AlertTriangle, Link2, Unlink, Phone, MapPin, Search } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -25,8 +25,10 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
   const [emailSubject, setEmailSubject] = useState("");
   const [emailContent, setEmailContent] = useState("");
   const [activeTab, setActiveTab] = useState("sms");
+  const [areaCodeSearch, setAreaCodeSearch] = useState("");
+  const [showNumberPicker, setShowNumberPicker] = useState(false);
 
-  const { data: commStatus } = useQuery<{ twilio: boolean; twilioPhone?: string; gmail: { connected: boolean; email?: string } }>({
+  const { data: commStatus } = useQuery<{ twilio: boolean; twilioPhone?: string; hasOwnNumber?: boolean; gmail: { connected: boolean; email?: string } }>({
     queryKey: ["/api/communications/status"],
     enabled: open,
   });
@@ -44,6 +46,20 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
   const { data: smsLimits } = useQuery<{ dailySent: number; dailyLimit: number; uniqueRecipients: number; uniqueRecipientsLimit: number }>({
     queryKey: ["/api/sms/limits"],
     enabled: open && activeTab === "sms",
+  });
+
+  const searchUrl = areaCodeSearch ? `/api/phone-number/search?areaCode=${areaCodeSearch}` : "/api/phone-number/search";
+  const { data: availableNumbers, isLoading: isSearching } = useQuery<{ numbers: Array<{ phoneNumber: string; friendlyName: string; locality: string; region: string }> }>({
+    queryKey: ["/api/phone-number/search", areaCodeSearch],
+    queryFn: async () => {
+      const res = await fetch(searchUrl, { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to search");
+      }
+      return res.json();
+    },
+    enabled: showNumberPicker,
   });
 
   const smsMutation = useMutation({
@@ -133,6 +149,53 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
     },
   });
 
+  const purchaseNumberMutation = useMutation({
+    mutationFn: async (data: { phoneNumber: string; areaCode?: string }) => {
+      const res = await apiRequest("POST", "/api/phone-number/purchase", data);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to purchase number");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/communications/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/phone-number"] });
+      setShowNumberPicker(false);
+      toast({ title: "Phone Number Assigned", description: "Your dedicated SMS number is now active." });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Purchase Failed",
+        description: error.message || "Failed to get phone number.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const releaseNumberMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/phone-number/release");
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to release number");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/communications/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/phone-number"] });
+      toast({ title: "Phone Number Released", description: "Your dedicated number has been released." });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Release Failed",
+        description: error.message || "Failed to release phone number.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSendSMS = () => {
     if (!client || !smsContent.trim()) return;
     const phone = client.mobilePhone || client.phone;
@@ -152,11 +215,17 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
     emailMutation.mutate({ clientId: client.id, subject: emailSubject.trim(), content: emailContent.trim() });
   };
 
+  const handleSearchNumbers = () => {
+    setShowNumberPicker(true);
+    queryClient.invalidateQueries({ queryKey: ["/api/phone-number/search"] });
+  };
+
   if (!client) return null;
 
   const phone = client.mobilePhone || client.phone;
   const gmailConnected = commStatus?.gmail?.connected;
   const gmailEmail = commStatus?.gmail?.email;
+  const hasOwnNumber = commStatus?.hasOwnNumber;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -181,7 +250,72 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
           </TabsList>
 
           <TabsContent value="sms" className="space-y-4 mt-4">
-            {!commStatus?.twilio ? (
+            {showNumberPicker ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 relative">
+                    <Input
+                      value={areaCodeSearch}
+                      onChange={(e) => setAreaCodeSearch(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                      placeholder="Area code (e.g. 817)"
+                      className="text-sm"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/phone-number/search"] })}
+                    disabled={isSearching}
+                  >
+                    {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setShowNumberPicker(false)}>
+                    Cancel
+                  </Button>
+                </div>
+
+                {isSearching ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">Searching available numbers...</span>
+                  </div>
+                ) : availableNumbers?.numbers?.length ? (
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    <p className="text-xs text-muted-foreground">Select a number to assign to your account:</p>
+                    {availableNumbers.numbers.map((num) => (
+                      <button
+                        key={num.phoneNumber}
+                        onClick={() => purchaseNumberMutation.mutate({
+                          phoneNumber: num.phoneNumber,
+                          areaCode: areaCodeSearch || undefined,
+                        })}
+                        disabled={purchaseNumberMutation.isPending}
+                        className="w-full flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors text-left disabled:opacity-50"
+                      >
+                        <div>
+                          <p className="font-mono font-medium text-sm">{num.friendlyName || num.phoneNumber}</p>
+                          {(num.locality || num.region) && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <MapPin className="h-3 w-3" />
+                              {[num.locality, num.region].filter(Boolean).join(", ")}
+                            </p>
+                          )}
+                        </div>
+                        {purchaseNumberMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <span className="text-xs text-blue-600 font-medium">Select</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Phone className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">No numbers found{areaCodeSearch ? ` for area code ${areaCodeSearch}` : ''}. Try a different area code.</p>
+                  </div>
+                )}
+              </div>
+            ) : !commStatus?.twilio ? (
               <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
                 <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
                 <div className="text-sm text-amber-700 dark:text-amber-300">
@@ -190,12 +324,33 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
               </div>
             ) : (
               <>
-                <div className="flex items-center p-2 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="flex items-center justify-between p-2 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
                   <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
                     <CheckCircle className="h-4 w-4" />
-                    <span>Sending from {commStatus.twilioPhone}</span>
+                    <span>Sending from {commStatus?.twilioPhone}</span>
                   </div>
+                  {hasOwnNumber && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm("Are you sure you want to release your phone number? This cannot be undone.")) {
+                          releaseNumberMutation.mutate();
+                        }
+                      }}
+                      disabled={releaseNumberMutation.isPending}
+                      className="text-xs text-muted-foreground h-7"
+                    >
+                      <Unlink className="h-3 w-3 mr-1" /> Release
+                    </Button>
+                  )}
                 </div>
+
+                {!hasOwnNumber && (
+                  <Button onClick={handleSearchNumbers} variant="outline" size="sm" className="w-full">
+                    <Phone className="h-3 w-3 mr-2" /> Get Your Own Dedicated Number
+                  </Button>
+                )}
 
                 <div className="space-y-2">
                   <Label>To</Label>

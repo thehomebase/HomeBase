@@ -20,6 +20,7 @@ import {
   type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
   type ShowingRequest, type SavedProperty, type InsertSavedProperty,
   type Communication, type InsertCommunication,
+  type AgentPhoneNumber,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -143,6 +144,11 @@ export interface IStorage {
   getSmsSentCountToday(agentId: number): Promise<number>;
   getUniqueRecipientsToday(agentId: number): Promise<number>;
 
+  // Agent phone numbers
+  getAgentPhoneNumber(userId: number): Promise<AgentPhoneNumber | null>;
+  saveAgentPhoneNumber(data: { userId: number; phoneNumber: string; twilioSid: string; areaCode?: string; friendlyName?: string }): Promise<AgentPhoneNumber>;
+  deleteAgentPhoneNumber(userId: number): Promise<void>;
+  getAgentByPhoneNumber(phoneNumber: string): Promise<AgentPhoneNumber | null>;
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -2650,6 +2656,78 @@ export class DatabaseStorage implements IStorage {
     if (digits.length === 10) return `+1${digits}`;
     if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
     return `+${digits}`;
+  }
+
+  async getAgentPhoneNumber(userId: number): Promise<AgentPhoneNumber | null> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM agent_phone_numbers WHERE user_id = ${userId} LIMIT 1`
+      );
+      if (!result.rows?.length) return null;
+      const row = result.rows[0] as any;
+      return {
+        id: Number(row.id),
+        userId: Number(row.user_id),
+        phoneNumber: String(row.phone_number),
+        twilioSid: String(row.twilio_sid),
+        areaCode: row.area_code ? String(row.area_code) : null,
+        friendlyName: row.friendly_name ? String(row.friendly_name) : null,
+        createdAt: row.created_at ? new Date(row.created_at) : null,
+      };
+    } catch (error) {
+      console.error('Error getting agent phone number:', error);
+      return null;
+    }
+  }
+
+  async saveAgentPhoneNumber(data: { userId: number; phoneNumber: string; twilioSid: string; areaCode?: string; friendlyName?: string }): Promise<AgentPhoneNumber> {
+    const result = await db.execute(
+      sql`INSERT INTO agent_phone_numbers (user_id, phone_number, twilio_sid, area_code, friendly_name)
+          VALUES (${data.userId}, ${data.phoneNumber}, ${data.twilioSid}, ${data.areaCode || null}, ${data.friendlyName || null})
+          ON CONFLICT (user_id) DO UPDATE SET
+            phone_number = ${data.phoneNumber},
+            twilio_sid = ${data.twilioSid},
+            area_code = ${data.areaCode || null},
+            friendly_name = ${data.friendlyName || null}
+          RETURNING *`
+    );
+    const row = result.rows[0] as any;
+    return {
+      id: Number(row.id),
+      userId: Number(row.user_id),
+      phoneNumber: String(row.phone_number),
+      twilioSid: String(row.twilio_sid),
+      areaCode: row.area_code ? String(row.area_code) : null,
+      friendlyName: row.friendly_name ? String(row.friendly_name) : null,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+    };
+  }
+
+  async deleteAgentPhoneNumber(userId: number): Promise<void> {
+    await db.execute(sql`DELETE FROM agent_phone_numbers WHERE user_id = ${userId}`);
+  }
+
+  async getAgentByPhoneNumber(phoneNumber: string): Promise<AgentPhoneNumber | null> {
+    try {
+      const normalized = this.normalizePhone(phoneNumber);
+      const result = await db.execute(
+        sql`SELECT * FROM agent_phone_numbers WHERE phone_number = ${normalized} LIMIT 1`
+      );
+      if (!result.rows?.length) return null;
+      const row = result.rows[0] as any;
+      return {
+        id: Number(row.id),
+        userId: Number(row.user_id),
+        phoneNumber: String(row.phone_number),
+        twilioSid: String(row.twilio_sid),
+        areaCode: row.area_code ? String(row.area_code) : null,
+        friendlyName: row.friendly_name ? String(row.friendly_name) : null,
+        createdAt: row.created_at ? new Date(row.created_at) : null,
+      };
+    } catch (error) {
+      console.error('Error getting agent by phone number:', error);
+      return null;
+    }
   }
 
   private mapTransactionRow(row: any): Transaction {

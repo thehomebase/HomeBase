@@ -8,7 +8,7 @@ import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
-import { sendSMS, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent } from "./twilio-service";
+import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages } from "./gmail-service";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -1924,14 +1924,111 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (req.user.role !== "agent") return res.sendStatus(403);
     try {
-      const gmailStatus = await getGmailStatus(req.user.id);
+      const [agentPhone, gmailStatus] = await Promise.all([
+        storage.getAgentPhoneNumber(req.user.id),
+        getGmailStatus(req.user.id),
+      ]);
+      const hasAgentNumber = !!agentPhone;
+      const hasPlatformNumber = isTwilioConfigured() && !!process.env.TWILIO_PHONE_NUMBER;
       res.json({
-        twilio: isTwilioConfigured(),
-        twilioPhone: isTwilioConfigured() ? getTwilioPhoneNumber() : null,
+        twilio: isTwilioConfigured() && (hasAgentNumber || hasPlatformNumber),
+        twilioPhone: agentPhone?.phoneNumber || (hasPlatformNumber ? getTwilioPhoneNumber() : null),
+        hasOwnNumber: hasAgentNumber,
         gmail: gmailStatus,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to check communication status" });
+    }
+  });
+
+  app.get("/api/phone-number", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const agentPhone = await storage.getAgentPhoneNumber(req.user.id);
+      res.json({ phoneNumber: agentPhone });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get phone number" });
+    }
+  });
+
+  app.get("/api/phone-number/search", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const existing = await storage.getAgentPhoneNumber(req.user.id);
+      if (existing) {
+        return res.status(400).json({ error: "You already have a phone number assigned. Release it first to get a new one." });
+      }
+
+      const areaCode = req.query.areaCode as string | undefined;
+      const result = await searchAvailableNumbers(areaCode);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      res.json({ numbers: result.numbers });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to search available numbers" });
+    }
+  });
+
+  app.post("/api/phone-number/purchase", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const existing = await storage.getAgentPhoneNumber(req.user.id);
+      if (existing) {
+        return res.status(400).json({ error: "You already have a phone number. Each agent is limited to one number." });
+      }
+
+      const phoneSchema = z.object({
+        phoneNumber: z.string().min(1),
+        areaCode: z.string().optional(),
+      });
+      const parsed = phoneSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request" });
+      }
+
+      const result = await purchasePhoneNumber(parsed.data.phoneNumber);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      const saved = await storage.saveAgentPhoneNumber({
+        userId: req.user.id,
+        phoneNumber: result.phoneNumber!,
+        twilioSid: result.sid!,
+        areaCode: parsed.data.areaCode,
+        friendlyName: result.friendlyName,
+      });
+
+      res.json({ success: true, phoneNumber: saved });
+    } catch (error) {
+      console.error("Error purchasing phone number:", error);
+      res.status(500).json({ error: "Failed to purchase phone number" });
+    }
+  });
+
+  app.post("/api/phone-number/release", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const existing = await storage.getAgentPhoneNumber(req.user.id);
+      if (!existing) {
+        return res.status(400).json({ error: "You don't have a phone number to release." });
+      }
+
+      const result = await releasePhoneNumber(existing.twilioSid);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      await storage.deleteAgentPhoneNumber(req.user.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error releasing phone number:", error);
+      res.status(500).json({ error: "Failed to release phone number" });
     }
   });
 
@@ -2052,6 +2149,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "SMS is not available. Please contact your platform administrator." });
       }
 
+      const agentPhone = await storage.getAgentPhoneNumber(req.user.id);
+      if (!agentPhone && !process.env.TWILIO_PHONE_NUMBER) {
+        return res.status(400).json({ error: "No phone number available. Please request a phone number first." });
+      }
+
       const client = await storage.getClient(clientId);
       if (!client || client.agentId !== req.user.id) {
         return res.status(404).json({ error: "Client not found" });
@@ -2093,7 +2195,8 @@ export function registerRoutes(app: Express): Server {
         }
       }
 
-      const result = await sendSMS(phone, content);
+      const fromNumber = agentPhone?.phoneNumber || process.env.TWILIO_PHONE_NUMBER!;
+      const result = await sendSMSFromNumber(fromNumber, phone, content);
 
       const comm = await storage.createCommunication({
         clientId,

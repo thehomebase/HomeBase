@@ -329,6 +329,18 @@ export const insertTwilioCredentialSchema = createInsertSchema(twilioCredentials
 export type TwilioCredential = typeof twilioCredentials.$inferSelect;
 export type InsertTwilioCredential = z.infer<typeof insertTwilioCredentialSchema>;
 
+export const agentPhoneNumbers = pgTable("agent_phone_numbers", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  phoneNumber: text("phone_number").notNull(),
+  twilioSid: text("twilio_sid").notNull(),
+  areaCode: text("area_code"),
+  friendlyName: text("friendly_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AgentPhoneNumber = typeof agentPhoneNumbers.$inferSelect;
+
 export const googleTokens = pgTable("google_tokens", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().unique(),
