@@ -83,7 +83,7 @@ function DraggableCard({
     <Card
       ref={setNodeRef}
       style={style}
-      className="p-3 w-full cursor-move hover:shadow-md transition-shadow relative group dark:bg-neutral-600 dark:border-neutral-500 bg-background border border-border/50"
+      className="p-3 w-full cursor-move hover:shadow-md transition-shadow relative group dark:bg-neutral-600 dark:border-neutral-500 bg-background border border-neutral-300"
       {...attributes}
       {...listeners}
     >
