@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   BarChart3, Plus, ArrowLeft, Search, Save, Share2, Printer, Trash2,
   Home, MapPin, BedDouble, Bath, Ruler, Calendar, DollarSign, Building2,
-  Loader2, Copy, Edit, TrendingUp, TrendingDown
+  Loader2, Copy, Edit, TrendingUp, TrendingDown, ArrowUpDown, ArrowUp, ArrowDown, Filter, X
 } from "lucide-react";
 import type { CmaReport } from "@shared/schema";
 
@@ -170,6 +170,9 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
   const [searchState, setSearchState] = useState("");
   const [searchZip, setSearchZip] = useState("");
   const [searchParams, setSearchParams] = useState<Record<string, string> | null>(null);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [narrowed, setNarrowed] = useState(false);
   const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
 
   const { isLoading: isLoadingReport } = useQuery<CmaReport>({
@@ -466,45 +469,117 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
             </div>
           )}
 
-          {listings.length > 0 && (
+          {listings.length > 0 && (() => {
+            const handleSort = (col: string) => {
+              if (sortColumn === col) {
+                setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+              } else {
+                setSortColumn(col);
+                setSortDirection("asc");
+              }
+            };
+
+            const SortIcon = ({ col }: { col: string }) => {
+              if (sortColumn !== col) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+              return sortDirection === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
+            };
+
+            const getVal = (listing: RentCastListing, col: string): number => {
+              switch (col) {
+                case "price": return listing.price || 0;
+                case "beds": return listing.bedrooms || 0;
+                case "baths": return listing.bathrooms || 0;
+                case "sqft": return listing.squareFootage || 0;
+                case "ppsqft": return listing.squareFootage > 0 ? listing.price / listing.squareFootage : 0;
+                case "year": return listing.yearBuilt || 0;
+                case "dom": return listing.daysOnMarket || 0;
+                default: return 0;
+              }
+            };
+
+            const visibleListings = narrowed && selectedListingIds.size > 0
+              ? listings.filter(l => selectedListingIds.has(l.id))
+              : listings;
+
+            const sortedListings = sortColumn
+              ? [...visibleListings].sort((a, b) => {
+                  const aVal = getVal(a, sortColumn);
+                  const bVal = getVal(b, sortColumn);
+                  return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+                })
+              : visibleListings;
+
+            return (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">{listings.length} properties found</p>
-                {selectedListingIds.size > 0 && (
-                  <Button size="sm" onClick={addSelectedComps} className="gap-1">
-                    <Plus className="h-4 w-4" />
-                    Add {selectedListingIds.size} Selected
-                  </Button>
-                )}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="text-sm text-muted-foreground">
+                  {narrowed && selectedListingIds.size > 0
+                    ? `Showing ${sortedListings.length} of ${listings.length} properties`
+                    : `${listings.length} properties found`}
+                </p>
+                <div className="flex items-center gap-2">
+                  {selectedListingIds.size > 0 && (
+                    <Button
+                      size="sm"
+                      variant={narrowed ? "default" : "outline"}
+                      onClick={() => setNarrowed(!narrowed)}
+                      className="gap-1"
+                    >
+                      {narrowed ? <X className="h-3.5 w-3.5" /> : <Filter className="h-3.5 w-3.5" />}
+                      {narrowed ? "Show All" : `Narrow to ${selectedListingIds.size} Selected`}
+                    </Button>
+                  )}
+                  {selectedListingIds.size > 0 && (
+                    <Button size="sm" onClick={addSelectedComps} className="gap-1">
+                      <Plus className="h-4 w-4" />
+                      Add {selectedListingIds.size} Selected
+                    </Button>
+                  )}
+                </div>
               </div>
-              <div className="overflow-x-auto max-h-[400px] overflow-y-auto border rounded-lg">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 sticky top-0">
+              <div className="max-h-[400px] overflow-y-auto border rounded-lg">
+                <table className="w-full text-sm table-fixed">
+                  <thead className="bg-muted/50 sticky top-0 z-10">
                     <tr className="border-b">
-                      <th className="px-3 py-2 text-left w-8">
+                      <th className="px-3 py-2 text-left w-10">
                         <Checkbox
-                          checked={listings.length > 0 && selectedListingIds.size === listings.length}
+                          checked={sortedListings.length > 0 && sortedListings.every(l => selectedListingIds.has(l.id))}
                           onCheckedChange={(checked) => {
                             if (checked) {
                               setSelectedListingIds(new Set(listings.map(l => l.id)));
                             } else {
                               setSelectedListingIds(new Set());
+                              setNarrowed(false);
                             }
                           }}
                         />
                       </th>
-                      <th className="px-3 py-2 text-left font-medium">Address</th>
-                      <th className="px-3 py-2 text-right font-medium">Price</th>
-                      <th className="px-3 py-2 text-center font-medium">Beds</th>
-                      <th className="px-3 py-2 text-center font-medium">Baths</th>
-                      <th className="px-3 py-2 text-right font-medium">Sqft</th>
-                      <th className="px-3 py-2 text-right font-medium">$/Sqft</th>
-                      <th className="px-3 py-2 text-center font-medium">Year</th>
-                      <th className="px-3 py-2 text-center font-medium">DOM</th>
+                      <th className="px-3 py-2 text-left font-medium w-[30%]">Address</th>
+                      <th className="px-3 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[12%]" onClick={() => handleSort("price")}>
+                        <span className="inline-flex items-center justify-end">Price<SortIcon col="price" /></span>
+                      </th>
+                      <th className="px-3 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[8%]" onClick={() => handleSort("beds")}>
+                        <span className="inline-flex items-center justify-center">Beds<SortIcon col="beds" /></span>
+                      </th>
+                      <th className="px-3 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[8%]" onClick={() => handleSort("baths")}>
+                        <span className="inline-flex items-center justify-center">Baths<SortIcon col="baths" /></span>
+                      </th>
+                      <th className="px-3 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[10%]" onClick={() => handleSort("sqft")}>
+                        <span className="inline-flex items-center justify-end">Sqft<SortIcon col="sqft" /></span>
+                      </th>
+                      <th className="px-3 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[10%]" onClick={() => handleSort("ppsqft")}>
+                        <span className="inline-flex items-center justify-end">$/Sqft<SortIcon col="ppsqft" /></span>
+                      </th>
+                      <th className="px-3 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[8%]" onClick={() => handleSort("year")}>
+                        <span className="inline-flex items-center justify-center">Year<SortIcon col="year" /></span>
+                      </th>
+                      <th className="px-3 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[8%]" onClick={() => handleSort("dom")}>
+                        <span className="inline-flex items-center justify-center">DOM<SortIcon col="dom" /></span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {listings.map(listing => {
+                    {sortedListings.map(listing => {
                       const isSelected = selectedListingIds.has(listing.id);
                       const pricePerSqft = listing.squareFootage > 0 ? Math.round(listing.price / listing.squareFootage) : 0;
                       return (
@@ -523,7 +598,7 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                           <td className="px-3 py-2">
                             <Checkbox checked={isSelected} />
                           </td>
-                          <td className="px-3 py-2 font-medium truncate max-w-[250px]">{listing.formattedAddress || listing.addressLine1}</td>
+                          <td className="px-3 py-2 font-medium truncate">{listing.formattedAddress || listing.addressLine1}</td>
                           <td className="px-3 py-2 text-right font-semibold text-primary">{formatPrice(listing.price)}</td>
                           <td className="px-3 py-2 text-center">{listing.bedrooms || "—"}</td>
                           <td className="px-3 py-2 text-center">{listing.bathrooms || "—"}</td>
@@ -538,7 +613,8 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                 </table>
               </div>
             </div>
-          )}
+            );
+          })()}
         </CardContent>
       </Card>
 
