@@ -83,7 +83,7 @@ function DraggableCard({
     <Card
       ref={setNodeRef}
       style={style}
-      className="p-3  w-full cursor-move hover:shadow-md transition-shadow relative group dark:bg-gray-700"
+      className="p-3 w-full cursor-move hover:shadow-md transition-shadow relative group"
       {...attributes}
       {...listeners}
     >
@@ -105,12 +105,12 @@ function DraggableCard({
           onClick();
         }}
       >
-        <div className="font-medium text-sm truncate pr-8 dark:text-white">
+        <div className="font-medium text-sm truncate pr-8">
           {transaction.streetName}
         </div>
         <div className="text-xs space-y-1.5">
           <div className="flex justify-between items-center">
-            <span className="capitalize font-medium text-primary dark:text-white">
+            <span className="capitalize font-medium text-primary">
               {transaction.type === "buy" ? "Purchase" : "Sale"}
             </span>
             <span>{formatPrice(transaction.contractPrice)}</span>
@@ -146,10 +146,10 @@ function KanbanColumn({
   });
 
   return (
-    <div ref={setNodeRef} className="bg-muted/50 rounded-lg p-2 dark:bg-gray-800/50 flex-1 border border-border">
+    <div ref={setNodeRef} className="bg-muted/50 rounded-lg p-2 flex-1 border border-border">
       <div className="flex justify-between items-center">
-        <h3 className="font-semibold text-sm dark:text-white">{title}</h3>
-        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs dark:text-white">
+        <h3 className="font-semibold text-sm">{title}</h3>
+        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs">
           {transactions.length}
         </span>
       </div>
@@ -281,14 +281,14 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
 
       <DragOverlay>
         {activeId && activeTransaction && activeTransaction.client ? (
-          <Card className="p-3 w-[180px] shadow-lg cursor-grabbing dark:bg-gray-700">
-            <div className="font-medium text-sm truncate dark:text-white">
+          <Card className="p-3 w-[180px] shadow-lg cursor-grabbing">
+            <div className="font-medium text-sm truncate">
               {activeTransaction.streetName}
             </div>
-            <div className="text-sm text-primary dark:text-primary-foreground">
+            <div className="text-sm text-primary">
               {activeTransaction.client.firstName} {activeTransaction.client.lastName}
             </div>
-            <div className="text-xs text-muted-foreground dark:text-gray-300">
+            <div className="text-xs text-muted-foreground">
               {activeTransaction.type === "buy" ? "Purchase" : "Sale"}
             </div>
           </Card>

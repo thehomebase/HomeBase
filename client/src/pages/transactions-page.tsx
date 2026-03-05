@@ -260,16 +260,16 @@ export default function TransactionsPage() {
     <main className="flex-1 min-w-0 px-4">
       <div className="w-full flex flex-wrap bg-background relative px-2 py-8">
         <div className="flex flex-col sm:flex-row w-full sm:items-center justify-between gap-2 mb-2">
-          <h2 className="text-2xl font-bold dark:text-white">
+          <h2 className="text-2xl font-bold">
             Your Transactions
           </h2>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-muted/50 rounded-lg dark:bg-gray-800/50">
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg">
               <Toggle
                 pressed={view === "list"}
                 onPressedChange={() => setView("list")}
                 aria-label="List view"
-                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
+                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground"
               >
                 <List className="h-4" />
               </Toggle>
@@ -277,7 +277,7 @@ export default function TransactionsPage() {
                 pressed={view === "board"}
                 onPressedChange={() => setView("board")}
                 aria-label="Board view"
-                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
+                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground"
               >
                 <LayoutGrid className="h-4 w-4" />
               </Toggle>
@@ -285,7 +285,7 @@ export default function TransactionsPage() {
                 pressed={view === "table"}
                 onPressedChange={() => setView("table")}
                 aria-label="Table view"
-                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground dark:text-white dark:hover:text-white dark:data-[state=on]:text-black"
+                className="data-[state=on]:bg-foreground data-[state=on]:text-background hover:text-foreground"
               >
                 <Table2 className="h-4 w-4" />
               </Toggle>
@@ -294,7 +294,7 @@ export default function TransactionsPage() {
               pressed={theme === "dark"}
               onPressedChange={toggleTheme}
               aria-label="Toggle theme"
-              className="hover:text-foreground dark:text-white dark:hover:text-white"
+              className="hover:text-foreground"
             >
               {theme === "light" ? (
                 <Moon className="h-4 w-4" />
@@ -324,7 +324,7 @@ export default function TransactionsPage() {
             {user?.role === "agent" && (
               <Dialog open={showNewTransactionDialog} onOpenChange={setShowNewTransactionDialog}>
                 <DialogTrigger asChild>
-                  <Button className="whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 dark:text-black dark:bg-white font-bold">
+                  <Button className="whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
                     <Plus className="h-4 w-4 mr-2" />
                     New Transaction
                   </Button>
@@ -543,12 +543,12 @@ export default function TransactionsPage() {
             {filteredTransactions.map((transaction: Transaction) => (
               <Card
                 key={transaction.id}
-                className="cursor-pointer hover:bg-accent/50 transition-colors relative dark:bg-gray-800 w-full min-w-0"
+                className="cursor-pointer hover:bg-accent/50 transition-colors relative w-full min-w-0"
                 onClick={() => setLocation(`/transactions/${transaction.id}`)}
               >
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle
-                    className="text-lg hover:underline dark:text-white truncate"
+                    className="text-lg hover:underline truncate"
                     onClick={() =>
                       setLocation(`/transactions/${transaction.id}`)
                     }
@@ -570,17 +570,17 @@ export default function TransactionsPage() {
                   )}
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground dark:text-gray-300 capitalize">
+                  <p className="text-sm text-muted-foreground capitalize">
                     Status: {transaction.status.replace("_", " ")}
                   </p>
-                  <p className="text-sm text-muted-foreground dark:text-gray-300">
+                  <p className="text-sm text-muted-foreground">
                     Client:{" "}
                     {transaction.client
                       ? `${transaction.client.firstName} ${transaction.client.lastName}`
                       : "Not set"}
                   </p>
                   {transaction.secondaryClient && (
-                    <p className="text-sm text-muted-foreground dark:text-gray-300">
+                    <p className="text-sm text-muted-foreground">
                       Secondary Client: {transaction.secondaryClient.firstName}{" "}
                       {transaction.secondaryClient.lastName}
                     </p>
@@ -590,7 +590,7 @@ export default function TransactionsPage() {
             ))}
 
             {filteredTransactions.length === 0 && (
-              <div className="col-span-full text-center py-12 text-muted-foreground dark:text-gray-400">
+              <div className="col-span-full text-center py-12 text-muted-foreground">
                 No transactions found.{" "}
                 {user?.role === "agent" ? (
                   <div className="mt-4">
