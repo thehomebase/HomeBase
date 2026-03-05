@@ -141,7 +141,8 @@ export async function sendGmailEmail(
   userId: number,
   to: string,
   subject: string,
-  body: string
+  body: string,
+  cc?: string
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     const auth = await getAuthenticatedClient(userId);
@@ -161,6 +162,7 @@ export async function sendGmailEmail(
     const messageParts = [
       `From: ${auth.email}`,
       `To: ${to}`,
+      ...(cc ? [`Cc: ${cc}`] : []),
       `Subject: ${subject}`,
       `Content-Type: text/html; charset=utf-8`,
       "",

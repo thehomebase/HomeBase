@@ -1,12 +1,16 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Loader2, Mail, Inbox, Send, AlertCircle, RefreshCw,
-  Link2, ArrowLeft, Search, X
+  Link2, ArrowLeft, Search, X, PenSquare, Reply, Forward, Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import DOMPurify from "dompurify";
@@ -36,14 +40,28 @@ interface InboxResponse {
   error?: string;
 }
 
+type ViewMode = "inbox" | "compose" | "detail";
+
+interface ComposeState {
+  to: string;
+  cc: string;
+  subject: string;
+  body: string;
+}
+
+const emptyCompose: ComposeState = { to: "", cc: "", subject: "", body: "" };
+
 export default function MailPage() {
-  const { user } = useAuth();
+  const { toast } = useToast();
+  const [viewMode, setViewMode] = useState<ViewMode>("inbox");
   const [filter, setFilter] = useState<"all" | "sent" | "received">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-  const [pages, setPages] = useState<{ token: string | undefined; label: string }[]>([
-    { token: undefined, label: "1" },
+  const [compose, setCompose] = useState<ComposeState>(emptyCompose);
+  const [showCc, setShowCc] = useState(false);
+  const [pages, setPages] = useState<{ token: string | undefined }[]>([
+    { token: undefined },
   ]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
@@ -82,7 +100,7 @@ export default function MailPage() {
       if (data.error) throw new Error(data.error);
       return data;
     },
-    enabled: !!gmailConnected,
+    enabled: !!gmailConnected && viewMode === "inbox",
     staleTime: 60 * 1000,
   });
 
@@ -95,39 +113,96 @@ export default function MailPage() {
       if (!res.ok) throw new Error("Failed to fetch message");
       return res.json();
     },
-    enabled: !!selectedMessageId,
+    enabled: !!selectedMessageId && viewMode === "detail",
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async (data: { to: string; cc?: string; subject: string; body: string }) => {
+      const res = await apiRequest("POST", "/api/gmail/send", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Email sent" });
+      setCompose(emptyCompose);
+      setShowCc(false);
+      setViewMode("inbox");
+      queryClient.invalidateQueries({ queryKey: ["/api/gmail/inbox"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+    },
   });
 
   const messages = inboxQuery.data?.messages || [];
   const nextPageToken = inboxQuery.data?.nextPageToken;
 
+  function openCompose(initial?: Partial<ComposeState>) {
+    setCompose({ ...emptyCompose, ...initial });
+    setShowCc(!!(initial?.cc));
+    setViewMode("compose");
+  }
+
+  function openDetail(msgId: string) {
+    setSelectedMessageId(msgId);
+    setViewMode("detail");
+  }
+
+  function backToInbox() {
+    setViewMode("inbox");
+    setSelectedMessageId(null);
+  }
+
+  function handleReply(msg: GmailMessageDetail) {
+    const fromEmail = msg.from?.match(/<([^>]+)>/)?.[1] || msg.from;
+    const reSubject = msg.subject?.startsWith("Re:") ? msg.subject : `Re: ${msg.subject}`;
+    const quotedBody = `\n\n\n---------- Original Message ----------\nFrom: ${msg.from}\nDate: ${msg.date}\nSubject: ${msg.subject}\n\n${msg.snippet}`;
+    openCompose({ to: fromEmail, subject: reSubject, body: quotedBody });
+  }
+
+  function handleForward(msg: GmailMessageDetail) {
+    const fwdSubject = msg.subject?.startsWith("Fwd:") ? msg.subject : `Fwd: ${msg.subject}`;
+    const fwdBody = `\n\n\n---------- Forwarded Message ----------\nFrom: ${msg.from}\nTo: ${msg.to}\nDate: ${msg.date}\nSubject: ${msg.subject}\n\n${msg.snippet}`;
+    openCompose({ subject: fwdSubject, body: fwdBody });
+  }
+
+  function handleSend() {
+    if (!compose.to || !compose.subject || !compose.body.trim()) {
+      toast({ title: "Please fill in To, Subject, and Body", variant: "destructive" });
+      return;
+    }
+    sendMutation.mutate({
+      to: compose.to.trim(),
+      cc: compose.cc.trim() || undefined,
+      subject: compose.subject,
+      body: compose.body,
+    });
+  }
+
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     setActiveSearch(searchQuery);
-    setPages([{ token: undefined, label: "1" }]);
+    setPages([{ token: undefined }]);
     setCurrentPageIndex(0);
-    setSelectedMessageId(null);
   }
 
   function clearSearch() {
     setSearchQuery("");
     setActiveSearch("");
-    setPages([{ token: undefined, label: "1" }]);
+    setPages([{ token: undefined }]);
     setCurrentPageIndex(0);
   }
 
   function handleFilterChange(f: "all" | "sent" | "received") {
     setFilter(f);
-    setPages([{ token: undefined, label: "1" }]);
+    setPages([{ token: undefined }]);
     setCurrentPageIndex(0);
-    setSelectedMessageId(null);
   }
 
   function goNextPage() {
     if (!nextPageToken) return;
     const nextIndex = currentPageIndex + 1;
     if (nextIndex >= pages.length) {
-      setPages((prev) => [...prev, { token: nextPageToken, label: String(nextIndex + 1) }]);
+      setPages((prev) => [...prev, { token: nextPageToken }]);
     }
     setCurrentPageIndex(nextIndex);
   }
@@ -157,7 +232,7 @@ export default function MailPage() {
             <Mail className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-40" />
             <h3 className="text-lg font-medium mb-2">Gmail Not Connected</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Connect your Gmail account to view your emails here.
+              Connect your Gmail account to view and send emails here.
               You can connect it from any client's contact dialog.
             </p>
           </CardContent>
@@ -166,16 +241,106 @@ export default function MailPage() {
     );
   }
 
-  if (selectedMessageId) {
+  if (viewMode === "compose") {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <Button variant="ghost" size="sm" className="mb-4" onClick={backToInbox}>
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back to inbox
+        </Button>
+
+        <Card>
+          <CardContent className="p-6">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <PenSquare className="h-5 w-5" /> New Email
+            </h2>
+
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                From: {gmailEmail}
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="to" className="w-10 text-sm text-right">To</Label>
+                  <Input
+                    id="to"
+                    type="email"
+                    placeholder="recipient@example.com"
+                    value={compose.to}
+                    onChange={(e) => setCompose((c) => ({ ...c, to: e.target.value }))}
+                    className="flex-1"
+                  />
+                  {!showCc && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-muted-foreground"
+                      onClick={() => setShowCc(true)}
+                    >
+                      Cc
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {showCc && (
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="cc" className="w-10 text-sm text-right">Cc</Label>
+                  <Input
+                    id="cc"
+                    type="text"
+                    placeholder="cc@example.com"
+                    value={compose.cc}
+                    onChange={(e) => setCompose((c) => ({ ...c, cc: e.target.value }))}
+                    className="flex-1"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Label htmlFor="subject" className="w-10 text-sm text-right">Sub</Label>
+                <Input
+                  id="subject"
+                  placeholder="Subject"
+                  value={compose.subject}
+                  onChange={(e) => setCompose((c) => ({ ...c, subject: e.target.value }))}
+                  className="flex-1"
+                />
+              </div>
+
+              <Textarea
+                placeholder="Write your email..."
+                value={compose.body}
+                onChange={(e) => setCompose((c) => ({ ...c, body: e.target.value }))}
+                rows={14}
+                className="resize-none"
+              />
+
+              <div className="flex items-center gap-2 pt-2">
+                <Button onClick={handleSend} disabled={sendMutation.isPending}>
+                  {sendMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  Send
+                </Button>
+                <Button variant="ghost" onClick={backToInbox}>
+                  Discard
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (viewMode === "detail") {
     const msg = messageQuery.data?.message;
     return (
       <div className="p-6 max-w-4xl mx-auto">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mb-4"
-          onClick={() => setSelectedMessageId(null)}
-        >
+        <Button variant="ghost" size="sm" className="mb-4" onClick={backToInbox}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back to inbox
         </Button>
 
@@ -198,29 +363,36 @@ export default function MailPage() {
               </h2>
               <div className="space-y-1 mb-4 text-sm text-muted-foreground border-b pb-4">
                 <p>
-                  <span className="font-medium text-foreground">From:</span>{" "}
-                  {msg.from}
+                  <span className="font-medium text-foreground">From:</span> {msg.from}
                 </p>
                 <p>
-                  <span className="font-medium text-foreground">To:</span>{" "}
-                  {msg.to}
+                  <span className="font-medium text-foreground">To:</span> {msg.to}
                 </p>
                 {msg.cc && (
                   <p>
-                    <span className="font-medium text-foreground">Cc:</span>{" "}
-                    {msg.cc}
+                    <span className="font-medium text-foreground">Cc:</span> {msg.cc}
                   </p>
                 )}
                 <p>
                   <span className="font-medium text-foreground">Date:</span>{" "}
-                  {msg.date
-                    ? format(new Date(msg.date), "EEEE, MMMM d, yyyy 'at' h:mm a")
-                    : ""}
+                  {msg.date ? format(new Date(msg.date), "EEEE, MMMM d, yyyy 'at' h:mm a") : ""}
                 </p>
               </div>
+
+              <div className="flex gap-2 mb-4">
+                <Button variant="outline" size="sm" onClick={() => handleReply(msg)}>
+                  <Reply className="h-4 w-4 mr-1" /> Reply
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleForward(msg)}>
+                  <Forward className="h-4 w-4 mr-1" /> Forward
+                </Button>
+              </div>
+
               <div
                 className="prose prose-sm dark:prose-invert max-w-none overflow-auto"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.body, { USE_PROFILES: { html: true } }) }}
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(msg.body, { USE_PROFILES: { html: true } }),
+                }}
               />
             </CardContent>
           </Card>
@@ -240,15 +412,20 @@ export default function MailPage() {
             <Link2 className="h-3 w-3" /> {gmailEmail}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => inboxQuery.refetch()}
-          disabled={inboxQuery.isFetching}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${inboxQuery.isFetching ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => openCompose()}>
+            <PenSquare className="h-4 w-4 mr-2" /> Compose
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => inboxQuery.refetch()}
+            disabled={inboxQuery.isFetching}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${inboxQuery.isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <form onSubmit={handleSearch} className="flex gap-2 mb-4">
@@ -337,7 +514,7 @@ export default function MailPage() {
               return (
                 <div
                   key={msg.id}
-                  onClick={() => setSelectedMessageId(msg.id)}
+                  onClick={() => openDetail(msg.id)}
                   className={`flex items-start gap-3 p-3 hover:bg-muted/50 border-b last:border-b-0 cursor-pointer transition-colors ${
                     msg.isUnread ? "bg-primary/5" : ""
                   }`}

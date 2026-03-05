@@ -2360,6 +2360,35 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/gmail/send", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const schema = z.object({
+        to: z.string().email(),
+        cc: z.string().optional(),
+        subject: z.string().min(1),
+        body: z.string().min(1),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
+      }
+      const { to, cc, subject, body } = parsed.data;
+
+      const result = await sendGmailEmail(req.user.id, to, subject, body, cc);
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json({ success: true, messageId: result.messageId });
+    } catch (error: any) {
+      console.error("Error sending email via Gmail:", error);
+      res.status(500).json({ error: error.message || "Failed to send email" });
+    }
+  });
+
   // Simple ping endpoint for health checks
   app.get("/ping", (req, res) => {
     res.json({ 
