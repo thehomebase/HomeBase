@@ -6,6 +6,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/gmail.compose",
   "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.settings.basic",
   "https://www.googleapis.com/auth/userinfo.email",
 ];
 
@@ -124,6 +125,18 @@ export async function disconnectGmail(userId: number): Promise<void> {
   await db.execute(sql`DELETE FROM google_tokens WHERE user_id = ${userId}`);
 }
 
+async function getGmailSignature(gmail: any, email: string): Promise<string> {
+  try {
+    const aliases = await gmail.users.settings.sendAs.list({ userId: "me" });
+    const sendAs = aliases.data.sendAs || [];
+    const primary = sendAs.find((a: any) => a.isPrimary) || sendAs.find((a: any) => a.sendAsEmail === email);
+    return primary?.signature || "";
+  } catch (error) {
+    console.error("Failed to fetch Gmail signature:", error);
+    return "";
+  }
+}
+
 export async function sendGmailEmail(
   userId: number,
   to: string,
@@ -138,7 +151,13 @@ export async function sendGmailEmail(
 
     const gmail = google.gmail({ version: "v1", auth: auth.client });
 
-    const htmlBody = body.replace(/\n/g, "<br>");
+    const signature = await getGmailSignature(gmail, auth.email);
+
+    let htmlBody = body.replace(/\n/g, "<br>");
+    if (signature) {
+      htmlBody += `<br><br>--<br>${signature}`;
+    }
+
     const messageParts = [
       `From: ${auth.email}`,
       `To: ${to}`,
@@ -153,18 +172,9 @@ export async function sendGmailEmail(
       .replace(/\//g, "_")
       .replace(/=+$/, "");
 
-    const draft = await gmail.users.drafts.create({
+    const result = await gmail.users.messages.send({
       userId: "me",
-      requestBody: {
-        message: { raw: rawMessage },
-      },
-    });
-
-    const result = await gmail.users.drafts.send({
-      userId: "me",
-      requestBody: {
-        id: draft.data.id!,
-      },
+      requestBody: { raw: rawMessage },
     });
 
     return { success: true, messageId: result.data.id || undefined };
