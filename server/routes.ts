@@ -9,9 +9,12 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
-import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail } from "./gmail-service";
+import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, type EmailAttachment } from "./gmail-service";
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 10 },
+});
 
 // Seller checklist items
 const SELLER_CHECKLIST_ITEMS = [
@@ -2360,23 +2363,35 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/gmail/send", async (req, res) => {
+  app.post("/api/gmail/send", upload.array("attachments", 10), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (req.user.role !== "agent") return res.sendStatus(403);
     try {
-      const schema = z.object({
-        to: z.string().email(),
+      const { to, cc, subject, body } = req.body;
+      const sendSchema = z.object({
+        to: z.string().email("Invalid email address"),
         cc: z.string().optional(),
-        subject: z.string().min(1),
-        body: z.string().min(1),
+        subject: z.string().min(1, "Subject is required"),
+        body: z.string().min(1, "Body is required"),
       });
-      const parsed = schema.safeParse(req.body);
+      const parsed = sendSchema.safeParse({ to, cc, subject, body });
       if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
+        return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid request" });
       }
-      const { to, cc, subject, body } = parsed.data;
 
-      const result = await sendGmailEmail(req.user.id, to, subject, body, cc);
+      const files = (req.files as Express.Multer.File[]) || [];
+      const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+      if (totalSize > 25 * 1024 * 1024) {
+        return res.status(400).json({ error: "Total attachment size exceeds 25MB limit" });
+      }
+
+      const attachments: EmailAttachment[] = files.map((f) => ({
+        filename: f.originalname,
+        mimeType: f.mimetype,
+        content: f.buffer,
+      }));
+
+      const result = await sendGmailEmail(req.user.id, to, subject, body, cc || undefined, attachments.length > 0 ? attachments : undefined);
 
       if (!result.success) {
         return res.status(400).json({ error: result.error });

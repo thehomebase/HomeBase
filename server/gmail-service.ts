@@ -137,12 +137,19 @@ async function getGmailSignature(gmail: any, email: string): Promise<string> {
   }
 }
 
+export interface EmailAttachment {
+  filename: string;
+  mimeType: string;
+  content: Buffer;
+}
+
 export async function sendGmailEmail(
   userId: number,
   to: string,
   subject: string,
   body: string,
-  cc?: string
+  cc?: string,
+  attachments?: EmailAttachment[]
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     const auth = await getAuthenticatedClient(userId);
@@ -154,25 +161,67 @@ export async function sendGmailEmail(
 
     const signature = await getGmailSignature(gmail, auth.email);
 
-    let htmlBody = body.replace(/\n/g, "<br>");
+    let htmlBody = body;
+    if (!body.startsWith("<")) {
+      htmlBody = body.replace(/\n/g, "<br>");
+    }
     if (signature) {
       htmlBody += `<br><br>--<br>${signature}`;
     }
 
-    const messageParts = [
-      `From: ${auth.email}`,
-      `To: ${to}`,
-      ...(cc ? [`Cc: ${cc}`] : []),
-      `Subject: ${subject}`,
-      `Content-Type: text/html; charset=utf-8`,
-      "",
-      htmlBody,
-    ];
-    const rawMessage = Buffer.from(messageParts.join("\r\n"))
-      .toString("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
+    let rawMessage: string;
+
+    if (attachments && attachments.length > 0) {
+      const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const headerLines = [
+        `From: ${auth.email}`,
+        `To: ${to}`,
+        ...(cc ? [`Cc: ${cc}`] : []),
+        `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
+        `MIME-Version: 1.0`,
+        `Content-Type: multipart/mixed; boundary="${boundary}"`,
+        "",
+        `--${boundary}`,
+        `Content-Type: text/html; charset=utf-8`,
+        `Content-Transfer-Encoding: base64`,
+        "",
+        Buffer.from(htmlBody).toString("base64"),
+      ];
+
+      for (const att of attachments) {
+        headerLines.push(
+          `--${boundary}`,
+          `Content-Type: ${att.mimeType}; name="${att.filename}"`,
+          `Content-Disposition: attachment; filename="${att.filename}"`,
+          `Content-Transfer-Encoding: base64`,
+          "",
+          att.content.toString("base64")
+        );
+      }
+
+      headerLines.push(`--${boundary}--`);
+
+      rawMessage = Buffer.from(headerLines.join("\r\n"))
+        .toString("base64")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+    } else {
+      const messageParts = [
+        `From: ${auth.email}`,
+        `To: ${to}`,
+        ...(cc ? [`Cc: ${cc}`] : []),
+        `Subject: ${subject}`,
+        `Content-Type: text/html; charset=utf-8`,
+        "",
+        htmlBody,
+      ];
+      rawMessage = Buffer.from(messageParts.join("\r\n"))
+        .toString("base64")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+    }
 
     const result = await gmail.users.messages.send({
       userId: "me",
