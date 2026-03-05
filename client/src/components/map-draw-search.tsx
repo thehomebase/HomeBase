@@ -288,10 +288,10 @@ function MapSearchResultsTable({
 
   const thSortable = (label: string, key: SortKey, align: string, extraClass = "") => (
     <th
-      className={`${align} px-3 py-2.5 font-medium cursor-pointer select-none hover:bg-muted/80 transition-colors ${extraClass}`}
+      className={`${align} px-2 py-2 font-medium cursor-pointer select-none hover:bg-muted/80 transition-colors text-xs ${extraClass}`}
       onClick={() => handleSort(key)}
     >
-      <span className={`inline-flex items-center gap-1 ${align === "text-right" ? "justify-end" : align === "text-center" ? "justify-center" : ""}`}>
+      <span className={`inline-flex items-center gap-0.5 ${align === "text-right" ? "justify-end" : align === "text-center" ? "justify-center" : ""}`}>
         {label}
         <SortIcon columnKey={key} sortKey={sortKey} sortDir={sortDir} />
       </span>
@@ -305,22 +305,18 @@ function MapSearchResultsTable({
           <MapPin className="h-4 w-4" />
           Listings in Area ({listings.length})
         </div>
-        <div className="overflow-x-auto border rounded-lg max-h-[500px] overflow-y-auto">
-          <table className="w-full text-sm">
+        <div className="border rounded-lg max-h-[500px] overflow-y-auto">
+          <table className="w-full text-xs table-fixed">
             <thead className="sticky top-0 z-10 bg-background">
               <tr className="bg-muted/50 border-b">
-                <th className="text-left px-3 py-2.5 font-medium">Address</th>
+                <th className="text-left px-2 py-2 font-medium text-xs w-[30%]">Address</th>
                 {thSortable("Price", "price", "text-right")}
-                {thSortable("Beds", "bedrooms", "text-center")}
-                {thSortable("Baths", "bathrooms", "text-center")}
-                {thSortable("Sqft", "squareFootage", "text-right", "hidden sm:table-cell")}
-                <th className="text-left px-3 py-2.5 font-medium hidden md:table-cell">Type</th>
-                {thSortable("Year", "yearBuilt", "text-center", "hidden md:table-cell")}
-                {thSortable("DOM", "daysOnMarket", "text-center", "hidden lg:table-cell")}
-                <th className="text-left px-3 py-2.5 font-medium hidden lg:table-cell">Agent</th>
-                <th className="text-left px-3 py-2.5 font-medium hidden lg:table-cell">MLS#</th>
-                <th className="text-center px-3 py-2.5 font-medium">Status</th>
-                <th className="px-3 py-2.5 font-medium w-20"></th>
+                {thSortable("Bd", "bedrooms", "text-center")}
+                {thSortable("Ba", "bathrooms", "text-center")}
+                {thSortable("Sqft", "squareFootage", "text-right")}
+                {thSortable("Yr", "yearBuilt", "text-center")}
+                {thSortable("DOM", "daysOnMarket", "text-center")}
+                <th className="px-2 py-2 font-medium text-xs text-center w-[52px]"></th>
               </tr>
             </thead>
             <tbody>
@@ -331,58 +327,44 @@ function MapSearchResultsTable({
                     key={listing.id || listing.formattedAddress}
                     className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "" : "bg-muted/10"}`}
                   >
-                    <td className="px-3 py-2.5">
-                      <div className="font-medium truncate max-w-[200px]">{listing.addressLine1}</div>
-                      <div className="text-xs text-muted-foreground">{listing.city}, {listing.state} {listing.zipCode}</div>
+                    <td className="px-2 py-1.5">
+                      <div className="font-medium truncate">{listing.addressLine1}</div>
+                      <div className="text-[10px] text-muted-foreground truncate">{listing.city}, {listing.state} {listing.zipCode}</div>
                     </td>
-                    <td className="px-3 py-2.5 text-right font-semibold text-primary whitespace-nowrap">
+                    <td className="px-2 py-1.5 text-right font-semibold text-primary whitespace-nowrap">
                       {formatPrice(listing.price)}
                     </td>
-                    <td className="px-3 py-2.5 text-center">{listing.bedrooms || "—"}</td>
-                    <td className="px-3 py-2.5 text-center">{listing.bathrooms || "—"}</td>
-                    <td className="px-3 py-2.5 text-right hidden sm:table-cell whitespace-nowrap">
+                    <td className="px-2 py-1.5 text-center">{listing.bedrooms || "—"}</td>
+                    <td className="px-2 py-1.5 text-center">{listing.bathrooms || "—"}</td>
+                    <td className="px-2 py-1.5 text-right whitespace-nowrap">
                       {listing.squareFootage ? listing.squareFootage.toLocaleString() : "—"}
                     </td>
-                    <td className="px-3 py-2.5 hidden md:table-cell text-muted-foreground text-xs">
-                      {listing.propertyType || "—"}
-                    </td>
-                    <td className="px-3 py-2.5 text-center hidden md:table-cell text-muted-foreground">
+                    <td className="px-2 py-1.5 text-center text-muted-foreground">
                       {listing.yearBuilt || "—"}
                     </td>
-                    <td className="px-3 py-2.5 text-center hidden lg:table-cell text-muted-foreground">
+                    <td className="px-2 py-1.5 text-center text-muted-foreground">
                       {listing.daysOnMarket}
                     </td>
-                    <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-muted-foreground truncate max-w-[140px]">
-                      {listing.listingAgent?.name || "—"}
-                    </td>
-                    <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-muted-foreground">
-                      {listing.mlsNumber || "—"}
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <Badge variant={listing.status === "Active" ? "default" : "secondary"} className="text-xs">
-                        {listing.status}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-0.5">
+                    <td className="px-1 py-1.5">
+                      <div className="flex items-center gap-0">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7"
+                          className="h-6 w-6"
                           onClick={() => onSave(listing)}
                           disabled={isSaving}
                           title="Save to favorites"
                         >
-                          <Heart className="h-3.5 w-3.5" />
+                          <Heart className="h-3 w-3" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7"
+                          className="h-6 w-6"
                           onClick={() => window.open(zillowUrl, "_blank", "noopener,noreferrer")}
                           title="View on Zillow"
                         >
-                          <ExternalLink className="h-3.5 w-3.5" />
+                          <ExternalLink className="h-3 w-3" />
                         </Button>
                       </div>
                     </td>
