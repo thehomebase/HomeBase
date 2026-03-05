@@ -476,7 +476,7 @@ export default function MapDrawSearch() {
   const [beds, setBeds] = useState("any");
   const [propertyType, setPropertyType] = useState("any");
   const [minSqft, setMinSqft] = useState("any");
-  const [poolOnly, setPoolOnly] = useState(false);
+  const [poolFilter, setPoolFilter] = useState("any");
 
   const { toast } = useToast();
 
@@ -489,7 +489,8 @@ export default function MapDrawSearch() {
     if (beds !== "any" && listing.bedrooms < parseInt(beds)) return false;
     if (propertyType !== "any" && listing.propertyType !== propertyType) return false;
     if (minSqft !== "any" && (listing.squareFootage || 0) < parseInt(minSqft)) return false;
-    if (poolOnly && !(listing.features || []).some((f) => /pool/i.test(f))) return false;
+    if (poolFilter === "yes" && !(listing.features || []).some((f) => /pool/i.test(f))) return false;
+    if (poolFilter === "no" && (listing.features || []).some((f) => /pool/i.test(f))) return false;
     return true;
   });
 
@@ -686,14 +687,14 @@ export default function MapDrawSearch() {
         </div>
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">Pool</Label>
-          <Button
-            variant={poolOnly ? "default" : "outline"}
-            size="sm"
-            className="h-8 w-full text-xs"
-            onClick={() => setPoolOnly(!poolOnly)}
-          >
-            {poolOnly ? "Pool Only" : "Any"}
-          </Button>
+          <Select value={poolFilter} onValueChange={setPoolFilter}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent className="z-[1100]">
+              <SelectItem value="any">Either</SelectItem>
+              <SelectItem value="yes">Pool</SelectItem>
+              <SelectItem value="no">No Pool</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

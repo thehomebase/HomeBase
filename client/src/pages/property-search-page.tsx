@@ -42,6 +42,17 @@ const BATHS_OPTIONS = [
   { value: "4", label: "4+" },
 ];
 
+const SQFT_MIN_OPTIONS = [
+  { value: "any", label: "No Min" },
+  { value: "1000", label: "1,000+" },
+  { value: "1500", label: "1,500+" },
+  { value: "2000", label: "2,000+" },
+  { value: "2500", label: "2,500+" },
+  { value: "3000", label: "3,000+" },
+  { value: "4000", label: "4,000+" },
+  { value: "5000", label: "5,000+" },
+];
+
 const PRICE_MIN_OPTIONS = [
   { value: "any", label: "No Min" },
   { value: "50000", label: "$50,000" },
@@ -402,6 +413,8 @@ export default function PropertySearchPage() {
   const [rcMaxPrice, setRcMaxPrice] = useState("any");
   const [rcBeds, setRcBeds] = useState("any");
   const [rcBaths, setRcBaths] = useState("any");
+  const [rcMinSqft, setRcMinSqft] = useState("any");
+  const [rcPool, setRcPool] = useState("any");
 
   const [searchParams, setSearchParams] = useState<Record<string, string> | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
@@ -481,6 +494,9 @@ export default function PropertySearchPage() {
     if (listing.price < min || listing.price > max) return false;
     if (rcBeds !== "any" && listing.bedrooms < parseInt(rcBeds)) return false;
     if (rcBaths !== "any" && listing.bathrooms < parseInt(rcBaths)) return false;
+    if (rcMinSqft !== "any" && (listing.squareFootage || 0) < parseInt(rcMinSqft)) return false;
+    if (rcPool === "yes" && !(listing.features || []).some((f: string) => /pool/i.test(f))) return false;
+    if (rcPool === "no" && (listing.features || []).some((f: string) => /pool/i.test(f))) return false;
     return true;
   });
 
@@ -565,6 +581,8 @@ export default function PropertySearchPage() {
     setRcMaxPrice("any");
     setRcBeds("any");
     setRcBaths("any");
+    setRcMinSqft("any");
+    setRcPool("any");
     setSearchParams(null);
   };
 
@@ -721,6 +739,36 @@ export default function PropertySearchPage() {
                       {RENTCAST_PROPERTY_TYPES.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    <Ruler className="h-4 w-4" />
+                    Min Sqft
+                  </Label>
+                  <Select value={rcMinSqft} onValueChange={setRcMinSqft}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SQFT_MIN_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-1.5">
+                    Pool
+                  </Label>
+                  <Select value={rcPool} onValueChange={setRcPool}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Either</SelectItem>
+                      <SelectItem value="yes">Pool</SelectItem>
+                      <SelectItem value="no">No Pool</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
