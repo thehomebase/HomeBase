@@ -8,7 +8,7 @@ import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
-import { sendSMS, isTwilioConfigured, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber } from "./twilio-service";
+import { sendSMS, isTwilioConfigured, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages } from "./gmail-service";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -2059,6 +2059,11 @@ export function registerRoutes(app: Express): Server {
 
       if (isBlockedNumber(phone)) {
         return res.status(400).json({ error: "This number cannot receive SMS messages. Emergency and short-code numbers are not allowed." });
+      }
+
+      const contentCheck = containsThreateningContent(content);
+      if (contentCheck.flagged) {
+        return res.status(400).json({ error: contentCheck.reason });
       }
 
       const isOptedOut = await storage.isPhoneOptedOut(phone);

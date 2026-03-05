@@ -10,6 +10,28 @@ const BLOCKED_NUMBERS = new Set([
   '18004224453',
 ]);
 
+const BLOCKED_PATTERNS = [
+  /\bkill\s+(you|him|her|them|u)\b/i,
+  /\bi('ll|m\s+going\s+to|m\s+gonna)\s+(kill|hurt|harm|murder|shoot|stab|attack)\b/i,
+  /\b(death\s+threat|i\s+will\s+end\s+you|you('re|\s+are)\s+dead)\b/i,
+  /\b(bomb|explosive|blow\s+(you|it)\s+up)\b/i,
+  /\b(shoot|gun|weapon)\s+(you|your|at)\b/i,
+  /\byou('re|\s+are)\s+going\s+to\s+(die|regret|pay)\b/i,
+  /\bi('ll|\s+will)\s+(find|hunt|track)\s+(you|your)\b/i,
+  /\b(rape|sexual\s+assault|molest)\b/i,
+  /\b(watch\s+your\s+back|sleep\s+with\s+one\s+eye)\b/i,
+  /\b(burn\s+down|set\s+fire|arson)\b/i,
+];
+
+export function containsThreateningContent(message: string): { flagged: boolean; reason?: string } {
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(message)) {
+      return { flagged: true, reason: "Message contains language that may be perceived as threatening or harmful." };
+    }
+  }
+  return { flagged: false };
+}
+
 export function isBlockedNumber(phone: string): boolean {
   const digits = phone.replace(/\D/g, '');
   if (BLOCKED_NUMBERS.has(digits)) return true;
