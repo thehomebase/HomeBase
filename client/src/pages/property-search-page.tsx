@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Eye, Map } from "lucide-react";
+import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Eye, Map, Droplets } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -761,6 +761,7 @@ export default function PropertySearchPage() {
                 </div>
                 <div className="space-y-2">
                   <Label className="font-medium flex items-center gap-1.5">
+                    <Droplets className="h-4 w-4" />
                     Pool
                   </Label>
                   <Select value={rcPool} onValueChange={setRcPool}>

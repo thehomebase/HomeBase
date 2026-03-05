@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Loader2, Trash2, Search, MapPin, BedDouble, Bath, Ruler, Building2,
+  Loader2, Trash2, Search, MapPin, BedDouble, Bath, Ruler, Building2, Droplets,
   DollarSign, ExternalLink, Heart, AlertTriangle, Info, ArrowUp, ArrowDown, ArrowUpDown, CheckSquare
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
@@ -686,7 +686,7 @@ export default function MapDrawSearch() {
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs flex items-center gap-1">Pool</Label>
+          <Label className="text-xs flex items-center gap-1"><Droplets className="h-3 w-3" /> Pool</Label>
           <Select value={poolFilter} onValueChange={setPoolFilter}>
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent className="z-[1100]">
