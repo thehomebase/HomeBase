@@ -83,7 +83,7 @@ function DraggableCard({
     <Card
       ref={setNodeRef}
       style={style}
-      className="p-3 w-full cursor-move hover:shadow-md transition-shadow relative group bg-background border border-border/50"
+      className="p-3 w-full cursor-move hover:shadow-md transition-shadow relative group dark:bg-neutral-600 dark:border-neutral-500 bg-background border border-border/50"
       {...attributes}
       {...listeners}
     >
@@ -281,7 +281,7 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
 
       <DragOverlay>
         {activeId && activeTransaction && activeTransaction.client ? (
-          <Card className="p-3 w-[180px] shadow-lg cursor-grabbing">
+          <Card className="p-3 w-[180px] shadow-lg cursor-grabbing dark:bg-neutral-600 dark:border-neutral-500">
             <div className="font-medium text-sm truncate">
               {activeTransaction.streetName}
             </div>
