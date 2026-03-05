@@ -20,7 +20,8 @@ import {
   AlignLeft, AlignCenter, AlignRight, Link as LinkIcon,
   Highlighter, Undo2, Redo2, Paperclip, FileIcon, XCircle,
   Type, Heading1, Heading2, Quote, Minus,
-  FileText, Eye, EyeOff, Trash2, Pencil, Plus, BarChart3, Clock, CheckCircle2
+  FileText, Eye, EyeOff, Trash2, Pencil, Plus, BarChart3, Clock, CheckCircle2,
+  Archive, MailOpen, MailX, Star, Tag, ChevronDown
 } from "lucide-react";
 import { format } from "date-fns";
 import DOMPurify from "dompurify";
@@ -422,6 +423,82 @@ export default function MailPage() {
   const [snippetForm, setSnippetForm] = useState({ title: "", body: "" });
   const [showSnippetPicker, setShowSnippetPicker] = useState(false);
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showLabelMenu, setShowLabelMenu] = useState(false);
+
+  const labelsQuery = useQuery<Array<{ id: string; name: string; type: string }>>({
+    queryKey: ["/api/gmail/labels"],
+    enabled: !!gmailConnected,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  function toggleSelect(msgId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(msgId)) next.delete(msgId);
+      else next.add(msgId);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    if (selectedIds.size === messages.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(messages.map((m) => m.id)));
+    }
+  }
+
+  const bulkTrashMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await fetch("/api/gmail/trash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageIds: ids }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to trash messages");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: `${selectedIds.size} email${selectedIds.size !== 1 ? "s" : ""} moved to trash` });
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["/api/gmail/inbox"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to trash emails", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const bulkModifyMutation = useMutation({
+    mutationFn: async (params: { ids: string[]; addLabelIds?: string[]; removeLabelIds?: string[] }) => {
+      const res = await fetch("/api/gmail/batch-modify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageIds: params.ids, addLabelIds: params.addLabelIds, removeLabelIds: params.removeLabelIds }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to modify messages");
+      return res.json();
+    },
+    onSuccess: (_data, variables) => {
+      const count = variables.ids.length;
+      let action = "updated";
+      if (variables.removeLabelIds?.includes("INBOX")) action = "archived";
+      else if (variables.removeLabelIds?.includes("UNREAD")) action = "marked as read";
+      else if (variables.addLabelIds?.includes("UNREAD")) action = "marked as unread";
+      else if (variables.addLabelIds?.includes("STARRED")) action = "starred";
+      else if (variables.removeLabelIds?.includes("STARRED")) action = "unstarred";
+      toast({ title: `${count} email${count !== 1 ? "s" : ""} ${action}` });
+      setSelectedIds(new Set());
+      setShowLabelMenu(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/gmail/inbox"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to modify emails", description: err.message, variant: "destructive" });
+    },
+  });
+
   const snippetCreateMutation = useMutation({
     mutationFn: async (data: { title: string; body: string }) => {
       const res = await fetch("/api/snippets", {
@@ -655,10 +732,14 @@ export default function MailPage() {
     setFilter(f);
     setPages([{ token: undefined }]);
     setCurrentPageIndex(0);
+    setSelectedIds(new Set());
+    setShowLabelMenu(false);
   }
 
   function goNextPage() {
     if (!nextPageToken) return;
+    setSelectedIds(new Set());
+    setShowLabelMenu(false);
     const nextIndex = currentPageIndex + 1;
     if (nextIndex >= pages.length) {
       setPages((prev) => [...prev, { token: nextPageToken }]);
@@ -667,7 +748,11 @@ export default function MailPage() {
   }
 
   function goPrevPage() {
-    if (currentPageIndex > 0) setCurrentPageIndex(currentPageIndex - 1);
+    if (currentPageIndex > 0) {
+      setSelectedIds(new Set());
+      setShowLabelMenu(false);
+      setCurrentPageIndex(currentPageIndex - 1);
+    }
   }
 
   function extractName(header: string): string {
@@ -1211,6 +1296,116 @@ export default function MailPage() {
         </div>
       )}
 
+      {messages.length > 0 && (
+        <div className="flex items-center gap-2 mb-3 border rounded-lg px-3 py-2 bg-muted/30">
+          <input
+            type="checkbox"
+            checked={messages.length > 0 && selectedIds.size === messages.length}
+            ref={(el) => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < messages.length; }}
+            onChange={selectAll}
+            className="h-4 w-4 rounded border-muted-foreground/50 cursor-pointer"
+          />
+          {selectedIds.size > 0 ? (
+            <>
+              <span className="text-xs text-muted-foreground">{selectedIds.size} selected</span>
+              <div className="h-4 w-px bg-border mx-1" />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7"
+                      disabled={bulkModifyMutation.isPending}
+                      onClick={() => bulkModifyMutation.mutate({ ids: [...selectedIds], removeLabelIds: ["INBOX"] })}>
+                      <Archive className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Archive</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7"
+                      disabled={bulkTrashMutation.isPending}
+                      onClick={() => bulkTrashMutation.mutate([...selectedIds])}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7"
+                      disabled={bulkModifyMutation.isPending}
+                      onClick={() => bulkModifyMutation.mutate({ ids: [...selectedIds], removeLabelIds: ["UNREAD"] })}>
+                      <MailOpen className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Mark as read</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7"
+                      disabled={bulkModifyMutation.isPending}
+                      onClick={() => bulkModifyMutation.mutate({ ids: [...selectedIds], addLabelIds: ["UNREAD"] })}>
+                      <MailX className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Mark as unread</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7"
+                      disabled={bulkModifyMutation.isPending}
+                      onClick={() => bulkModifyMutation.mutate({ ids: [...selectedIds], addLabelIds: ["STARRED"] })}>
+                      <Star className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Star</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <div className="relative">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs"
+                        onClick={() => setShowLabelMenu(!showLabelMenu)}>
+                        <Tag className="h-3.5 w-3.5 mr-1" /> Label <ChevronDown className="h-3 w-3 ml-1" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Apply label</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {showLabelMenu && (
+                  <div className="absolute left-0 top-full mt-1 z-50 bg-background border rounded-lg shadow-lg w-48 max-h-[250px] overflow-auto">
+                    <div className="p-2 border-b">
+                      <p className="text-xs font-medium text-muted-foreground">Apply label</p>
+                    </div>
+                    {(labelsQuery.data || []).length === 0 ? (
+                      <p className="p-3 text-xs text-muted-foreground text-center">No labels found</p>
+                    ) : (
+                      (labelsQuery.data || []).map((label) => (
+                        <button key={label.id}
+                          className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+                          onClick={() => {
+                            bulkModifyMutation.mutate({ ids: [...selectedIds], addLabelIds: [label.id] });
+                          }}>
+                          {label.name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {(bulkTrashMutation.isPending || bulkModifyMutation.isPending) && (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground ml-1" />
+              )}
+            </>
+          ) : (
+            <span className="text-xs text-muted-foreground">Select emails</span>
+          )}
+        </div>
+      )}
+
       {inboxQuery.isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -1250,11 +1445,18 @@ export default function MailPage() {
               const wasOpened = trackingRecord && trackingRecord.openCount > 0;
 
               return (
-                <div key={msg.id} onClick={() => openDetail(msg.id)}
+                <div key={msg.id}
                   className={`flex items-start gap-3 p-3 hover:bg-muted/50 border-b last:border-b-0 cursor-pointer transition-colors ${
                     msg.isUnread ? "bg-primary/5" : ""
-                  }`}>
-                  <div className="mt-1">
+                  } ${selectedIds.has(msg.id) ? "bg-primary/10" : ""}`}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(msg.id)}
+                    onChange={(e) => { e.stopPropagation(); toggleSelect(msg.id); }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-4 w-4 mt-1 rounded border-muted-foreground/50 cursor-pointer shrink-0"
+                  />
+                  <div className="mt-1 shrink-0" onClick={() => openDetail(msg.id)}>
                     {isFromAgent ? (
                       wasOpened ? (
                         <Eye className="h-4 w-4 text-green-500" />
@@ -1265,7 +1467,7 @@ export default function MailPage() {
                       <Inbox className="h-4 w-4 text-purple-500" />
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0" onClick={() => openDetail(msg.id)}>
                     <div className="flex items-center gap-2">
                       <span className={`text-sm truncate ${msg.isUnread ? "font-bold" : "font-medium"}`}>
                         {displayName}

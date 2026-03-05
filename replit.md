@@ -35,7 +35,7 @@ Preferred communication style: Simple, everyday language.
 - **Showing Requests**: Clients can request showings for saved properties, which agents view on a map.
 - **Client Communications**:
     - **SMS**: Via Twilio, with agent-specific phone numbers, opt-out handling, rate limiting, and content filtering.
-    - **Email**: Via agent's linked Gmail account (Google OAuth), including full inbox view, compose, reply, forward, email snippets/templates, and read receipts (tracking pixel).
+    - **Email**: Via agent's linked Gmail account (Google OAuth), including full inbox view, compose, reply, forward, email snippets/templates, read receipts (tracking pixel), and Gmail-like bulk actions (checkbox selection with archive, delete, mark read/unread, star, label).
 
 ## External Dependencies
 

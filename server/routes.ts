@@ -9,7 +9,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
-import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, type EmailAttachment } from "./gmail-service";
+import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, type EmailAttachment } from "./gmail-service";
 import { randomUUID } from "crypto";
 
 const upload = multer({
@@ -2433,6 +2433,43 @@ export function registerRoutes(app: Express): Server {
       console.error("Error sending email via Gmail:", error);
       res.status(500).json({ error: error.message || "Failed to send email" });
     }
+  });
+
+  // ============ Gmail Bulk Actions ============
+  app.post("/api/gmail/batch-modify", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    const schema = z.object({
+      messageIds: z.array(z.string()).min(1),
+      addLabelIds: z.array(z.string()).optional(),
+      removeLabelIds: z.array(z.string()).optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+    const result = await batchModifyMessages(req.user.id, parsed.data.messageIds, parsed.data.addLabelIds, parsed.data.removeLabelIds);
+    if (!result.success) return res.status(400).json({ error: result.error });
+    res.json({ success: true });
+  });
+
+  app.post("/api/gmail/trash", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    const schema = z.object({
+      messageIds: z.array(z.string()).min(1),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+    const result = await trashMessages(req.user.id, parsed.data.messageIds);
+    if (!result.success) return res.status(400).json({ error: result.error });
+    res.json({ success: true });
+  });
+
+  app.get("/api/gmail/labels", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    const result = await getGmailLabels(req.user.id);
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.json(result.labels);
   });
 
   // ============ Email Snippets ============

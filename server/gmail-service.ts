@@ -6,6 +6,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/gmail.compose",
   "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.modify",
   "https://www.googleapis.com/auth/gmail.settings.basic",
   "https://www.googleapis.com/auth/userinfo.email",
 ];
@@ -377,6 +378,73 @@ export async function getGmailMessageDetail(
   } catch (error: any) {
     console.error("Gmail message detail error:", error);
     return { message: null, error: error.message || "Failed to fetch message" };
+  }
+}
+
+export async function batchModifyMessages(
+  userId: number,
+  messageIds: string[],
+  addLabelIds?: string[],
+  removeLabelIds?: string[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const auth = await getAuthenticatedClient(userId);
+    if (!auth) return { success: false, error: "Gmail not connected" };
+    const gmail = google.gmail({ version: "v1", auth: auth.client });
+
+    await gmail.users.messages.batchModify({
+      userId: "me",
+      requestBody: {
+        ids: messageIds,
+        addLabelIds: addLabelIds || [],
+        removeLabelIds: removeLabelIds || [],
+      },
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Gmail batch modify error:", error);
+    return { success: false, error: error.message || "Failed to modify messages" };
+  }
+}
+
+export async function trashMessages(
+  userId: number,
+  messageIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const auth = await getAuthenticatedClient(userId);
+    if (!auth) return { success: false, error: "Gmail not connected" };
+    const gmail = google.gmail({ version: "v1", auth: auth.client });
+
+    await Promise.all(
+      messageIds.map((id) =>
+        gmail.users.messages.trash({ userId: "me", id })
+      )
+    );
+    return { success: true };
+  } catch (error: any) {
+    console.error("Gmail trash error:", error);
+    return { success: false, error: error.message || "Failed to trash messages" };
+  }
+}
+
+export async function getGmailLabels(
+  userId: number
+): Promise<{ labels: Array<{ id: string; name: string; type: string }>; error?: string }> {
+  try {
+    const auth = await getAuthenticatedClient(userId);
+    if (!auth) return { labels: [], error: "Gmail not connected" };
+    const gmail = google.gmail({ version: "v1", auth: auth.client });
+
+    const result = await gmail.users.labels.list({ userId: "me" });
+    const labels = (result.data.labels || [])
+      .filter((l) => l.type === "user" || ["STARRED", "IMPORTANT"].includes(l.id || ""))
+      .map((l) => ({ id: l.id || "", name: l.name || "", type: l.type || "" }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return { labels };
+  } catch (error: any) {
+    console.error("Gmail labels error:", error);
+    return { labels: [], error: error.message || "Failed to fetch labels" };
   }
 }
 
