@@ -35,6 +35,7 @@ interface RentCastListing {
   status: string;
   latitude: number;
   longitude: number;
+  lotSize?: number;
   features?: string[];
 }
 
@@ -180,6 +181,7 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
   const [isGeocodingSubject, setIsGeocodingSubject] = useState(false);
   const [filterPropertyType, setFilterPropertyType] = useState("all");
   const [filterSqftRange, setFilterSqftRange] = useState<[number, number]>([0, 10000]);
+  const [filterLotRange, setFilterLotRange] = useState<[number, number]>([0, 20]);
   const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
 
   const { isLoading: isLoadingReport } = useQuery<CmaReport>({
@@ -564,6 +566,19 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                   className="w-40"
                 />
               </div>
+              <div className="flex items-center gap-3">
+                <Label className="text-sm whitespace-nowrap min-w-fit">
+                  Lot: {filterLotRange[0]}–{filterLotRange[1] >= 20 ? "20+" : filterLotRange[1]} ac
+                </Label>
+                <Slider
+                  value={filterLotRange}
+                  onValueChange={([min, max]) => setFilterLotRange([min, max])}
+                  min={0}
+                  max={20}
+                  step={0.25}
+                  className="w-40"
+                />
+              </div>
             </div>
           )}
 
@@ -609,6 +624,7 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                 case "ppsqft": return listing.squareFootage > 0 ? listing.price / listing.squareFootage : 0;
                 case "year": return listing.yearBuilt || 0;
                 case "dom": return listing.daysOnMarket || 0;
+                case "lot": return listing.lotSize ? listing.lotSize / 43560 : 0;
                 case "pool": return hasPool(listing) ? 1 : 0;
                 default: return 0;
               }
@@ -628,9 +644,15 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
               return sqft >= filterSqftRange[0] && (filterSqftRange[1] >= 10000 || sqft <= filterSqftRange[1]);
             });
 
+            const lotFiltered = sqftFiltered.filter(l => {
+              const acres = l.lotSize ? l.lotSize / 43560 : 0;
+              if (acres === 0) return true;
+              return acres >= filterLotRange[0] && (filterLotRange[1] >= 20 || acres <= filterLotRange[1]);
+            });
+
             const visibleListings = narrowed && selectedListingIds.size > 0
-              ? sqftFiltered.filter(l => selectedListingIds.has(l.id))
-              : sqftFiltered;
+              ? lotFiltered.filter(l => selectedListingIds.has(l.id))
+              : lotFiltered;
 
             const sortedListings = sortColumn
               ? [...visibleListings].sort((a, b) => {
@@ -646,8 +668,8 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                 <p className="text-sm text-muted-foreground">
                   {narrowed && selectedListingIds.size > 0
                     ? `Showing ${sortedListings.length} of ${listings.length} properties`
-                    : sqftFiltered.length < listings.length
-                    ? `${sqftFiltered.length} of ${listings.length} properties (filtered)`
+                    : lotFiltered.length < listings.length
+                    ? `${lotFiltered.length} of ${listings.length} properties (filtered)`
                     : `${listings.length} properties found`}
                 </p>
                 <div className="flex items-center gap-2">
@@ -695,29 +717,32 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                           }}
                         />
                       </th>
-                      <th className="px-2 py-2 text-left font-medium w-[26%]">Address</th>
-                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[11%]" onClick={() => handleSort("price")}>
+                      <th className="px-2 py-2 text-left font-medium w-[22%]">Address</th>
+                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[10%]" onClick={() => handleSort("price")}>
                         <span className="inline-flex items-center justify-end">Price<SortIcon col="price" /></span>
                       </th>
-                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[7%]" onClick={() => handleSort("beds")}>
+                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[6%]" onClick={() => handleSort("beds")}>
                         <span className="inline-flex items-center justify-center">Beds<SortIcon col="beds" /></span>
                       </th>
-                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[7%]" onClick={() => handleSort("baths")}>
+                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[6%]" onClick={() => handleSort("baths")}>
                         <span className="inline-flex items-center justify-center">Baths<SortIcon col="baths" /></span>
                       </th>
-                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[9%]" onClick={() => handleSort("sqft")}>
+                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[8%]" onClick={() => handleSort("sqft")}>
                         <span className="inline-flex items-center justify-end">Sqft<SortIcon col="sqft" /></span>
                       </th>
-                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[9%]" onClick={() => handleSort("ppsqft")}>
+                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[8%]" onClick={() => handleSort("ppsqft")}>
                         <span className="inline-flex items-center justify-end">$/Sqft<SortIcon col="ppsqft" /></span>
                       </th>
-                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[7%]" onClick={() => handleSort("year")}>
+                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[6%]" onClick={() => handleSort("year")}>
                         <span className="inline-flex items-center justify-center">Year<SortIcon col="year" /></span>
                       </th>
-                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[7%]" onClick={() => handleSort("dom")}>
+                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[6%]" onClick={() => handleSort("dom")}>
                         <span className="inline-flex items-center justify-center">DOM<SortIcon col="dom" /></span>
                       </th>
-                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[7%]" onClick={() => handleSort("pool")}>
+                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[7%]" onClick={() => handleSort("lot")}>
+                        <span className="inline-flex items-center justify-end">Lot(ac)<SortIcon col="lot" /></span>
+                      </th>
+                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[6%]" onClick={() => handleSort("pool")}>
                         <span className="inline-flex items-center justify-center">Pool<SortIcon col="pool" /></span>
                       </th>
                       <th className="px-2 py-2 w-8"></th>
@@ -751,6 +776,7 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                           <td className="px-2 py-2 text-right">{pricePerSqft > 0 ? `$${pricePerSqft}` : "—"}</td>
                           <td className="px-2 py-2 text-center">{listing.yearBuilt || "—"}</td>
                           <td className="px-2 py-2 text-center">{listing.daysOnMarket}</td>
+                          <td className="px-2 py-2 text-right">{listing.lotSize ? (listing.lotSize / 43560).toFixed(2) : "—"}</td>
                           <td className="px-2 py-2 text-center">
                             {hasPool(listing)
                               ? <Badge variant="default" className="text-xs px-1.5 py-0">Yes</Badge>
