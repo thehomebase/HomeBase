@@ -151,19 +151,19 @@ function CmaListView({ onSelect, onCreate }: { onSelect: (id: number) => void; o
   );
 }
 
-function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack: () => void }) {
+function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null; prefill?: Record<string, string> | null; onBack: () => void }) {
   const { toast } = useToast();
   const isEditing = reportId !== null;
 
-  const [subjectAddress, setSubjectAddress] = useState("");
-  const [subjectCity, setSubjectCity] = useState("");
-  const [subjectState, setSubjectState] = useState("");
-  const [subjectZip, setSubjectZip] = useState("");
-  const [subjectBeds, setSubjectBeds] = useState("");
-  const [subjectBaths, setSubjectBaths] = useState("");
-  const [subjectSqft, setSubjectSqft] = useState("");
-  const [subjectPrice, setSubjectPrice] = useState("");
-  const [subjectYearBuilt, setSubjectYearBuilt] = useState("");
+  const [subjectAddress, setSubjectAddress] = useState(prefill?.address || "");
+  const [subjectCity, setSubjectCity] = useState(prefill?.city || "");
+  const [subjectState, setSubjectState] = useState(prefill?.state || "");
+  const [subjectZip, setSubjectZip] = useState(prefill?.zip || "");
+  const [subjectBeds, setSubjectBeds] = useState(prefill?.beds || "");
+  const [subjectBaths, setSubjectBaths] = useState(prefill?.baths || "");
+  const [subjectSqft, setSubjectSqft] = useState(prefill?.sqft || "");
+  const [subjectPrice, setSubjectPrice] = useState(prefill?.price || "");
+  const [subjectYearBuilt, setSubjectYearBuilt] = useState(prefill?.yearBuilt || "");
   const [notes, setNotes] = useState("");
   const [comps, setComps] = useState<CompData[]>([]);
   const [shareToken, setShareToken] = useState("");
@@ -190,6 +190,7 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
   const [filterLotMax, setFilterLotMax] = useState("");
   const [filterRadiusMax, setFilterRadiusMax] = useState("");
   const [filterPool, setFilterPool] = useState("all");
+  const [searchStatuses, setSearchStatuses] = useState<Set<string>>(new Set(["Active", "Pending", "Sold"]));
   const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
 
   const { isLoading: isLoadingReport } = useQuery<CmaReport>({
@@ -396,7 +397,10 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
     }
 
     if (subjectBeds) params.bedroomsMin = String(Math.max(1, parseInt(subjectBeds) - 1));
-    params.status = "Active";
+    const activeStatuses = Array.from(searchStatuses);
+    if (activeStatuses.length === 1) {
+      params.status = activeStatuses[0];
+    }
     params.limit = "100";
     setSearchParams(params);
     setSelectedListingIds(new Set());
@@ -665,6 +669,31 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
               <Label>ZIP</Label>
               <Input value={searchZip} onChange={e => setSearchZip(e.target.value)} placeholder={subjectZip || "ZIP"} className="w-24" maxLength={5} />
             </div>
+            <div>
+              <Label>Status</Label>
+              <div className="flex items-center gap-3 h-9">
+                {["Active", "Pending", "Sold"].map(status => (
+                  <label key={status} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={searchStatuses.has(status)}
+                      onCheckedChange={(checked) => {
+                        setSearchStatuses(prev => {
+                          const next = new Set(prev);
+                          if (checked) {
+                            next.add(status);
+                          } else {
+                            next.delete(status);
+                            if (next.size === 0) return prev;
+                          }
+                          return next;
+                        });
+                      }}
+                    />
+                    {status}
+                  </label>
+                ))}
+              </div>
+            </div>
             <Button onClick={handleSearchComps} disabled={isSearching} className="gap-1">
               {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               Search
@@ -813,9 +842,16 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
               ? listings.filter(l => !l.latitude || !l.longitude || haversineDistance(subjectCoords.lat, subjectCoords.lng, l.latitude, l.longitude) <= radiusMax)
               : listings;
 
-            const typeFiltered = filterPropertyType === "all"
+            const statusFiltered = searchStatuses.size === 3
               ? radiusFiltered
-              : radiusFiltered.filter(l => (l.propertyType || "").toLowerCase().includes(filterPropertyType.toLowerCase()));
+              : radiusFiltered.filter(l => {
+                  const s = (l.status || "").trim();
+                  return Array.from(searchStatuses).some(st => s.toLowerCase().startsWith(st.toLowerCase()));
+                });
+
+            const typeFiltered = filterPropertyType === "all"
+              ? statusFiltered
+              : statusFiltered.filter(l => (l.propertyType || "").toLowerCase().includes(filterPropertyType.toLowerCase()));
 
             const sqftMin = filterSqftMin ? parseFloat(filterSqftMin) : null;
             const sqftMax = filterSqftMax ? parseFloat(filterSqftMax) : null;
@@ -910,32 +946,33 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                           }}
                         />
                       </th>
-                      <th className="px-2 py-2 text-left font-medium w-[22%]">Address</th>
-                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[10%]" onClick={() => handleSort("price")}>
+                      <th className="px-2 py-2 text-left font-medium w-[19%]">Address</th>
+                      <th className="px-2 py-2 text-center font-medium w-[7%]">Status</th>
+                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[9%]" onClick={() => handleSort("price")}>
                         <span className="inline-flex items-center justify-end">Price<SortIcon col="price" /></span>
                       </th>
-                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[6%]" onClick={() => handleSort("beds")}>
+                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[5%]" onClick={() => handleSort("beds")}>
                         <span className="inline-flex items-center justify-center">Beds<SortIcon col="beds" /></span>
                       </th>
                       <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[6%]" onClick={() => handleSort("baths")}>
                         <span className="inline-flex items-center justify-center">Baths<SortIcon col="baths" /></span>
                       </th>
-                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[8%]" onClick={() => handleSort("sqft")}>
+                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[7%]" onClick={() => handleSort("sqft")}>
                         <span className="inline-flex items-center justify-end">Sqft<SortIcon col="sqft" /></span>
                       </th>
-                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[8%]" onClick={() => handleSort("ppsqft")}>
+                      <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[7%]" onClick={() => handleSort("ppsqft")}>
                         <span className="inline-flex items-center justify-end">$/Sqft<SortIcon col="ppsqft" /></span>
                       </th>
                       <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[6%]" onClick={() => handleSort("year")}>
                         <span className="inline-flex items-center justify-center">Year<SortIcon col="year" /></span>
                       </th>
-                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[6%]" onClick={() => handleSort("dom")}>
+                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[5%]" onClick={() => handleSort("dom")}>
                         <span className="inline-flex items-center justify-center">DOM<SortIcon col="dom" /></span>
                       </th>
                       <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[7%]" onClick={() => handleSort("lot")}>
                         <span className="inline-flex items-center justify-end">Lot(ac)<SortIcon col="lot" /></span>
                       </th>
-                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[6%]" onClick={() => handleSort("pool")}>
+                      <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[5%]" onClick={() => handleSort("pool")}>
                         <span className="inline-flex items-center justify-center">Pool<SortIcon col="pool" /></span>
                       </th>
                       <th className="px-2 py-2 w-8"></th>
@@ -962,6 +999,11 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                             <Checkbox checked={isSelected} />
                           </td>
                           <td className="px-2 py-2 font-medium truncate">{listing.formattedAddress || listing.addressLine1}</td>
+                          <td className="px-2 py-2 text-center">
+                            <Badge variant={listing.status === "Active" ? "default" : listing.status === "Pending" ? "secondary" : "outline"} className="text-xs px-1.5 py-0">
+                              {listing.status}
+                            </Badge>
+                          </td>
                           <td className="px-2 py-2 text-right font-semibold text-primary">{formatPrice(listing.price)}</td>
                           <td className="px-2 py-2 text-center">{listing.bedrooms || "—"}</td>
                           <td className="px-2 py-2 text-center">{listing.bathrooms || "—"}</td>
@@ -1110,18 +1152,31 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
 export default function CmaPage() {
   const [view, setView] = useState<"list" | "builder">("list");
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
+  const [prefill, setPrefill] = useState<Record<string, string> | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("address") || params.get("city")) {
+      const data: Record<string, string> = {};
+      for (const [k, v] of params.entries()) data[k] = v;
+      setPrefill(data);
+      setView("builder");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       {view === "list" ? (
         <CmaListView
           onSelect={(id) => { setSelectedReportId(id); setView("builder"); }}
-          onCreate={() => { setSelectedReportId(null); setView("builder"); }}
+          onCreate={() => { setSelectedReportId(null); setPrefill(null); setView("builder"); }}
         />
       ) : (
         <CmaBuilderView
           reportId={selectedReportId}
-          onBack={() => { setView("list"); setSelectedReportId(null); }}
+          prefill={prefill}
+          onBack={() => { setView("list"); setSelectedReportId(null); setPrefill(null); }}
         />
       )}
     </div>
