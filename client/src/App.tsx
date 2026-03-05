@@ -19,6 +19,8 @@ import ClientsPage from "@/pages/clients-page";
 import TransactionPage from "@/pages/transaction-page";
 import CalendarPage from "@/pages/calendar-page";
 import DataPage from "./pages/data-page";
+import PrivacyPolicyPage from "@/pages/privacy-policy-page";
+import TermsPage from "@/pages/terms-page";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "./hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
@@ -233,6 +235,8 @@ function Router() {
 
   return (
     <Switch>
+      <Route path="/privacy-policy" component={PrivacyPolicyPage} />
+      <Route path="/terms" component={TermsPage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/messages" component={MessagesPage} />
       <Route path="/property-search">
