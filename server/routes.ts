@@ -1915,6 +1915,58 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/rentcast/property", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    const { address } = req.query;
+    if (!address) {
+      return res.status(400).json({ error: "Please provide an address" });
+    }
+
+    const cacheKey = `property:${String(address).toLowerCase().trim()}`;
+    const cached = rentcastCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return res.json({ property: cached.data, fromCache: true });
+    }
+
+    resetMonthlyCounterIfNeeded();
+    if (monthlyCallCount >= MONTHLY_LIMIT) {
+      return res.status(429).json({ error: "Monthly API limit reached." });
+    }
+
+    try {
+      const apiKey = process.env.RENTCAST_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "RentCast API key not configured" });
+      }
+
+      const params = new URLSearchParams({ address: String(address) });
+      const url = `https://api.rentcast.io/v1/properties?${params.toString()}`;
+      console.log(`RentCast property lookup #${monthlyCallCount + 1}: ${url}`);
+
+      const response = await fetch(url, {
+        headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("RentCast property lookup error:", response.status, errorText);
+        return res.status(response.status).json({ error: `RentCast API error: ${response.statusText}` });
+      }
+
+      const data = await response.json();
+      monthlyCallCount++;
+
+      const property = Array.isArray(data) && data.length > 0 ? data[0] : data;
+      rentcastCache.set(cacheKey, { data: property, timestamp: Date.now() });
+
+      res.json({ property, fromCache: false });
+    } catch (error) {
+      console.error("RentCast property lookup error:", error);
+      res.status(500).json({ error: "Failed to look up property" });
+    }
+  });
+
   app.get("/api/rentcast/status", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     resetMonthlyCounterIfNeeded();

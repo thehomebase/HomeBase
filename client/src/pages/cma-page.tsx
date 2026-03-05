@@ -179,6 +179,7 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
   const [radiusMiles, setRadiusMiles] = useState(25);
   const [subjectCoords, setSubjectCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isGeocodingSubject, setIsGeocodingSubject] = useState(false);
+  const [isLookingUpSubject, setIsLookingUpSubject] = useState(false);
   const [filterPropertyType, setFilterPropertyType] = useState("all");
   const [filterSqftRange, setFilterSqftRange] = useState<[number, number]>([0, 10000]);
   const [filterLotRange, setFilterLotRange] = useState<[number, number]>([0, 20]);
@@ -265,6 +266,44 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
       toast({ title: "Geocoding failed", description: "Unable to look up the address. Try again.", variant: "destructive" });
     } finally {
       setIsGeocodingSubject(false);
+    }
+  };
+
+  const lookupSubjectProperty = async () => {
+    const addr = subjectAddress.trim();
+    const city = subjectCity.trim();
+    const state = subjectState.trim();
+    const zip = subjectZip.trim();
+    const fullAddress = [addr, city, state, zip].filter(Boolean).join(", ");
+    if (!addr) {
+      toast({ title: "Enter an address", description: "Type the subject property street address first.", variant: "destructive" });
+      return;
+    }
+    setIsLookingUpSubject(true);
+    try {
+      const res = await apiRequest("GET", `/api/rentcast/property?address=${encodeURIComponent(fullAddress)}`);
+      const { property } = await res.json();
+      if (!property || (!property.addressLine1 && !property.formattedAddress)) {
+        toast({ title: "Property not found", description: "Could not find data for that address. You can fill in the details manually.", variant: "destructive" });
+        return;
+      }
+      if (property.city) setSubjectCity(property.city);
+      if (property.state) setSubjectState(property.state);
+      if (property.zipCode) setSubjectZip(property.zipCode);
+      if (property.bedrooms) setSubjectBeds(String(property.bedrooms));
+      if (property.bathrooms) setSubjectBaths(String(property.bathrooms));
+      if (property.squareFootage) setSubjectSqft(String(property.squareFootage));
+      if (property.yearBuilt) setSubjectYearBuilt(String(property.yearBuilt));
+      if (property.price || property.lastSalePrice) setSubjectPrice(String(property.price || property.lastSalePrice));
+      if (property.latitude && property.longitude) {
+        setSubjectCoords({ lat: property.latitude, lng: property.longitude });
+      }
+      toast({ title: "Property data loaded", description: "Fields have been auto-filled. You can edit any value as needed." });
+    } catch (err: any) {
+      const msg = err?.message || "Failed to look up property";
+      toast({ title: "Lookup failed", description: msg, variant: "destructive" });
+    } finally {
+      setIsLookingUpSubject(false);
     }
   };
 
@@ -432,7 +471,19 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="md:col-span-2 lg:col-span-3">
               <Label>Address</Label>
-              <Input value={subjectAddress} onChange={e => { setSubjectAddress(e.target.value); setSubjectCoords(null); }} placeholder="123 Main St" />
+              <div className="flex gap-2">
+                <Input value={subjectAddress} onChange={e => { setSubjectAddress(e.target.value); setSubjectCoords(null); }} placeholder="123 Main St" className="flex-1" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={lookupSubjectProperty}
+                  disabled={isLookingUpSubject || !subjectAddress.trim()}
+                  className="gap-1 whitespace-nowrap h-10"
+                >
+                  {isLookingUpSubject ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  Look Up
+                </Button>
+              </div>
             </div>
             <div>
               <Label>City</Label>
