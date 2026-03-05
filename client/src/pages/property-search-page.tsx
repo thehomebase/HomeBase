@@ -548,8 +548,8 @@ export default function PropertySearchPage() {
 
     if (rcMinPrice !== "any") params.minPrice = rcMinPrice;
     if (rcMaxPrice !== "any") params.maxPrice = rcMaxPrice;
-    if (rcBeds !== "any") params.bedrooms = rcBeds;
-    if (rcBaths !== "any") params.bathrooms = rcBaths;
+    if (rcBeds !== "any") params.bedroomsMin = rcBeds;
+    if (rcBaths !== "any") params.bathroomsMin = rcBaths;
     if (rcPropertyType !== "any") params.propertyType = rcPropertyType;
     params.status = "Active";
     params.limit = "500";

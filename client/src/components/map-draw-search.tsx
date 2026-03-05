@@ -537,7 +537,7 @@ export default function MapDrawSearch() {
         params.set("limit", "500");
         if (minPrice !== "any") params.set("minPrice", minPrice);
         if (maxPrice !== "any") params.set("maxPrice", maxPrice);
-        if (beds !== "any") params.set("bedrooms", beds);
+        if (beds !== "any") params.set("bedroomsMin", beds);
         if (propertyType !== "any") params.set("propertyType", propertyType);
 
         try {

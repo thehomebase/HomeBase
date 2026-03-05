@@ -1842,7 +1842,7 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/rentcast/listings", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
-    const { city, state, zipCode, minPrice, maxPrice, bedrooms, bathrooms, propertyType, status, limit } = req.query;
+    const { city, state, zipCode, minPrice, maxPrice, bedrooms, bathrooms, bedroomsMin, bathroomsMin, propertyType, status, limit } = req.query;
 
     if (!city && !zipCode) {
       return res.status(400).json({ error: "Please provide a city or ZIP code" });
@@ -1854,8 +1854,10 @@ export function registerRoutes(app: Express): Server {
     if (zipCode) params.set("zipCode", String(zipCode));
     if (minPrice && minPrice !== "any") params.set("minPrice", String(minPrice));
     if (maxPrice && maxPrice !== "any") params.set("maxPrice", String(maxPrice));
-    if (bedrooms && bedrooms !== "any") params.set("bedrooms", String(bedrooms));
-    if (bathrooms && bathrooms !== "any") params.set("bathrooms", String(bathrooms));
+    if (bedroomsMin && bedroomsMin !== "any") params.set("bedroomsMin", String(bedroomsMin));
+    else if (bedrooms && bedrooms !== "any") params.set("bedroomsMin", String(bedrooms));
+    if (bathroomsMin && bathroomsMin !== "any") params.set("bathroomsMin", String(bathroomsMin));
+    else if (bathrooms && bathrooms !== "any") params.set("bathroomsMin", String(bathrooms));
     if (propertyType && propertyType !== "any") params.set("propertyType", String(propertyType));
     if (status) params.set("status", String(status));
     const parsedLimit = Math.min(Math.max(parseInt(String(limit)) || 50, 1), 500);
