@@ -1905,6 +1905,7 @@ export function registerRoutes(app: Express): Server {
 
       const data = await response.json();
       monthlyCallCount++;
+      console.log(`RentCast returned ${Array.isArray(data) ? data.length : 'non-array'} listings for: ${cacheKey}`);
 
       rentcastCache.set(cacheKey, { data, timestamp: Date.now() });
 

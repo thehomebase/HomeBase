@@ -320,6 +320,61 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
     return merged;
   }, [searchResults, extraListings]);
 
+  const haversineDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 3958.8;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }, []);
+
+  const hasPool = useCallback((listing: RentCastListing) =>
+    (listing.features || []).some((f: string) => /pool/i.test(f)), []);
+
+  const filteredListings = useMemo(() => {
+    const radiusMax = filterRadiusMax ? parseFloat(filterRadiusMax) : null;
+    const radiusFiltered = subjectCoords && radiusMax
+      ? listings.filter(l => !l.latitude || !l.longitude || haversineDistance(subjectCoords.lat, subjectCoords.lng, l.latitude, l.longitude) <= radiusMax)
+      : listings;
+
+    const statusFiltered = searchStatuses.size === 3
+      ? radiusFiltered
+      : radiusFiltered.filter(l => {
+          const s = (l.status || "").trim();
+          return Array.from(searchStatuses).some(st => s.toLowerCase().startsWith(st.toLowerCase()));
+        });
+
+    const typeFiltered = filterPropertyType === "all"
+      ? statusFiltered
+      : statusFiltered.filter(l => (l.propertyType || "").toLowerCase().includes(filterPropertyType.toLowerCase()));
+
+    const sqftMin = filterSqftMin ? parseFloat(filterSqftMin) : null;
+    const sqftMax = filterSqftMax ? parseFloat(filterSqftMax) : null;
+    const sqftFiltered = typeFiltered.filter(l => {
+      const sqft = l.squareFootage || 0;
+      if (sqft === 0) return true;
+      if (sqftMin && sqft < sqftMin) return false;
+      if (sqftMax && sqft > sqftMax) return false;
+      return true;
+    });
+
+    const lotMin = filterLotMin ? parseFloat(filterLotMin) : null;
+    const lotMax = filterLotMax ? parseFloat(filterLotMax) : null;
+    const lotFiltered = sqftFiltered.filter(l => {
+      const acres = l.lotSize ? l.lotSize / 43560 : 0;
+      if (acres === 0) return true;
+      if (lotMin && acres < lotMin) return false;
+      if (lotMax && acres > lotMax) return false;
+      return true;
+    });
+
+    return filterPool === "all"
+      ? lotFiltered
+      : filterPool === "yes"
+      ? lotFiltered.filter(l => hasPool(l))
+      : lotFiltered.filter(l => !hasPool(l));
+  }, [listings, filterRadiusMax, subjectCoords, searchStatuses, filterPropertyType, filterSqftMin, filterSqftMax, filterLotMin, filterLotMax, filterPool, haversineDistance, hasPool]);
+
   const geocodeSubject = async () => {
     const addr = subjectAddress.trim();
     const city = subjectCity.trim();
@@ -433,7 +488,7 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
   };
 
   const addSelectedComps = () => {
-    const selected = listings.filter(l => selectedListingIds.has(l.id));
+    const selected = filteredListings.filter(l => selectedListingIds.has(l.id));
     const newComps: CompData[] = selected.map(l => ({
       address: l.formattedAddress || l.addressLine1 || "",
       city: l.city,
@@ -841,17 +896,6 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
               return sortDirection === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
             };
 
-            const hasPool = (listing: RentCastListing) =>
-              (listing.features || []).some((f: string) => /pool/i.test(f));
-
-            const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-              const R = 3958.8;
-              const dLat = (lat2 - lat1) * Math.PI / 180;
-              const dLon = (lon2 - lon1) * Math.PI / 180;
-              const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-              return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            };
-
             const getVal = (listing: RentCastListing, col: string): number => {
               switch (col) {
                 case "price": return listing.price || 0;
@@ -867,51 +911,9 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
               }
             };
 
-            const radiusMax = filterRadiusMax ? parseFloat(filterRadiusMax) : null;
-            const radiusFiltered = subjectCoords && radiusMax
-              ? listings.filter(l => !l.latitude || !l.longitude || haversineDistance(subjectCoords.lat, subjectCoords.lng, l.latitude, l.longitude) <= radiusMax)
-              : listings;
-
-            const statusFiltered = searchStatuses.size === 3
-              ? radiusFiltered
-              : radiusFiltered.filter(l => {
-                  const s = (l.status || "").trim();
-                  return Array.from(searchStatuses).some(st => s.toLowerCase().startsWith(st.toLowerCase()));
-                });
-
-            const typeFiltered = filterPropertyType === "all"
-              ? statusFiltered
-              : statusFiltered.filter(l => (l.propertyType || "").toLowerCase().includes(filterPropertyType.toLowerCase()));
-
-            const sqftMin = filterSqftMin ? parseFloat(filterSqftMin) : null;
-            const sqftMax = filterSqftMax ? parseFloat(filterSqftMax) : null;
-            const sqftFiltered = typeFiltered.filter(l => {
-              const sqft = l.squareFootage || 0;
-              if (sqft === 0) return true;
-              if (sqftMin && sqft < sqftMin) return false;
-              if (sqftMax && sqft > sqftMax) return false;
-              return true;
-            });
-
-            const lotMin = filterLotMin ? parseFloat(filterLotMin) : null;
-            const lotMax = filterLotMax ? parseFloat(filterLotMax) : null;
-            const lotFiltered = sqftFiltered.filter(l => {
-              const acres = l.lotSize ? l.lotSize / 43560 : 0;
-              if (acres === 0) return true;
-              if (lotMin && acres < lotMin) return false;
-              if (lotMax && acres > lotMax) return false;
-              return true;
-            });
-
-            const poolFiltered = filterPool === "all"
-              ? lotFiltered
-              : filterPool === "yes"
-              ? lotFiltered.filter(l => hasPool(l))
-              : lotFiltered.filter(l => !hasPool(l));
-
             const visibleListings = narrowed && selectedListingIds.size > 0
-              ? poolFiltered.filter(l => selectedListingIds.has(l.id))
-              : poolFiltered;
+              ? filteredListings.filter(l => selectedListingIds.has(l.id))
+              : filteredListings;
 
             const sortedListings = sortColumn
               ? [...visibleListings].sort((a, b) => {
@@ -921,37 +923,36 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
                 })
               : visibleListings;
 
+            const visibleSelectedCount = filteredListings.filter(l => selectedListingIds.has(l.id)).length;
+
             return (
             <div className="space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <p className="text-sm text-muted-foreground">
                   {narrowed && selectedListingIds.size > 0
                     ? `Showing ${sortedListings.length} of ${listings.length} properties`
-                    : poolFiltered.length < listings.length
-                    ? `${poolFiltered.length} of ${listings.length} properties (filtered)`
+                    : filteredListings.length < listings.length
+                    ? `${filteredListings.length} of ${listings.length} properties (filtered)`
                     : `${listings.length} properties found`}
                 </p>
                 <div className="flex items-center gap-2">
-                  {selectedListingIds.size > 0 && (() => {
-                    const visibleSelectedCount = poolFiltered.filter(l => selectedListingIds.has(l.id)).length;
-                    return (
-                      <>
-                        <Button
-                          size="sm"
-                          variant={narrowed ? "default" : "outline"}
-                          onClick={() => setNarrowed(!narrowed)}
-                          className="gap-1"
-                        >
-                          {narrowed ? <X className="h-3.5 w-3.5" /> : <Filter className="h-3.5 w-3.5" />}
-                          {narrowed ? "Show All" : `Narrow to ${visibleSelectedCount} Selected`}
-                        </Button>
-                        <Button size="sm" onClick={addSelectedComps} className="gap-1">
-                          <Plus className="h-4 w-4" />
-                          Add {visibleSelectedCount} Selected
-                        </Button>
-                      </>
-                    );
-                  })()}
+                  {visibleSelectedCount > 0 && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant={narrowed ? "default" : "outline"}
+                        onClick={() => setNarrowed(!narrowed)}
+                        className="gap-1"
+                      >
+                        {narrowed ? <X className="h-3.5 w-3.5" /> : <Filter className="h-3.5 w-3.5" />}
+                        {narrowed ? "Show All" : `Narrow to ${visibleSelectedCount} Selected`}
+                      </Button>
+                      <Button size="sm" onClick={addSelectedComps} className="gap-1">
+                        <Plus className="h-4 w-4" />
+                        Add {visibleSelectedCount} Selected
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="max-h-[400px] overflow-y-auto border rounded-lg">
