@@ -1,5 +1,23 @@
 let twilioClient: any = null;
 
+const BLOCKED_NUMBERS = new Set([
+  '911', '112', '999',
+  '311', '411', '511', '611', '711', '811',
+  '988',
+  '18002221222',
+  '18003737888',
+  '18007997233',
+  '18004224453',
+]);
+
+export function isBlockedNumber(phone: string): boolean {
+  const digits = phone.replace(/\D/g, '');
+  if (BLOCKED_NUMBERS.has(digits)) return true;
+  if (digits.length <= 3) return true;
+  if (digits.length < 7) return true;
+  return false;
+}
+
 export function normalizePhoneNumber(phone: string): string {
   const digits = phone.replace(/\D/g, '');
   if (digits.length === 10) {
