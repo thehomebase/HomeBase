@@ -35,11 +35,21 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
 
   const { data: history = [] } = useQuery<Communication[]>({
     queryKey: ["/api/communications", client?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/communications/${client!.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch communications");
+      return res.json();
+    },
     enabled: open && !!client?.id,
   });
 
   const { data: gmailMessages } = useQuery<{ messages: any[] }>({
     queryKey: ["/api/gmail/messages", client?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/gmail/messages/${client!.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch Gmail messages");
+      return res.json();
+    },
     enabled: open && !!client?.id && !!commStatus?.gmail?.connected && activeTab === "history",
   });
 
