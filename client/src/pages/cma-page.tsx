@@ -477,41 +477,65 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                   </Button>
                 )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-1">
-                {listings.map(listing => {
-                  const isSelected = selectedListingIds.has(listing.id);
-                  return (
-                    <div
-                      key={listing.id}
-                      className={`border rounded-lg p-3 hover:bg-muted/30 transition-colors cursor-pointer ${isSelected ? "ring-2 ring-primary border-primary" : ""}`}
-                      onClick={() => {
-                        setSelectedListingIds(prev => {
-                          const next = new Set(prev);
-                          if (next.has(listing.id)) next.delete(listing.id);
-                          else next.add(listing.id);
-                          return next;
-                        });
-                      }}
-                    >
-                      <div className="flex items-start gap-2">
-                        <Checkbox checked={isSelected} className="mt-0.5 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="font-medium text-sm truncate">{listing.formattedAddress || listing.addressLine1}</p>
-                            <span className="font-bold text-primary shrink-0">{formatPrice(listing.price)}</span>
-                          </div>
-                          <div className="flex flex-wrap gap-2 mt-1 text-xs text-muted-foreground">
-                            {listing.bedrooms > 0 && <span>{listing.bedrooms} bd</span>}
-                            {listing.bathrooms > 0 && <span>{listing.bathrooms} ba</span>}
-                            {listing.squareFootage > 0 && <span>{listing.squareFootage.toLocaleString()} sqft</span>}
-                            {listing.yearBuilt && <span>Built {listing.yearBuilt}</span>}
-                            <span>{listing.daysOnMarket} DOM</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="overflow-x-auto max-h-[400px] overflow-y-auto border rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 sticky top-0">
+                    <tr className="border-b">
+                      <th className="px-3 py-2 text-left w-8">
+                        <Checkbox
+                          checked={listings.length > 0 && selectedListingIds.size === listings.length}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedListingIds(new Set(listings.map(l => l.id)));
+                            } else {
+                              setSelectedListingIds(new Set());
+                            }
+                          }}
+                        />
+                      </th>
+                      <th className="px-3 py-2 text-left font-medium">Address</th>
+                      <th className="px-3 py-2 text-right font-medium">Price</th>
+                      <th className="px-3 py-2 text-center font-medium">Beds</th>
+                      <th className="px-3 py-2 text-center font-medium">Baths</th>
+                      <th className="px-3 py-2 text-right font-medium">Sqft</th>
+                      <th className="px-3 py-2 text-right font-medium">$/Sqft</th>
+                      <th className="px-3 py-2 text-center font-medium">Year</th>
+                      <th className="px-3 py-2 text-center font-medium">DOM</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {listings.map(listing => {
+                      const isSelected = selectedListingIds.has(listing.id);
+                      const pricePerSqft = listing.squareFootage > 0 ? Math.round(listing.price / listing.squareFootage) : 0;
+                      return (
+                        <tr
+                          key={listing.id}
+                          className={`border-b last:border-0 cursor-pointer hover:bg-muted/30 transition-colors ${isSelected ? "bg-primary/5" : ""}`}
+                          onClick={() => {
+                            setSelectedListingIds(prev => {
+                              const next = new Set(prev);
+                              if (next.has(listing.id)) next.delete(listing.id);
+                              else next.add(listing.id);
+                              return next;
+                            });
+                          }}
+                        >
+                          <td className="px-3 py-2">
+                            <Checkbox checked={isSelected} />
+                          </td>
+                          <td className="px-3 py-2 font-medium truncate max-w-[250px]">{listing.formattedAddress || listing.addressLine1}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-primary">{formatPrice(listing.price)}</td>
+                          <td className="px-3 py-2 text-center">{listing.bedrooms || "—"}</td>
+                          <td className="px-3 py-2 text-center">{listing.bathrooms || "—"}</td>
+                          <td className="px-3 py-2 text-right">{listing.squareFootage > 0 ? listing.squareFootage.toLocaleString() : "—"}</td>
+                          <td className="px-3 py-2 text-right">{pricePerSqft > 0 ? `$${pricePerSqft}` : "—"}</td>
+                          <td className="px-3 py-2 text-center">{listing.yearBuilt || "—"}</td>
+                          <td className="px-3 py-2 text-center">{listing.daysOnMarket}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
