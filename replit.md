@@ -88,7 +88,9 @@ Preferred communication style: Simple, everyday language.
 - **Caching**: In-memory cache with 24-hour TTL per unique search query to minimize API calls
 - **Rate Limiting**: Soft limit of 45 calls/month (buffer under 50 plan limit). Counter resets monthly.
 - **Filters**: city, state, zipCode, minPrice, maxPrice, bedrooms, bathrooms, propertyType, status
-- **Frontend**: Tabbed UI with "Listing Search" (RentCast) and "Zillow Search" tabs. Results shown inline with property details, agent info, and "View on Zillow" links.
+- **Frontend**: Tabbed UI with "Text Search" and "Map Search" tabs. Text search uses city/state/ZIP input. Map Search allows drawing a polygon/rectangle on a Leaflet map to search for listings within a custom area.
+- **Map Draw Search**: `client/src/components/map-draw-search.tsx` — uses Leaflet + leaflet-draw for polygon/rectangle drawing tools. Reverse-geocodes sample points within the drawn area via Nominatim to discover ZIP codes, then queries RentCast for each ZIP code. Results are filtered client-side using point-in-polygon algorithm to only show listings within the drawn boundary. Listings appear as map markers with popups and in a scrollable list below. Includes price/beds/type filters and save-to-favorites functionality.
+- **Dependencies**: `leaflet-draw`, `@types/leaflet-draw`
 
 ### Showing Request from Saved Properties
 - **Location**: `client/src/pages/property-search-page.tsx` (toggle button), `client/src/pages/map-page.tsx` (map display), `server/routes.ts` (API), `server/storage.ts` (storage)

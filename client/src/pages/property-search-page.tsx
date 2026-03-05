@@ -1,12 +1,15 @@
-import { useState, useRef } from "react";
+import { useState, useRef, lazy, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Eye } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Eye, Map } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
+
+const MapDrawSearch = lazy(() => import("@/components/map-draw-search"));
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -587,7 +590,40 @@ export default function PropertySearchPage() {
         )}
       </div>
 
-      <div className="space-y-4">
+      <Tabs defaultValue="text" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="text" className="gap-2">
+            <Search className="h-4 w-4" /> Text Search
+          </TabsTrigger>
+          <TabsTrigger value="map" className="gap-2">
+            <Map className="h-4 w-4" /> Map Search
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="map">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Map className="h-5 w-5" />
+                Draw Area Search
+              </CardTitle>
+              <CardDescription>
+                Draw a rectangle or polygon on the map to search for active listings in that area.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              }>
+                <MapDrawSearch />
+              </Suspense>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="text" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -840,7 +876,8 @@ export default function PropertySearchPage() {
               </CardContent>
             </Card>
           )}
-      </div>
+        </TabsContent>
+      </Tabs>
 
       <Card>
         <CardHeader>
