@@ -226,6 +226,9 @@ function DocumentCard({
                 </Button>
               )}
             </div>
+            <p className="text-[10px] text-muted-foreground/70 leading-tight mt-1">
+              This link is visible to anyone with access to this transaction. Only the signing platform (DocuSign, ZipForms, etc.) controls who can view or sign the document.
+            </p>
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Notes</label>
