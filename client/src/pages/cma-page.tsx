@@ -193,6 +193,7 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
   const [filterRadiusMax, setFilterRadiusMax] = useState("");
   const [filterPool, setFilterPool] = useState("all");
   const [searchStatuses, setSearchStatuses] = useState<Set<string>>(new Set(["Active"]));
+  const [soldDateRange, setSoldDateRange] = useState("365");
   const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
 
   const { isLoading: isLoadingReport } = useQuery<CmaReport>({
@@ -516,7 +517,7 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
       setIsSoldSearching(true);
       const soldParams = new URLSearchParams(baseParams);
       soldParams.delete("status");
-      soldParams.set("saleDateRange", "365");
+      soldParams.set("saleDateRange", soldDateRange);
       fetch(`/api/rentcast/sold?${soldParams.toString()}`, { credentials: "include" })
         .then(r => {
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -833,6 +834,22 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
                 ))}
               </div>
             </div>
+            {searchStatuses.has("Sold") && (
+              <div>
+                <Label>Sold Within</Label>
+                <select
+                  value={soldDateRange}
+                  onChange={e => setSoldDateRange(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-background text-foreground px-3 pr-8 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+                >
+                  <option value="90">3 Months</option>
+                  <option value="180">6 Months</option>
+                  <option value="365">1 Year</option>
+                  <option value="730">2 Years</option>
+                </select>
+              </div>
+            )}
             <Button onClick={handleSearchComps} disabled={isSearching} className="gap-1">
               {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               Search
@@ -1055,7 +1072,7 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
                         <span className="inline-flex items-center justify-center">Year<SortIcon col="year" /></span>
                       </th>
                       <th className="px-2 py-2 text-center font-medium cursor-pointer select-none hover:text-foreground w-[5%]" onClick={() => handleSort("dom")}>
-                        <span className="inline-flex items-center justify-center">DOM<SortIcon col="dom" /></span>
+                        <span className="inline-flex items-center justify-center">{searchStatuses.has("Sold") ? "DOM/Sold" : "DOM"}<SortIcon col="dom" /></span>
                       </th>
                       <th className="px-2 py-2 text-right font-medium cursor-pointer select-none hover:text-foreground w-[7%]" onClick={() => handleSort("lot")}>
                         <span className="inline-flex items-center justify-end">Lot(ac)<SortIcon col="lot" /></span>
