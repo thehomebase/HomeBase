@@ -512,11 +512,13 @@ const SortableHeader = ({
 const TableContent = ({
   clients,
   onUpdate,
-  onDelete
+  onDelete,
+  onContact
 }: {
   clients: Client[];
   onUpdate: (client: Client) => Promise<void>;
   onDelete: (clientId: number) => void;
+  onContact?: (client: Client) => void;
 }) => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
@@ -726,6 +728,7 @@ const TableContent = ({
         isOpen={!!selectedClient}
         onClose={() => setSelectedClient(null)}
         onUpdate={onUpdate}
+        onContact={onContact ? (client) => { setSelectedClient(null); onContact(client); } : undefined}
       />
     </>
   );
@@ -736,13 +739,15 @@ const ClientTable = ({
   searchQuery,
   selectedLabels,
   onUpdate,
-  onDelete
+  onDelete,
+  onContact
 }: {
   clients: Client[];
   searchQuery: string;
   selectedLabels: string[];
   onUpdate: (client: Client) => Promise<void>;
   onDelete: (clientId: number) => void;
+  onContact?: (client: Client) => void;
 }) => {
   const filterClients = (clients: Client[]) => {
     return clients.filter(client => {
@@ -778,13 +783,13 @@ const ClientTable = ({
         <TabsTrigger value="renters">Renters</TabsTrigger>
       </TabsList>
       <TabsContent value="sellers">
-        <TableContent clients={sellers} onUpdate={onUpdate} onDelete={onDelete} />
+        <TableContent clients={sellers} onUpdate={onUpdate} onDelete={onDelete} onContact={onContact} />
       </TabsContent>
       <TabsContent value="buyers">
-        <TableContent clients={buyers} onUpdate={onUpdate} onDelete={onDelete} />
+        <TableContent clients={buyers} onUpdate={onUpdate} onDelete={onDelete} onContact={onContact} />
       </TabsContent>
       <TabsContent value="renters">
-        <TableContent clients={renters} onUpdate={onUpdate} onDelete={onDelete} />
+        <TableContent clients={renters} onUpdate={onUpdate} onDelete={onDelete} onContact={onContact} />
       </TabsContent>
     </Tabs>
   );
@@ -1400,6 +1405,7 @@ export default function ClientsPage() {
             selectedLabels={selectedLabels}
             onUpdate={handleClientUpdate}
             onDelete={setClientToDelete}
+            onContact={(client) => { setContactClient(client); }}
           />
         </div>
       </Card>
