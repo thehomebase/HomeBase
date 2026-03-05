@@ -176,6 +176,8 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [narrowed, setNarrowed] = useState(false);
   const [radiusMiles, setRadiusMiles] = useState(25);
+  const [subjectCoords, setSubjectCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [isGeocodingSubject, setIsGeocodingSubject] = useState(false);
   const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
 
   const { isLoading: isLoadingReport } = useQuery<CmaReport>({
@@ -234,6 +236,33 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
   });
 
   const listings = searchResults?.listings || [];
+
+  const geocodeSubject = async () => {
+    const addr = subjectAddress.trim();
+    const city = subjectCity.trim();
+    const state = subjectState.trim();
+    const zip = subjectZip.trim();
+    if (!addr && !city) {
+      toast({ title: "Enter subject property", description: "Fill in the subject property address first.", variant: "destructive" });
+      return;
+    }
+    setIsGeocodingSubject(true);
+    try {
+      const q = [addr, city, state, zip].filter(Boolean).join(", ");
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`);
+      const data = await res.json();
+      if (data.length > 0) {
+        setSubjectCoords({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
+        toast({ title: "Subject property located", description: `Coordinates set. Radius filter is now active.` });
+      } else {
+        toast({ title: "Could not locate address", description: "Try adding more detail to the subject property address.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Geocoding failed", description: "Unable to look up the address. Try again.", variant: "destructive" });
+    } finally {
+      setIsGeocodingSubject(false);
+    }
+  };
 
   const handleSearchComps = () => {
     const params: Record<string, string> = {};
@@ -399,19 +428,19 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="md:col-span-2 lg:col-span-3">
               <Label>Address</Label>
-              <Input value={subjectAddress} onChange={e => setSubjectAddress(e.target.value)} placeholder="123 Main St" />
+              <Input value={subjectAddress} onChange={e => { setSubjectAddress(e.target.value); setSubjectCoords(null); }} placeholder="123 Main St" />
             </div>
             <div>
               <Label>City</Label>
-              <Input value={subjectCity} onChange={e => setSubjectCity(e.target.value)} placeholder="Austin" />
+              <Input value={subjectCity} onChange={e => { setSubjectCity(e.target.value); setSubjectCoords(null); }} placeholder="Austin" />
             </div>
             <div>
               <Label>State</Label>
-              <Input value={subjectState} onChange={e => setSubjectState(e.target.value)} placeholder="TX" maxLength={2} />
+              <Input value={subjectState} onChange={e => { setSubjectState(e.target.value); setSubjectCoords(null); }} placeholder="TX" maxLength={2} />
             </div>
             <div>
               <Label>ZIP Code</Label>
-              <Input value={subjectZip} onChange={e => setSubjectZip(e.target.value)} placeholder="78701" maxLength={5} />
+              <Input value={subjectZip} onChange={e => { setSubjectZip(e.target.value); setSubjectCoords(null); }} placeholder="78701" maxLength={5} />
             </div>
             <div>
               <Label>Bedrooms</Label>
@@ -433,6 +462,28 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
               <Label>Year Built</Label>
               <Input type="number" value={subjectYearBuilt} onChange={e => setSubjectYearBuilt(e.target.value)} placeholder="2005" />
             </div>
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <Button
+              variant={subjectCoords ? "outline" : "default"}
+              size="sm"
+              onClick={geocodeSubject}
+              disabled={isGeocodingSubject || (!subjectAddress.trim() && !subjectCity.trim())}
+              className="gap-1"
+            >
+              {isGeocodingSubject ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+              {subjectCoords ? "Re-locate Subject" : "Lock in Subject Location"}
+            </Button>
+            {subjectCoords && (
+              <span className="text-sm text-muted-foreground">
+                Location set — radius filter active
+              </span>
+            )}
+            {!subjectCoords && subjectAddress.trim() && (
+              <span className="text-sm text-muted-foreground">
+                Lock in location to enable radius filtering on comps
+              </span>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -465,7 +516,7 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
             </Button>
           </div>
 
-          {listings.length > 0 && (
+          {listings.length > 0 && subjectCoords && (
             <div className="flex items-center gap-4 pt-1">
               <Label className="text-sm whitespace-nowrap min-w-fit">Radius: {radiusMiles} mi</Label>
               <Slider
@@ -477,6 +528,9 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                 className="w-48"
               />
             </div>
+          )}
+          {listings.length > 0 && !subjectCoords && (
+            <p className="text-xs text-muted-foreground pt-1">Lock in your subject property location above to enable radius filtering.</p>
           )}
 
           {isSearching && (
@@ -512,10 +566,6 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
               return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             };
 
-            const validCoords = listings.filter(l => l.latitude && l.longitude);
-            const centerLat = validCoords.length > 0 ? validCoords.reduce((s, l) => s + l.latitude, 0) / validCoords.length : 0;
-            const centerLng = validCoords.length > 0 ? validCoords.reduce((s, l) => s + l.longitude, 0) / validCoords.length : 0;
-
             const getVal = (listing: RentCastListing, col: string): number => {
               switch (col) {
                 case "price": return listing.price || 0;
@@ -530,8 +580,8 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
               }
             };
 
-            const radiusFiltered = centerLat !== 0
-              ? listings.filter(l => !l.latitude || !l.longitude || haversineDistance(centerLat, centerLng, l.latitude, l.longitude) <= radiusMiles)
+            const radiusFiltered = subjectCoords
+              ? listings.filter(l => !l.latitude || !l.longitude || haversineDistance(subjectCoords.lat, subjectCoords.lng, l.latitude, l.longitude) <= radiusMiles)
               : listings;
 
             const visibleListings = narrowed && selectedListingIds.size > 0
