@@ -38,6 +38,7 @@ interface RentCastListing {
   listingAgent?: { name: string };
   listingOffice?: { name: string };
   mlsNumber?: string;
+  features?: string[];
 }
 
 const PRICE_MIN_OPTIONS = [
@@ -77,6 +78,17 @@ const PROPERTY_TYPES = [
   { value: "Condo", label: "Condo" },
   { value: "Townhouse", label: "Townhouse" },
   { value: "Multi-Family", label: "Multi-Family" },
+];
+
+const SQFT_MIN_OPTIONS = [
+  { value: "any", label: "No Min" },
+  { value: "1000", label: "1,000+" },
+  { value: "1500", label: "1,500+" },
+  { value: "2000", label: "2,000+" },
+  { value: "2500", label: "2,500+" },
+  { value: "3000", label: "3,000+" },
+  { value: "4000", label: "4,000+" },
+  { value: "5000", label: "5,000+" },
 ];
 
 function formatPrice(price: number): string {
@@ -463,6 +475,8 @@ export default function MapDrawSearch() {
   const [maxPrice, setMaxPrice] = useState("any");
   const [beds, setBeds] = useState("any");
   const [propertyType, setPropertyType] = useState("any");
+  const [minSqft, setMinSqft] = useState("any");
+  const [poolOnly, setPoolOnly] = useState(false);
 
   const { toast } = useToast();
 
@@ -474,6 +488,8 @@ export default function MapDrawSearch() {
     if (listing.price < min || listing.price > max) return false;
     if (beds !== "any" && listing.bedrooms < parseInt(beds)) return false;
     if (propertyType !== "any" && listing.propertyType !== propertyType) return false;
+    if (minSqft !== "any" && (listing.squareFootage || 0) < parseInt(minSqft)) return false;
+    if (poolOnly && !(listing.features || []).some((f) => /pool/i.test(f))) return false;
     return true;
   });
 
@@ -602,7 +618,7 @@ export default function MapDrawSearch() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-[1001]">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 relative z-[1001]">
         <div className="space-y-1">
           <Label className="text-xs flex items-center gap-1">
             <DollarSign className="h-3 w-3" /> Min Price
@@ -654,6 +670,30 @@ export default function MapDrawSearch() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs flex items-center gap-1">
+            <Ruler className="h-3 w-3" /> Min Sqft
+          </Label>
+          <Select value={minSqft} onValueChange={setMinSqft}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent className="z-[1100]">
+              {SQFT_MIN_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs flex items-center gap-1">Pool</Label>
+          <Button
+            variant={poolOnly ? "default" : "outline"}
+            size="sm"
+            className="h-8 w-full text-xs"
+            onClick={() => setPoolOnly(!poolOnly)}
+          >
+            {poolOnly ? "Pool Only" : "Any"}
+          </Button>
         </div>
       </div>
 

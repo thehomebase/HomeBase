@@ -112,6 +112,7 @@ interface RentCastListing {
     phone?: string;
     email?: string;
   };
+  features?: string[];
 }
 
 function formatAddress(prop: SavedProperty): string {

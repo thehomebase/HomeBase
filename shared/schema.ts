@@ -290,7 +290,7 @@ export const communications = pgTable("communications", {
   subject: text("subject"),
   content: text("content"),
   status: text("status").notNull().default("sent"),
-  externalId: text("external_id"), // ID from Twilio/SendGrid
+  externalId: text("external_id"), // ID from Twilio/Gmail
   createdAt: timestamp("created_at").defaultNow(),
 });
 
