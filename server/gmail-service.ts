@@ -137,6 +137,18 @@ async function getGmailSignature(gmail: any, email: string): Promise<string> {
   }
 }
 
+export async function getSignature(userId: number): Promise<{ signature: string; error?: string }> {
+  try {
+    const auth = await getAuthenticatedClient(userId);
+    if (!auth) return { signature: "", error: "Gmail not connected" };
+    const gmail = google.gmail({ version: "v1", auth: auth.client });
+    const sig = await getGmailSignature(gmail, auth.email);
+    return { signature: sig };
+  } catch (error: any) {
+    return { signature: "", error: error.message };
+  }
+}
+
 export interface EmailAttachment {
   filename: string;
   mimeType: string;
@@ -159,14 +171,14 @@ export async function sendGmailEmail(
 
     const gmail = google.gmail({ version: "v1", auth: auth.client });
 
-    const signature = await getGmailSignature(gmail, auth.email);
-
     let htmlBody = body;
-    if (!body.startsWith("<")) {
+    const isRichHtml = body.startsWith("<");
+    if (!isRichHtml) {
       htmlBody = body.replace(/\n/g, "<br>");
-    }
-    if (signature) {
-      htmlBody += `<br><br>--<br>${signature}`;
+      const signature = await getGmailSignature(gmail, auth.email);
+      if (signature) {
+        htmlBody += `<br><br>--<br>${signature}`;
+      }
     }
 
     let rawMessage: string;

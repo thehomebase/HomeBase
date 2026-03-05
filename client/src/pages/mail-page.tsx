@@ -365,6 +365,19 @@ export default function MailPage() {
   const gmailEmail = commStatus?.gmail?.email || "";
   const gmailConnected = commStatus?.gmail?.connected;
 
+  const signatureQuery = useQuery<{ signature: string }>({
+    queryKey: ["/api/gmail/signature"],
+    queryFn: async () => {
+      const res = await fetch("/api/gmail/signature", { credentials: "include" });
+      if (!res.ok) return { signature: "" };
+      return res.json();
+    },
+    enabled: !!gmailConnected,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const signature = signatureQuery.data?.signature || "";
+
   const labelMap: Record<string, string> = {
     all: "",
     sent: "SENT",
@@ -440,12 +453,23 @@ export default function MailPage() {
     editor?.commands.clearContent();
   }
 
+  function buildEditorContent(body?: string): string {
+    const sigBlock = signature
+      ? `<div style="margin-top: 16px;" data-signature="true"><p>--</p>${signature}</div>`
+      : "";
+    if (body) {
+      return `<p></p>${body}${sigBlock}`;
+    }
+    return `<p></p>${sigBlock}`;
+  }
+
   function openCompose(initial?: { to?: string; cc?: string; subject?: string; body?: string }) {
     setCompose({ to: initial?.to || "", cc: initial?.cc || "", subject: initial?.subject || "" });
     setShowCc(!!(initial?.cc));
     setAttachments([]);
     setTimeout(() => {
-      editor?.commands.setContent(initial?.body || "");
+      editor?.commands.setContent(buildEditorContent(initial?.body));
+      editor?.commands.focus("start");
     }, 50);
     setViewMode("compose");
   }

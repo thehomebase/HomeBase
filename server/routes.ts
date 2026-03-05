@@ -9,7 +9,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
-import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, type EmailAttachment } from "./gmail-service";
+import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, type EmailAttachment } from "./gmail-service";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -2081,6 +2081,17 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error("Gmail callback error:", error);
       res.redirect(`${baseUrl}/clients?gmail=error`);
+    }
+  });
+
+  app.get("/api/gmail/signature", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const result = await getSignature(req.user.id);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ signature: "", error: error.message });
     }
   });
 
