@@ -178,6 +178,8 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
   const [radiusMiles, setRadiusMiles] = useState(25);
   const [subjectCoords, setSubjectCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isGeocodingSubject, setIsGeocodingSubject] = useState(false);
+  const [filterPropertyType, setFilterPropertyType] = useState("all");
+  const [filterSqftRange, setFilterSqftRange] = useState<[number, number]>([0, 10000]);
   const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
 
   const { isLoading: isLoadingReport } = useQuery<CmaReport>({
@@ -516,21 +518,53 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
             </Button>
           </div>
 
-          {listings.length > 0 && subjectCoords && (
-            <div className="flex items-center gap-4 pt-1">
-              <Label className="text-sm whitespace-nowrap min-w-fit">Radius: {radiusMiles} mi</Label>
-              <Slider
-                value={[radiusMiles]}
-                onValueChange={([v]) => setRadiusMiles(v)}
-                min={1}
-                max={25}
-                step={1}
-                className="w-48"
-              />
+          {listings.length > 0 && (
+            <div className="flex flex-wrap items-end gap-4 pt-1">
+              {subjectCoords ? (
+                <div className="flex items-center gap-3">
+                  <Label className="text-sm whitespace-nowrap min-w-fit">Radius: {radiusMiles} mi</Label>
+                  <Slider
+                    value={[radiusMiles]}
+                    onValueChange={([v]) => setRadiusMiles(v)}
+                    min={1}
+                    max={25}
+                    step={1}
+                    className="w-40"
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Lock in subject location above to enable radius filtering.</p>
+              )}
+              <div className="flex items-center gap-2">
+                <Label className="text-sm whitespace-nowrap">Type:</Label>
+                <select
+                  value={filterPropertyType}
+                  onChange={e => setFilterPropertyType(e.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">All Types</option>
+                  <option value="Single Family">Single Family</option>
+                  <option value="Condo">Condo</option>
+                  <option value="Townhouse">Townhouse</option>
+                  <option value="Multi Family">Multi Family</option>
+                  <option value="Land">Land</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-3">
+                <Label className="text-sm whitespace-nowrap min-w-fit">
+                  Sqft: {filterSqftRange[0].toLocaleString()}–{filterSqftRange[1] >= 10000 ? "10k+" : filterSqftRange[1].toLocaleString()}
+                </Label>
+                <Slider
+                  value={filterSqftRange}
+                  onValueChange={([min, max]) => setFilterSqftRange([min, max])}
+                  min={0}
+                  max={10000}
+                  step={100}
+                  className="w-40"
+                />
+              </div>
             </div>
-          )}
-          {listings.length > 0 && !subjectCoords && (
-            <p className="text-xs text-muted-foreground pt-1">Lock in your subject property location above to enable radius filtering.</p>
           )}
 
           {isSearching && (
@@ -584,9 +618,19 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
               ? listings.filter(l => !l.latitude || !l.longitude || haversineDistance(subjectCoords.lat, subjectCoords.lng, l.latitude, l.longitude) <= radiusMiles)
               : listings;
 
+            const typeFiltered = filterPropertyType === "all"
+              ? radiusFiltered
+              : radiusFiltered.filter(l => (l.propertyType || "").toLowerCase().includes(filterPropertyType.toLowerCase()));
+
+            const sqftFiltered = typeFiltered.filter(l => {
+              const sqft = l.squareFootage || 0;
+              if (sqft === 0) return true;
+              return sqft >= filterSqftRange[0] && (filterSqftRange[1] >= 10000 || sqft <= filterSqftRange[1]);
+            });
+
             const visibleListings = narrowed && selectedListingIds.size > 0
-              ? radiusFiltered.filter(l => selectedListingIds.has(l.id))
-              : radiusFiltered;
+              ? sqftFiltered.filter(l => selectedListingIds.has(l.id))
+              : sqftFiltered;
 
             const sortedListings = sortColumn
               ? [...visibleListings].sort((a, b) => {
@@ -602,8 +646,8 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                 <p className="text-sm text-muted-foreground">
                   {narrowed && selectedListingIds.size > 0
                     ? `Showing ${sortedListings.length} of ${listings.length} properties`
-                    : radiusFiltered.length < listings.length
-                    ? `${radiusFiltered.length} of ${listings.length} properties within ${radiusMiles} mi`
+                    : sqftFiltered.length < listings.length
+                    ? `${sqftFiltered.length} of ${listings.length} properties (filtered)`
                     : `${listings.length} properties found`}
                 </p>
                 <div className="flex items-center gap-2">
