@@ -15,7 +15,6 @@ import {
   Home, MapPin, BedDouble, Bath, Ruler, Calendar, DollarSign, Building2,
   Loader2, Copy, Edit, TrendingUp, TrendingDown, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, ExternalLink
 } from "lucide-react";
-import { Slider } from "@/components/ui/slider";
 import type { CmaReport } from "@shared/schema";
 
 interface RentCastListing {
@@ -176,7 +175,6 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [narrowed, setNarrowed] = useState(false);
-  const [radiusMiles, setRadiusMiles] = useState(25);
   const [subjectCoords, setSubjectCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isGeocodingSubject, setIsGeocodingSubject] = useState(false);
   const [isLookingUpSubject, setIsLookingUpSubject] = useState(false);
@@ -186,8 +184,12 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
   const addressDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addressWrapperRef = useRef<HTMLDivElement>(null);
   const [filterPropertyType, setFilterPropertyType] = useState("all");
-  const [filterSqftRange, setFilterSqftRange] = useState<[number, number]>([0, 10000]);
-  const [filterLotRange, setFilterLotRange] = useState<[number, number]>([0, 20]);
+  const [filterSqftMin, setFilterSqftMin] = useState("");
+  const [filterSqftMax, setFilterSqftMax] = useState("");
+  const [filterLotMin, setFilterLotMin] = useState("");
+  const [filterLotMax, setFilterLotMax] = useState("");
+  const [filterRadiusMax, setFilterRadiusMax] = useState("");
+  const [filterPool, setFilterPool] = useState("all");
   const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
 
   const { isLoading: isLoadingReport } = useQuery<CmaReport>({
@@ -670,28 +672,25 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
           </div>
 
           {listings.length > 0 && (
-            <div className="flex flex-wrap items-end gap-4 pt-1">
-              {subjectCoords ? (
-                <div className="flex items-center gap-3">
-                  <Label className="text-sm whitespace-nowrap min-w-fit">Radius: {radiusMiles} mi</Label>
-                  <Slider
-                    value={[radiusMiles]}
-                    onValueChange={([v]) => setRadiusMiles(v)}
-                    min={1}
-                    max={25}
-                    step={1}
-                    className="w-40"
+            <div className="flex flex-wrap items-end gap-3 pt-1">
+              {subjectCoords && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Radius (mi)</Label>
+                  <Input
+                    type="number"
+                    value={filterRadiusMax}
+                    onChange={e => setFilterRadiusMax(e.target.value)}
+                    placeholder="25"
+                    className="w-20 h-9"
                   />
                 </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">Lock in subject location above to enable radius filtering.</p>
               )}
-              <div className="flex items-center gap-2">
-                <Label className="text-sm whitespace-nowrap">Type:</Label>
+              <div>
+                <Label className="text-xs text-muted-foreground">Property Type</Label>
                 <select
                   value={filterPropertyType}
                   onChange={e => setFilterPropertyType(e.target.value)}
-                  className="h-9 rounded-md border border-input bg-background text-foreground px-3 pr-8 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
+                  className="flex h-9 w-full rounded-md border border-input bg-background text-foreground px-3 pr-8 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
                   style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
                 >
                   <option value="all">All Types</option>
@@ -703,31 +702,60 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                   <option value="Other">Other</option>
                 </select>
               </div>
-              <div className="flex items-center gap-3">
-                <Label className="text-sm whitespace-nowrap min-w-fit">
-                  Sqft: {filterSqftRange[0].toLocaleString()}–{filterSqftRange[1] >= 10000 ? "10k+" : filterSqftRange[1].toLocaleString()}
-                </Label>
-                <Slider
-                  value={filterSqftRange}
-                  onValueChange={([min, max]) => setFilterSqftRange([min, max])}
-                  min={0}
-                  max={10000}
-                  step={100}
-                  className="w-40"
+              <div>
+                <Label className="text-xs text-muted-foreground">Sqft Min</Label>
+                <Input
+                  type="number"
+                  value={filterSqftMin}
+                  onChange={e => setFilterSqftMin(e.target.value)}
+                  placeholder="0"
+                  className="w-24 h-9"
                 />
               </div>
-              <div className="flex items-center gap-3">
-                <Label className="text-sm whitespace-nowrap min-w-fit">
-                  Lot: {filterLotRange[0]}–{filterLotRange[1] >= 20 ? "20+" : filterLotRange[1]} ac
-                </Label>
-                <Slider
-                  value={filterLotRange}
-                  onValueChange={([min, max]) => setFilterLotRange([min, max])}
-                  min={0}
-                  max={20}
-                  step={0.25}
-                  className="w-40"
+              <div>
+                <Label className="text-xs text-muted-foreground">Sqft Max</Label>
+                <Input
+                  type="number"
+                  value={filterSqftMax}
+                  onChange={e => setFilterSqftMax(e.target.value)}
+                  placeholder="Any"
+                  className="w-24 h-9"
                 />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Lot Min (ac)</Label>
+                <Input
+                  type="number"
+                  value={filterLotMin}
+                  onChange={e => setFilterLotMin(e.target.value)}
+                  placeholder="0"
+                  className="w-24 h-9"
+                  step="0.1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Lot Max (ac)</Label>
+                <Input
+                  type="number"
+                  value={filterLotMax}
+                  onChange={e => setFilterLotMax(e.target.value)}
+                  placeholder="Any"
+                  className="w-24 h-9"
+                  step="0.1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Pool</Label>
+                <select
+                  value={filterPool}
+                  onChange={e => setFilterPool(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-background text-foreground px-3 pr-8 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+                >
+                  <option value="all">Any</option>
+                  <option value="yes">Pool</option>
+                  <option value="no">No Pool</option>
+                </select>
               </div>
             </div>
           )}
@@ -780,29 +808,44 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
               }
             };
 
-            const radiusFiltered = subjectCoords
-              ? listings.filter(l => !l.latitude || !l.longitude || haversineDistance(subjectCoords.lat, subjectCoords.lng, l.latitude, l.longitude) <= radiusMiles)
+            const radiusMax = filterRadiusMax ? parseFloat(filterRadiusMax) : null;
+            const radiusFiltered = subjectCoords && radiusMax
+              ? listings.filter(l => !l.latitude || !l.longitude || haversineDistance(subjectCoords.lat, subjectCoords.lng, l.latitude, l.longitude) <= radiusMax)
               : listings;
 
             const typeFiltered = filterPropertyType === "all"
               ? radiusFiltered
               : radiusFiltered.filter(l => (l.propertyType || "").toLowerCase().includes(filterPropertyType.toLowerCase()));
 
+            const sqftMin = filterSqftMin ? parseFloat(filterSqftMin) : null;
+            const sqftMax = filterSqftMax ? parseFloat(filterSqftMax) : null;
             const sqftFiltered = typeFiltered.filter(l => {
               const sqft = l.squareFootage || 0;
               if (sqft === 0) return true;
-              return sqft >= filterSqftRange[0] && (filterSqftRange[1] >= 10000 || sqft <= filterSqftRange[1]);
+              if (sqftMin && sqft < sqftMin) return false;
+              if (sqftMax && sqft > sqftMax) return false;
+              return true;
             });
 
+            const lotMin = filterLotMin ? parseFloat(filterLotMin) : null;
+            const lotMax = filterLotMax ? parseFloat(filterLotMax) : null;
             const lotFiltered = sqftFiltered.filter(l => {
               const acres = l.lotSize ? l.lotSize / 43560 : 0;
               if (acres === 0) return true;
-              return acres >= filterLotRange[0] && (filterLotRange[1] >= 20 || acres <= filterLotRange[1]);
+              if (lotMin && acres < lotMin) return false;
+              if (lotMax && acres > lotMax) return false;
+              return true;
             });
 
+            const poolFiltered = filterPool === "all"
+              ? lotFiltered
+              : filterPool === "yes"
+              ? lotFiltered.filter(l => hasPool(l))
+              : lotFiltered.filter(l => !hasPool(l));
+
             const visibleListings = narrowed && selectedListingIds.size > 0
-              ? lotFiltered.filter(l => selectedListingIds.has(l.id))
-              : lotFiltered;
+              ? poolFiltered.filter(l => selectedListingIds.has(l.id))
+              : poolFiltered;
 
             const sortedListings = sortColumn
               ? [...visibleListings].sort((a, b) => {
@@ -818,8 +861,8 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
                 <p className="text-sm text-muted-foreground">
                   {narrowed && selectedListingIds.size > 0
                     ? `Showing ${sortedListings.length} of ${listings.length} properties`
-                    : lotFiltered.length < listings.length
-                    ? `${lotFiltered.length} of ${listings.length} properties (filtered)`
+                    : poolFiltered.length < listings.length
+                    ? `${poolFiltered.length} of ${listings.length} properties (filtered)`
                     : `${listings.length} properties found`}
                 </p>
                 <div className="flex items-center gap-2">
