@@ -123,9 +123,3 @@ html {
   padding: 0 2px;
 }
 
-.tiptap [data-signature="true"] {
-  border-top: 1px solid hsl(var(--border));
-  margin-top: 1rem;
-  padding-top: 0.5rem;
-  opacity: 0.7;
-}

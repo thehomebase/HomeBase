@@ -453,22 +453,12 @@ export default function MailPage() {
     editor?.commands.clearContent();
   }
 
-  function buildEditorContent(body?: string): string {
-    const sigBlock = signature
-      ? `<div style="margin-top: 16px;" data-signature="true"><p>--</p>${signature}</div>`
-      : "";
-    if (body) {
-      return `<p></p>${body}${sigBlock}`;
-    }
-    return `<p></p>${sigBlock}`;
-  }
-
   function openCompose(initial?: { to?: string; cc?: string; subject?: string; body?: string }) {
     setCompose({ to: initial?.to || "", cc: initial?.cc || "", subject: initial?.subject || "" });
     setShowCc(!!(initial?.cc));
     setAttachments([]);
     setTimeout(() => {
-      editor?.commands.setContent(buildEditorContent(initial?.body));
+      editor?.commands.setContent(initial?.body ? `<p></p>${initial.body}` : "<p></p>");
       editor?.commands.focus("start");
     }, 50);
     setViewMode("compose");
@@ -503,16 +493,20 @@ export default function MailPage() {
   }
 
   function handleSend() {
-    const htmlBody = editor?.getHTML() || "";
-    if (!compose.to || !compose.subject || !htmlBody.replace(/<[^>]*>/g, "").trim()) {
+    const editorHtml = editor?.getHTML() || "";
+    if (!compose.to || !compose.subject || !editorHtml.replace(/<[^>]*>/g, "").trim()) {
       toast({ title: "Please fill in To, Subject, and Body", variant: "destructive" });
       return;
+    }
+    let fullBody = editorHtml;
+    if (signature) {
+      fullBody += `<br><br><div>--<br>${signature}</div>`;
     }
     const formData = new FormData();
     formData.append("to", compose.to.trim());
     if (compose.cc.trim()) formData.append("cc", compose.cc.trim());
     formData.append("subject", compose.subject);
-    formData.append("body", htmlBody);
+    formData.append("body", fullBody);
     attachments.forEach((att) => {
       formData.append("attachments", att.file);
     });
@@ -671,6 +665,24 @@ export default function MailPage() {
             <div className="border-b">
               <EditorContent editor={editor} />
             </div>
+
+            {signature && (
+              <div className="px-4 py-3 border-b bg-muted/10">
+                <p className="text-xs text-muted-foreground mb-2">Your signature will be included:</p>
+                <div className="border-t pt-2 text-sm text-muted-foreground">
+                  <p className="mb-1">--</p>
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(signature, {
+                        USE_PROFILES: { html: true },
+                        ADD_TAGS: ["img"],
+                        ADD_ATTR: ["src", "alt", "width", "height", "style", "target", "href"],
+                      }),
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
             {attachments.length > 0 && (
               <div className="px-4 py-2 border-b bg-muted/20">
