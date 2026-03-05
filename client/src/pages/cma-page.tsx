@@ -701,7 +701,7 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
                 {[
                   { label: "Active", value: "Active" },
                   { label: "Pending", value: "Pending" },
-                  { label: "Sold", value: "Inactive" },
+                  { label: "Sold", value: "Closed" },
                 ].map(({ label, value }) => (
                   <label key={value} className="flex items-center gap-1.5 text-sm cursor-pointer">
                     <Checkbox
@@ -1034,7 +1034,7 @@ function CmaBuilderView({ reportId, prefill, onBack }: { reportId: number | null
                           <td className="px-2 py-2 font-medium truncate">{listing.formattedAddress || listing.addressLine1}</td>
                           <td className="px-2 py-2 text-center">
                             <Badge variant={listing.status === "Active" ? "default" : listing.status === "Pending" ? "secondary" : "outline"} className="text-xs px-1.5 py-0">
-                              {listing.status === "Inactive" ? "Sold" : listing.status}
+                              {listing.status === "Closed" ? "Sold" : listing.status}
                             </Badge>
                           </td>
                           <td className="px-2 py-2 text-right font-semibold text-primary">{formatPrice(listing.price)}</td>
