@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.compose",
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/userinfo.email",
 ];
@@ -137,13 +138,14 @@ export async function sendGmailEmail(
 
     const gmail = google.gmail({ version: "v1", auth: auth.client });
 
+    const htmlBody = body.replace(/\n/g, "<br>");
     const messageParts = [
       `From: ${auth.email}`,
       `To: ${to}`,
       `Subject: ${subject}`,
-      `Content-Type: text/plain; charset=utf-8`,
+      `Content-Type: text/html; charset=utf-8`,
       "",
-      body,
+      htmlBody,
     ];
     const rawMessage = Buffer.from(messageParts.join("\r\n"))
       .toString("base64")
@@ -151,9 +153,18 @@ export async function sendGmailEmail(
       .replace(/\//g, "_")
       .replace(/=+$/, "");
 
-    const result = await gmail.users.messages.send({
+    const draft = await gmail.users.drafts.create({
       userId: "me",
-      requestBody: { raw: rawMessage },
+      requestBody: {
+        message: { raw: rawMessage },
+      },
+    });
+
+    const result = await gmail.users.drafts.send({
+      userId: "me",
+      requestBody: {
+        id: draft.data.id!,
+      },
     });
 
     return { success: true, messageId: result.data.id || undefined };
