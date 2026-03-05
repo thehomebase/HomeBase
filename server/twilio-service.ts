@@ -1,5 +1,19 @@
 let twilioClient: any = null;
 
+function formatPhoneNumber(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+  if (phone.startsWith('+')) {
+    return phone;
+  }
+  return `+${digits}`;
+}
+
 async function getTwilioClient() {
   try {
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -30,15 +44,21 @@ export async function sendSMS(to: string, body: string): Promise<{ success: bool
       return { success: false, error: "Twilio phone number not configured (TWILIO_PHONE_NUMBER)." };
     }
 
+    const formattedTo = formatPhoneNumber(to);
+    const formattedFrom = formatPhoneNumber(fromNumber);
+
+    console.log(`Sending SMS: from=${formattedFrom} to=${formattedTo} body_length=${body.length}`);
+
     const message = await client.messages.create({
       body,
-      from: fromNumber,
-      to,
+      from: formattedFrom,
+      to: formattedTo,
     });
 
+    console.log(`SMS sent successfully: SID=${message.sid} status=${message.status}`);
     return { success: true, externalId: message.sid };
   } catch (error: any) {
-    console.error('Twilio SMS error:', error);
+    console.error('Twilio SMS error:', error.message || error);
     return { success: false, error: error.message || 'Failed to send SMS' };
   }
 }
