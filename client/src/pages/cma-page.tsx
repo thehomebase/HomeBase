@@ -274,17 +274,20 @@ function CmaBuilderView({ reportId, onBack }: { reportId: number | null; onBack:
     const city = subjectCity.trim();
     const state = subjectState.trim();
     const zip = subjectZip.trim();
-    const fullAddress = [addr, city, state, zip].filter(Boolean).join(", ");
     if (!addr) {
       toast({ title: "Enter an address", description: "Type the subject property street address first.", variant: "destructive" });
       return;
     }
     setIsLookingUpSubject(true);
     try {
-      const res = await apiRequest("GET", `/api/rentcast/property?address=${encodeURIComponent(fullAddress)}`);
+      const params = new URLSearchParams({ address: addr });
+      if (city) params.set("city", city);
+      if (state) params.set("state", state);
+      if (zip) params.set("zipCode", zip);
+      const res = await apiRequest("GET", `/api/rentcast/property?${params.toString()}`);
       const { property } = await res.json();
-      if (!property || (!property.addressLine1 && !property.formattedAddress)) {
-        toast({ title: "Property not found", description: "Could not find data for that address. You can fill in the details manually.", variant: "destructive" });
+      if (!property) {
+        toast({ title: "Property not found", description: "Could not find data for that address. Try adding the city and state, or fill in the details manually.", variant: "destructive" });
         return;
       }
       if (property.city) setSubjectCity(property.city);

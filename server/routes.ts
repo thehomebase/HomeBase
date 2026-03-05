@@ -1918,12 +1918,17 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/rentcast/property", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
-    const { address } = req.query;
+    const { address, city, state, zipCode } = req.query;
     if (!address) {
       return res.status(400).json({ error: "Please provide an address" });
     }
 
-    const cacheKey = `property:${String(address).toLowerCase().trim()}`;
+    const addressStr = String(address).trim();
+    const cityStr = city ? String(city).trim() : "";
+    const stateStr = state ? String(state).trim() : "";
+    const zipStr = zipCode ? String(zipCode).trim() : "";
+
+    const cacheKey = `property:${[addressStr, cityStr, stateStr, zipStr].join("|").toLowerCase()}`;
     const cached = rentcastCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       return res.json({ property: cached.data, fromCache: true });
@@ -1940,7 +1945,33 @@ export function registerRoutes(app: Express): Server {
         return res.status(500).json({ error: "RentCast API key not configured" });
       }
 
-      const params = new URLSearchParams({ address: String(address) });
+      let resolvedCity = cityStr;
+      let resolvedState = stateStr;
+      let resolvedZip = zipStr;
+
+      if (!resolvedCity && !resolvedZip) {
+        try {
+          const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressStr)}&limit=1&addressdetails=1`, {
+            headers: { "User-Agent": "HomeBase-CRM/1.0" }
+          });
+          const geoData = await geoRes.json();
+          if (geoData.length > 0) {
+            const addr = geoData[0].address || {};
+            resolvedCity = addr.city || addr.town || addr.village || "";
+            resolvedState = addr.state || "";
+            resolvedZip = addr.postcode || "";
+          }
+        } catch (e) {
+          console.log("Geocoding fallback failed, continuing with original address");
+        }
+      }
+
+      const params = new URLSearchParams();
+      params.set("address", addressStr);
+      if (resolvedCity) params.set("city", resolvedCity);
+      if (resolvedState) params.set("state", resolvedState);
+      if (resolvedZip) params.set("zipCode", resolvedZip);
+
       const url = `https://api.rentcast.io/v1/properties?${params.toString()}`;
       console.log(`RentCast property lookup #${monthlyCallCount + 1}: ${url}`);
 
@@ -1949,6 +1980,9 @@ export function registerRoutes(app: Express): Server {
       });
 
       if (!response.ok) {
+        if (response.status === 404) {
+          return res.json({ property: null, fromCache: false, message: "Property not found in RentCast database" });
+        }
         const errorText = await response.text();
         console.error("RentCast property lookup error:", response.status, errorText);
         return res.status(response.status).json({ error: `RentCast API error: ${response.statusText}` });
@@ -1957,8 +1991,10 @@ export function registerRoutes(app: Express): Server {
       const data = await response.json();
       monthlyCallCount++;
 
-      const property = Array.isArray(data) && data.length > 0 ? data[0] : data;
-      rentcastCache.set(cacheKey, { data: property, timestamp: Date.now() });
+      const property = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      if (property) {
+        rentcastCache.set(cacheKey, { data: property, timestamp: Date.now() });
+      }
 
       res.json({ property, fromCache: false });
     } catch (error) {
