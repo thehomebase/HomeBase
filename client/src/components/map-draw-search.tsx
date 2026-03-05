@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Loader2, Trash2, Search, MapPin, BedDouble, Bath, Ruler, Building2,
-  DollarSign, ExternalLink, Heart, AlertTriangle, Info
+  DollarSign, ExternalLink, Heart, AlertTriangle, Info, ArrowUp, ArrowDown, ArrowUpDown
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -246,6 +246,155 @@ function FitBoundsToListings({ listings }: { listings: RentCastListing[] }) {
   }, [listings]);
 
   return null;
+}
+
+type SortKey = "price" | "bedrooms" | "bathrooms" | "squareFootage" | "yearBuilt" | "daysOnMarket" | null;
+type SortDir = "asc" | "desc";
+
+function SortIcon({ columnKey, sortKey, sortDir }: { columnKey: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+  if (sortKey !== columnKey) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
+  return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+}
+
+function MapSearchResultsTable({
+  listings,
+  onSave,
+  isSaving,
+}: {
+  listings: RentCastListing[];
+  onSave: (listing: RentCastListing) => void;
+  isSaving: boolean;
+}) {
+  const [sortKey, setSortKey] = useState<SortKey>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const sortedListings = [...listings].sort((a, b) => {
+    if (!sortKey) return 0;
+    const valA = a[sortKey] ?? 0;
+    const valB = b[sortKey] ?? 0;
+    if (valA < valB) return sortDir === "asc" ? -1 : 1;
+    if (valA > valB) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const thSortable = (label: string, key: SortKey, align: string, extraClass = "") => (
+    <th
+      className={`${align} px-3 py-2.5 font-medium cursor-pointer select-none hover:bg-muted/80 transition-colors ${extraClass}`}
+      onClick={() => handleSort(key)}
+    >
+      <span className={`inline-flex items-center gap-1 ${align === "text-right" ? "justify-end" : align === "text-center" ? "justify-center" : ""}`}>
+        {label}
+        <SortIcon columnKey={key} sortKey={sortKey} sortDir={sortDir} />
+      </span>
+    </th>
+  );
+
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <div className="text-sm font-medium mb-3 flex items-center gap-2">
+          <MapPin className="h-4 w-4" />
+          Listings in Area ({listings.length})
+        </div>
+        <div className="overflow-x-auto border rounded-lg max-h-[500px] overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-background">
+              <tr className="bg-muted/50 border-b">
+                <th className="text-left px-3 py-2.5 font-medium">Address</th>
+                {thSortable("Price", "price", "text-right")}
+                {thSortable("Beds", "bedrooms", "text-center")}
+                {thSortable("Baths", "bathrooms", "text-center")}
+                {thSortable("Sqft", "squareFootage", "text-right", "hidden sm:table-cell")}
+                <th className="text-left px-3 py-2.5 font-medium hidden md:table-cell">Type</th>
+                {thSortable("Year", "yearBuilt", "text-center", "hidden md:table-cell")}
+                {thSortable("DOM", "daysOnMarket", "text-center", "hidden lg:table-cell")}
+                <th className="text-left px-3 py-2.5 font-medium hidden lg:table-cell">Agent</th>
+                <th className="text-left px-3 py-2.5 font-medium hidden lg:table-cell">MLS#</th>
+                <th className="text-center px-3 py-2.5 font-medium">Status</th>
+                <th className="px-3 py-2.5 font-medium w-20"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedListings.map((listing, i) => {
+                const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, "").replace(/\s+/g, "-"))}_rb/`;
+                return (
+                  <tr
+                    key={listing.id || listing.formattedAddress}
+                    className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "" : "bg-muted/10"}`}
+                  >
+                    <td className="px-3 py-2.5">
+                      <div className="font-medium truncate max-w-[200px]">{listing.addressLine1}</div>
+                      <div className="text-xs text-muted-foreground">{listing.city}, {listing.state} {listing.zipCode}</div>
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-primary whitespace-nowrap">
+                      {formatPrice(listing.price)}
+                    </td>
+                    <td className="px-3 py-2.5 text-center">{listing.bedrooms || "—"}</td>
+                    <td className="px-3 py-2.5 text-center">{listing.bathrooms || "—"}</td>
+                    <td className="px-3 py-2.5 text-right hidden sm:table-cell whitespace-nowrap">
+                      {listing.squareFootage ? listing.squareFootage.toLocaleString() : "—"}
+                    </td>
+                    <td className="px-3 py-2.5 hidden md:table-cell text-muted-foreground text-xs">
+                      {listing.propertyType || "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-center hidden md:table-cell text-muted-foreground">
+                      {listing.yearBuilt || "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-center hidden lg:table-cell text-muted-foreground">
+                      {listing.daysOnMarket}
+                    </td>
+                    <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-muted-foreground truncate max-w-[140px]">
+                      {listing.listingAgent?.name || "—"}
+                    </td>
+                    <td className="px-3 py-2.5 hidden lg:table-cell text-xs text-muted-foreground">
+                      {listing.mlsNumber || "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <Badge variant={listing.status === "Active" ? "default" : "secondary"} className="text-xs">
+                        {listing.status}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => onSave(listing)}
+                          disabled={isSaving}
+                          title="Save to favorites"
+                        >
+                          <Heart className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => window.open(zillowUrl, "_blank", "noopener,noreferrer")}
+                          title="View on Zillow"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function MapDrawSearch() {
@@ -582,72 +731,11 @@ export default function MapDrawSearch() {
       )}
 
       {filteredListings.length > 0 && (
-        <Card>
-          <CardContent className="pt-4">
-            <div className="text-sm font-medium mb-3 flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              Listings in Area ({filteredListings.length})
-            </div>
-            <div className="divide-y max-h-[400px] overflow-y-auto">
-              {filteredListings.map((listing) => (
-                <div
-                  key={listing.id || listing.formattedAddress}
-                  className="py-3 flex items-start justify-between gap-3 hover:bg-muted/30 px-2 rounded"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{listing.addressLine1}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {listing.city}, {listing.state} {listing.zipCode}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-muted-foreground">
-                      <span className="font-bold text-primary text-sm">{formatPrice(listing.price)}</span>
-                      {listing.bedrooms > 0 && (
-                        <span className="flex items-center gap-0.5">
-                          <BedDouble className="h-3 w-3" /> {listing.bedrooms}
-                        </span>
-                      )}
-                      {listing.bathrooms > 0 && (
-                        <span className="flex items-center gap-0.5">
-                          <Bath className="h-3 w-3" /> {listing.bathrooms}
-                        </span>
-                      )}
-                      {listing.squareFootage > 0 && (
-                        <span className="flex items-center gap-0.5">
-                          <Ruler className="h-3 w-3" /> {listing.squareFootage.toLocaleString()}
-                        </span>
-                      )}
-                      {listing.daysOnMarket > 0 && (
-                        <span>{listing.daysOnMarket} DOM</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => saveMutation.mutate(listing)}
-                      disabled={saveMutation.isPending}
-                    >
-                      <Heart className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => {
-                        const url = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, "").replace(/\s+/g, "-"))}_rb/`;
-                        window.open(url, "_blank");
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <MapSearchResultsTable
+          listings={filteredListings}
+          onSave={(listing) => saveMutation.mutate(listing)}
+          isSaving={saveMutation.isPending}
+        />
       )}
     </div>
   );
