@@ -16,7 +16,7 @@ interface StorageDocument {
 import {
   users, transactions, checklists, messages, clients, documents, contractors, contractorReviews,
   propertyViewings, propertyFeedback, showingRequests, savedProperties, communications, smsOptOuts,
-  emailSnippets, emailTracking, cmaReports,
+  emailSnippets, emailTracking,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
   type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
   type ShowingRequest, type SavedProperty, type InsertSavedProperty,
@@ -24,7 +24,6 @@ import {
   type AgentPhoneNumber,
   type EmailSnippet, type InsertEmailSnippet,
   type EmailTracking, type InsertEmailTracking,
-  type CmaReport, type InsertCmaReport,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -168,13 +167,6 @@ export interface IStorage {
   getEmailTrackingByUser(userId: number): Promise<EmailTracking[]>;
   updateEmailTrackingMessageId(trackingId: string, gmailMessageId: string): Promise<void>;
 
-  // CMA Reports
-  getCmaReportsByAgent(agentId: number): Promise<CmaReport[]>;
-  getCmaReport(id: number): Promise<CmaReport | undefined>;
-  getCmaReportByShareToken(shareToken: string): Promise<CmaReport | undefined>;
-  createCmaReport(report: InsertCmaReport): Promise<CmaReport>;
-  updateCmaReport(id: number, data: Partial<CmaReport>): Promise<CmaReport>;
-  deleteCmaReport(id: number): Promise<void>;
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -2913,81 +2905,6 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  private mapCmaReportRow(row: any): CmaReport {
-    return {
-      id: Number(row.id),
-      agentId: Number(row.agent_id),
-      subjectAddress: String(row.subject_address),
-      subjectCity: String(row.subject_city),
-      subjectState: String(row.subject_state),
-      subjectZip: String(row.subject_zip),
-      subjectBeds: row.subject_beds ? Number(row.subject_beds) : null,
-      subjectBaths: row.subject_baths ? Number(row.subject_baths) : null,
-      subjectSqft: row.subject_sqft ? Number(row.subject_sqft) : null,
-      subjectPrice: row.subject_price ? Number(row.subject_price) : null,
-      subjectYearBuilt: row.subject_year_built ? Number(row.subject_year_built) : null,
-      comps: typeof row.comps === 'string' ? JSON.parse(row.comps) : (row.comps || []),
-      notes: row.notes ? String(row.notes) : null,
-      shareToken: String(row.share_token),
-      createdAt: row.created_at ? new Date(row.created_at) : new Date(),
-    };
-  }
-
-  async getCmaReportsByAgent(agentId: number): Promise<CmaReport[]> {
-    const result = await db.execute(
-      sql`SELECT * FROM cma_reports WHERE agent_id = ${agentId} ORDER BY created_at DESC`
-    );
-    return (result.rows as any[]).map(row => this.mapCmaReportRow(row));
-  }
-
-  async getCmaReport(id: number): Promise<CmaReport | undefined> {
-    const result = await db.execute(
-      sql`SELECT * FROM cma_reports WHERE id = ${id} LIMIT 1`
-    );
-    if (!result.rows || result.rows.length === 0) return undefined;
-    return this.mapCmaReportRow(result.rows[0]);
-  }
-
-  async getCmaReportByShareToken(shareToken: string): Promise<CmaReport | undefined> {
-    const result = await db.execute(
-      sql`SELECT * FROM cma_reports WHERE share_token = ${shareToken} LIMIT 1`
-    );
-    if (!result.rows || result.rows.length === 0) return undefined;
-    return this.mapCmaReportRow(result.rows[0]);
-  }
-
-  async createCmaReport(report: InsertCmaReport): Promise<CmaReport> {
-    const compsJson = JSON.stringify(report.comps || []);
-    const result = await db.execute(
-      sql`INSERT INTO cma_reports (agent_id, subject_address, subject_city, subject_state, subject_zip, subject_beds, subject_baths, subject_sqft, subject_price, subject_year_built, comps, notes, share_token)
-      VALUES (${report.agentId}, ${report.subjectAddress}, ${report.subjectCity}, ${report.subjectState}, ${report.subjectZip}, ${report.subjectBeds ?? null}, ${report.subjectBaths ?? null}, ${report.subjectSqft ?? null}, ${report.subjectPrice ?? null}, ${report.subjectYearBuilt ?? null}, ${compsJson}::json, ${report.notes ?? null}, ${report.shareToken})
-      RETURNING *`
-    );
-    return this.mapCmaReportRow(result.rows[0]);
-  }
-
-  async updateCmaReport(id: number, data: Partial<CmaReport>): Promise<CmaReport> {
-    await db.execute(sql`UPDATE cma_reports SET
-      subject_address = COALESCE(${data.subjectAddress ?? null}, subject_address),
-      subject_city = COALESCE(${data.subjectCity ?? null}, subject_city),
-      subject_state = COALESCE(${data.subjectState ?? null}, subject_state),
-      subject_zip = COALESCE(${data.subjectZip ?? null}, subject_zip),
-      subject_beds = COALESCE(${data.subjectBeds ?? null}, subject_beds),
-      subject_baths = COALESCE(${data.subjectBaths ?? null}, subject_baths),
-      subject_sqft = COALESCE(${data.subjectSqft ?? null}, subject_sqft),
-      subject_price = COALESCE(${data.subjectPrice ?? null}, subject_price),
-      subject_year_built = COALESCE(${data.subjectYearBuilt ?? null}, subject_year_built),
-      comps = COALESCE(${data.comps !== undefined ? JSON.stringify(data.comps) : null}::json, comps),
-      notes = COALESCE(${data.notes !== undefined ? data.notes : null}, notes)
-      WHERE id = ${id}`);
-
-    const result = await db.execute(sql`SELECT * FROM cma_reports WHERE id = ${id} LIMIT 1`);
-    return this.mapCmaReportRow(result.rows[0]);
-  }
-
-  async deleteCmaReport(id: number): Promise<void> {
-    await db.execute(sql`DELETE FROM cma_reports WHERE id = ${id}`);
-  }
 }
 
 export const storage = new DatabaseStorage();

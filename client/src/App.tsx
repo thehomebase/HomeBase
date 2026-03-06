@@ -56,8 +56,6 @@ import ContractorsPage from "@/pages/contractors-page";
 import MapPage from "@/pages/map-page";
 import PropertySearchPage from "@/pages/property-search-page";
 import MailPage from "@/pages/mail-page";
-import CmaPage from "@/pages/cma-page";
-import CmaSharePage from "@/pages/cma-share-page";
 import ClientTransactionPage from "@/pages/client-transaction-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -146,14 +144,6 @@ function Layout({ children }: { children: React.ReactNode }) {
                                 <Link href="/map" className="flex items-center gap-2">
                                   <Map className="h-4 w-4" />
                                   {isSidebarOpen && <span>Map</span>}
-                                </Link>
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                              <SidebarMenuButton asChild tooltip="Market Analysis">
-                                <Link href="/cma" className="flex items-center gap-2">
-                                  <BarChart3 className="h-4 w-4" />
-                                  {isSidebarOpen && <span>Market Analysis</span>}
                                 </Link>
                               </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -310,9 +300,6 @@ function Router() {
           <Route path="/mail">
             <ProtectedRoute path="/mail" component={MailPage} />
           </Route>
-          <Route path="/cma">
-            <ProtectedRoute path="/cma" component={CmaPage} />
-          </Route>
           <Route path="/">
             <ProtectedRoute path="/" component={TransactionsPage} />
           </Route>
@@ -350,7 +337,6 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Switch>
-          <Route path="/cma/share/:shareToken" component={CmaSharePage} />
           <Route>
             <Layout>
               <Router />

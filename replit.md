@@ -26,7 +26,7 @@ Preferred communication style: Simple, everyday language.
 ### Data Storage
 - **Database**: PostgreSQL (Neon serverless)
 - **ORM**: Drizzle ORM
-- **Key Models**: Users, Transactions, Clients, Documents, Checklists, Contractors, Messages, Saved Properties, Communications, Agent Phone Numbers, Email Snippets, Email Tracking, CMA Reports.
+- **Key Models**: Users, Transactions, Clients, Documents, Checklists, Contractors, Messages, Saved Properties, Communications, Agent Phone Numbers, Email Snippets, Email Tracking.
 
 ### Key Features
 - **Contract Upload**: Extracts data from PDF contracts (e.g., purchase price, dates, contacts) using `pdf-parse` and regex. Documents are processed in-memory for privacy.
@@ -35,7 +35,6 @@ Preferred communication style: Simple, everyday language.
 - **Showing Requests**: Clients can request showings for saved properties, which agents view on a map.
 - **Transaction Timeline & Risk Alerts**: Analyzes transaction dates and document statuses to generate proactive deadline alerts. Color-coded risk levels (green/yellow/orange/red). Dashboard-level alert summary across all active transactions.
 - **Client Portal**: Clients see a read-only "My Transaction" view with status progress, key dates, financial summary, document statuses with signing links, and timeline events.
-- **CMA Reports**: Comparative Market Analysis generator using RentCast data. Agents create reports with subject property + comparable listings, price analysis, and notes. Reports are shareable via public link and printable.
 - **Client Communications**:
     - **SMS**: Via Twilio, with agent-specific phone numbers, opt-out handling, rate limiting, and content filtering.
     - **Email**: Via agent's linked Gmail account (Google OAuth), including full inbox view, compose, reply, forward, email snippets/templates, read receipts (tracking pixel), and Gmail-like bulk actions (checkbox selection with archive, delete, mark read/unread, star, label).

@@ -1,12 +1,11 @@
 import { useState, useRef, lazy, Suspense } from "react";
-import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Eye, Map, Droplets, BarChart3 } from "lucide-react";
+import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Eye, Map, Droplets } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -390,7 +389,6 @@ function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll }: { 
 }
 
 export default function PropertySearchPage() {
-  const [, navigate] = useLocation();
   const [rcLocation, setRcLocation] = useState("");
   const [rcPropertyType, setRcPropertyType] = useState("any");
   const [rcMinPrice, setRcMinPrice] = useState("");
@@ -875,30 +873,6 @@ export default function PropertySearchPage() {
                       >
                         {bulkSaveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Heart className="h-3.5 w-3.5" />}
                         Save to Favorites
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="gap-1.5"
-                        onClick={() => {
-                          const selected = filteredListings.filter(l => selectedListingIds.has(l.id));
-                          const first = selected[0];
-                          if (!first) return;
-                          const params = new URLSearchParams();
-                          params.set("address", first.addressLine1 || first.formattedAddress || "");
-                          params.set("city", first.city || "");
-                          params.set("state", first.state || "");
-                          params.set("zip", first.zipCode || "");
-                          if (first.bedrooms) params.set("beds", String(first.bedrooms));
-                          if (first.bathrooms) params.set("baths", String(first.bathrooms));
-                          if (first.squareFootage) params.set("sqft", String(first.squareFootage));
-                          if (first.price) params.set("price", String(first.price));
-                          if (first.yearBuilt) params.set("yearBuilt", String(first.yearBuilt));
-                          navigate(`/cma?${params.toString()}`);
-                        }}
-                      >
-                        <BarChart3 className="h-3.5 w-3.5" />
-                        Create CMA
                       </Button>
                       <Button
                         size="sm"
