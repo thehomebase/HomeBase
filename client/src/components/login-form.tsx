@@ -21,6 +21,7 @@ export function LoginForm({
   const [defaultReferralCode, setDefaultReferralCode] = useState("");
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
+  const [selectedRole, setSelectedRole] = useState("client");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -208,7 +209,7 @@ export function LoginForm({
             </div>
             <div className="space-y-2">
               <Label htmlFor="reg-role">Role</Label>
-              <Select name="role" defaultValue="client">
+              <Select name="role" defaultValue="client" onValueChange={setSelectedRole}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
@@ -216,19 +217,22 @@ export function LoginForm({
                   <SelectItem value="agent">Agent</SelectItem>
                   <SelectItem value="client">Client</SelectItem>
                   <SelectItem value="vendor">Vendor</SelectItem>
+                  <SelectItem value="lender">Lender</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="reg-referralCode">Referral Code (optional)</Label>
-              <Input
-                id="reg-referralCode"
-                name="referralCode"
-                placeholder="Enter referral code"
-                defaultValue={defaultReferralCode}
-                className="font-mono tracking-wider"
-              />
-            </div>
+            {selectedRole !== "lender" && (
+              <div className="space-y-2">
+                <Label htmlFor="reg-referralCode">Referral Code (optional)</Label>
+                <Input
+                  id="reg-referralCode"
+                  name="referralCode"
+                  placeholder="Enter referral code"
+                  defaultValue={defaultReferralCode}
+                  className="font-mono tracking-wider"
+                />
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
               Create Account
             </Button>

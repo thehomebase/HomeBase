@@ -5183,6 +5183,328 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // ===== LENDER PORTAL ROUTES =====
+
+  const LENDER_STAGES = ['invited', 'under_contract', 'processing', 'underwriting', 'conditions_clearing', 'clear_to_close', 'closed', 'on_hold'];
+
+  const DEFAULT_CHECKLIST_MAPPINGS: Array<{ lenderItemId: string; agentItemId: string; description: string }> = [
+    { lenderItemId: "l-inv-1", agentItemId: "b-pre-2", description: "Pre-qualification letter → Pre-approval obtained" },
+    { lenderItemId: "l-uc-1", agentItemId: "b-dd-1", description: "Contract received → Contract executed" },
+    { lenderItemId: "l-proc-3", agentItemId: "b-dd-3", description: "Appraisal ordered → Appraisal ordered" },
+    { lenderItemId: "l-uw-3", agentItemId: "b-dd-5", description: "Conditional approval → Loan approval received" },
+    { lenderItemId: "l-cc-5", agentItemId: "b-close-1", description: "Clear-to-close → Clear to close confirmed" },
+    { lenderItemId: "l-ctc-2", agentItemId: "b-close-2", description: "CD sent → Closing disclosure reviewed" },
+    { lenderItemId: "l-cl-1", agentItemId: "b-close-5", description: "Loan funded → Closing complete" },
+  ];
+
+  app.get("/api/lender/transactions", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'lender') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const transactions = await storage.getLenderTransactionsByLender(req.user.id);
+      res.json(transactions);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch lender transactions' });
+    }
+  });
+
+  app.post("/api/lender/transactions", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'lender') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const schema = z.object({
+        borrowerName: z.string().min(1),
+        borrowerEmail: z.string().email().optional().nullable(),
+        borrowerPhone: z.string().optional().nullable(),
+        propertyAddress: z.string().optional().nullable(),
+        loanAmount: z.number().optional().nullable(),
+        loanType: z.enum(['conventional', 'fha', 'va', 'usda', 'jumbo', 'other']).optional().default('conventional'),
+        interestRate: z.number().optional().nullable(),
+        notes: z.string().optional().nullable(),
+        agentTransactionId: z.number().optional().nullable(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
+      let agentId = null;
+      if (parsed.data.agentTransactionId) {
+        const agentTx = await storage.getTransaction(parsed.data.agentTransactionId);
+        if (agentTx) agentId = agentTx.agentId;
+      }
+
+      const transaction = await storage.createLenderTransaction({
+        ...parsed.data,
+        lenderId: req.user.id,
+        agentId,
+        status: 'invited',
+      });
+
+      await storage.createLenderChecklist({
+        lenderTransactionId: transaction.id,
+        items: [],
+      });
+
+      if (parsed.data.agentTransactionId) {
+        for (const mapping of DEFAULT_CHECKLIST_MAPPINGS) {
+          await storage.createLenderChecklistMapping({
+            lenderTransactionId: transaction.id,
+            lenderChecklistItemId: mapping.lenderItemId,
+            agentTransactionId: parsed.data.agentTransactionId,
+            agentChecklistItemId: mapping.agentItemId,
+          });
+        }
+      }
+
+      res.status(201).json(transaction);
+    } catch (error) {
+      console.error('Error creating lender transaction:', error);
+      res.status(500).json({ error: 'Failed to create lender transaction' });
+    }
+  });
+
+  app.get("/api/lender/transactions/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'lender') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const transaction = await storage.getLenderTransaction(Number(req.params.id));
+      if (!transaction || transaction.lenderId !== req.user.id) return res.status(404).json({ error: 'Not found' });
+      res.json(transaction);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch lender transaction' });
+    }
+  });
+
+  app.patch("/api/lender/transactions/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'lender') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const transaction = await storage.getLenderTransaction(Number(req.params.id));
+      if (!transaction || transaction.lenderId !== req.user.id) return res.status(404).json({ error: 'Not found' });
+
+      const schema = z.object({
+        borrowerName: z.string().optional(),
+        borrowerEmail: z.string().email().optional().nullable(),
+        borrowerPhone: z.string().optional().nullable(),
+        propertyAddress: z.string().optional().nullable(),
+        loanAmount: z.number().optional().nullable(),
+        loanType: z.string().optional(),
+        interestRate: z.number().optional().nullable(),
+        status: z.enum(['invited', 'under_contract', 'processing', 'underwriting', 'conditions_clearing', 'clear_to_close', 'closed', 'on_hold'] as const).optional(),
+        notes: z.string().optional().nullable(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
+      const updated = await storage.updateLenderTransaction(Number(req.params.id), parsed.data);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update lender transaction' });
+    }
+  });
+
+  app.delete("/api/lender/transactions/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'lender') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const transaction = await storage.getLenderTransaction(Number(req.params.id));
+      if (!transaction || transaction.lenderId !== req.user.id) return res.status(404).json({ error: 'Not found' });
+      await storage.deleteLenderTransaction(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete lender transaction' });
+    }
+  });
+
+  app.get("/api/lender/transactions/:id/checklist", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'lender') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const transaction = await storage.getLenderTransaction(Number(req.params.id));
+      if (!transaction || transaction.lenderId !== req.user.id) return res.status(404).json({ error: 'Not found' });
+
+      let checklist = await storage.getLenderChecklist(transaction.id);
+      if (!checklist) {
+        checklist = await storage.createLenderChecklist({
+          lenderTransactionId: transaction.id,
+          items: [],
+        });
+      }
+      res.json(checklist);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch lender checklist' });
+    }
+  });
+
+  app.patch("/api/lender/transactions/:id/checklist", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'lender') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const transaction = await storage.getLenderTransaction(Number(req.params.id));
+      if (!transaction || transaction.lenderId !== req.user.id) return res.status(404).json({ error: 'Not found' });
+
+      const { items } = req.body;
+      if (!Array.isArray(items)) return res.status(400).json({ error: 'Items must be an array' });
+
+      let checklist = await storage.getLenderChecklist(transaction.id);
+      if (!checklist) {
+        checklist = await storage.createLenderChecklist({ lenderTransactionId: transaction.id, items: [] });
+      }
+
+      const updated = await storage.updateLenderChecklist(checklist.id, items);
+
+      const mappings = await storage.getLenderChecklistMappings(transaction.id);
+      if (mappings.length > 0 && transaction.agentTransactionId) {
+        for (const mapping of mappings) {
+          const lenderItem = items.find((i: any) => i.id === mapping.lenderChecklistItemId);
+          if (lenderItem) {
+            const agentChecklist = await storage.getChecklist(mapping.agentTransactionId);
+            if (agentChecklist) {
+              const agentItems = (agentChecklist.items as any[]) || [];
+              const agentItemIndex = agentItems.findIndex((i: any) => i.id === mapping.agentChecklistItemId);
+              if (agentItemIndex >= 0 && agentItems[agentItemIndex].completed !== lenderItem.completed) {
+                agentItems[agentItemIndex].completed = lenderItem.completed;
+                await storage.updateChecklist(agentChecklist.id, agentItems);
+              }
+            }
+          }
+        }
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating lender checklist:', error);
+      res.status(500).json({ error: 'Failed to update lender checklist' });
+    }
+  });
+
+  app.get("/api/lender/transactions/:id/checklist/mappings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'lender') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const transaction = await storage.getLenderTransaction(Number(req.params.id));
+      if (!transaction || transaction.lenderId !== req.user.id) return res.status(404).json({ error: 'Not found' });
+      const mappings = await storage.getLenderChecklistMappings(transaction.id);
+      res.json(mappings);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch mappings' });
+    }
+  });
+
+  app.post("/api/lender/transactions/:id/checklist/mappings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'lender') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const transaction = await storage.getLenderTransaction(Number(req.params.id));
+      if (!transaction || transaction.lenderId !== req.user.id) return res.status(404).json({ error: 'Not found' });
+
+      const schema = z.object({
+        lenderChecklistItemId: z.string(),
+        agentTransactionId: z.number(),
+        agentChecklistItemId: z.string(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
+      if (transaction.agentTransactionId !== parsed.data.agentTransactionId) {
+        return res.status(403).json({ error: 'Can only map to linked agent transaction' });
+      }
+
+      const mapping = await storage.createLenderChecklistMapping({
+        lenderTransactionId: transaction.id,
+        ...parsed.data,
+      });
+      res.status(201).json(mapping);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to create mapping' });
+    }
+  });
+
+  app.post("/api/transactions/:id/invite-lender", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'agent') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const transaction = await storage.getTransaction(Number(req.params.id));
+      if (!transaction || transaction.agentId !== req.user.id) return res.status(404).json({ error: 'Not found' });
+
+      const existing = await storage.getLenderTransactionByAgentTransaction(transaction.id);
+      if (existing) return res.status(400).json({ error: 'A lender is already linked to this transaction' });
+
+      const schema = z.object({
+        lenderId: z.number(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
+      const lender = await storage.getUser(parsed.data.lenderId);
+      if (!lender || lender.role !== 'lender') return res.status(400).json({ error: 'Invalid lender' });
+
+      const clientName = transaction.clientId 
+        ? await storage.getClient(transaction.clientId).then(c => c ? `${c.firstName} ${c.lastName}` : 'Unknown Borrower')
+        : 'Unknown Borrower';
+
+      const lenderTx = await storage.createLenderTransaction({
+        lenderId: parsed.data.lenderId,
+        borrowerName: clientName,
+        propertyAddress: `${transaction.streetName || ''}, ${transaction.city || ''}, ${transaction.state || ''} ${transaction.zipCode || ''}`.trim(),
+        loanAmount: transaction.contractPrice ? Number(transaction.contractPrice) : null,
+        agentId: req.user.id,
+        agentTransactionId: transaction.id,
+        status: 'invited',
+      });
+
+      await storage.createLenderChecklist({
+        lenderTransactionId: lenderTx.id,
+        items: [],
+      });
+
+      for (const mapping of DEFAULT_CHECKLIST_MAPPINGS) {
+        await storage.createLenderChecklistMapping({
+          lenderTransactionId: lenderTx.id,
+          lenderChecklistItemId: mapping.lenderItemId,
+          agentTransactionId: transaction.id,
+          agentChecklistItemId: mapping.agentItemId,
+        });
+      }
+
+      res.status(201).json(lenderTx);
+    } catch (error) {
+      console.error('Error inviting lender:', error);
+      res.status(500).json({ error: 'Failed to invite lender' });
+    }
+  });
+
+  app.get("/api/transactions/:id/lender-status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+      const transaction = await storage.getTransaction(Number(req.params.id));
+      if (!transaction) return res.status(404).json({ error: 'Not found' });
+      if (transaction.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+      const lenderTx = await storage.getLenderTransactionByAgentTransaction(transaction.id);
+      if (!lenderTx) return res.json({ linked: false });
+
+      const lender = await storage.getUser(lenderTx.lenderId);
+      const checklist = await storage.getLenderChecklist(lenderTx.id);
+      const items = (checklist?.items as any[]) || [];
+      const completed = items.filter((i: any) => i.completed).length;
+      const total = items.length;
+
+      res.json({
+        linked: true,
+        lenderName: lender ? `${lender.firstName} ${lender.lastName}` : 'Unknown',
+        status: lenderTx.status,
+        loanType: lenderTx.loanType,
+        loanAmount: lenderTx.loanAmount,
+        interestRate: lenderTx.interestRate,
+        checklistProgress: total > 0 ? Math.round((completed / total) * 100) : 0,
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch lender status' });
+    }
+  });
+
+  app.get("/api/lenders", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'agent') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const { db } = await import('./db');
+      const { sql: sqlTag } = await import('drizzle-orm/sql');
+      const result = await db.execute(sqlTag`SELECT id, first_name, last_name, email FROM users WHERE role = 'lender' ORDER BY first_name`);
+      res.json(result.rows);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch lenders' });
+    }
+  });
+
   // Simple ping endpoint for health checks
   app.get("/ping", (req, res) => {
     res.json({ 

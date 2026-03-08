@@ -56,6 +56,25 @@ function getNavItems(role: string | undefined): { primary: NavItem[]; overflow: 
     };
   }
 
+  if (role === "lender") {
+    return {
+      primary: [
+        { icon: FileText, label: "Pipeline", href: "/lender-portal" },
+        { icon: Store, label: "Pros", href: "/marketplace" },
+        { icon: MessageSquare, label: "Messages", href: "/messages" },
+        { icon: Search, label: "Search", href: "/property-search" },
+      ],
+      overflow: [
+        { icon: HardHat, label: "My Team", href: "/my-team" },
+        { icon: Home, label: "MyHome", href: "/my-home" },
+        { icon: Star, label: "Find Agents", href: "/top-agents" },
+        { icon: Calendar, label: "Calendar", href: "/calendar" },
+        { icon: CreditCard, label: "Billing", href: "/billing" },
+        { icon: Calculator, label: "Calculators", href: "/calculators" },
+      ],
+    };
+  }
+
   if (role === "client") {
     return {
       primary: [

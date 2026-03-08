@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -17,6 +17,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 
 export default function TransactionPage() {
@@ -99,6 +101,71 @@ export default function TransactionPage() {
       toast({ title: "Error updating transaction", description: error.message, variant: "destructive" });
     },
   });
+
+  const isAgent = user?.role === 'agent';
+  const [showInviteLender, setShowInviteLender] = useState(false);
+  const [selectedLenderId, setSelectedLenderId] = useState<string>("");
+
+  const { data: lenderStatus } = useQuery<{
+    linked: boolean;
+    lenderName?: string;
+    status?: string;
+    loanType?: string;
+    loanAmount?: number;
+    interestRate?: number;
+    checklistProgress?: number;
+  }>({
+    queryKey: ["/api/transactions", parsedId, "lender-status"],
+    queryFn: async () => {
+      const res = await fetch(`/api/transactions/${parsedId}/lender-status`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!parsedId && isAgent,
+  });
+
+  const { data: lenders } = useQuery<Array<{ id: number; first_name: string; last_name: string; email: string }>>({
+    queryKey: ["/api/lenders"],
+    enabled: isAgent && showInviteLender,
+  });
+
+  const inviteLenderMutation = useMutation({
+    mutationFn: async (lenderId: number) => {
+      const res = await apiRequest("POST", `/api/transactions/${parsedId}/invite-lender`, { lenderId });
+      if (!res.ok) throw new Error("Failed to invite lender");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId, "lender-status"] });
+      setShowInviteLender(false);
+      toast({ title: "Lender invited successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error inviting lender", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const LENDER_STATUS_LABELS: Record<string, string> = {
+    invited: "Invited",
+    under_contract: "Under Contract",
+    processing: "Processing",
+    underwriting: "Underwriting",
+    conditions_clearing: "Conditions Clearing",
+    clear_to_close: "Clear to Close",
+    closed: "Closed",
+    on_hold: "On Hold",
+  };
+
+  const LENDER_STATUS_COLORS: Record<string, string> = {
+    invited: "bg-blue-100 text-blue-800",
+    under_contract: "bg-yellow-100 text-yellow-800",
+    processing: "bg-orange-100 text-orange-800",
+    underwriting: "bg-purple-100 text-purple-800",
+    conditions_clearing: "bg-amber-100 text-amber-800",
+    clear_to_close: "bg-green-100 text-green-800",
+    closed: "bg-emerald-100 text-emerald-800",
+    on_hold: "bg-gray-100 text-gray-800",
+  };
 
   const handleSave = () => {
     const updateData: Record<string, unknown> = {
@@ -299,6 +366,91 @@ export default function TransactionPage() {
           </div>
         </CardContent>
       </Card>
+
+      {isAgent && (
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Landmark className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold">Lender</span>
+              </div>
+              {!lenderStatus?.linked && (
+                <Button variant="outline" size="sm" onClick={() => setShowInviteLender(true)}>
+                  <UserCheck className="h-3.5 w-3.5 mr-1.5" />
+                  Invite Lender
+                </Button>
+              )}
+            </div>
+            {lenderStatus?.linked ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    {lenderStatus.lenderName}
+                  </span>
+                  <Badge className={LENDER_STATUS_COLORS[lenderStatus.status || 'invited']}>
+                    {LENDER_STATUS_LABELS[lenderStatus.status || 'invited']}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  {lenderStatus.loanType && <span className="capitalize">{lenderStatus.loanType}</span>}
+                  {lenderStatus.loanAmount && <span>${(lenderStatus.loanAmount).toLocaleString()}</span>}
+                  {lenderStatus.interestRate && <span>{lenderStatus.interestRate}%</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Progress value={lenderStatus.checklistProgress || 0} className="flex-1 h-2" />
+                  <span className="text-xs text-muted-foreground">{lenderStatus.checklistProgress || 0}%</span>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <RefreshCw className="h-3 w-3" />
+                  <span>Checklist items sync automatically with lender</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No lender linked to this transaction yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={showInviteLender} onOpenChange={setShowInviteLender}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite Lender</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Select a lender to link to this transaction. The lender will receive pre-populated loan details and a synced checklist.
+            </p>
+            <Select value={selectedLenderId} onValueChange={setSelectedLenderId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a lender..." />
+              </SelectTrigger>
+              <SelectContent>
+                {lenders?.map((l: any) => (
+                  <SelectItem key={l.id} value={String(l.id)}>
+                    {l.first_name} {l.last_name} ({l.email})
+                  </SelectItem>
+                ))}
+                {(!lenders || lenders.length === 0) && (
+                  <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                    No lenders registered yet. Have your lender create an account first.
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInviteLender(false)}>Cancel</Button>
+            <Button
+              onClick={() => selectedLenderId && inviteLenderMutation.mutate(Number(selectedLenderId))}
+              disabled={!selectedLenderId || inviteLenderMutation.isPending}
+            >
+              {inviteLenderMutation.isPending ? "Inviting..." : "Invite Lender"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Tabs defaultValue="progress" className="w-full">
         <TabsList>

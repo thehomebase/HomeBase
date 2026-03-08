@@ -172,12 +172,12 @@ export function setupAuth(app: Express) {
         password: await hashPassword(req.body.password),
         firstName: req.body.firstName,
         lastName: req.body.lastName,
-        role: ['agent', 'client', 'vendor'].includes(req.body.role) ? req.body.role : 'client'
+        role: ['agent', 'client', 'vendor', 'lender'].includes(req.body.role) ? req.body.role : 'client'
       });
 
       console.log('User created successfully:', { id: user.id, email: user.email });
 
-      if (referralCodeRecord) {
+      if (referralCodeRecord && user.role !== 'lender') {
         try {
           await storage.createReferralCredit({
             userId: referralCodeRecord.agentUserId,

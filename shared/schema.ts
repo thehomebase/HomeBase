@@ -840,3 +840,56 @@ export type VendorLead = typeof vendorLeads.$inferSelect;
 export type InsertVendorLead = z.infer<typeof insertVendorLeadSchema>;
 export type VendorLeadRotation = typeof vendorLeadRotations.$inferSelect;
 export type InsertVendorLeadRotation = z.infer<typeof insertVendorLeadRotationSchema>;
+
+export const lenderTransactions = pgTable("lender_transactions", {
+  id: serial("id").primaryKey(),
+  lenderId: integer("lender_id").notNull(),
+  borrowerName: text("borrower_name").notNull(),
+  borrowerEmail: text("borrower_email"),
+  borrowerPhone: text("borrower_phone"),
+  propertyAddress: text("property_address"),
+  loanAmount: integer("loan_amount"),
+  loanType: text("loan_type").default("conventional"),
+  interestRate: doublePrecision("interest_rate"),
+  status: text("status").default("invited").notNull(),
+  notes: text("notes"),
+  agentId: integer("agent_id"),
+  agentTransactionId: integer("agent_transaction_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const lenderChecklists = pgTable("lender_checklists", {
+  id: serial("id").primaryKey(),
+  lenderTransactionId: integer("lender_transaction_id").notNull(),
+  items: json("items").$type<Array<{ id: string; text: string; completed: boolean; phase: string }>>().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const lenderChecklistMappings = pgTable("lender_checklist_mappings", {
+  id: serial("id").primaryKey(),
+  lenderTransactionId: integer("lender_transaction_id").notNull(),
+  lenderChecklistItemId: text("lender_checklist_item_id").notNull(),
+  agentTransactionId: integer("agent_transaction_id").notNull(),
+  agentChecklistItemId: text("agent_checklist_item_id").notNull(),
+});
+
+export const insertLenderTransactionSchema = createInsertSchema(lenderTransactions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertLenderChecklistSchema = createInsertSchema(lenderChecklists).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertLenderChecklistMappingSchema = createInsertSchema(lenderChecklistMappings).omit({
+  id: true,
+});
+
+export type LenderTransaction = typeof lenderTransactions.$inferSelect;
+export type InsertLenderTransaction = z.infer<typeof insertLenderTransactionSchema>;
+export type LenderChecklist = typeof lenderChecklists.$inferSelect;
+export type InsertLenderChecklist = z.infer<typeof insertLenderChecklistSchema>;
+export type LenderChecklistMapping = typeof lenderChecklistMappings.$inferSelect;
+export type InsertLenderChecklistMapping = z.infer<typeof insertLenderChecklistMappingSchema>;

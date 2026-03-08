@@ -65,6 +65,8 @@ import PropertySearchPage from "@/pages/property-search-page";
 import MailPage from "@/pages/mail-page";
 import ClientTransactionPage from "@/pages/client-transaction-page";
 import VendorPortal from "@/pages/vendor-portal";
+import LenderPortal from "@/pages/lender-portal";
+import LenderTransactionPage from "@/pages/lender-transaction-page";
 import InspectionReviewPage from "@/pages/inspection-review-page";
 import BidComparisonPage from "@/pages/bid-comparison-page";
 import MyHomePage from "@/pages/my-home-page";
@@ -123,6 +125,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
   const isClient = user?.role === 'client';
   const isVendor = user?.role === 'vendor';
+  const isLender = user?.role === 'lender';
   const { newLeadCount } = useLeadAlerts();
 
   // Update sidebar state when mobile status changes
@@ -190,6 +193,16 @@ function Layout({ children }: { children: React.ReactNode }) {
                         </SidebarMenuItem>
                       </>
                     )}
+                    {isLender && (
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Loan Pipeline">
+                          <Link href="/lender-portal" className="flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            {isSidebarOpen && <span>Loan Pipeline</span>}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )}
                     {isClient && (
                       <SidebarMenuItem>
                         <SidebarMenuButton asChild tooltip="My Transaction">
@@ -200,7 +213,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     )}
-                    {!isClient && !isVendor && (
+                    {!isClient && !isVendor && !isLender && (
                       <>
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Transactions">
@@ -487,6 +500,21 @@ function Router() {
           </Route>
           <Route path="/">
             <ProtectedRoute path="/" component={VendorPortal} />
+          </Route>
+        </>
+      ) : user?.role === "lender" ? (
+        <>
+          <Route path="/lender-portal">
+            <ProtectedRoute path="/lender-portal" component={LenderPortal} />
+          </Route>
+          <Route path="/lender-transaction/:id">
+            <ProtectedRoute path="/lender-transaction/:id" component={LenderTransactionPage} />
+          </Route>
+          <Route path="/billing">
+            <ProtectedRoute path="/billing" component={BillingPage} />
+          </Route>
+          <Route path="/">
+            <ProtectedRoute path="/" component={LenderPortal} />
           </Route>
         </>
       ) : user?.role === "agent" ? (

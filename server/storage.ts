@@ -49,6 +49,9 @@ import {
   type VendorZipCode, type InsertVendorZipCode,
   type VendorLead, type InsertVendorLead,
   type VendorLeadRotation, type InsertVendorLeadRotation,
+  type LenderTransaction, type InsertLenderTransaction,
+  type LenderChecklist, type InsertLenderChecklist,
+  type LenderChecklistMapping, type InsertLenderChecklistMapping,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -350,6 +353,20 @@ export interface IStorage {
 
   getAgentResponseMetrics(agentId: number): Promise<{ avgResponseMs: number; fastestMs: number; slowestMs: number; totalResponded: number; responseRate: number }>;
   getVendorResponseMetrics(vendorId: number): Promise<{ avgResponseMs: number; fastestMs: number; slowestMs: number; totalResponded: number; responseRate: number }>;
+
+  createLenderTransaction(data: InsertLenderTransaction): Promise<LenderTransaction>;
+  getLenderTransaction(id: number): Promise<LenderTransaction | undefined>;
+  getLenderTransactionsByLender(lenderId: number): Promise<LenderTransaction[]>;
+  getLenderTransactionByAgentTransaction(agentTransactionId: number): Promise<LenderTransaction | undefined>;
+  updateLenderTransaction(id: number, data: Partial<LenderTransaction>): Promise<LenderTransaction>;
+  deleteLenderTransaction(id: number): Promise<void>;
+
+  createLenderChecklist(data: InsertLenderChecklist): Promise<LenderChecklist>;
+  getLenderChecklist(lenderTransactionId: number): Promise<LenderChecklist | undefined>;
+  updateLenderChecklist(id: number, items: any[]): Promise<LenderChecklist>;
+
+  getLenderChecklistMappings(lenderTransactionId: number): Promise<LenderChecklistMapping[]>;
+  createLenderChecklistMapping(data: InsertLenderChecklistMapping): Promise<LenderChecklistMapping>;
 
 }
 
@@ -4433,6 +4450,132 @@ export class DatabaseStorage implements IStorage {
       totalResponded,
       responseRate: totalAssigned > 0 ? (totalResponded / totalAssigned) * 100 : 0,
     };
+  }
+
+  private LENDER_CHECKLIST_ITEMS: ChecklistItem[] = [
+    { id: "l-inv-1", text: "Pre-qualification letter issued", completed: false, phase: "Invited / Pre-Contract" },
+    { id: "l-inv-2", text: "Initial application started", completed: false, phase: "Invited / Pre-Contract" },
+    { id: "l-inv-3", text: "Credit report pulled", completed: false, phase: "Invited / Pre-Contract" },
+    { id: "l-inv-4", text: "Income documents requested", completed: false, phase: "Invited / Pre-Contract" },
+
+    { id: "l-uc-1", text: "Purchase contract received", completed: false, phase: "Under Contract" },
+    { id: "l-uc-2", text: "Full application (1003/URLA) submitted", completed: false, phase: "Under Contract" },
+    { id: "l-uc-3", text: "Disclosures sent", completed: false, phase: "Under Contract" },
+    { id: "l-uc-4", text: "Processing fee collected", completed: false, phase: "Under Contract" },
+
+    { id: "l-proc-1", text: "Income verification (VoE) completed", completed: false, phase: "Processing" },
+    { id: "l-proc-2", text: "Bank statements verified", completed: false, phase: "Processing" },
+    { id: "l-proc-3", text: "Appraisal ordered", completed: false, phase: "Processing" },
+    { id: "l-proc-4", text: "Title search ordered", completed: false, phase: "Processing" },
+    { id: "l-proc-5", text: "Insurance binder requested", completed: false, phase: "Processing" },
+    { id: "l-proc-6", text: "Tax transcripts ordered", completed: false, phase: "Processing" },
+
+    { id: "l-uw-1", text: "File submitted to underwriter", completed: false, phase: "Underwriting" },
+    { id: "l-uw-2", text: "Credit/capacity/collateral analysis complete", completed: false, phase: "Underwriting" },
+    { id: "l-uw-3", text: "Conditional approval issued", completed: false, phase: "Underwriting" },
+    { id: "l-uw-4", text: "Conditions list sent to borrower", completed: false, phase: "Underwriting" },
+
+    { id: "l-cc-1", text: "Conditions documents received", completed: false, phase: "Conditions Clearing" },
+    { id: "l-cc-2", text: "Updated paystub/bank statement received", completed: false, phase: "Conditions Clearing" },
+    { id: "l-cc-3", text: "Explanation letters received", completed: false, phase: "Conditions Clearing" },
+    { id: "l-cc-4", text: "Final review submitted", completed: false, phase: "Conditions Clearing" },
+    { id: "l-cc-5", text: "Clear-to-close issued", completed: false, phase: "Conditions Clearing" },
+
+    { id: "l-ctc-1", text: "Closing disclosure prepared", completed: false, phase: "Clear to Close" },
+    { id: "l-ctc-2", text: "CD sent to borrower (3-day waiting period)", completed: false, phase: "Clear to Close" },
+    { id: "l-ctc-3", text: "Wire instructions confirmed", completed: false, phase: "Clear to Close" },
+    { id: "l-ctc-4", text: "Closing date confirmed with title", completed: false, phase: "Clear to Close" },
+    { id: "l-ctc-5", text: "Final walkthrough confirmed", completed: false, phase: "Clear to Close" },
+
+    { id: "l-cl-1", text: "Loan funded", completed: false, phase: "Closed" },
+    { id: "l-cl-2", text: "Closing documents recorded", completed: false, phase: "Closed" },
+    { id: "l-cl-3", text: "First payment date set", completed: false, phase: "Closed" },
+    { id: "l-cl-4", text: "File archived", completed: false, phase: "Closed" },
+  ];
+
+  async createLenderTransaction(data: InsertLenderTransaction): Promise<LenderTransaction> {
+    const result = await db.execute(sql`
+      INSERT INTO lender_transactions (lender_id, borrower_name, borrower_email, borrower_phone, property_address, loan_amount, loan_type, interest_rate, status, notes, agent_id, agent_transaction_id)
+      VALUES (${data.lenderId}, ${data.borrowerName}, ${data.borrowerEmail ?? null}, ${data.borrowerPhone ?? null}, ${data.propertyAddress ?? null}, ${data.loanAmount ?? null}, ${data.loanType ?? 'conventional'}, ${data.interestRate ?? null}, ${data.status ?? 'invited'}, ${data.notes ?? null}, ${data.agentId ?? null}, ${data.agentTransactionId ?? null})
+      RETURNING *
+    `);
+    return result.rows[0] as LenderTransaction;
+  }
+
+  async getLenderTransaction(id: number): Promise<LenderTransaction | undefined> {
+    const result = await db.execute(sql`SELECT * FROM lender_transactions WHERE id = ${id}`);
+    return result.rows[0] as LenderTransaction | undefined;
+  }
+
+  async getLenderTransactionsByLender(lenderId: number): Promise<LenderTransaction[]> {
+    const result = await db.execute(sql`SELECT * FROM lender_transactions WHERE lender_id = ${lenderId} ORDER BY updated_at DESC`);
+    return result.rows as LenderTransaction[];
+  }
+
+  async getLenderTransactionByAgentTransaction(agentTransactionId: number): Promise<LenderTransaction | undefined> {
+    const result = await db.execute(sql`SELECT * FROM lender_transactions WHERE agent_transaction_id = ${agentTransactionId} LIMIT 1`);
+    return result.rows[0] as LenderTransaction | undefined;
+  }
+
+  async updateLenderTransaction(id: number, data: Partial<LenderTransaction>): Promise<LenderTransaction> {
+    if (data.borrowerName !== undefined) await db.execute(sql`UPDATE lender_transactions SET borrower_name = ${data.borrowerName} WHERE id = ${id}`);
+    if (data.borrowerEmail !== undefined) await db.execute(sql`UPDATE lender_transactions SET borrower_email = ${data.borrowerEmail} WHERE id = ${id}`);
+    if (data.borrowerPhone !== undefined) await db.execute(sql`UPDATE lender_transactions SET borrower_phone = ${data.borrowerPhone} WHERE id = ${id}`);
+    if (data.propertyAddress !== undefined) await db.execute(sql`UPDATE lender_transactions SET property_address = ${data.propertyAddress} WHERE id = ${id}`);
+    if (data.loanAmount !== undefined) await db.execute(sql`UPDATE lender_transactions SET loan_amount = ${data.loanAmount} WHERE id = ${id}`);
+    if (data.loanType !== undefined) await db.execute(sql`UPDATE lender_transactions SET loan_type = ${data.loanType} WHERE id = ${id}`);
+    if (data.interestRate !== undefined) await db.execute(sql`UPDATE lender_transactions SET interest_rate = ${data.interestRate} WHERE id = ${id}`);
+    if (data.status !== undefined) await db.execute(sql`UPDATE lender_transactions SET status = ${data.status} WHERE id = ${id}`);
+    if (data.notes !== undefined) await db.execute(sql`UPDATE lender_transactions SET notes = ${data.notes} WHERE id = ${id}`);
+    if (data.agentId !== undefined) await db.execute(sql`UPDATE lender_transactions SET agent_id = ${data.agentId} WHERE id = ${id}`);
+    if (data.agentTransactionId !== undefined) await db.execute(sql`UPDATE lender_transactions SET agent_transaction_id = ${data.agentTransactionId} WHERE id = ${id}`);
+    await db.execute(sql`UPDATE lender_transactions SET updated_at = NOW() WHERE id = ${id}`);
+    const result = await db.execute(sql`SELECT * FROM lender_transactions WHERE id = ${id}`);
+    return result.rows[0] as LenderTransaction;
+  }
+
+  async deleteLenderTransaction(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM lender_checklist_mappings WHERE lender_transaction_id = ${id}`);
+    await db.execute(sql`DELETE FROM lender_checklists WHERE lender_transaction_id = ${id}`);
+    await db.execute(sql`DELETE FROM lender_transactions WHERE id = ${id}`);
+  }
+
+  async createLenderChecklist(data: InsertLenderChecklist): Promise<LenderChecklist> {
+    const items = (data.items && Array.isArray(data.items) && data.items.length > 0) ? data.items : this.LENDER_CHECKLIST_ITEMS;
+    const itemsJson = JSON.stringify(items);
+    const result = await db.execute(sql`
+      INSERT INTO lender_checklists (lender_transaction_id, items)
+      VALUES (${data.lenderTransactionId}, ${itemsJson}::json)
+      RETURNING *
+    `);
+    return result.rows[0] as LenderChecklist;
+  }
+
+  async getLenderChecklist(lenderTransactionId: number): Promise<LenderChecklist | undefined> {
+    const result = await db.execute(sql`SELECT * FROM lender_checklists WHERE lender_transaction_id = ${lenderTransactionId}`);
+    return result.rows[0] as LenderChecklist | undefined;
+  }
+
+  async updateLenderChecklist(id: number, items: any[]): Promise<LenderChecklist> {
+    const itemsJson = JSON.stringify(items);
+    const result = await db.execute(sql`
+      UPDATE lender_checklists SET items = ${itemsJson}::json WHERE id = ${id} RETURNING *
+    `);
+    return result.rows[0] as LenderChecklist;
+  }
+
+  async getLenderChecklistMappings(lenderTransactionId: number): Promise<LenderChecklistMapping[]> {
+    const result = await db.execute(sql`SELECT * FROM lender_checklist_mappings WHERE lender_transaction_id = ${lenderTransactionId}`);
+    return result.rows as LenderChecklistMapping[];
+  }
+
+  async createLenderChecklistMapping(data: InsertLenderChecklistMapping): Promise<LenderChecklistMapping> {
+    const result = await db.execute(sql`
+      INSERT INTO lender_checklist_mappings (lender_transaction_id, lender_checklist_item_id, agent_transaction_id, agent_checklist_item_id)
+      VALUES (${data.lenderTransactionId}, ${data.lenderChecklistItemId}, ${data.agentTransactionId}, ${data.agentChecklistItemId})
+      RETURNING *
+    `);
+    return result.rows[0] as LenderChecklistMapping;
   }
 
 }
