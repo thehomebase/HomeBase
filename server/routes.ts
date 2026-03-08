@@ -908,7 +908,9 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (!["agent", "vendor", "lender"].includes(req.user.role)) return res.sendStatus(403);
     try {
-      const metrics = await storage.getCommunicationMetrics(req.user.id);
+      const parsedContactId = req.query.contactId ? parseInt(req.query.contactId as string) : undefined;
+      const contactId = parsedContactId && Number.isFinite(parsedContactId) ? parsedContactId : undefined;
+      const metrics = await storage.getCommunicationMetrics(req.user.id, contactId);
       res.json(metrics);
     } catch (error) {
       console.error('Error fetching communication metrics:', error);

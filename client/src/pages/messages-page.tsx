@@ -9,7 +9,8 @@ import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Lock, Send, Plus, Search, ArrowLeft, ShieldCheck, MessageSquare, Check, CheckCheck, Mail, Phone, BarChart3, Users, TrendingUp } from "lucide-react";
+import { Lock, Send, Plus, Search, ArrowLeft, ShieldCheck, MessageSquare, Check, CheckCheck, Mail, Phone, BarChart3, Users, TrendingUp, ChevronDown, Activity } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 
 interface Conversation {
   userId: number;
@@ -47,6 +48,7 @@ interface MetricsData {
   sms: { today: number; thisWeek: number; thisMonth: number; total: number; uniqueContacts: number };
   email: { today: number; thisWeek: number; thisMonth: number; total: number };
   privateMessages: { today: number; thisWeek: number; thisMonth: number; total: number; uniqueRecipients: number };
+  hourlyActivity?: { hour: number; count: number }[];
 }
 
 const roleColors: Record<string, string> = {
@@ -81,6 +83,62 @@ function getDateLabel(ts: string): string {
   return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
 }
 
+function formatHour(h: number) {
+  if (h === 0) return "12a";
+  if (h < 12) return `${h}a`;
+  if (h === 12) return "12p";
+  return `${h - 12}p`;
+}
+
+function ContactActivityChart({ metrics }: { metrics: MetricsData }) {
+  const hourly = metrics.hourlyActivity || [];
+  const total = hourly.reduce((s, h) => s + h.count, 0);
+  const chartData = hourly.map(h => ({ name: formatHour(h.hour), count: h.count }));
+
+  return (
+    <Card className="p-3 mb-3">
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <div className="text-sm font-semibold">Activity</div>
+          <div className="text-[11px] text-muted-foreground">Messages & communications today</div>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-bold">{total}</div>
+          <div className="text-[10px] text-muted-foreground uppercase font-medium">Total</div>
+        </div>
+      </div>
+      <div className="h-[100px] mt-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+            <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={3} />
+            <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
+            <Tooltip
+              contentStyle={{ fontSize: 11, borderRadius: 8 }}
+              labelFormatter={(l) => `${l}`}
+              formatter={(v: number) => [v, "Activity"]}
+            />
+            <Bar dataKey="count" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t">
+        <div className="text-center">
+          <div className="text-xs font-semibold">{metrics.privateMessages.total}</div>
+          <div className="text-[10px] text-muted-foreground">Messages</div>
+        </div>
+        <div className="text-center">
+          <div className="text-xs font-semibold">{metrics.sms.total}</div>
+          <div className="text-[10px] text-muted-foreground">SMS</div>
+        </div>
+        <div className="text-center">
+          <div className="text-xs font-semibold">{metrics.email.total}</div>
+          <div className="text-[10px] text-muted-foreground">Emails</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export default function MessagesPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -90,6 +148,9 @@ export default function MessagesPage() {
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [showMetrics, setShowMetrics] = useState(false);
+  const [metricsContactId, setMetricsContactId] = useState<number | null>(null);
+  const [showContactFilter, setShowContactFilter] = useState(false);
+  const [showChatStats, setShowChatStats] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: conversations = [], isLoading: convLoading } = useQuery<Conversation[]>({
@@ -121,13 +182,28 @@ export default function MessagesPage() {
     enabled: !!user && newChatOpen,
   });
 
+  const canSeeMetrics = !!user && (user.role === "agent" || user.role === "vendor" || user.role === "lender");
+
+  const metricsUrl = metricsContactId
+    ? `/api/communications/metrics?contactId=${metricsContactId}`
+    : "/api/communications/metrics";
+
   const { data: metrics } = useQuery<MetricsData>({
-    queryKey: ["/api/communications/metrics"],
+    queryKey: ["/api/communications/metrics", metricsContactId],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/communications/metrics");
+      const res = await apiRequest("GET", metricsUrl);
       return res.json();
     },
-    enabled: !!user && (user.role === "agent" || user.role === "vendor" || user.role === "lender"),
+    enabled: canSeeMetrics,
+  });
+
+  const { data: chatContactMetrics } = useQuery<MetricsData>({
+    queryKey: ["/api/communications/metrics", "chat", activeConversation],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/communications/metrics?contactId=${activeConversation}`);
+      return res.json();
+    },
+    enabled: canSeeMetrics && !!activeConversation && showChatStats,
   });
 
   const sendMutation = useMutation({
@@ -191,6 +267,10 @@ export default function MessagesPage() {
     }
   }
 
+  const selectedContact = metricsContactId
+    ? conversations.find(c => c.userId === metricsContactId)
+    : null;
+
   return (
     <main className="container mx-auto px-4 py-4 md:py-8 h-[calc(100vh-120px)] md:h-[calc(100vh-80px)]">
       <div className="flex items-center gap-3 mb-4">
@@ -203,7 +283,7 @@ export default function MessagesPage() {
         {totalUnread > 0 && (
           <Badge variant="destructive" className="ml-auto">{totalUnread} unread</Badge>
         )}
-        {metrics && (
+        {canSeeMetrics && (
           <Button
             variant="outline"
             size="sm"
@@ -217,62 +297,153 @@ export default function MessagesPage() {
       </div>
 
       {showMetrics && metrics && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <Card className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <MessageSquare className="h-4 w-4 text-primary" />
-              <span className="text-xs font-medium text-muted-foreground">Messages</span>
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filter by</span>
+            <div className="relative">
+              <button
+                onClick={() => setShowContactFilter(!showContactFilter)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg hover:bg-muted transition-colors"
+              >
+                <span className="font-medium">
+                  {selectedContact ? selectedContact.name : "All Contacts (Total)"}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              {showContactFilter && (
+                <div className="absolute top-full left-0 mt-1 w-64 bg-background border rounded-xl shadow-lg z-50 overflow-hidden">
+                  <div className="max-h-[250px] overflow-y-auto">
+                    <button
+                      onClick={() => {
+                        setMetricsContactId(null);
+                        setShowContactFilter(false);
+                      }}
+                      className={`w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors flex items-center gap-2 ${
+                        !metricsContactId ? "bg-primary/10 text-primary font-medium" : ""
+                      }`}
+                    >
+                      <Users className="h-4 w-4" />
+                      All Contacts (Total)
+                    </button>
+                    {conversations.map(conv => (
+                      <button
+                        key={conv.userId}
+                        onClick={() => {
+                          setMetricsContactId(conv.userId);
+                          setShowContactFilter(false);
+                        }}
+                        className={`w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors flex items-center gap-2 ${
+                          metricsContactId === conv.userId ? "bg-primary/10 text-primary font-medium" : ""
+                        }`}
+                      >
+                        <Avatar className="h-5 w-5">
+                          <AvatarFallback className="text-[9px]">{getInitials(conv.name)}</AvatarFallback>
+                        </Avatar>
+                        <span className="flex-1 truncate">{conv.name}</span>
+                        <Badge variant="outline" className={`text-[9px] px-1 py-0 ${roleColors[conv.role] || ""}`}>
+                          {conv.role}
+                        </Badge>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="text-2xl font-bold">{metrics.privateMessages.thisMonth}</div>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[11px] text-muted-foreground">Today: {metrics.privateMessages.today}</span>
-              <span className="text-[11px] text-muted-foreground">Week: {metrics.privateMessages.thisWeek}</span>
-            </div>
-            <div className="flex items-center gap-1 mt-1">
-              <Users className="h-3 w-3 text-muted-foreground" />
-              <span className="text-[11px] text-muted-foreground">{metrics.privateMessages.uniqueRecipients} contacts</span>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Phone className="h-4 w-4 text-blue-600" />
-              <span className="text-xs font-medium text-muted-foreground">SMS Sent</span>
-            </div>
-            <div className="text-2xl font-bold">{metrics.sms.thisMonth}</div>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[11px] text-muted-foreground">Today: {metrics.sms.today}</span>
-              <span className="text-[11px] text-muted-foreground">Week: {metrics.sms.thisWeek}</span>
-            </div>
-            <div className="flex items-center gap-1 mt-1">
-              <Users className="h-3 w-3 text-muted-foreground" />
-              <span className="text-[11px] text-muted-foreground">{metrics.sms.uniqueContacts} contacts</span>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Mail className="h-4 w-4 text-green-600" />
-              <span className="text-xs font-medium text-muted-foreground">Emails</span>
-            </div>
-            <div className="text-2xl font-bold">{metrics.email.thisMonth}</div>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[11px] text-muted-foreground">Today: {metrics.email.today}</span>
-              <span className="text-[11px] text-muted-foreground">Week: {metrics.email.thisWeek}</span>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="h-4 w-4 text-amber-600" />
-              <span className="text-xs font-medium text-muted-foreground">All-Time</span>
-            </div>
-            <div className="text-2xl font-bold">{metrics.privateMessages.total + metrics.sms.total + metrics.email.total}</div>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[11px] text-muted-foreground">Msgs: {metrics.privateMessages.total}</span>
-              <span className="text-[11px] text-muted-foreground">SMS: {metrics.sms.total}</span>
-            </div>
-            <div className="flex items-center gap-1 mt-1">
-              <span className="text-[11px] text-muted-foreground">Emails: {metrics.email.total}</span>
-            </div>
-          </Card>
+          </div>
+          <div className={`grid grid-cols-2 ${metricsContactId ? "md:grid-cols-3" : "md:grid-cols-4"} gap-3`}>
+            <Card className="p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <MessageSquare className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium text-muted-foreground">Messages</span>
+              </div>
+              <div className="text-2xl font-bold">{metrics.privateMessages.thisMonth}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[11px] text-muted-foreground">Today: {metrics.privateMessages.today}</span>
+                <span className="text-[11px] text-muted-foreground">Week: {metrics.privateMessages.thisWeek}</span>
+              </div>
+              {!metricsContactId && (
+                <div className="flex items-center gap-1 mt-1">
+                  <Users className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-[11px] text-muted-foreground">{metrics.privateMessages.uniqueRecipients} contacts</span>
+                </div>
+              )}
+            </Card>
+            <Card className="p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <Phone className="h-4 w-4 text-blue-600" />
+                <span className="text-xs font-medium text-muted-foreground">SMS Sent</span>
+              </div>
+              <div className="text-2xl font-bold">{metrics.sms.thisMonth}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[11px] text-muted-foreground">Today: {metrics.sms.today}</span>
+                <span className="text-[11px] text-muted-foreground">Week: {metrics.sms.thisWeek}</span>
+              </div>
+              {!metricsContactId && (
+                <div className="flex items-center gap-1 mt-1">
+                  <Users className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-[11px] text-muted-foreground">{metrics.sms.uniqueContacts} contacts</span>
+                </div>
+              )}
+            </Card>
+            {!metricsContactId && (
+              <Card className="p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Mail className="h-4 w-4 text-green-600" />
+                  <span className="text-xs font-medium text-muted-foreground">Emails</span>
+                </div>
+                <div className="text-2xl font-bold">{metrics.email.thisMonth}</div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[11px] text-muted-foreground">Today: {metrics.email.today}</span>
+                  <span className="text-[11px] text-muted-foreground">Week: {metrics.email.thisWeek}</span>
+                </div>
+              </Card>
+            )}
+            <Card className="p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="h-4 w-4 text-amber-600" />
+                <span className="text-xs font-medium text-muted-foreground">All-Time</span>
+              </div>
+              <div className="text-2xl font-bold">{metrics.privateMessages.total + metrics.sms.total + metrics.email.total}</div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[11px] text-muted-foreground">Msgs: {metrics.privateMessages.total}</span>
+                <span className="text-[11px] text-muted-foreground">SMS: {metrics.sms.total}</span>
+              </div>
+              {!metricsContactId && (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-[11px] text-muted-foreground">Emails: {metrics.email.total}</span>
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {metrics.hourlyActivity && (
+            <Card className="p-3 mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <div className="text-sm font-semibold">Activity</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {selectedContact ? `${selectedContact.name} — ` : ""}Messages & communications today
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold">
+                    {metrics.hourlyActivity.reduce((s, h) => s + h.count, 0)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground uppercase font-medium">Today</div>
+                </div>
+              </div>
+              <div className="h-[100px] mt-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={metrics.hourlyActivity.map(h => ({ name: formatHour(h.hour), count: h.count }))} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={3} />
+                    <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
+                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} formatter={(v: number) => [v, "Activity"]} />
+                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          )}
         </div>
       )}
 
@@ -427,9 +598,23 @@ export default function MessagesPage() {
                     <span className="text-[11px] text-green-600 font-medium">Encrypted</span>
                   </div>
                 </div>
+                {canSeeMetrics && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setShowChatStats(!showChatStats)}
+                    title="Contact activity"
+                  >
+                    <Activity className={`h-4 w-4 ${showChatStats ? "text-primary" : "text-muted-foreground"}`} />
+                  </Button>
+                )}
               </div>
 
               <ScrollArea className="flex-1 p-4">
+                {showChatStats && chatContactMetrics && (
+                  <ContactActivityChart metrics={chatContactMetrics} />
+                )}
                 {msgsLoading ? (
                   <div className="text-center text-sm text-muted-foreground py-8">Loading messages...</div>
                 ) : chatMessages.length === 0 ? (
@@ -535,6 +720,10 @@ export default function MessagesPage() {
           )}
         </Card>
       </div>
+
+      {showContactFilter && (
+        <div className="fixed inset-0 z-40" onClick={() => setShowContactFilter(false)} />
+      )}
     </main>
   );
 }

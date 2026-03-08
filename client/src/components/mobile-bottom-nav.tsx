@@ -26,6 +26,8 @@ import {
   X,
   Settings2,
   Check,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -145,6 +147,7 @@ export function MobileBottomNav() {
   const [location, setLocation] = useLocation();
   const [showMore, setShowMore] = useState(false);
   const [showCustomize, setShowCustomize] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
   const { newLeadCount } = useLeadAlerts();
 
   const [selectedIds, setSelectedIds] = useState<string[]>(() => loadSelectedIds(user?.role, user?.id));
@@ -287,6 +290,17 @@ export function MobileBottomNav() {
               ))}
             </div>
             <div className="p-3 border-t space-y-2">
+              <button
+                onClick={() => {
+                  const nowDark = document.documentElement.classList.toggle("dark");
+                  localStorage.setItem("theme", nowDark ? "dark" : "light");
+                  setIsDarkMode(nowDark);
+                }}
+                className="flex items-center gap-3 w-full p-3 rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-transform"
+              >
+                {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                <span className="text-sm">{isDarkMode ? "Light Mode" : "Dark Mode"}</span>
+              </button>
               <button
                 onClick={() => {
                   setShowMore(false);

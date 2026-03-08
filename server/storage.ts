@@ -1192,49 +1192,125 @@ export class DatabaseStorage implements IStorage {
     return Array.from(convMap.values());
   }
 
-  async getCommunicationMetrics(userId: number): Promise<any> {
+  async getCommunicationMetrics(userId: number, contactId?: number): Promise<any> {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).toISOString();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    const smsResult = await db.execute(sql`
-      SELECT 
-        COUNT(*) FILTER (WHERE created_at >= ${todayStart}::timestamp)::int as sms_today,
-        COUNT(*) FILTER (WHERE created_at >= ${weekStart}::timestamp)::int as sms_week,
-        COUNT(*) FILTER (WHERE created_at >= ${monthStart}::timestamp)::int as sms_month,
-        COUNT(*)::int as sms_total
-      FROM communications 
-      WHERE agent_id = ${userId} AND type = 'sms' AND status = 'sent'
-    `);
+    const smsResult = contactId
+      ? await db.execute(sql`
+          SELECT 
+            COUNT(*) FILTER (WHERE created_at >= ${todayStart}::timestamp)::int as sms_today,
+            COUNT(*) FILTER (WHERE created_at >= ${weekStart}::timestamp)::int as sms_week,
+            COUNT(*) FILTER (WHERE created_at >= ${monthStart}::timestamp)::int as sms_month,
+            COUNT(*)::int as sms_total
+          FROM communications 
+          WHERE agent_id = ${userId} AND type = 'sms' AND status = 'sent' AND client_id = ${contactId}
+        `)
+      : await db.execute(sql`
+          SELECT 
+            COUNT(*) FILTER (WHERE created_at >= ${todayStart}::timestamp)::int as sms_today,
+            COUNT(*) FILTER (WHERE created_at >= ${weekStart}::timestamp)::int as sms_week,
+            COUNT(*) FILTER (WHERE created_at >= ${monthStart}::timestamp)::int as sms_month,
+            COUNT(*)::int as sms_total
+          FROM communications 
+          WHERE agent_id = ${userId} AND type = 'sms' AND status = 'sent'
+        `);
 
-    const emailResult = await db.execute(sql`
-      SELECT 
-        COUNT(*) FILTER (WHERE sent_at >= ${todayStart}::timestamp)::int as email_today,
-        COUNT(*) FILTER (WHERE sent_at >= ${weekStart}::timestamp)::int as email_week,
-        COUNT(*) FILTER (WHERE sent_at >= ${monthStart}::timestamp)::int as email_month,
-        COUNT(*)::int as email_total
-      FROM email_tracking WHERE user_id = ${userId}
-    `);
+    const emailResult = contactId
+      ? await db.execute(sql`
+          SELECT 0::int as email_today, 0::int as email_week, 0::int as email_month, 0::int as email_total
+        `)
+      : await db.execute(sql`
+          SELECT 
+            COUNT(*) FILTER (WHERE sent_at >= ${todayStart}::timestamp)::int as email_today,
+            COUNT(*) FILTER (WHERE sent_at >= ${weekStart}::timestamp)::int as email_week,
+            COUNT(*) FILTER (WHERE sent_at >= ${monthStart}::timestamp)::int as email_month,
+            COUNT(*)::int as email_total
+          FROM email_tracking WHERE user_id = ${userId}
+        `);
 
-    const pmResult = await db.execute(sql`
-      SELECT 
-        COUNT(*) FILTER (WHERE timestamp >= ${todayStart})::int as pm_today,
-        COUNT(*) FILTER (WHERE timestamp >= ${weekStart})::int as pm_week,
-        COUNT(*) FILTER (WHERE timestamp >= ${monthStart})::int as pm_month,
-        COUNT(*)::int as pm_total
-      FROM private_messages WHERE sender_id = ${userId}
-    `);
+    const pmResult = contactId
+      ? await db.execute(sql`
+          SELECT 
+            COUNT(*) FILTER (WHERE timestamp >= ${todayStart})::int as pm_today,
+            COUNT(*) FILTER (WHERE timestamp >= ${weekStart})::int as pm_week,
+            COUNT(*) FILTER (WHERE timestamp >= ${monthStart})::int as pm_month,
+            COUNT(*)::int as pm_total
+          FROM private_messages WHERE sender_id = ${userId} AND recipient_id = ${contactId}
+        `)
+      : await db.execute(sql`
+          SELECT 
+            COUNT(*) FILTER (WHERE timestamp >= ${todayStart})::int as pm_today,
+            COUNT(*) FILTER (WHERE timestamp >= ${weekStart})::int as pm_week,
+            COUNT(*) FILTER (WHERE timestamp >= ${monthStart})::int as pm_month,
+            COUNT(*)::int as pm_total
+          FROM private_messages WHERE sender_id = ${userId}
+        `);
 
-    const recipientsResult = await db.execute(sql`
-      SELECT COUNT(DISTINCT recipient_id)::int as unique_recipients
-      FROM private_messages WHERE sender_id = ${userId}
-    `);
+    const recipientsResult = contactId
+      ? await db.execute(sql`
+          SELECT 1::int as unique_recipients
+        `)
+      : await db.execute(sql`
+          SELECT COUNT(DISTINCT recipient_id)::int as unique_recipients
+          FROM private_messages WHERE sender_id = ${userId}
+        `);
 
-    const smsRecipientsResult = await db.execute(sql`
-      SELECT COUNT(DISTINCT client_id)::int as unique_sms_contacts
-      FROM communications WHERE agent_id = ${userId} AND type = 'sms'
-    `);
+    const smsRecipientsResult = contactId
+      ? await db.execute(sql`
+          SELECT 1::int as unique_sms_contacts
+        `)
+      : await db.execute(sql`
+          SELECT COUNT(DISTINCT client_id)::int as unique_sms_contacts
+          FROM communications WHERE agent_id = ${userId} AND type = 'sms'
+        `);
+
+    const hourlyResult = contactId
+      ? await db.execute(sql`
+          SELECT 
+            EXTRACT(HOUR FROM timestamp)::int as hour,
+            COUNT(*)::int as count
+          FROM private_messages
+          WHERE ((sender_id = ${userId} AND recipient_id = ${contactId})
+              OR (sender_id = ${contactId} AND recipient_id = ${userId}))
+            AND timestamp >= ${todayStart}
+          GROUP BY hour
+          UNION ALL
+          SELECT 
+            EXTRACT(HOUR FROM created_at)::int as hour,
+            COUNT(*)::int as count
+          FROM communications
+          WHERE agent_id = ${userId} AND client_id = ${contactId} AND status = 'sent'
+            AND created_at >= ${todayStart}::timestamp
+          GROUP BY hour
+        `)
+      : await db.execute(sql`
+          SELECT 
+            EXTRACT(HOUR FROM timestamp)::int as hour,
+            COUNT(*)::int as count
+          FROM private_messages
+          WHERE sender_id = ${userId}
+            AND timestamp >= ${todayStart}
+          GROUP BY hour
+          UNION ALL
+          SELECT 
+            EXTRACT(HOUR FROM created_at)::int as hour,
+            COUNT(*)::int as count
+          FROM communications
+          WHERE agent_id = ${userId} AND status = 'sent'
+            AND created_at >= ${todayStart}::timestamp
+          GROUP BY hour
+        `);
+
+    const hourlyData: { hour: number; count: number }[] = Array.from({ length: 24 }, (_, i) => ({ hour: i, count: 0 }));
+    for (const row of hourlyResult.rows as any[]) {
+      const h = row.hour;
+      if (h >= 0 && h < 24) {
+        hourlyData[h].count += row.count;
+      }
+    }
 
     const sms = (smsResult.rows[0] as any) || {};
     const email = (emailResult.rows[0] as any) || {};
@@ -1261,6 +1337,7 @@ export class DatabaseStorage implements IStorage {
         total: pm.pm_total || 0,
         uniqueRecipients: (recipientsResult.rows[0] as any)?.unique_recipients || 0,
       },
+      hourlyActivity: hourlyData,
     };
   }
 
