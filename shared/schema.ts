@@ -21,7 +21,9 @@ export const users = pgTable("users", {
   agentId: integer("agent_id"),
   clientRecordId: integer("client_record_id"),
   claimedTransactionId: integer("claimed_transaction_id"),
-  claimedAccessCode: text("claimed_access_code")
+  claimedAccessCode: text("claimed_access_code"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
 });
 
 export const clients = pgTable("clients", {

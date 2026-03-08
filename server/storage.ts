@@ -226,6 +226,7 @@ export interface IStorage {
   getReferralCodeByCode(code: string): Promise<ReferralCode | undefined>;
   createReferralCredit(data: InsertReferralCredit): Promise<ReferralCredit>;
   getReferralCreditsByUser(userId: number): Promise<ReferralCredit[]>;
+  getReferralCreditsByReferralCode(referralCodeId: number): Promise<ReferralCredit[]>;
   applyReferralCredit(id: number): Promise<ReferralCredit>;
 
   // Marketplace operations
@@ -3398,6 +3399,13 @@ export class DatabaseStorage implements IStorage {
 
   async getReferralCreditsByUser(userId: number): Promise<ReferralCredit[]> {
     const result = await db.execute(sql`SELECT * FROM referral_credits WHERE user_id = ${userId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => ({
+      id: row.id, userId: row.user_id, type: row.type, referralCodeId: row.referral_code_id, referredUserId: row.referred_user_id, status: row.status, createdAt: row.created_at, appliedAt: row.applied_at
+    }));
+  }
+
+  async getReferralCreditsByReferralCode(referralCodeId: number): Promise<ReferralCredit[]> {
+    const result = await db.execute(sql`SELECT * FROM referral_credits WHERE referral_code_id = ${referralCodeId} ORDER BY created_at DESC`);
     return (result.rows as any[]).map(row => ({
       id: row.id, userId: row.user_id, type: row.type, referralCodeId: row.referral_code_id, referredUserId: row.referred_user_id, status: row.status, createdAt: row.created_at, appliedAt: row.applied_at
     }));

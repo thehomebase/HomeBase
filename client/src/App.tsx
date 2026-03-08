@@ -47,7 +47,8 @@ import {
   Mail,
   Gift,
   Store,
-  HardHat
+  HardHat,
+  CreditCard
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -67,6 +68,7 @@ import MyHomePage from "@/pages/my-home-page";
 import ReferralPage from "@/pages/referral-page";
 import MarketplacePage from "@/pages/marketplace-page";
 import MyTeamPage from "@/pages/my-team-page";
+import BillingPage from "@/pages/billing-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -240,6 +242,16 @@ function Layout({ children }: { children: React.ReactNode }) {
                         </SidebarMenuItem>
                       </>
                     )}
+                    {(user?.role === 'agent' || user?.role === 'vendor') && (
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Billing">
+                          <Link href="/billing" className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4" />
+                            {isSidebarOpen && <span>Billing</span>}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )}
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild tooltip="Calculators">
                         <Link href="/calculators" className="flex items-center gap-2">
@@ -343,6 +355,9 @@ function Router() {
           <Route path="/vendor">
             <ProtectedRoute path="/vendor" component={VendorPortal} />
           </Route>
+          <Route path="/billing">
+            <ProtectedRoute path="/billing" component={BillingPage} />
+          </Route>
           <Route path="/">
             <ProtectedRoute path="/" component={VendorPortal} />
           </Route>
@@ -381,6 +396,9 @@ function Router() {
           </Route>
           <Route path="/referrals">
             <ProtectedRoute path="/referrals" component={ReferralPage} />
+          </Route>
+          <Route path="/billing">
+            <ProtectedRoute path="/billing" component={BillingPage} />
           </Route>
           <Route path="/">
             <ProtectedRoute path="/" component={TransactionsPage} />

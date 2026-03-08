@@ -86,7 +86,7 @@ export default function ReferralPage() {
       <div>
         <h1 className="text-3xl font-bold">Referral Program</h1>
         <p className="text-muted-foreground mt-1">
-          Invite other agents to HomeBase and earn free credits for both of you.
+          Invite agents and vendors to HomeBase. When they sign up and add a payment method, you both get a free month.
         </p>
       </div>
 
@@ -139,7 +139,7 @@ export default function ReferralPage() {
             Your Referral Code
           </CardTitle>
           <CardDescription>
-            Share this code with other agents. When they sign up, you both get a free month of credit.
+            Share this code with agents or vendors. When they sign up and add a payment method, you both get a free month.
           </CardDescription>
         </CardHeader>
         <CardContent>
