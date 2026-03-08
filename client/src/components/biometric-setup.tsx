@@ -15,16 +15,6 @@ import {
 } from "@/components/ui/dialog";
 
 export function BiometricSetupButton({ compact = false }: { compact?: boolean }) {
-  const [available, setAvailable] = useState(false);
-
-  useEffect(() => {
-    if (window.PublicKeyCredential) {
-      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(setAvailable);
-    }
-  }, []);
-
-  if (!available) return null;
-
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -52,10 +42,27 @@ export function BiometricSetupButton({ compact = false }: { compact?: boolean })
 function BiometricSetupContent() {
   const { toast } = useToast();
   const [registering, setRegistering] = useState(false);
+  const [available, setAvailable] = useState(false);
+
+  useEffect(() => {
+    if (window.PublicKeyCredential) {
+      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(setAvailable);
+    }
+  }, []);
 
   const { data: credentials = [], isLoading } = useQuery({
     queryKey: ["/api/webauthn/credentials"],
   });
+
+  if (!available) {
+    return (
+      <div className="text-center py-4">
+        <p className="text-sm text-muted-foreground">
+          Biometric login is not available on this device or browser. Try opening the app in Safari (iPhone) or Chrome (Android) on your phone.
+        </p>
+      </div>
+    );
+  }
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
