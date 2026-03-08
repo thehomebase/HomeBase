@@ -103,6 +103,13 @@ const BUYER_CHECKLIST_ITEMS = [
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
+  app.get("/marketing-videos/:filename", (req, res) => {
+    const filename = req.params.filename.replace(/[^a-zA-Z0-9_\-\.]/g, "");
+    if (!filename.endsWith(".mp4")) return res.status(400).send("Invalid file");
+    const filePath = `${process.cwd()}/attached_assets/generated_videos/${filename}`;
+    res.sendFile(filePath);
+  });
+
   const rpName = "Home-Base";
   const getWebAuthnConfig = (req: any) => {
     const host = req.get("host") || "localhost:5000";
