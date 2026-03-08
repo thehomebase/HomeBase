@@ -1026,20 +1026,20 @@ export default function ClientsPage() {
   });
 
   return (
-    <main className="flex-1 min-w-0 px-4">
+    <main className="flex-1 min-w-0 px-4 overflow-x-hidden">
       <div className="w-full flex flex-wrap bg-background relative px-2 py-8">
         <div className="flex flex-col sm:flex-row w-full sm:items-center justify-between gap-2 mb-2">
           <h2 className="text-2xl font-bold dark:text-white">Client Management</h2>
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 min-w-[140px] sm:flex-none">
               <Input
                 type="text"
                 placeholder="Search clients..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="sm:w-60 md:w-80"
+                className="w-full sm:w-60 md:w-80 pr-10"
               />
-              <Search className="absolute right-3 top-2.5 h-5 w-5 text-muted-foreground" />
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

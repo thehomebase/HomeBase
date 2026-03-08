@@ -301,13 +301,13 @@ export default function TransactionsPage() {
   });
 
   return (
-    <main className="flex-1 min-w-0 px-4">
+    <main className="flex-1 min-w-0 px-4 overflow-x-hidden">
       <div className="w-full flex flex-wrap bg-background relative px-2 py-8">
         <div className="flex flex-col sm:flex-row w-full sm:items-center justify-between gap-2 mb-2">
           <h2 className="text-2xl font-bold">
             Your Transactions
           </h2>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-2 bg-muted/50 rounded-lg">
               <Toggle
                 pressed={view === "list"}
@@ -368,8 +368,8 @@ export default function TransactionsPage() {
             {user?.role === "agent" && (
               <Dialog open={showNewTransactionDialog} onOpenChange={setShowNewTransactionDialog}>
                 <DialogTrigger asChild>
-                  <Button className="whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
-                    <Plus className="h-4 w-4 mr-2" />
+                  <Button className="whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 font-bold" size="sm">
+                    <Plus className="h-4 w-4 mr-1" />
                     New Transaction
                   </Button>
                 </DialogTrigger>
@@ -569,17 +569,17 @@ export default function TransactionsPage() {
               highCount > 0 ? "border-orange-500/50 bg-orange-50 dark:bg-orange-950/20" :
               "border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20"
             )}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-start sm:items-center justify-between gap-2 mb-3">
+                <div className="flex flex-wrap items-center gap-2">
                   {criticalCount > 0 ? (
-                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" />
                   ) : (
-                    <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                    <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400 shrink-0" />
                   )}
                   <span className="font-semibold text-sm">
                     {totalAlerts} alert{totalAlerts !== 1 ? "s" : ""} across {alertsData.length} transaction{alertsData.length !== 1 ? "s" : ""}
                   </span>
-                  <div className="flex gap-1.5 ml-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {criticalCount > 0 && (
                       <span className="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">
                         {criticalCount} overdue
@@ -614,11 +614,11 @@ export default function TransactionsPage() {
                     onClick={() => setLocation(`/transactions/${txAlert.transactionId}`)}
                   >
                     <div className="flex-1 min-w-0">
-                      <span className="font-medium text-sm">{txAlert.streetName}</span>
-                      <span className="text-muted-foreground text-xs ml-2">
+                      <p className="font-medium text-sm truncate">{txAlert.streetName}</p>
+                      <p className="text-muted-foreground text-xs truncate">
                         {txAlert.alerts.length} alert{txAlert.alerts.length !== 1 ? "s" : ""}:
                         {" "}{txAlert.alerts.map(a => a.message).join("; ")}
-                      </span>
+                      </p>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
                   </div>

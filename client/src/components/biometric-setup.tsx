@@ -39,6 +39,25 @@ export function BiometricSetupButton({ compact = false }: { compact?: boolean })
   );
 }
 
+export function BiometricSetupDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5" />
+            Biometric Login
+          </DialogTitle>
+          <DialogDescription>
+            Set up Face ID, fingerprint, or other biometric authentication for quick sign-in.
+          </DialogDescription>
+        </DialogHeader>
+        <BiometricSetupContent />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function BiometricSetupContent() {
   const { toast } = useToast();
   const [registering, setRegistering] = useState(false);

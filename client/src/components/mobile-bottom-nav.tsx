@@ -6,6 +6,7 @@ import {
   MessageSquare,
   Search,
   MoreHorizontal,
+  Fingerprint,
   Home,
   Wrench,
   BarChart3,
@@ -26,7 +27,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { BiometricSetupButton } from "@/components/biometric-setup";
+import { BiometricSetupDialog } from "@/components/biometric-setup";
 
 interface NavItem {
   icon: LucideIcon;
@@ -104,6 +105,7 @@ export function MobileBottomNav() {
   const { user, logoutMutation } = useAuth();
   const [location] = useLocation();
   const [showMore, setShowMore] = useState(false);
+  const [showBiometric, setShowBiometric] = useState(false);
 
   if (!user) return null;
 
@@ -149,7 +151,16 @@ export function MobileBottomNav() {
               ))}
             </div>
             <div className="p-3 border-t space-y-2">
-              <BiometricSetupButton />
+              <button
+                onClick={() => {
+                  setShowMore(false);
+                  setTimeout(() => setShowBiometric(true), 150);
+                }}
+                className="flex items-center gap-3 w-full p-3 rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-transform"
+              >
+                <Fingerprint className="h-5 w-5" />
+                <span className="text-sm">Biometric Login</span>
+              </button>
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="flex items-center gap-3 w-full p-3 rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-transform"
@@ -161,6 +172,8 @@ export function MobileBottomNav() {
           </div>
         </div>
       )}
+
+      <BiometricSetupDialog open={showBiometric} onOpenChange={setShowBiometric} />
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t md:hidden">
         <div className="flex items-center justify-around px-1 pt-1 pb-safe">
