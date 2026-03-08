@@ -563,6 +563,50 @@ export const clientSpecialDates = pgTable("client_special_dates", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const leadZipCodes = pgTable("lead_zip_codes", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  zipCode: text("zip_code").notNull(),
+  isActive: boolean("is_active").default(true),
+  monthlyRate: integer("monthly_rate").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const leads = pgTable("leads", {
+  id: serial("id").primaryKey(),
+  zipCode: text("zip_code").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  type: text("type", { enum: ['buyer', 'seller', 'both'] }).notNull(),
+  message: text("message"),
+  budget: text("budget"),
+  timeframe: text("timeframe"),
+  status: text("status", { enum: ['new', 'assigned', 'accepted', 'rejected', 'converted'] }).notNull().default('new'),
+  assignedAgentId: integer("assigned_agent_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const leadRotations = pgTable("lead_rotations", {
+  id: serial("id").primaryKey(),
+  zipCode: text("zip_code").notNull().unique(),
+  lastAgentId: integer("last_agent_id"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const agentReviews = pgTable("agent_reviews", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  reviewerId: integer("reviewer_id").notNull(),
+  rating: integer("rating").notNull(),
+  title: text("title"),
+  comment: text("comment").notNull(),
+  transactionId: integer("transaction_id"),
+  isPublic: boolean("is_public").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertDripCampaignSchema = createInsertSchema(dripCampaigns).omit({
   id: true,
   createdAt: true,
@@ -578,6 +622,22 @@ export const insertDripEnrollmentSchema = createInsertSchema(dripEnrollments).om
   lastActionAt: true,
 });
 export const insertClientSpecialDateSchema = createInsertSchema(clientSpecialDates).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertLeadZipCodeSchema = createInsertSchema(leadZipCodes).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertLeadSchema = createInsertSchema(leads).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertLeadRotationSchema = createInsertSchema(leadRotations).omit({
+  id: true,
+  updatedAt: true,
+});
+export const insertAgentReviewSchema = createInsertSchema(agentReviews).omit({
   id: true,
   createdAt: true,
 });
@@ -660,3 +720,11 @@ export type DripEnrollment = typeof dripEnrollments.$inferSelect;
 export type InsertDripEnrollment = z.infer<typeof insertDripEnrollmentSchema>;
 export type ClientSpecialDate = typeof clientSpecialDates.$inferSelect;
 export type InsertClientSpecialDate = z.infer<typeof insertClientSpecialDateSchema>;
+export type LeadZipCode = typeof leadZipCodes.$inferSelect;
+export type InsertLeadZipCode = z.infer<typeof insertLeadZipCodeSchema>;
+export type Lead = typeof leads.$inferSelect;
+export type InsertLead = z.infer<typeof insertLeadSchema>;
+export type LeadRotation = typeof leadRotations.$inferSelect;
+export type InsertLeadRotation = z.infer<typeof insertLeadRotationSchema>;
+export type AgentReview = typeof agentReviews.$inferSelect;
+export type InsertAgentReview = z.infer<typeof insertAgentReviewSchema>;

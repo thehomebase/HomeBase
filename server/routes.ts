@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema } from "@shared/schema";
 import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -3998,6 +3998,344 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error seeding templates:', error);
       res.status(500).json({ error: 'Failed to seed templates' });
+    }
+  });
+
+  app.get("/api/agents/top", async (req, res) => {
+    try {
+      const limit = req.query.limit ? Number(req.query.limit) : 20;
+      const topAgents = await storage.getTopAgents(limit);
+      const safeAgents = topAgents.map(({ user, avgRating, reviewCount }) => ({
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avgRating,
+        reviewCount,
+      }));
+      res.json(safeAgents);
+    } catch (error) {
+      console.error('Error fetching top agents:', error);
+      res.status(500).json({ error: 'Failed to fetch top agents' });
+    }
+  });
+
+  // ===== Lead Zip Code Routes (agent-only, authenticated) =====
+
+  app.post("/api/leads/zip-codes", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+
+    try {
+      const { zipCode } = req.body;
+      if (!zipCode || typeof zipCode !== 'string' || zipCode.trim().length === 0) {
+        return res.status(400).json({ error: 'Zip code is required' });
+      }
+
+      const alreadyClaimed = await storage.isZipCodeClaimed(req.user.id, zipCode.trim());
+      if (alreadyClaimed) {
+        return res.status(409).json({ error: 'You have already claimed this zip code' });
+      }
+
+      const claimed = await storage.claimZipCode({
+        agentId: req.user.id,
+        zipCode: zipCode.trim(),
+        isActive: true,
+        monthlyRate: 0,
+      });
+      res.status(201).json(claimed);
+    } catch (error) {
+      console.error('Error claiming zip code:', error);
+      res.status(500).json({ error: 'Failed to claim zip code' });
+    }
+  });
+
+  app.delete("/api/leads/zip-codes/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+
+    try {
+      const id = Number(req.params.id);
+      const agentZips = await storage.getAgentZipCodes(req.user.id);
+      const owns = agentZips.find(z => z.id === id);
+      if (!owns) {
+        return res.status(403).json({ error: 'You do not own this zip code claim' });
+      }
+
+      await storage.unclaimZipCode(id);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error unclaiming zip code:', error);
+      res.status(500).json({ error: 'Failed to unclaim zip code' });
+    }
+  });
+
+  app.get("/api/leads/zip-codes", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+
+    try {
+      const zips = await storage.getAgentZipCodes(req.user.id);
+      res.json(zips);
+    } catch (error) {
+      console.error('Error fetching zip codes:', error);
+      res.status(500).json({ error: 'Failed to fetch zip codes' });
+    }
+  });
+
+  // ===== Lead Submission Route (PUBLIC, no auth) =====
+
+  app.post("/api/leads/submit", async (req, res) => {
+    try {
+      const schema = z.object({
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        email: z.string().email(),
+        phone: z.string().optional().nullable(),
+        zipCode: z.string().min(1),
+        type: z.enum(['buyer', 'seller', 'both']),
+        message: z.string().optional().nullable(),
+        budget: z.string().optional().nullable(),
+        timeframe: z.string().optional().nullable(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json(parsed.error);
+      }
+
+      const data = parsed.data;
+      const agents = await storage.getAgentsForZipCode(data.zipCode);
+
+      let assignedAgentId: number | null = null;
+      let status: string = 'new';
+
+      if (agents.length > 0) {
+        const rotation = await storage.getLeadRotation(data.zipCode);
+        const lastAgentId = rotation?.lastAgentId;
+
+        let nextAgent: typeof agents[0];
+        if (lastAgentId) {
+          const lastIndex = agents.findIndex(a => a.agentId === lastAgentId);
+          const nextIndex = (lastIndex + 1) % agents.length;
+          nextAgent = agents[nextIndex];
+        } else {
+          nextAgent = agents[0];
+        }
+
+        assignedAgentId = nextAgent.agentId;
+        status = 'assigned';
+
+        await storage.upsertLeadRotation(data.zipCode, assignedAgentId);
+      }
+
+      const lead = await storage.createLead({
+        ...data,
+        phone: data.phone || null,
+        message: data.message || null,
+        budget: data.budget || null,
+        timeframe: data.timeframe || null,
+        status,
+        assignedAgentId,
+      });
+
+      res.status(201).json(lead);
+    } catch (error) {
+      console.error('Error submitting lead:', error);
+      res.status(500).json({ error: 'Failed to submit lead' });
+    }
+  });
+
+  // ===== Lead Management Routes (agent-only, authenticated) =====
+
+  app.get("/api/leads", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+
+    try {
+      const leads = await storage.getLeadsByAgent(req.user.id);
+      res.json(leads);
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+      res.status(500).json({ error: 'Failed to fetch leads' });
+    }
+  });
+
+  app.patch("/api/leads/:id/status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+
+    try {
+      const id = Number(req.params.id);
+      const { status } = req.body;
+
+      if (!status || !['accepted', 'rejected', 'converted'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status. Must be accepted, rejected, or converted.' });
+      }
+
+      const lead = await storage.getLead(id);
+      if (!lead) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+      if (lead.assignedAgentId !== req.user.id) {
+        return res.status(403).json({ error: 'You are not assigned to this lead' });
+      }
+
+      const updatedLead = await storage.updateLeadStatus(id, status);
+
+      if (status === 'accepted' && lead.status !== 'accepted') {
+        try {
+          await storage.createClient({
+            firstName: lead.firstName,
+            lastName: lead.lastName,
+            email: lead.email || null,
+            phone: lead.phone || null,
+            mobilePhone: null,
+            address: null,
+            street: null,
+            city: null,
+            zipCode: lead.zipCode,
+            type: lead.type === 'both' ? ['buyer', 'seller'] : [lead.type as 'buyer' | 'seller'],
+            status: 'active',
+            notes: lead.message || null,
+            labels: ['lead'],
+            agentId: req.user.id,
+          });
+        } catch (clientError) {
+          console.error('Error auto-creating client from lead:', clientError);
+        }
+      }
+
+      res.json(updatedLead);
+    } catch (error) {
+      console.error('Error updating lead status:', error);
+      res.status(500).json({ error: 'Failed to update lead status' });
+    }
+  });
+
+  app.get("/api/leads/stats", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+
+    try {
+      const leads = await storage.getLeadsByAgent(req.user.id);
+      const total = leads.length;
+      const newCount = leads.filter(l => l.status === 'new' || l.status === 'assigned').length;
+      const accepted = leads.filter(l => l.status === 'accepted').length;
+      const converted = leads.filter(l => l.status === 'converted').length;
+      const rejected = leads.filter(l => l.status === 'rejected').length;
+      const acceptanceRate = (accepted + converted + rejected) > 0
+        ? Math.round(((accepted + converted) / (accepted + converted + rejected)) * 100)
+        : 0;
+
+      res.json({ total, new: newCount, accepted, converted, rejected, acceptanceRate });
+    } catch (error) {
+      console.error('Error fetching lead stats:', error);
+      res.status(500).json({ error: 'Failed to fetch lead stats' });
+    }
+  });
+
+  // ===== Public Lead Page Route =====
+
+  app.get("/api/leads/available-zip-codes", async (req, res) => {
+    try {
+      const zipCodes = await storage.getAvailableZipCodes();
+      res.json(zipCodes);
+    } catch (error) {
+      console.error('Error fetching available zip codes:', error);
+      res.status(500).json({ error: 'Failed to fetch available zip codes' });
+    }
+  });
+
+  // ===== Agent Review Routes =====
+
+  app.post("/api/agents/:agentId/reviews", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const agentId = Number(req.params.agentId);
+      if (agentId === req.user.id) {
+        return res.status(400).json({ error: 'You cannot review yourself' });
+      }
+
+      const agent = await storage.getUser(agentId);
+      if (!agent || agent.role !== 'agent') {
+        return res.status(404).json({ error: 'Agent not found' });
+      }
+
+      const schema = z.object({
+        rating: z.number().int().min(1).max(5),
+        title: z.string().optional().nullable(),
+        comment: z.string().min(1),
+        transactionId: z.number().optional().nullable(),
+        isPublic: z.boolean().optional(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json(parsed.error);
+      }
+
+      const review = await storage.createAgentReview({
+        agentId,
+        reviewerId: req.user.id,
+        rating: parsed.data.rating,
+        title: parsed.data.title || null,
+        comment: parsed.data.comment,
+        transactionId: parsed.data.transactionId || null,
+        isPublic: parsed.data.isPublic ?? true,
+      });
+
+      res.status(201).json(review);
+    } catch (error) {
+      console.error('Error creating review:', error);
+      res.status(500).json({ error: 'Failed to create review' });
+    }
+  });
+
+  app.get("/api/agents/:agentId/reviews", async (req, res) => {
+    try {
+      const agentId = Number(req.params.agentId);
+      const reviews = await storage.getAgentReviews(agentId);
+      res.json(reviews);
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+      res.status(500).json({ error: 'Failed to fetch reviews' });
+    }
+  });
+
+  app.get("/api/agents/:agentId/profile", async (req, res) => {
+    try {
+      const agentId = Number(req.params.agentId);
+      const profile = await storage.getPublicAgentProfile(agentId);
+      if (!profile) {
+        return res.status(404).json({ error: 'Agent not found' });
+      }
+      const { password, email, ...safeUser } = profile.user;
+      res.json({ user: safeUser, avgRating: profile.avgRating, reviewCount: profile.reviewCount });
+    } catch (error) {
+      console.error('Error fetching agent profile:', error);
+      res.status(500).json({ error: 'Failed to fetch agent profile' });
+    }
+  });
+
+  app.delete("/api/agents/:agentId/reviews/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const reviewId = Number(req.params.id);
+      const review = await storage.getAgentReview(reviewId);
+      if (!review) {
+        return res.status(404).json({ error: 'Review not found' });
+      }
+      if (review.reviewerId !== req.user.id) {
+        return res.status(403).json({ error: 'You can only delete your own reviews' });
+      }
+
+      await storage.deleteAgentReview(reviewId);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting review:', error);
+      res.status(500).json({ error: 'Failed to delete review' });
     }
   });
 

@@ -38,6 +38,10 @@ import {
   type DripStep, type InsertDripStep,
   type DripEnrollment, type InsertDripEnrollment,
   type ClientSpecialDate, type InsertClientSpecialDate,
+  type LeadZipCode, type InsertLeadZipCode,
+  type Lead, type InsertLead,
+  type LeadRotation, type InsertLeadRotation,
+  type AgentReview, type InsertAgentReview,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -270,6 +274,32 @@ export interface IStorage {
   updateClientSpecialDate(id: number, data: Partial<ClientSpecialDate>): Promise<ClientSpecialDate>;
   deleteClientSpecialDate(id: number): Promise<void>;
   getUpcomingSpecialDates(agentId: number, withinDays: number): Promise<ClientSpecialDate[]>;
+
+  claimZipCode(data: InsertLeadZipCode): Promise<LeadZipCode>;
+  unclaimZipCode(id: number): Promise<void>;
+  getAgentZipCodes(agentId: number): Promise<LeadZipCode[]>;
+  getAgentsForZipCode(zipCode: string): Promise<LeadZipCode[]>;
+  isZipCodeClaimed(agentId: number, zipCode: string): Promise<boolean>;
+  getAvailableZipCodes(): Promise<string[]>;
+
+  createLead(data: InsertLead): Promise<Lead>;
+  getLead(id: number): Promise<Lead | undefined>;
+  getLeadsByAgent(agentId: number): Promise<Lead[]>;
+  getLeadsByZipCode(zipCode: string): Promise<Lead[]>;
+  updateLeadStatus(id: number, status: string, agentId?: number): Promise<Lead>;
+  getNewLeadsByZipCode(zipCode: string): Promise<Lead[]>;
+
+  getLeadRotation(zipCode: string): Promise<LeadRotation | undefined>;
+  upsertLeadRotation(zipCode: string, lastAgentId: number): Promise<LeadRotation>;
+
+  createAgentReview(data: InsertAgentReview): Promise<AgentReview>;
+  getAgentReviews(agentId: number): Promise<AgentReview[]>;
+  getAgentAverageRating(agentId: number): Promise<{ avg: number; count: number }>;
+  getReviewsByReviewer(reviewerId: number): Promise<AgentReview[]>;
+  deleteAgentReview(id: number): Promise<void>;
+  getAgentReview(id: number): Promise<AgentReview | undefined>;
+  getPublicAgentProfile(agentId: number): Promise<{ user: User; avgRating: number; reviewCount: number } | undefined>;
+  getTopAgents(limit: number): Promise<{ user: User; avgRating: number; reviewCount: number }[]>;
 
 }
 
@@ -3734,6 +3764,233 @@ export class DatabaseStorage implements IStorage {
     }
     
     return dates;
+  }
+
+  private mapLeadZipCodeRow(row: any): LeadZipCode {
+    return {
+      id: Number(row.id),
+      agentId: Number(row.agent_id),
+      zipCode: String(row.zip_code),
+      isActive: row.is_active === true || row.is_active === 't',
+      monthlyRate: row.monthly_rate ? Number(row.monthly_rate) : 0,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+    };
+  }
+
+  private mapLeadRow(row: any): Lead {
+    return {
+      id: Number(row.id),
+      zipCode: String(row.zip_code),
+      firstName: String(row.first_name),
+      lastName: String(row.last_name),
+      email: String(row.email),
+      phone: row.phone ? String(row.phone) : null,
+      type: String(row.type) as any,
+      message: row.message ? String(row.message) : null,
+      budget: row.budget ? String(row.budget) : null,
+      timeframe: row.timeframe ? String(row.timeframe) : null,
+      status: String(row.status) as any,
+      assignedAgentId: row.assigned_agent_id ? Number(row.assigned_agent_id) : null,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+    };
+  }
+
+  private mapLeadRotationRow(row: any): LeadRotation {
+    return {
+      id: Number(row.id),
+      zipCode: String(row.zip_code),
+      lastAgentId: row.last_agent_id ? Number(row.last_agent_id) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null,
+    };
+  }
+
+  private mapAgentReviewRow(row: any): AgentReview {
+    return {
+      id: Number(row.id),
+      agentId: Number(row.agent_id),
+      reviewerId: Number(row.reviewer_id),
+      rating: Number(row.rating),
+      title: row.title ? String(row.title) : null,
+      comment: String(row.comment),
+      transactionId: row.transaction_id ? Number(row.transaction_id) : null,
+      isPublic: row.is_public === true || row.is_public === 't',
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+    };
+  }
+
+  async claimZipCode(data: InsertLeadZipCode): Promise<LeadZipCode> {
+    const result = await db.execute(sql`
+      INSERT INTO lead_zip_codes (agent_id, zip_code, is_active, monthly_rate)
+      VALUES (${data.agentId}, ${data.zipCode}, ${data.isActive ?? true}, ${data.monthlyRate ?? 0})
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to claim zip code');
+    return this.mapLeadZipCodeRow(result.rows[0]);
+  }
+
+  async unclaimZipCode(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM lead_zip_codes WHERE id = ${id}`);
+  }
+
+  async getAgentZipCodes(agentId: number): Promise<LeadZipCode[]> {
+    const result = await db.execute(sql`SELECT * FROM lead_zip_codes WHERE agent_id = ${agentId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => this.mapLeadZipCodeRow(row));
+  }
+
+  async getAgentsForZipCode(zipCode: string): Promise<LeadZipCode[]> {
+    const result = await db.execute(sql`SELECT * FROM lead_zip_codes WHERE zip_code = ${zipCode} AND is_active = true`);
+    return (result.rows as any[]).map(row => this.mapLeadZipCodeRow(row));
+  }
+
+  async isZipCodeClaimed(agentId: number, zipCode: string): Promise<boolean> {
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM lead_zip_codes WHERE agent_id = ${agentId} AND zip_code = ${zipCode}`);
+    return Number(result.rows[0]?.count) > 0;
+  }
+
+  async getAvailableZipCodes(): Promise<string[]> {
+    const result = await db.execute(sql`SELECT DISTINCT zip_code FROM lead_zip_codes WHERE is_active = true ORDER BY zip_code`);
+    return (result.rows as any[]).map(row => String(row.zip_code));
+  }
+
+  async createLead(data: InsertLead): Promise<Lead> {
+    const result = await db.execute(sql`
+      INSERT INTO leads (zip_code, first_name, last_name, email, phone, type, message, budget, timeframe, status, assigned_agent_id)
+      VALUES (${data.zipCode}, ${data.firstName}, ${data.lastName}, ${data.email}, ${data.phone || null}, ${data.type}, ${data.message || null}, ${data.budget || null}, ${data.timeframe || null}, ${data.status || 'new'}, ${data.assignedAgentId || null})
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to create lead');
+    return this.mapLeadRow(result.rows[0]);
+  }
+
+  async getLead(id: number): Promise<Lead | undefined> {
+    const result = await db.execute(sql`SELECT * FROM leads WHERE id = ${id} LIMIT 1`);
+    if (!result.rows[0]) return undefined;
+    return this.mapLeadRow(result.rows[0]);
+  }
+
+  async getLeadsByAgent(agentId: number): Promise<Lead[]> {
+    const result = await db.execute(sql`SELECT * FROM leads WHERE assigned_agent_id = ${agentId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => this.mapLeadRow(row));
+  }
+
+  async getLeadsByZipCode(zipCode: string): Promise<Lead[]> {
+    const result = await db.execute(sql`SELECT * FROM leads WHERE zip_code = ${zipCode} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => this.mapLeadRow(row));
+  }
+
+  async updateLeadStatus(id: number, status: string, agentId?: number): Promise<Lead> {
+    let result;
+    if (agentId !== undefined) {
+      result = await db.execute(sql`UPDATE leads SET status = ${status}, assigned_agent_id = ${agentId} WHERE id = ${id} RETURNING *`);
+    } else {
+      result = await db.execute(sql`UPDATE leads SET status = ${status} WHERE id = ${id} RETURNING *`);
+    }
+    if (!result.rows[0]) throw new Error('Lead not found');
+    return this.mapLeadRow(result.rows[0]);
+  }
+
+  async getNewLeadsByZipCode(zipCode: string): Promise<Lead[]> {
+    const result = await db.execute(sql`SELECT * FROM leads WHERE zip_code = ${zipCode} AND status = 'new' ORDER BY created_at ASC`);
+    return (result.rows as any[]).map(row => this.mapLeadRow(row));
+  }
+
+  async getLeadRotation(zipCode: string): Promise<LeadRotation | undefined> {
+    const result = await db.execute(sql`SELECT * FROM lead_rotations WHERE zip_code = ${zipCode} LIMIT 1`);
+    if (!result.rows[0]) return undefined;
+    return this.mapLeadRotationRow(result.rows[0]);
+  }
+
+  async upsertLeadRotation(zipCode: string, lastAgentId: number): Promise<LeadRotation> {
+    const result = await db.execute(sql`
+      INSERT INTO lead_rotations (zip_code, last_agent_id, updated_at)
+      VALUES (${zipCode}, ${lastAgentId}, NOW())
+      ON CONFLICT (zip_code) DO UPDATE SET last_agent_id = ${lastAgentId}, updated_at = NOW()
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to upsert lead rotation');
+    return this.mapLeadRotationRow(result.rows[0]);
+  }
+
+  async createAgentReview(data: InsertAgentReview): Promise<AgentReview> {
+    const result = await db.execute(sql`
+      INSERT INTO agent_reviews (agent_id, reviewer_id, rating, title, comment, transaction_id, is_public)
+      VALUES (${data.agentId}, ${data.reviewerId}, ${data.rating}, ${data.title || null}, ${data.comment}, ${data.transactionId || null}, ${data.isPublic ?? true})
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to create agent review');
+    return this.mapAgentReviewRow(result.rows[0]);
+  }
+
+  async getAgentReviews(agentId: number): Promise<AgentReview[]> {
+    const result = await db.execute(sql`SELECT * FROM agent_reviews WHERE agent_id = ${agentId} AND is_public = true ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => this.mapAgentReviewRow(row));
+  }
+
+  async getAgentAverageRating(agentId: number): Promise<{ avg: number; count: number }> {
+    const result = await db.execute(sql`
+      SELECT COALESCE(AVG(rating), 0) as avg_rating, COUNT(*) as review_count
+      FROM agent_reviews WHERE agent_id = ${agentId} AND is_public = true
+    `);
+    const row = result.rows[0];
+    return {
+      avg: row ? Number(Number(row.avg_rating).toFixed(1)) : 0,
+      count: row ? Number(row.review_count) : 0,
+    };
+  }
+
+  async getReviewsByReviewer(reviewerId: number): Promise<AgentReview[]> {
+    const result = await db.execute(sql`SELECT * FROM agent_reviews WHERE reviewer_id = ${reviewerId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => this.mapAgentReviewRow(row));
+  }
+
+  async deleteAgentReview(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM agent_reviews WHERE id = ${id}`);
+  }
+
+  async getAgentReview(id: number): Promise<AgentReview | undefined> {
+    const result = await db.execute(sql`SELECT * FROM agent_reviews WHERE id = ${id} LIMIT 1`);
+    if (!result.rows[0]) return undefined;
+    return this.mapAgentReviewRow(result.rows[0]);
+  }
+
+  async getPublicAgentProfile(agentId: number): Promise<{ user: User; avgRating: number; reviewCount: number } | undefined> {
+    const user = await this.getUser(agentId);
+    if (!user) return undefined;
+    const { avg, count } = await this.getAgentAverageRating(agentId);
+    return { user, avgRating: avg, reviewCount: count };
+  }
+
+  async getTopAgents(limit: number): Promise<{ user: User; avgRating: number; reviewCount: number }[]> {
+    const result = await db.execute(sql`
+      SELECT u.id, u.email, u.password, u.first_name as "firstName", u.last_name as "lastName",
+             u.role, u.agent_id as "agentId", u.client_record_id as "clientRecordId",
+             u.claimed_transaction_id as "claimedTransactionId", u.claimed_access_code as "claimedAccessCode",
+             COALESCE(AVG(ar.rating), 0) as avg_rating,
+             COUNT(ar.id) as review_count
+      FROM users u
+      INNER JOIN agent_reviews ar ON ar.agent_id = u.id AND ar.is_public = true
+      WHERE u.role = 'agent'
+      GROUP BY u.id
+      HAVING COUNT(ar.id) > 0
+      ORDER BY AVG(ar.rating) DESC, COUNT(ar.id) DESC
+      LIMIT ${limit}
+    `);
+    return (result.rows as any[]).map(row => ({
+      user: {
+        id: Number(row.id),
+        email: String(row.email),
+        password: String(row.password),
+        firstName: String(row.firstName),
+        lastName: String(row.lastName),
+        role: String(row.role),
+        agentId: row.agentId ? Number(row.agentId) : null,
+        clientRecordId: row.clientRecordId ? Number(row.clientRecordId) : null,
+        claimedTransactionId: row.claimedTransactionId ? Number(row.claimedTransactionId) : null,
+        claimedAccessCode: row.claimedAccessCode ? String(row.claimedAccessCode) : null,
+      },
+      avgRating: Number(Number(row.avg_rating).toFixed(1)),
+      reviewCount: Number(row.review_count),
+    }));
   }
 
 }

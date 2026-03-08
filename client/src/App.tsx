@@ -49,7 +49,9 @@ import {
   Store,
   HardHat,
   CreditCard,
-  Bell
+  Bell,
+  MapPin,
+  Star
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -71,6 +73,9 @@ import MarketplacePage from "@/pages/marketplace-page";
 import MyTeamPage from "@/pages/my-team-page";
 import BillingPage from "@/pages/billing-page";
 import DripCampaignsPage from "@/pages/drip-campaigns-page";
+import { TopAgentsPage, AgentReviewsPage } from "@/pages/agent-reviews-page";
+import LeadGenerationPage from "@/pages/lead-generation-page";
+import LeadSubmitPage from "@/pages/lead-submit-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -201,6 +206,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="Find Agents">
+                        <Link href="/top-agents" className="flex items-center gap-2">
+                          <Star className="h-4 w-4" />
+                          {isSidebarOpen && <span>Find Agents</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
                       <SidebarMenuButton asChild tooltip="Property Search">
                         <Link href="/property-search" className="flex items-center gap-2">
                           <Search className="h-4 w-4" />
@@ -247,6 +260,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                             <Link href="/drip" className="flex items-center gap-2">
                               <Bell className="h-4 w-4" />
                               {isSidebarOpen && <span>Drip Campaigns</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Lead Gen">
+                            <Link href="/lead-gen" className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4" />
+                              {isSidebarOpen && <span>Lead Gen</span>}
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -337,6 +358,9 @@ function Router() {
     <Switch>
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsPage} />
+      <Route path="/find-agent" component={LeadSubmitPage} />
+      <Route path="/agents/:agentId/reviews" component={AgentReviewsPage} />
+      <Route path="/top-agents" component={TopAgentsPage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/messages" component={MessagesPage} />
       <Route path="/property-search">
@@ -409,6 +433,9 @@ function Router() {
           </Route>
           <Route path="/drip">
             <ProtectedRoute path="/drip" component={DripCampaignsPage} />
+          </Route>
+          <Route path="/lead-gen">
+            <ProtectedRoute path="/lead-gen" component={LeadGenerationPage} />
           </Route>
           <Route path="/billing">
             <ProtectedRoute path="/billing" component={BillingPage} />
