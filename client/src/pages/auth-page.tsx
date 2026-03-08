@@ -8,7 +8,7 @@ export default function AuthPage() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (user) setLocation("/");
+    if (user) setLocation("/dashboard");
   }, [user, setLocation]);
 
   return (

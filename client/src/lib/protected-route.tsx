@@ -25,16 +25,16 @@ export function ProtectedRoute({
     console.error('Auth error:', error);
     return (
       <Route path={path}>
-        <Redirect to="/auth" />
+        <Redirect to="/" />
       </Route>
     );
   }
 
   if (!user) {
-    console.log('No user found, redirecting to auth');
+    console.log('No user found, redirecting to landing');
     return (
       <Route path={path}>
-        <Redirect to="/auth" />
+        <Redirect to="/" />
       </Route>
     );
   }

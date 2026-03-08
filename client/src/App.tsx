@@ -83,6 +83,7 @@ import LeadSubmitPage from "@/pages/lead-submit-page";
 import FindContractorPage from "@/pages/find-contractor-page";
 import VendorRatingsPage from "@/pages/vendor-ratings-page";
 import BiometricSettingsPage from "@/pages/biometric-settings-page";
+import LandingPage from "@/pages/landing-page";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { BiometricSetupButton } from "@/components/biometric-setup";
 import { useLeadAlerts } from "@/hooks/use-lead-alerts";
@@ -649,16 +650,33 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Switch>
-          <Route>
-            <Layout>
-              <Router />
-            </Layout>
-          </Route>
-        </Switch>
+        <AppShell />
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>
+  );
+}
+
+function AppShell() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <Switch>
+      {!user && <Route path="/" component={LandingPage} />}
+      <Route>
+        <Layout>
+          <Router />
+        </Layout>
+      </Route>
+    </Switch>
   );
 }
 
