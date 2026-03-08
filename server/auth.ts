@@ -159,6 +159,14 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ error: "Email already exists" });
       }
 
+      let referralCodeRecord: any = null;
+      if (req.body.referralCode) {
+        referralCodeRecord = await storage.getReferralCodeByCode(req.body.referralCode);
+        if (!referralCodeRecord) {
+          return res.status(400).json({ error: "Invalid referral code" });
+        }
+      }
+
       const user = await storage.createUser({
         email: req.body.email,
         password: await hashPassword(req.body.password),
@@ -169,12 +177,32 @@ export function setupAuth(app: Express) {
 
       console.log('User created successfully:', { id: user.id, email: user.email });
 
+      if (referralCodeRecord) {
+        try {
+          await storage.createReferralCredit({
+            userId: referralCodeRecord.agentUserId,
+            type: 'referrer',
+            referralCodeId: referralCodeRecord.id,
+            referredUserId: user.id,
+            status: 'pending',
+          });
+          await storage.createReferralCredit({
+            userId: user.id,
+            type: 'referred',
+            referralCodeId: referralCodeRecord.id,
+            referredUserId: user.id,
+            status: 'pending',
+          });
+        } catch (creditError) {
+          console.error('Error creating referral credits:', creditError);
+        }
+      }
+
       req.login(user, (err) => {
         if (err) {
           console.error('Login error after registration:', err);
           return next(err);
         }
-        // Only send necessary user data
         const { password, ...userWithoutPassword } = user;
         res.status(201).json(userWithoutPassword);
       });

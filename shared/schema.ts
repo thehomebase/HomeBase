@@ -463,6 +463,81 @@ export const insertSavedPropertySchema = createInsertSchema(savedProperties).omi
   createdAt: true,
 });
 
+export const homeTeamMembers = pgTable("home_team_members", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  contractorId: integer("contractor_id").notNull(),
+  category: text("category").notNull(),
+  notes: text("notes"),
+  addedAt: timestamp("added_at").defaultNow(),
+});
+
+export const homeownerHomes = pgTable("homeowner_homes", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  address: text("address").notNull(),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  purchaseDate: text("purchase_date"),
+  purchasePrice: integer("purchase_price"),
+  transactionId: integer("transaction_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const homeMaintenanceRecords = pgTable("home_maintenance_records", {
+  id: serial("id").primaryKey(),
+  homeId: integer("home_id").notNull(),
+  contractorId: integer("contractor_id"),
+  category: text("category").notNull(),
+  description: text("description").notNull(),
+  serviceDate: text("service_date"),
+  cost: integer("cost"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const referralCodes = pgTable("referral_codes", {
+  id: serial("id").primaryKey(),
+  agentUserId: integer("agent_user_id").notNull(),
+  code: text("code").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const referralCredits = pgTable("referral_credits", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  type: text("type", { enum: ['referrer', 'referred'] }).notNull(),
+  referralCodeId: integer("referral_code_id").notNull(),
+  referredUserId: integer("referred_user_id"),
+  status: text("status", { enum: ['pending', 'applied', 'expired'] }).notNull().default('pending'),
+  createdAt: timestamp("created_at").defaultNow(),
+  appliedAt: timestamp("applied_at"),
+});
+
+export const insertHomeTeamMemberSchema = createInsertSchema(homeTeamMembers).omit({
+  id: true,
+  addedAt: true,
+});
+export const insertHomeownerHomeSchema = createInsertSchema(homeownerHomes).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertMaintenanceRecordSchema = createInsertSchema(homeMaintenanceRecords).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertReferralCodeSchema = createInsertSchema(referralCodes).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertReferralCreditSchema = createInsertSchema(referralCredits).omit({
+  id: true,
+  createdAt: true,
+  appliedAt: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
@@ -501,3 +576,13 @@ export type BidRequest = typeof bidRequests.$inferSelect;
 export type InsertBidRequest = z.infer<typeof insertBidRequestSchema>;
 export type Bid = typeof bids.$inferSelect;
 export type InsertBid = z.infer<typeof insertBidSchema>;
+export type HomeTeamMember = typeof homeTeamMembers.$inferSelect;
+export type InsertHomeTeamMember = z.infer<typeof insertHomeTeamMemberSchema>;
+export type HomeownerHome = typeof homeownerHomes.$inferSelect;
+export type InsertHomeownerHome = z.infer<typeof insertHomeownerHomeSchema>;
+export type MaintenanceRecord = typeof homeMaintenanceRecords.$inferSelect;
+export type InsertMaintenanceRecord = z.infer<typeof insertMaintenanceRecordSchema>;
+export type ReferralCode = typeof referralCodes.$inferSelect;
+export type InsertReferralCode = z.infer<typeof insertReferralCodeSchema>;
+export type ReferralCredit = typeof referralCredits.$inferSelect;
+export type InsertReferralCredit = z.infer<typeof insertReferralCreditSchema>;

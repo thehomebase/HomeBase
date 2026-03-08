@@ -17,6 +17,7 @@ import {
   users, transactions, checklists, messages, clients, documents, contractors, contractorReviews,
   propertyViewings, propertyFeedback, showingRequests, savedProperties, communications, smsOptOuts,
   emailSnippets, emailTracking, inspectionItems, bidRequests, bids,
+  homeTeamMembers, homeownerHomes, homeMaintenanceRecords, referralCodes, referralCredits,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
   type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
   type ShowingRequest, type SavedProperty, type InsertSavedProperty,
@@ -27,6 +28,11 @@ import {
   type InspectionItem, type InsertInspectionItem,
   type BidRequest, type InsertBidRequest,
   type Bid, type InsertBid,
+  type HomeTeamMember, type InsertHomeTeamMember,
+  type HomeownerHome, type InsertHomeownerHome,
+  type MaintenanceRecord, type InsertMaintenanceRecord,
+  type ReferralCode, type InsertReferralCode,
+  type ReferralCredit, type InsertReferralCredit,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -194,6 +200,37 @@ export interface IStorage {
 
   // Contractor by vendor user
   getContractorByVendorUserId(vendorUserId: number): Promise<Contractor | undefined>;
+
+  // Home Team operations
+  addHomeTeamMember(data: InsertHomeTeamMember): Promise<HomeTeamMember>;
+  removeHomeTeamMember(id: number): Promise<void>;
+  getHomeTeamByUser(userId: number): Promise<HomeTeamMember[]>;
+  getHomeTeamMember(id: number): Promise<HomeTeamMember | undefined>;
+
+  // Homeowner Home operations
+  createHome(data: InsertHomeownerHome): Promise<HomeownerHome>;
+  getHomesByUser(userId: number): Promise<HomeownerHome[]>;
+  getHome(id: number): Promise<HomeownerHome | undefined>;
+  updateHome(id: number, data: Partial<HomeownerHome>): Promise<HomeownerHome>;
+  deleteHome(id: number): Promise<void>;
+
+  // Maintenance Record operations
+  createMaintenanceRecord(data: InsertMaintenanceRecord): Promise<MaintenanceRecord>;
+  getMaintenanceByHome(homeId: number): Promise<MaintenanceRecord[]>;
+  updateMaintenanceRecord(id: number, data: Partial<MaintenanceRecord>): Promise<MaintenanceRecord>;
+  deleteMaintenanceRecord(id: number): Promise<void>;
+
+  // Referral operations
+  createReferralCode(data: InsertReferralCode): Promise<ReferralCode>;
+  getReferralCodeByAgent(agentUserId: number): Promise<ReferralCode | undefined>;
+  getReferralCodeByCode(code: string): Promise<ReferralCode | undefined>;
+  createReferralCredit(data: InsertReferralCredit): Promise<ReferralCredit>;
+  getReferralCreditsByUser(userId: number): Promise<ReferralCredit[]>;
+  applyReferralCredit(id: number): Promise<ReferralCredit>;
+
+  // Marketplace operations
+  getMarketplaceContractors(filters?: { category?: string; search?: string; limit?: number; offset?: number }): Promise<Contractor[]>;
+  getMarketplaceContractorCount(filters?: { category?: string; search?: string }): Promise<number>;
 
 }
 
@@ -3211,6 +3248,188 @@ export class DatabaseStorage implements IStorage {
       console.error('Error in getContractorByVendorUserId:', error);
       return undefined;
     }
+  }
+
+  async addHomeTeamMember(data: InsertHomeTeamMember): Promise<HomeTeamMember> {
+    const result = await db.execute(sql`
+      INSERT INTO home_team_members (user_id, contractor_id, category, notes)
+      VALUES (${data.userId}, ${data.contractorId}, ${data.category}, ${data.notes || null})
+      RETURNING *
+    `);
+    const row = result.rows[0] as any;
+    return { id: row.id, userId: row.user_id, contractorId: row.contractor_id, category: row.category, notes: row.notes, addedAt: row.added_at };
+  }
+
+  async removeHomeTeamMember(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM home_team_members WHERE id = ${id}`);
+  }
+
+  async getHomeTeamByUser(userId: number): Promise<HomeTeamMember[]> {
+    const result = await db.execute(sql`
+      SELECT * FROM home_team_members WHERE user_id = ${userId} ORDER BY added_at DESC
+    `);
+    return (result.rows as any[]).map(row => ({
+      id: row.id, userId: row.user_id, contractorId: row.contractor_id, category: row.category, notes: row.notes, addedAt: row.added_at
+    }));
+  }
+
+  async getHomeTeamMember(id: number): Promise<HomeTeamMember | undefined> {
+    const result = await db.execute(sql`SELECT * FROM home_team_members WHERE id = ${id}`);
+    if (!result.rows?.length) return undefined;
+    const row = result.rows[0] as any;
+    return { id: row.id, userId: row.user_id, contractorId: row.contractor_id, category: row.category, notes: row.notes, addedAt: row.added_at };
+  }
+
+  async createHome(data: InsertHomeownerHome): Promise<HomeownerHome> {
+    const result = await db.execute(sql`
+      INSERT INTO homeowner_homes (user_id, address, city, state, zip_code, purchase_date, purchase_price, transaction_id, notes)
+      VALUES (${data.userId}, ${data.address}, ${data.city || null}, ${data.state || null}, ${data.zipCode || null}, ${data.purchaseDate || null}, ${data.purchasePrice || null}, ${data.transactionId || null}, ${data.notes || null})
+      RETURNING *
+    `);
+    const row = result.rows[0] as any;
+    return { id: row.id, userId: row.user_id, address: row.address, city: row.city, state: row.state, zipCode: row.zip_code, purchaseDate: row.purchase_date, purchasePrice: row.purchase_price, transactionId: row.transaction_id, notes: row.notes, createdAt: row.created_at };
+  }
+
+  async getHomesByUser(userId: number): Promise<HomeownerHome[]> {
+    const result = await db.execute(sql`SELECT * FROM homeowner_homes WHERE user_id = ${userId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => ({
+      id: row.id, userId: row.user_id, address: row.address, city: row.city, state: row.state, zipCode: row.zip_code, purchaseDate: row.purchase_date, purchasePrice: row.purchase_price, transactionId: row.transaction_id, notes: row.notes, createdAt: row.created_at
+    }));
+  }
+
+  async getHome(id: number): Promise<HomeownerHome | undefined> {
+    const result = await db.execute(sql`SELECT * FROM homeowner_homes WHERE id = ${id}`);
+    if (!result.rows?.length) return undefined;
+    const row = result.rows[0] as any;
+    return { id: row.id, userId: row.user_id, address: row.address, city: row.city, state: row.state, zipCode: row.zip_code, purchaseDate: row.purchase_date, purchasePrice: row.purchase_price, transactionId: row.transaction_id, notes: row.notes, createdAt: row.created_at };
+  }
+
+  async updateHome(id: number, data: Partial<HomeownerHome>): Promise<HomeownerHome> {
+    const parts: any[] = [];
+    if (data.address !== undefined) parts.push(sql`address = ${data.address}`);
+    if (data.city !== undefined) parts.push(sql`city = ${data.city}`);
+    if (data.state !== undefined) parts.push(sql`state = ${data.state}`);
+    if (data.zipCode !== undefined) parts.push(sql`zip_code = ${data.zipCode}`);
+    if (data.purchaseDate !== undefined) parts.push(sql`purchase_date = ${data.purchaseDate}`);
+    if (data.purchasePrice !== undefined) parts.push(sql`purchase_price = ${data.purchasePrice}`);
+    if (data.notes !== undefined) parts.push(sql`notes = ${data.notes}`);
+    if (parts.length === 0) {
+      const existing = await this.getHome(id);
+      if (!existing) throw new Error('Home not found');
+      return existing;
+    }
+    const result = await db.execute(sql`UPDATE homeowner_homes SET ${sql.join(parts, sql`, `)} WHERE id = ${id} RETURNING *`);
+    if (!result.rows[0]) throw new Error('Home not found');
+    const row = result.rows[0] as any;
+    return { id: row.id, userId: row.user_id, address: row.address, city: row.city, state: row.state, zipCode: row.zip_code, purchaseDate: row.purchase_date, purchasePrice: row.purchase_price, transactionId: row.transaction_id, notes: row.notes, createdAt: row.created_at };
+  }
+
+  async deleteHome(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM home_maintenance_records WHERE home_id = ${id}`);
+    await db.execute(sql`DELETE FROM homeowner_homes WHERE id = ${id}`);
+  }
+
+  async createMaintenanceRecord(data: InsertMaintenanceRecord): Promise<MaintenanceRecord> {
+    const result = await db.execute(sql`
+      INSERT INTO home_maintenance_records (home_id, contractor_id, category, description, service_date, cost, notes)
+      VALUES (${data.homeId}, ${data.contractorId || null}, ${data.category}, ${data.description}, ${data.serviceDate || null}, ${data.cost || null}, ${data.notes || null})
+      RETURNING *
+    `);
+    const row = result.rows[0] as any;
+    return { id: row.id, homeId: row.home_id, contractorId: row.contractor_id, category: row.category, description: row.description, serviceDate: row.service_date, cost: row.cost, notes: row.notes, createdAt: row.created_at };
+  }
+
+  async getMaintenanceByHome(homeId: number): Promise<MaintenanceRecord[]> {
+    const result = await db.execute(sql`SELECT * FROM home_maintenance_records WHERE home_id = ${homeId} ORDER BY service_date DESC, created_at DESC`);
+    return (result.rows as any[]).map(row => ({
+      id: row.id, homeId: row.home_id, contractorId: row.contractor_id, category: row.category, description: row.description, serviceDate: row.service_date, cost: row.cost, notes: row.notes, createdAt: row.created_at
+    }));
+  }
+
+  async updateMaintenanceRecord(id: number, data: Partial<MaintenanceRecord>): Promise<MaintenanceRecord> {
+    const parts: any[] = [];
+    if (data.category !== undefined) parts.push(sql`category = ${data.category}`);
+    if (data.description !== undefined) parts.push(sql`description = ${data.description}`);
+    if (data.serviceDate !== undefined) parts.push(sql`service_date = ${data.serviceDate}`);
+    if (data.cost !== undefined) parts.push(sql`cost = ${data.cost}`);
+    if (data.notes !== undefined) parts.push(sql`notes = ${data.notes}`);
+    if (data.contractorId !== undefined) parts.push(sql`contractor_id = ${data.contractorId}`);
+    const result = await db.execute(sql`UPDATE home_maintenance_records SET ${sql.join(parts, sql`, `)} WHERE id = ${id} RETURNING *`);
+    if (!result.rows[0]) throw new Error('Maintenance record not found');
+    const row = result.rows[0] as any;
+    return { id: row.id, homeId: row.home_id, contractorId: row.contractor_id, category: row.category, description: row.description, serviceDate: row.service_date, cost: row.cost, notes: row.notes, createdAt: row.created_at };
+  }
+
+  async deleteMaintenanceRecord(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM home_maintenance_records WHERE id = ${id}`);
+  }
+
+  async createReferralCode(data: InsertReferralCode): Promise<ReferralCode> {
+    const result = await db.execute(sql`
+      INSERT INTO referral_codes (agent_user_id, code) VALUES (${data.agentUserId}, ${data.code}) RETURNING *
+    `);
+    const row = result.rows[0] as any;
+    return { id: row.id, agentUserId: row.agent_user_id, code: row.code, createdAt: row.created_at };
+  }
+
+  async getReferralCodeByAgent(agentUserId: number): Promise<ReferralCode | undefined> {
+    const result = await db.execute(sql`SELECT * FROM referral_codes WHERE agent_user_id = ${agentUserId} LIMIT 1`);
+    if (!result.rows?.length) return undefined;
+    const row = result.rows[0] as any;
+    return { id: row.id, agentUserId: row.agent_user_id, code: row.code, createdAt: row.created_at };
+  }
+
+  async getReferralCodeByCode(code: string): Promise<ReferralCode | undefined> {
+    const result = await db.execute(sql`SELECT * FROM referral_codes WHERE code = ${code} LIMIT 1`);
+    if (!result.rows?.length) return undefined;
+    const row = result.rows[0] as any;
+    return { id: row.id, agentUserId: row.agent_user_id, code: row.code, createdAt: row.created_at };
+  }
+
+  async createReferralCredit(data: InsertReferralCredit): Promise<ReferralCredit> {
+    const result = await db.execute(sql`
+      INSERT INTO referral_credits (user_id, type, referral_code_id, referred_user_id, status)
+      VALUES (${data.userId}, ${data.type}, ${data.referralCodeId}, ${data.referredUserId || null}, ${data.status || 'pending'})
+      RETURNING *
+    `);
+    const row = result.rows[0] as any;
+    return { id: row.id, userId: row.user_id, type: row.type, referralCodeId: row.referral_code_id, referredUserId: row.referred_user_id, status: row.status, createdAt: row.created_at, appliedAt: row.applied_at };
+  }
+
+  async getReferralCreditsByUser(userId: number): Promise<ReferralCredit[]> {
+    const result = await db.execute(sql`SELECT * FROM referral_credits WHERE user_id = ${userId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => ({
+      id: row.id, userId: row.user_id, type: row.type, referralCodeId: row.referral_code_id, referredUserId: row.referred_user_id, status: row.status, createdAt: row.created_at, appliedAt: row.applied_at
+    }));
+  }
+
+  async applyReferralCredit(id: number): Promise<ReferralCredit> {
+    const result = await db.execute(sql`
+      UPDATE referral_credits SET status = 'applied', applied_at = NOW() WHERE id = ${id} RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Credit not found');
+    const row = result.rows[0] as any;
+    return { id: row.id, userId: row.user_id, type: row.type, referralCodeId: row.referral_code_id, referredUserId: row.referred_user_id, status: row.status, createdAt: row.created_at, appliedAt: row.applied_at };
+  }
+
+  async getMarketplaceContractors(filters?: { category?: string; search?: string; limit?: number; offset?: number }): Promise<Contractor[]> {
+    const conditions: any[] = [];
+    if (filters?.category) conditions.push(sql`category = ${filters.category}`);
+    if (filters?.search) conditions.push(sql`LOWER(name) LIKE LOWER(${'%' + filters.search + '%'})`);
+    const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
+    const limit = filters?.limit || 50;
+    const offset = filters?.offset || 0;
+    const result = await db.execute(sql`SELECT * FROM contractors ${whereClause} ORDER BY name ASC LIMIT ${limit} OFFSET ${offset}`);
+    return (result.rows as any[]).map(row => this.mapContractorRow(row));
+  }
+
+  async getMarketplaceContractorCount(filters?: { category?: string; search?: string }): Promise<number> {
+    const conditions: any[] = [];
+    if (filters?.category) conditions.push(sql`category = ${filters.category}`);
+    if (filters?.search) conditions.push(sql`LOWER(name) LIKE LOWER(${'%' + filters.search + '%'})`);
+    const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM contractors ${whereClause}`);
+    return Number((result.rows[0] as any)?.count || 0);
   }
 
 }

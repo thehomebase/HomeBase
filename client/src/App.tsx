@@ -44,7 +44,10 @@ import {
   Wrench,
   Map,
   Search,
-  Mail
+  Mail,
+  Gift,
+  Store,
+  HardHat
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -60,6 +63,10 @@ import ClientTransactionPage from "@/pages/client-transaction-page";
 import VendorPortal from "@/pages/vendor-portal";
 import InspectionReviewPage from "@/pages/inspection-review-page";
 import BidComparisonPage from "@/pages/bid-comparison-page";
+import MyHomePage from "@/pages/my-home-page";
+import ReferralPage from "@/pages/referral-page";
+import MarketplacePage from "@/pages/marketplace-page";
+import MyTeamPage from "@/pages/my-team-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -166,6 +173,30 @@ function Layout({ children }: { children: React.ReactNode }) {
                       </>
                     )}
                     <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="HomeBase Pros">
+                        <Link href="/marketplace" className="flex items-center gap-2">
+                          <Store className="h-4 w-4" />
+                          {isSidebarOpen && <span>HomeBase Pros</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="My Team">
+                        <Link href="/my-team" className="flex items-center gap-2">
+                          <HardHat className="h-4 w-4" />
+                          {isSidebarOpen && <span>My Team</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="MyHome">
+                        <Link href="/my-home" className="flex items-center gap-2">
+                          <Home className="h-4 w-4" />
+                          {isSidebarOpen && <span>MyHome</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
                       <SidebarMenuButton asChild tooltip="Property Search">
                         <Link href="/property-search" className="flex items-center gap-2">
                           <Search className="h-4 w-4" />
@@ -190,14 +221,24 @@ function Layout({ children }: { children: React.ReactNode }) {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                     {user?.role === "agent" && (
-                      <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Mail">
-                          <Link href="/mail" className="flex items-center gap-2">
-                            <Mail className="h-4 w-4" />
-                            {isSidebarOpen && <span>Mail</span>}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
+                      <>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Mail">
+                            <Link href="/mail" className="flex items-center gap-2">
+                              <Mail className="h-4 w-4" />
+                              {isSidebarOpen && <span>Mail</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Referrals">
+                            <Link href="/referrals" className="flex items-center gap-2">
+                              <Gift className="h-4 w-4" />
+                              {isSidebarOpen && <span>Referrals</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </>
                     )}
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild tooltip="Calculators">
@@ -281,6 +322,15 @@ function Router() {
       </Route>
       {isClient && <Route path="/my-transaction" component={ClientTransactionPage} />}
       {isClient && <Route path="/glossary" component={GlossaryPage} />}
+      <Route path="/my-home">
+        <ProtectedRoute path="/my-home" component={MyHomePage} />
+      </Route>
+      <Route path="/marketplace">
+        <ProtectedRoute path="/marketplace" component={MarketplacePage} />
+      </Route>
+      <Route path="/my-team">
+        <ProtectedRoute path="/my-team" component={MyTeamPage} />
+      </Route>
       <Route path="/calculators">
         <ProtectedRoute path="/calculators" component={CalculatorsPage} />
       </Route>
@@ -328,6 +378,9 @@ function Router() {
           </Route>
           <Route path="/mail">
             <ProtectedRoute path="/mail" component={MailPage} />
+          </Route>
+          <Route path="/referrals">
+            <ProtectedRoute path="/referrals" component={ReferralPage} />
           </Route>
           <Route path="/">
             <ProtectedRoute path="/" component={TransactionsPage} />

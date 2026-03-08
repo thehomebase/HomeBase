@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,16 @@ export function LoginForm({
 }: React.ComponentPropsWithoutRef<"div">) {
   const { loginMutation, registerMutation } = useAuth();
   const [showRegister, setShowRegister] = useState(false);
+  const [defaultReferralCode, setDefaultReferralCode] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      setDefaultReferralCode(ref);
+      setShowRegister(true);
+    }
+  }, []);
 
   const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -27,13 +37,15 @@ export function LoginForm({
   const handleRegister = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const referralCode = formData.get("referralCode") as string;
     registerMutation.mutate({
       email: formData.get("email") as string,
       password: formData.get("password") as string,
       firstName: formData.get("firstName") as string,
       lastName: formData.get("lastName") as string,
       role: formData.get("role") as string,
-    });
+      ...(referralCode ? { referralCode } : {}),
+    } as any);
     setShowRegister(false);
   };
 
@@ -143,6 +155,16 @@ export function LoginForm({
                   <SelectItem value="vendor">Vendor</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reg-referralCode">Referral Code (optional)</Label>
+              <Input
+                id="reg-referralCode"
+                name="referralCode"
+                placeholder="Enter referral code"
+                defaultValue={defaultReferralCode}
+                className="font-mono tracking-wider"
+              />
             </div>
             <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
               Create Account

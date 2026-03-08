@@ -26,7 +26,7 @@ Preferred communication style: Simple, everyday language.
 ### Data Storage
 - **Database**: PostgreSQL (Neon serverless)
 - **ORM**: Drizzle ORM
-- **Key Models**: Users (agent/client/vendor roles), Transactions, Clients, Documents, Checklists, Contractors, Messages, Saved Properties, Communications, Agent Phone Numbers, Email Snippets, Email Tracking, Inspection Items, Bid Requests, Bids.
+- **Key Models**: Users (agent/client/vendor roles), Transactions, Clients, Documents, Checklists, Contractors, Messages, Saved Properties, Communications, Agent Phone Numbers, Email Snippets, Email Tracking, Inspection Items, Bid Requests, Bids, Home Team Members, Homeowner Homes, Home Maintenance Records, Referral Codes, Referral Credits.
 
 ### Key Features
 - **Contract Upload**: Extracts data from PDF contracts (e.g., purchase price, dates, contacts) using `pdf-parse` and regex. Documents are processed in-memory for privacy.
@@ -41,6 +41,10 @@ Preferred communication style: Simple, everyday language.
 - **Client Communications**:
     - **SMS**: Via Twilio, with agent-specific phone numbers, opt-out handling, rate limiting, and content filtering.
     - **Email**: Via agent's linked Gmail account (Google OAuth), including full inbox view, compose, reply, forward, email snippets/templates, read receipts (tracking pixel), and Gmail-like bulk actions (checkbox selection with archive, delete, mark read/unread, star, label).
+- **HomeBase Pros (Marketplace)**: A home services marketplace accessible to all authenticated users. Browse contractors by category with search, filtering, and pagination. View contractor profiles with reviews and verification badges. Add contractors to your team directly from the marketplace. Categories include plumbing, electrical, HVAC, roofing, painting, landscaping, pest control, pool maintenance, windows, and many more.
+- **MyHome (Post-Close Hub)**: Homeowners track their properties after closing. Add multiple homes with purchase details. Maintain a service/maintenance log with category, description, cost, and contractor links. Quick access to marketplace and team. DB tables: `homeowner_homes`, `home_maintenance_records`.
+- **MyHomeTeam**: Users assemble a team of preferred vendors for all home-related needs. Grid layout organized by service category. Add contractors from the marketplace, remove as needed. Available to all roles (agents, clients, vendors). DB table: `home_team_members`.
+- **Affiliate Referral System**: Agents generate unique referral codes (`HB-{userId}-{random}`). Share via link or code. When a new agent registers with a referral code, both the referrer and referred agent receive a pending credit for a free month. Credits tracked in `referral_credits` table with status (pending/applied/expired). Referral code input field on registration form with auto-detection from URL `?ref=` parameter.
 
 ## External Dependencies
 

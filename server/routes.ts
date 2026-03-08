@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema } from "@shared/schema";
 import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -3111,6 +3111,324 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error fetching vendor bids:', error);
       res.status(500).json({ error: 'Failed to fetch vendor bids' });
+    }
+  });
+
+  app.post("/api/referral/generate", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const existing = await storage.getReferralCodeByAgent(req.user.id);
+      if (existing) {
+        return res.json(existing);
+      }
+      const code = `HB-${req.user.id}-${randomUUID().slice(0, 8).toUpperCase()}`;
+      const referralCode = await storage.createReferralCode({
+        agentUserId: req.user.id,
+        code,
+      });
+      res.status(201).json(referralCode);
+    } catch (error) {
+      console.error('Error generating referral code:', error);
+      res.status(500).json({ error: 'Failed to generate referral code' });
+    }
+  });
+
+  app.get("/api/referral/my-code", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const referralCode = await storage.getReferralCodeByAgent(req.user.id);
+      if (!referralCode) {
+        return res.status(404).json({ error: 'No referral code found. Generate one first.' });
+      }
+      res.json(referralCode);
+    } catch (error) {
+      console.error('Error fetching referral code:', error);
+      res.status(500).json({ error: 'Failed to fetch referral code' });
+    }
+  });
+
+  app.get("/api/referral/credits", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const credits = await storage.getReferralCreditsByUser(req.user.id);
+      res.json(credits);
+    } catch (error) {
+      console.error('Error fetching referral credits:', error);
+      res.status(500).json({ error: 'Failed to fetch referral credits' });
+    }
+  });
+
+  app.get("/api/marketplace/categories", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const categories = [
+        { id: "plumbing", name: "Plumbing", icon: "wrench" },
+        { id: "electrical", name: "Electrical", icon: "zap" },
+        { id: "hvac", name: "HVAC", icon: "thermometer" },
+        { id: "roofing", name: "Roofing", icon: "home" },
+        { id: "painting", name: "Painting", icon: "paintbrush" },
+        { id: "landscaping", name: "Landscaping", icon: "trees" },
+        { id: "cleaning", name: "Cleaning", icon: "sparkles" },
+        { id: "handyman", name: "Handyman", icon: "hammer" },
+        { id: "pest_control", name: "Pest Control", icon: "bug" },
+        { id: "pool_maintenance", name: "Pool Maintenance", icon: "waves" },
+        { id: "window_specialist", name: "Window Specialist", icon: "square" },
+        { id: "garage_door", name: "Garage Door", icon: "door-open" },
+        { id: "carpet_cleaning", name: "Carpet Cleaning", icon: "vacuum" },
+        { id: "locksmith", name: "Locksmith", icon: "key" },
+        { id: "tree_service", name: "Tree Service", icon: "tree-pine" },
+        { id: "gutter_cleaning", name: "Gutter Cleaning", icon: "droplets" },
+        { id: "pressure_washing", name: "Pressure Washing", icon: "spray-can" },
+        { id: "fence", name: "Fence", icon: "fence" },
+        { id: "concrete", name: "Concrete", icon: "construction" },
+        { id: "flooring", name: "Flooring", icon: "layers" },
+        { id: "cabinet", name: "Cabinet", icon: "cabinet" },
+        { id: "countertop", name: "Countertop", icon: "square" },
+        { id: "appliance_repair", name: "Appliance Repair", icon: "settings" },
+        { id: "security_system", name: "Security System", icon: "shield" },
+        { id: "inspector", name: "Inspector", icon: "search" },
+        { id: "appraiser", name: "Appraiser", icon: "clipboard" },
+        { id: "surveyor", name: "Surveyor", icon: "map" },
+        { id: "photographer", name: "Photographer", icon: "camera" },
+        { id: "stager", name: "Stager", icon: "sofa" },
+        { id: "mover", name: "Mover", icon: "truck" },
+        { id: "other", name: "Other", icon: "more-horizontal" },
+      ];
+      res.json(categories);
+    } catch (error) {
+      console.error('Error fetching marketplace categories:', error);
+      res.status(500).json({ error: 'Failed to fetch categories' });
+    }
+  });
+
+  app.get("/api/marketplace/contractors", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const category = req.query.category ? String(req.query.category) : undefined;
+      const search = req.query.search ? String(req.query.search) : undefined;
+      const limit = req.query.limit ? Number(req.query.limit) : 50;
+      const offset = req.query.offset ? Number(req.query.offset) : 0;
+
+      const [contractors, total] = await Promise.all([
+        storage.getMarketplaceContractors({ category, search, limit, offset }),
+        storage.getMarketplaceContractorCount({ category, search }),
+      ]);
+
+      res.json({ contractors, total, limit, offset });
+    } catch (error) {
+      console.error('Error fetching marketplace contractors:', error);
+      res.status(500).json({ error: 'Failed to fetch contractors' });
+    }
+  });
+
+  app.get("/api/marketplace/contractors/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = Number(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: 'Invalid contractor ID' });
+
+      const contractor = await storage.getContractor(id);
+      if (!contractor) return res.status(404).json({ error: 'Contractor not found' });
+
+      const reviews = await storage.getContractorReviews(id);
+      const recommendationCount = await storage.getContractorRecommendationCount(id);
+
+      res.json({ ...contractor, reviews, recommendationCount });
+    } catch (error) {
+      console.error('Error fetching marketplace contractor:', error);
+      res.status(500).json({ error: 'Failed to fetch contractor' });
+    }
+  });
+
+  // ==================== MyHome Routes ====================
+
+  app.post("/api/my-homes", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const parsed = insertHomeownerHomeSchema.safeParse({ ...req.body, userId: req.user.id });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+      const home = await storage.createHome(parsed.data);
+      res.status(201).json(home);
+    } catch (error) {
+      console.error('Error creating home:', error);
+      res.status(500).json({ error: 'Failed to create home' });
+    }
+  });
+
+  app.get("/api/my-homes", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homes = await storage.getHomesByUser(req.user.id);
+      res.json(homes);
+    } catch (error) {
+      console.error('Error fetching homes:', error);
+      res.status(500).json({ error: 'Failed to fetch homes' });
+    }
+  });
+
+  app.get("/api/my-homes/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = Number(req.params.id);
+      const home = await storage.getHome(id);
+      if (!home) return res.status(404).json({ error: 'Home not found' });
+      if (home.userId !== req.user.id) return res.sendStatus(403);
+      const maintenance = await storage.getMaintenanceByHome(id);
+      res.json({ ...home, maintenance });
+    } catch (error) {
+      console.error('Error fetching home:', error);
+      res.status(500).json({ error: 'Failed to fetch home' });
+    }
+  });
+
+  app.patch("/api/my-homes/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = Number(req.params.id);
+      const home = await storage.getHome(id);
+      if (!home) return res.status(404).json({ error: 'Home not found' });
+      if (home.userId !== req.user.id) return res.sendStatus(403);
+      const updated = await storage.updateHome(id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating home:', error);
+      res.status(500).json({ error: 'Failed to update home' });
+    }
+  });
+
+  app.delete("/api/my-homes/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = Number(req.params.id);
+      const home = await storage.getHome(id);
+      if (!home) return res.status(404).json({ error: 'Home not found' });
+      if (home.userId !== req.user.id) return res.sendStatus(403);
+      await storage.deleteHome(id);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting home:', error);
+      res.status(500).json({ error: 'Failed to delete home' });
+    }
+  });
+
+  // ==================== Maintenance Routes ====================
+
+  app.post("/api/my-homes/:id/maintenance", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = Number(req.params.id);
+      const home = await storage.getHome(homeId);
+      if (!home) return res.status(404).json({ error: 'Home not found' });
+      if (home.userId !== req.user.id) return res.sendStatus(403);
+      const parsed = insertMaintenanceRecordSchema.safeParse({ ...req.body, homeId });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+      const record = await storage.createMaintenanceRecord(parsed.data);
+      res.status(201).json(record);
+    } catch (error) {
+      console.error('Error creating maintenance record:', error);
+      res.status(500).json({ error: 'Failed to create maintenance record' });
+    }
+  });
+
+  app.get("/api/my-homes/:id/maintenance", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = Number(req.params.id);
+      const home = await storage.getHome(homeId);
+      if (!home) return res.status(404).json({ error: 'Home not found' });
+      if (home.userId !== req.user.id) return res.sendStatus(403);
+      const records = await storage.getMaintenanceByHome(homeId);
+      res.json(records);
+    } catch (error) {
+      console.error('Error fetching maintenance records:', error);
+      res.status(500).json({ error: 'Failed to fetch maintenance records' });
+    }
+  });
+
+  app.patch("/api/maintenance/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = Number(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      const homeIds = homes.map(h => h.id);
+      let ownsRecord = false;
+      for (const hId of homeIds) {
+        const records = await storage.getMaintenanceByHome(hId);
+        if (records.some(r => r.id === id)) { ownsRecord = true; break; }
+      }
+      if (!ownsRecord) return res.status(403).json({ error: 'Not authorized' });
+      const updated = await storage.updateMaintenanceRecord(id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating maintenance record:', error);
+      res.status(500).json({ error: 'Failed to update maintenance record' });
+    }
+  });
+
+  app.delete("/api/maintenance/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = Number(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      const homeIds = homes.map(h => h.id);
+      let ownsRecord = false;
+      for (const hId of homeIds) {
+        const records = await storage.getMaintenanceByHome(hId);
+        if (records.some(r => r.id === id)) { ownsRecord = true; break; }
+      }
+      if (!ownsRecord) return res.status(403).json({ error: 'Not authorized' });
+      await storage.deleteMaintenanceRecord(id);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting maintenance record:', error);
+      res.status(500).json({ error: 'Failed to delete maintenance record' });
+    }
+  });
+
+  // ==================== MyHomeTeam Routes ====================
+
+  app.post("/api/my-team", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const parsed = insertHomeTeamMemberSchema.safeParse({ ...req.body, userId: req.user.id });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+      const member = await storage.addHomeTeamMember(parsed.data);
+      res.status(201).json(member);
+    } catch (error) {
+      console.error('Error adding team member:', error);
+      res.status(500).json({ error: 'Failed to add team member' });
+    }
+  });
+
+  app.get("/api/my-team", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const members = await storage.getHomeTeamByUser(req.user.id);
+      const membersWithContractors = await Promise.all(
+        members.map(async (member) => {
+          const contractor = await storage.getContractor(member.contractorId);
+          return { ...member, contractor: contractor || null };
+        })
+      );
+      res.json(membersWithContractors);
+    } catch (error) {
+      console.error('Error fetching team members:', error);
+      res.status(500).json({ error: 'Failed to fetch team members' });
+    }
+  });
+
+  app.delete("/api/my-team/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = Number(req.params.id);
+      const member = await storage.getHomeTeamMember(id);
+      if (!member) return res.status(404).json({ error: 'Team member not found' });
+      if (member.userId !== req.user.id) return res.sendStatus(403);
+      await storage.removeHomeTeamMember(id);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error removing team member:', error);
+      res.status(500).json({ error: 'Failed to remove team member' });
     }
   });
 
