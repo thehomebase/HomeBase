@@ -2954,6 +2954,48 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/communications/call", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const schema = z.object({
+        clientId: z.number(),
+        duration: z.number().int().min(0).max(43200),
+        outcome: z.enum(["connected", "no_answer", "voicemail", "busy", "wrong_number"]),
+        notes: z.string().max(2000).optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
+      }
+      const { clientId, duration, outcome, notes } = parsed.data;
+
+      const client = await storage.getClient(clientId);
+      if (!client || client.agentId !== req.user.id) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      const minutes = Math.floor(duration / 60);
+      const seconds = duration % 60;
+      const durationStr = `${minutes}m ${seconds}s`;
+
+      const comm = await storage.createCommunication({
+        clientId,
+        agentId: req.user.id,
+        type: "call",
+        subject: `${outcome} — ${durationStr}`,
+        content: notes || null,
+        status: "sent",
+        externalId: null,
+      });
+
+      res.json(comm);
+    } catch (error) {
+      console.error("Error logging call:", error);
+      res.status(500).json({ error: "Failed to log call" });
+    }
+  });
+
   app.post("/api/gmail/send", upload.array("attachments", 10), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (req.user.role !== "agent") return res.sendStatus(403);

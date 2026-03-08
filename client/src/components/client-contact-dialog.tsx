@@ -6,7 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, MessageSquare, Loader2, CheckCircle, XCircle, Clock, AlertTriangle, Link2, Unlink, Phone, MapPin, Search } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Mail, MessageSquare, Loader2, CheckCircle, XCircle, Clock, AlertTriangle, Link2, Unlink, Phone, MapPin, Search, PhoneCall, Timer } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +28,10 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
   const [activeTab, setActiveTab] = useState("sms");
   const [areaCodeSearch, setAreaCodeSearch] = useState("");
   const [showNumberPicker, setShowNumberPicker] = useState(false);
+  const [callMinutes, setCallMinutes] = useState("");
+  const [callSeconds, setCallSeconds] = useState("");
+  const [callOutcome, setCallOutcome] = useState<string>("connected");
+  const [callNotes, setCallNotes] = useState("");
 
   const { data: commStatus } = useQuery<{ twilio: boolean; twilioPhone?: string; hasOwnNumber?: boolean; gmail: { connected: boolean; email?: string } }>({
     queryKey: ["/api/communications/status"],
@@ -206,6 +211,45 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
     },
   });
 
+  const callMutation = useMutation({
+    mutationFn: async (data: { clientId: number; duration: number; outcome: string; notes?: string }) => {
+      const res = await apiRequest("POST", "/api/communications/call", data);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to log call");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/communications", client?.id] });
+      setCallMinutes("");
+      setCallSeconds("");
+      setCallOutcome("connected");
+      setCallNotes("");
+      toast({ title: "Call Logged", description: `Phone call with ${client?.firstName} ${client?.lastName} has been recorded.` });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Log Failed",
+        description: error.message || "Failed to log the call.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleLogCall = () => {
+    if (!client) return;
+    const mins = parseInt(callMinutes) || 0;
+    const secs = parseInt(callSeconds) || 0;
+    const totalSeconds = mins * 60 + secs;
+    callMutation.mutate({
+      clientId: client.id,
+      duration: totalSeconds,
+      outcome: callOutcome,
+      notes: callNotes.trim() || undefined,
+    });
+  };
+
   const handleSendSMS = () => {
     if (!client || !smsContent.trim()) return;
     const phone = client.mobilePhone || client.phone;
@@ -253,6 +297,9 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
             </TabsTrigger>
             <TabsTrigger value="email" className="flex-1 gap-1">
               <Mail className="h-3 w-3" /> Email
+            </TabsTrigger>
+            <TabsTrigger value="call" className="flex-1 gap-1">
+              <PhoneCall className="h-3 w-3" /> Log Call
             </TabsTrigger>
             <TabsTrigger value="history" className="flex-1 gap-1">
               <Clock className="h-3 w-3" /> History
@@ -486,11 +533,102 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
             )}
           </TabsContent>
 
+          <TabsContent value="call" className="space-y-4 mt-4">
+            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <PhoneCall className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+              <div className="text-sm text-blue-700 dark:text-blue-300">
+                Log a phone call you just had with {client.firstName}. Record the outcome, duration, and any notes.
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Contact</Label>
+              <Input value={`${client.firstName} ${client.lastName}${phone ? ` — ${phone}` : ""}`} disabled className="bg-muted" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Call Outcome</Label>
+              <Select value={callOutcome} onValueChange={setCallOutcome}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="connected">Connected</SelectItem>
+                  <SelectItem value="no_answer">No Answer</SelectItem>
+                  <SelectItem value="voicemail">Left Voicemail</SelectItem>
+                  <SelectItem value="busy">Busy</SelectItem>
+                  <SelectItem value="wrong_number">Wrong Number</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Call Duration</Label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="999"
+                      value={callMinutes}
+                      onChange={(e) => setCallMinutes(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                      placeholder="0"
+                      className="pr-10"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">min</span>
+                  </div>
+                </div>
+                <span className="text-muted-foreground font-medium">:</span>
+                <div className="flex-1">
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={callSeconds}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 2);
+                        if (parseInt(val) > 59) return;
+                        setCallSeconds(val);
+                      }}
+                      placeholder="0"
+                      className="pr-10"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">sec</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notes <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Textarea
+                value={callNotes}
+                onChange={(e) => setCallNotes(e.target.value)}
+                placeholder="Key topics discussed, follow-up items, etc."
+                rows={3}
+              />
+            </div>
+
+            <Button
+              onClick={handleLogCall}
+              disabled={callMutation.isPending || ((parseInt(callMinutes) || 0) === 0 && (parseInt(callSeconds) || 0) === 0 && !callNotes.trim())}
+              className="w-full"
+            >
+              {callMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+              ) : (
+                <><PhoneCall className="h-4 w-4 mr-2" /> Log Call</>
+              )}
+            </Button>
+          </TabsContent>
+
           <TabsContent value="history" className="mt-4">
             {(() => {
               const items: Array<{
                 id: string;
-                type: "email" | "sms";
+                type: "email" | "sms" | "call";
                 direction: "sent" | "received" | "failed";
                 subject?: string;
                 preview?: string;
@@ -516,7 +654,7 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
 
                 items.push({
                   id: `platform-${comm.id}`,
-                  type: comm.type as "email" | "sms",
+                  type: comm.type as "email" | "sms" | "call",
                   direction: comm.status === "sent" ? "sent" : "failed",
                   subject: comm.subject || undefined,
                   preview: comm.content || undefined,
@@ -542,6 +680,8 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
                       <div className="mt-0.5">
                         {item.type === "sms" ? (
                           <MessageSquare className="h-4 w-4 text-green-600" />
+                        ) : item.type === "call" ? (
+                          <PhoneCall className="h-4 w-4 text-amber-600" />
                         ) : (
                           <Mail className={`h-4 w-4 ${item.direction === "received" ? "text-purple-600" : "text-blue-600"}`} />
                         )}
@@ -549,7 +689,7 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant="outline" className="text-xs">
-                            {item.type === "sms" ? "SMS" : "EMAIL"}
+                            {item.type === "sms" ? "SMS" : item.type === "call" ? "CALL" : "EMAIL"}
                           </Badge>
                           {item.direction === "failed" ? (
                             <Badge variant="destructive" className="text-xs">
@@ -557,7 +697,7 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
                             </Badge>
                           ) : (
                             <span className="text-xs text-muted-foreground">
-                              {item.direction === "sent" ? "Sent" : "Received"}
+                              {item.type === "call" ? "Logged" : item.direction === "sent" ? "Sent" : "Received"}
                             </span>
                           )}
                           <span className="text-xs text-muted-foreground ml-auto">
