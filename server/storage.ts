@@ -283,6 +283,9 @@ export interface IStorage {
   getAgentsForZipCode(zipCode: string): Promise<LeadZipCode[]>;
   isZipCodeClaimed(agentId: number, zipCode: string): Promise<boolean>;
   getAvailableZipCodes(): Promise<string[]>;
+  getAgentCountForZipCode(zipCode: string): Promise<number>;
+  countAgentZipCodes(agentId: number): Promise<number>;
+  countAgentFreeZipCodes(agentId: number): Promise<number>;
 
   createLead(data: InsertLead): Promise<Lead>;
   getLead(id: number): Promise<Lead | undefined>;
@@ -3865,6 +3868,21 @@ export class DatabaseStorage implements IStorage {
   async getAvailableZipCodes(): Promise<string[]> {
     const result = await db.execute(sql`SELECT DISTINCT zip_code FROM lead_zip_codes WHERE is_active = true ORDER BY zip_code`);
     return (result.rows as any[]).map(row => String(row.zip_code));
+  }
+
+  async getAgentCountForZipCode(zipCode: string): Promise<number> {
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM lead_zip_codes WHERE zip_code = ${zipCode} AND is_active = true`);
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async countAgentZipCodes(agentId: number): Promise<number> {
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM lead_zip_codes WHERE agent_id = ${agentId}`);
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async countAgentFreeZipCodes(agentId: number): Promise<number> {
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM lead_zip_codes WHERE agent_id = ${agentId} AND monthly_rate = 0`);
+    return Number(result.rows[0]?.count ?? 0);
   }
 
   async createLead(data: InsertLead): Promise<Lead> {

@@ -4376,28 +4376,91 @@ export function registerRoutes(app: Express): Server {
 
   // ===== Lead Zip Code Routes (agent-only, authenticated) =====
 
+  const FREE_ZIP_CODES_PER_AGENT = 3;
+  const MAX_AGENTS_PER_ZIP = 5;
+  const ZIP_BASE_PRICE = 1000; // $10.00 in cents
+  const ZIP_PRICE_INCREMENT = 500; // $5.00 in cents
+
+  function calculateZipCodePrice(currentAgentCount: number): number {
+    return ZIP_BASE_PRICE + (currentAgentCount * ZIP_PRICE_INCREMENT);
+  }
+
+  app.get("/api/leads/zip-pricing/:zipCode", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+
+    try {
+      const zipCode = req.params.zipCode.trim();
+      if (!/^\d{5}$/.test(zipCode)) {
+        return res.status(400).json({ error: 'Invalid zip code' });
+      }
+
+      const agentCount = await storage.getAgentCountForZipCode(zipCode);
+      const freeZipsUsed = await storage.countAgentFreeZipCodes(req.user.id);
+      const alreadyClaimed = await storage.isZipCodeClaimed(req.user.id, zipCode);
+      const isFreeSlot = freeZipsUsed < FREE_ZIP_CODES_PER_AGENT;
+      const price = isFreeSlot ? 0 : calculateZipCodePrice(agentCount);
+
+      res.json({
+        zipCode,
+        currentAgents: agentCount,
+        maxAgents: MAX_AGENTS_PER_ZIP,
+        spotsRemaining: MAX_AGENTS_PER_ZIP - agentCount,
+        isFull: agentCount >= MAX_AGENTS_PER_ZIP,
+        alreadyClaimed,
+        freeZipsUsed,
+        freeZipsTotal: FREE_ZIP_CODES_PER_AGENT,
+        isFreeSlot,
+        monthlyRate: price,
+        monthlyRateDisplay: isFreeSlot ? "Free (included)" : `$${(price / 100).toFixed(2)}/mo`,
+      });
+    } catch (error) {
+      console.error('Error fetching zip pricing:', error);
+      res.status(500).json({ error: 'Failed to fetch pricing' });
+    }
+  });
+
   app.post("/api/leads/zip-codes", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (req.user.role !== "agent") return res.sendStatus(403);
 
     try {
       const { zipCode } = req.body;
-      if (!zipCode || typeof zipCode !== 'string' || zipCode.trim().length === 0) {
+      if (!zipCode || typeof zipCode !== 'string') {
         return res.status(400).json({ error: 'Zip code is required' });
       }
 
-      const alreadyClaimed = await storage.isZipCodeClaimed(req.user.id, zipCode.trim());
+      const trimmedZip = zipCode.trim();
+      if (!/^\d{5}$/.test(trimmedZip)) {
+        return res.status(400).json({ error: 'Please enter a valid 5-digit zip code' });
+      }
+
+      const alreadyClaimed = await storage.isZipCodeClaimed(req.user.id, trimmedZip);
       if (alreadyClaimed) {
         return res.status(409).json({ error: 'You have already claimed this zip code' });
       }
 
+      const agentCount = await storage.getAgentCountForZipCode(trimmedZip);
+      if (agentCount >= MAX_AGENTS_PER_ZIP) {
+        return res.status(409).json({ error: `This zip code is full (max ${MAX_AGENTS_PER_ZIP} agents). Try a nearby zip code.` });
+      }
+
+      const freeZipsUsed = await storage.countAgentFreeZipCodes(req.user.id);
+      const isFreeSlot = freeZipsUsed < FREE_ZIP_CODES_PER_AGENT;
+      const monthlyRate = isFreeSlot ? 0 : calculateZipCodePrice(agentCount);
+
       const claimed = await storage.claimZipCode({
         agentId: req.user.id,
-        zipCode: zipCode.trim(),
+        zipCode: trimmedZip,
         isActive: true,
-        monthlyRate: 0,
+        monthlyRate,
       });
-      res.status(201).json(claimed);
+      res.status(201).json({
+        ...claimed,
+        isFreeSlot,
+        currentAgents: agentCount + 1,
+        maxAgents: MAX_AGENTS_PER_ZIP,
+      });
     } catch (error) {
       console.error('Error claiming zip code:', error);
       res.status(500).json({ error: 'Failed to claim zip code' });
@@ -4430,7 +4493,22 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const zips = await storage.getAgentZipCodes(req.user.id);
-      res.json(zips);
+      const freeZipsUsed = await storage.countAgentFreeZipCodes(req.user.id);
+      const enriched = await Promise.all(zips.map(async (zc) => {
+        const agentCount = await storage.getAgentCountForZipCode(zc.zipCode);
+        return {
+          ...zc,
+          currentAgents: agentCount,
+          maxAgents: MAX_AGENTS_PER_ZIP,
+          isFreeSlot: zc.monthlyRate === 0,
+        };
+      }));
+      res.json({
+        zipCodes: enriched,
+        freeZipsUsed,
+        freeZipsTotal: FREE_ZIP_CODES_PER_AGENT,
+        maxAgentsPerZip: MAX_AGENTS_PER_ZIP,
+      });
     } catch (error) {
       console.error('Error fetching zip codes:', error);
       res.status(500).json({ error: 'Failed to fetch zip codes' });
