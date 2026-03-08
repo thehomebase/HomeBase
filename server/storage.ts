@@ -46,6 +46,9 @@ import {
   type WebAuthnCredential,
   type PushSubscription, type InsertPushSubscription,
   pushSubscriptions,
+  type VendorZipCode, type InsertVendorZipCode,
+  type VendorLead, type InsertVendorLead,
+  type VendorLeadRotation, type InsertVendorLeadRotation,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -326,6 +329,27 @@ export interface IStorage {
   deletePushSubscription(id: number): Promise<void>;
   deletePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
   deletePushSubscriptionByUserAndEndpoint(userId: number, endpoint: string): Promise<void>;
+
+  getVendorZipCodes(vendorId: number): Promise<VendorZipCode[]>;
+  claimVendorZipCode(data: InsertVendorZipCode): Promise<VendorZipCode>;
+  releaseVendorZipCode(id: number, vendorId: number): Promise<void>;
+  getVendorZipCodesByZip(zipCode: string, category?: string): Promise<VendorZipCode[]>;
+  getVendorCountForZipCategory(zipCode: string, category: string): Promise<number>;
+  countVendorZipCodes(vendorId: number): Promise<number>;
+  countVendorFreeZipCodes(vendorId: number): Promise<number>;
+  isVendorZipClaimed(vendorId: number, zipCode: string, category: string): Promise<boolean>;
+
+  createVendorLead(data: InsertVendorLead): Promise<VendorLead>;
+  getVendorLead(id: number): Promise<VendorLead | undefined>;
+  getVendorLeadsByVendor(vendorId: number): Promise<VendorLead[]>;
+  updateVendorLeadStatus(id: number, status: string, vendorId?: number): Promise<VendorLead>;
+  getVendorLeadStats(vendorId: number): Promise<{ total: number; new: number; accepted: number; rejected: number; converted: number }>;
+
+  getVendorLeadRotation(zipCode: string, category: string): Promise<VendorLeadRotation | undefined>;
+  upsertVendorLeadRotation(zipCode: string, category: string, lastVendorId: number): Promise<VendorLeadRotation>;
+
+  getAgentResponseMetrics(agentId: number): Promise<{ avgResponseMs: number; fastestMs: number; slowestMs: number; totalResponded: number; responseRate: number }>;
+  getVendorResponseMetrics(vendorId: number): Promise<{ avgResponseMs: number; fastestMs: number; slowestMs: number; totalResponded: number; responseRate: number }>;
 
 }
 
@@ -3820,6 +3844,8 @@ export class DatabaseStorage implements IStorage {
       timeframe: row.timeframe ? String(row.timeframe) : null,
       status: String(row.status) as any,
       assignedAgentId: row.assigned_agent_id ? Number(row.assigned_agent_id) : null,
+      assignedAt: row.assigned_at ? new Date(row.assigned_at) : null,
+      respondedAt: row.responded_at ? new Date(row.responded_at) : null,
       createdAt: row.created_at ? new Date(row.created_at) : null,
     };
   }
@@ -3897,9 +3923,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createLead(data: InsertLead): Promise<Lead> {
+    const assignedAt = data.assignedAgentId ? new Date() : null;
     const result = await db.execute(sql`
-      INSERT INTO leads (zip_code, first_name, last_name, email, phone, type, message, budget, timeframe, status, assigned_agent_id)
-      VALUES (${data.zipCode}, ${data.firstName}, ${data.lastName}, ${data.email}, ${data.phone || null}, ${data.type}, ${data.message || null}, ${data.budget || null}, ${data.timeframe || null}, ${data.status || 'new'}, ${data.assignedAgentId || null})
+      INSERT INTO leads (zip_code, first_name, last_name, email, phone, type, message, budget, timeframe, status, assigned_agent_id, assigned_at)
+      VALUES (${data.zipCode}, ${data.firstName}, ${data.lastName}, ${data.email}, ${data.phone || null}, ${data.type}, ${data.message || null}, ${data.budget || null}, ${data.timeframe || null}, ${data.status || 'new'}, ${data.assignedAgentId || null}, ${assignedAt})
       RETURNING *
     `);
     if (!result.rows[0]) throw new Error('Failed to create lead');
@@ -3924,8 +3951,13 @@ export class DatabaseStorage implements IStorage {
 
   async updateLeadStatus(id: number, status: string, agentId?: number): Promise<Lead> {
     let result;
-    if (agentId !== undefined) {
+    const isResponse = status === 'accepted' || status === 'rejected';
+    if (agentId !== undefined && isResponse) {
+      result = await db.execute(sql`UPDATE leads SET status = ${status}, assigned_agent_id = ${agentId}, responded_at = NOW() WHERE id = ${id} RETURNING *`);
+    } else if (agentId !== undefined) {
       result = await db.execute(sql`UPDATE leads SET status = ${status}, assigned_agent_id = ${agentId} WHERE id = ${id} RETURNING *`);
+    } else if (isResponse) {
+      result = await db.execute(sql`UPDATE leads SET status = ${status}, responded_at = NOW() WHERE id = ${id} RETURNING *`);
     } else {
       result = await db.execute(sql`UPDATE leads SET status = ${status} WHERE id = ${id} RETURNING *`);
     }
@@ -4188,6 +4220,219 @@ export class DatabaseStorage implements IStorage {
 
   async deletePushSubscriptionByUserAndEndpoint(userId: number, endpoint: string): Promise<void> {
     await db.execute(sql`DELETE FROM push_subscriptions WHERE user_id = ${userId} AND endpoint = ${endpoint}`);
+  }
+
+  private mapVendorZipCodeRow(row: any): VendorZipCode {
+    return {
+      id: Number(row.id),
+      vendorId: Number(row.vendor_id),
+      zipCode: String(row.zip_code),
+      category: String(row.category),
+      isActive: row.is_active !== false,
+      monthlyRate: row.monthly_rate ? Number(row.monthly_rate) : 0,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+    };
+  }
+
+  private mapVendorLeadRow(row: any): VendorLead {
+    return {
+      id: Number(row.id),
+      zipCode: String(row.zip_code),
+      category: String(row.category),
+      firstName: String(row.first_name),
+      lastName: String(row.last_name),
+      email: String(row.email),
+      phone: row.phone ? String(row.phone) : null,
+      description: row.description ? String(row.description) : null,
+      urgency: String(row.urgency) as any,
+      status: String(row.status) as any,
+      assignedVendorId: row.assigned_vendor_id ? Number(row.assigned_vendor_id) : null,
+      assignedAt: row.assigned_at ? new Date(row.assigned_at) : null,
+      respondedAt: row.responded_at ? new Date(row.responded_at) : null,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+    };
+  }
+
+  private mapVendorLeadRotationRow(row: any): VendorLeadRotation {
+    return {
+      id: Number(row.id),
+      zipCode: String(row.zip_code),
+      category: String(row.category),
+      lastVendorId: row.last_vendor_id ? Number(row.last_vendor_id) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null,
+    };
+  }
+
+  async getVendorZipCodes(vendorId: number): Promise<VendorZipCode[]> {
+    const result = await db.execute(sql`SELECT * FROM vendor_zip_codes WHERE vendor_id = ${vendorId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => this.mapVendorZipCodeRow(row));
+  }
+
+  async claimVendorZipCode(data: InsertVendorZipCode): Promise<VendorZipCode> {
+    const result = await db.execute(sql`
+      INSERT INTO vendor_zip_codes (vendor_id, zip_code, category, is_active, monthly_rate)
+      VALUES (${data.vendorId}, ${data.zipCode}, ${data.category}, ${data.isActive ?? true}, ${data.monthlyRate ?? 0})
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to claim vendor zip code');
+    return this.mapVendorZipCodeRow(result.rows[0]);
+  }
+
+  async releaseVendorZipCode(id: number, vendorId: number): Promise<void> {
+    await db.execute(sql`DELETE FROM vendor_zip_codes WHERE id = ${id} AND vendor_id = ${vendorId}`);
+  }
+
+  async getVendorZipCodesByZip(zipCode: string, category?: string): Promise<VendorZipCode[]> {
+    if (category) {
+      const result = await db.execute(sql`SELECT * FROM vendor_zip_codes WHERE zip_code = ${zipCode} AND category = ${category} AND is_active = true`);
+      return (result.rows as any[]).map(row => this.mapVendorZipCodeRow(row));
+    }
+    const result = await db.execute(sql`SELECT * FROM vendor_zip_codes WHERE zip_code = ${zipCode} AND is_active = true`);
+    return (result.rows as any[]).map(row => this.mapVendorZipCodeRow(row));
+  }
+
+  async getVendorCountForZipCategory(zipCode: string, category: string): Promise<number> {
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM vendor_zip_codes WHERE zip_code = ${zipCode} AND category = ${category} AND is_active = true`);
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async countVendorZipCodes(vendorId: number): Promise<number> {
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM vendor_zip_codes WHERE vendor_id = ${vendorId}`);
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async countVendorFreeZipCodes(vendorId: number): Promise<number> {
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM vendor_zip_codes WHERE vendor_id = ${vendorId} AND monthly_rate = 0`);
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async isVendorZipClaimed(vendorId: number, zipCode: string, category: string): Promise<boolean> {
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM vendor_zip_codes WHERE vendor_id = ${vendorId} AND zip_code = ${zipCode} AND category = ${category}`);
+    return Number(result.rows[0]?.count ?? 0) > 0;
+  }
+
+  async createVendorLead(data: InsertVendorLead): Promise<VendorLead> {
+    const assignedAt = data.assignedVendorId ? new Date() : null;
+    const result = await db.execute(sql`
+      INSERT INTO vendor_leads (zip_code, category, first_name, last_name, email, phone, description, urgency, status, assigned_vendor_id, assigned_at)
+      VALUES (${data.zipCode}, ${data.category}, ${data.firstName}, ${data.lastName}, ${data.email}, ${data.phone || null}, ${data.description || null}, ${data.urgency || 'medium'}, ${data.status || 'new'}, ${data.assignedVendorId || null}, ${assignedAt})
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to create vendor lead');
+    return this.mapVendorLeadRow(result.rows[0]);
+  }
+
+  async getVendorLead(id: number): Promise<VendorLead | undefined> {
+    const result = await db.execute(sql`SELECT * FROM vendor_leads WHERE id = ${id} LIMIT 1`);
+    if (!result.rows[0]) return undefined;
+    return this.mapVendorLeadRow(result.rows[0]);
+  }
+
+  async getVendorLeadsByVendor(vendorId: number): Promise<VendorLead[]> {
+    const result = await db.execute(sql`SELECT * FROM vendor_leads WHERE assigned_vendor_id = ${vendorId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => this.mapVendorLeadRow(row));
+  }
+
+  async updateVendorLeadStatus(id: number, status: string, vendorId?: number): Promise<VendorLead> {
+    let result;
+    const isResponse = status === 'accepted' || status === 'rejected';
+    if (vendorId !== undefined && isResponse) {
+      result = await db.execute(sql`UPDATE vendor_leads SET status = ${status}, assigned_vendor_id = ${vendorId}, responded_at = NOW() WHERE id = ${id} RETURNING *`);
+    } else if (vendorId !== undefined) {
+      result = await db.execute(sql`UPDATE vendor_leads SET status = ${status}, assigned_vendor_id = ${vendorId} WHERE id = ${id} RETURNING *`);
+    } else if (isResponse) {
+      result = await db.execute(sql`UPDATE vendor_leads SET status = ${status}, responded_at = NOW() WHERE id = ${id} RETURNING *`);
+    } else {
+      result = await db.execute(sql`UPDATE vendor_leads SET status = ${status} WHERE id = ${id} RETURNING *`);
+    }
+    if (!result.rows[0]) throw new Error('Vendor lead not found');
+    return this.mapVendorLeadRow(result.rows[0]);
+  }
+
+  async getVendorLeadStats(vendorId: number): Promise<{ total: number; new: number; accepted: number; rejected: number; converted: number }> {
+    const result = await db.execute(sql`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status IN ('new', 'assigned')) as new,
+        COUNT(*) FILTER (WHERE status = 'accepted') as accepted,
+        COUNT(*) FILTER (WHERE status = 'rejected') as rejected,
+        COUNT(*) FILTER (WHERE status = 'converted') as converted
+      FROM vendor_leads WHERE assigned_vendor_id = ${vendorId}
+    `);
+    const row = result.rows[0] as any;
+    return {
+      total: Number(row?.total ?? 0),
+      new: Number(row?.new ?? 0),
+      accepted: Number(row?.accepted ?? 0),
+      rejected: Number(row?.rejected ?? 0),
+      converted: Number(row?.converted ?? 0),
+    };
+  }
+
+  async getVendorLeadRotation(zipCode: string, category: string): Promise<VendorLeadRotation | undefined> {
+    const result = await db.execute(sql`SELECT * FROM vendor_lead_rotations WHERE zip_code = ${zipCode} AND category = ${category} LIMIT 1`);
+    if (!result.rows[0]) return undefined;
+    return this.mapVendorLeadRotationRow(result.rows[0]);
+  }
+
+  async upsertVendorLeadRotation(zipCode: string, category: string, lastVendorId: number): Promise<VendorLeadRotation> {
+    const existing = await this.getVendorLeadRotation(zipCode, category);
+    if (existing) {
+      const result = await db.execute(sql`UPDATE vendor_lead_rotations SET last_vendor_id = ${lastVendorId}, updated_at = NOW() WHERE id = ${existing.id} RETURNING *`);
+      if (!result.rows[0]) throw new Error('Failed to update vendor lead rotation');
+      return this.mapVendorLeadRotationRow(result.rows[0]);
+    }
+    const result = await db.execute(sql`
+      INSERT INTO vendor_lead_rotations (zip_code, category, last_vendor_id, updated_at)
+      VALUES (${zipCode}, ${category}, ${lastVendorId}, NOW())
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to create vendor lead rotation');
+    return this.mapVendorLeadRotationRow(result.rows[0]);
+  }
+
+  async getAgentResponseMetrics(agentId: number): Promise<{ avgResponseMs: number; fastestMs: number; slowestMs: number; totalResponded: number; responseRate: number }> {
+    const result = await db.execute(sql`
+      SELECT 
+        AVG(EXTRACT(EPOCH FROM (responded_at - assigned_at)) * 1000) as avg_ms,
+        MIN(EXTRACT(EPOCH FROM (responded_at - assigned_at)) * 1000) as min_ms,
+        MAX(EXTRACT(EPOCH FROM (responded_at - assigned_at)) * 1000) as max_ms,
+        COUNT(*) FILTER (WHERE responded_at IS NOT NULL) as responded,
+        COUNT(*) FILTER (WHERE assigned_at IS NOT NULL) as total_assigned
+      FROM leads WHERE assigned_agent_id = ${agentId} AND assigned_at IS NOT NULL
+    `);
+    const row = result.rows[0] as any;
+    const totalAssigned = Number(row?.total_assigned ?? 0);
+    const totalResponded = Number(row?.responded ?? 0);
+    return {
+      avgResponseMs: Number(row?.avg_ms ?? 0),
+      fastestMs: Number(row?.min_ms ?? 0),
+      slowestMs: Number(row?.max_ms ?? 0),
+      totalResponded,
+      responseRate: totalAssigned > 0 ? (totalResponded / totalAssigned) * 100 : 0,
+    };
+  }
+
+  async getVendorResponseMetrics(vendorId: number): Promise<{ avgResponseMs: number; fastestMs: number; slowestMs: number; totalResponded: number; responseRate: number }> {
+    const result = await db.execute(sql`
+      SELECT 
+        AVG(EXTRACT(EPOCH FROM (responded_at - assigned_at)) * 1000) as avg_ms,
+        MIN(EXTRACT(EPOCH FROM (responded_at - assigned_at)) * 1000) as min_ms,
+        MAX(EXTRACT(EPOCH FROM (responded_at - assigned_at)) * 1000) as max_ms,
+        COUNT(*) FILTER (WHERE responded_at IS NOT NULL) as responded,
+        COUNT(*) FILTER (WHERE assigned_at IS NOT NULL) as total_assigned
+      FROM vendor_leads WHERE assigned_vendor_id = ${vendorId} AND assigned_at IS NOT NULL
+    `);
+    const row = result.rows[0] as any;
+    const totalAssigned = Number(row?.total_assigned ?? 0);
+    const totalResponded = Number(row?.responded ?? 0);
+    return {
+      avgResponseMs: Number(row?.avg_ms ?? 0),
+      fastestMs: Number(row?.min_ms ?? 0),
+      slowestMs: Number(row?.max_ms ?? 0),
+      totalResponded,
+      responseRate: totalAssigned > 0 ? (totalResponded / totalAssigned) * 100 : 0,
+    };
   }
 
 }

@@ -20,7 +20,7 @@ import {
 import type {
   AuthenticatorTransportFuture,
 } from "@simplewebauthn/server";
-import { notifyAgentOfNewLead } from "./notification-service";
+import { notifyAgentOfNewLead, notifyVendorOfNewLead } from "./notification-service";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -4947,6 +4947,239 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error removing push subscription:', error);
       res.status(500).json({ error: 'Failed to remove subscription' });
+    }
+  });
+
+  // ============ VENDOR LEAD SYSTEM ============
+
+  const FREE_VENDOR_ZIPS = 3;
+  const MAX_VENDORS_PER_ZIP_CATEGORY = 5;
+  const VENDOR_ZIP_BASE_PRICE = 1000;
+  const VENDOR_ZIP_PRICE_INCREMENT = 500;
+  const FREE_ELIGIBLE_MIN_OPEN_SLOTS_VENDOR = 3;
+
+  function getVendorZipPrice(currentVendorCount: number): number {
+    return VENDOR_ZIP_BASE_PRICE + (currentVendorCount * VENDOR_ZIP_PRICE_INCREMENT);
+  }
+
+  function isVendorZipFreeEligible(currentVendorCount: number): boolean {
+    const openSlots = MAX_VENDORS_PER_ZIP_CATEGORY - currentVendorCount;
+    return openSlots >= FREE_ELIGIBLE_MIN_OPEN_SLOTS_VENDOR;
+  }
+
+  app.get("/api/vendor/zip-codes", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'vendor') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const zipCodes = await storage.getVendorZipCodes(req.user.id);
+      res.json(zipCodes);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch vendor zip codes' });
+    }
+  });
+
+  app.get("/api/vendor/zip-codes/pricing", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'vendor') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const { zipCode, category } = req.query;
+      if (!zipCode || !category) return res.status(400).json({ error: 'zipCode and category are required' });
+
+      const currentCount = await storage.getVendorCountForZipCategory(String(zipCode), String(category));
+      const alreadyClaimed = await storage.isVendorZipClaimed(req.user.id, String(zipCode), String(category));
+      const totalVendorZips = await storage.countVendorZipCodes(req.user.id);
+      const freeZipsUsed = await storage.countVendorFreeZipCodes(req.user.id);
+      const freeEligible = isVendorZipFreeEligible(currentCount);
+      const hasFreeSlots = freeZipsUsed < FREE_VENDOR_ZIPS && freeEligible;
+
+      res.json({
+        zipCode: String(zipCode),
+        category: String(category),
+        currentVendors: currentCount,
+        maxVendors: MAX_VENDORS_PER_ZIP_CATEGORY,
+        isFull: currentCount >= MAX_VENDORS_PER_ZIP_CATEGORY,
+        alreadyClaimed,
+        monthlyRate: hasFreeSlots ? 0 : getVendorZipPrice(currentCount),
+        freeSlots: FREE_VENDOR_ZIPS - freeZipsUsed,
+        totalClaimed: totalVendorZips,
+        freeEligible,
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch pricing' });
+    }
+  });
+
+  app.post("/api/vendor/zip-codes/claim", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'vendor') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const schema = z.object({
+        zipCode: z.string().min(5).max(5),
+        category: z.string().min(1),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
+      const { zipCode, category } = parsed.data;
+      const alreadyClaimed = await storage.isVendorZipClaimed(req.user.id, zipCode, category);
+      if (alreadyClaimed) return res.status(400).json({ error: 'You already claimed this zip code for this category' });
+
+      const currentCount = await storage.getVendorCountForZipCategory(zipCode, category);
+      if (currentCount >= MAX_VENDORS_PER_ZIP_CATEGORY) return res.status(400).json({ error: 'This zip code is full for this category' });
+
+      const freeZipsUsed = await storage.countVendorFreeZipCodes(req.user.id);
+      const freeEligible = isVendorZipFreeEligible(currentCount);
+      const isFree = freeZipsUsed < FREE_VENDOR_ZIPS && freeEligible;
+      const monthlyRate = isFree ? 0 : getVendorZipPrice(currentCount);
+
+      const zipClaim = await storage.claimVendorZipCode({
+        vendorId: req.user.id,
+        zipCode,
+        category,
+        isActive: true,
+        monthlyRate,
+      });
+
+      res.status(201).json(zipClaim);
+    } catch (error) {
+      console.error('Error claiming vendor zip code:', error);
+      res.status(500).json({ error: 'Failed to claim zip code' });
+    }
+  });
+
+  app.delete("/api/vendor/zip-codes/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'vendor') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      await storage.releaseVendorZipCode(Number(req.params.id), req.user.id);
+      res.sendStatus(200);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to release zip code' });
+    }
+  });
+
+  async function assignVendorLead(zipCode: string, category: string): Promise<{ assignedVendorId: number | null; status: string }> {
+    const vendors = await storage.getVendorZipCodesByZip(zipCode, category);
+    if (vendors.length === 0) return { assignedVendorId: null, status: 'new' };
+
+    const rotation = await storage.getVendorLeadRotation(zipCode, category);
+    const lastVendorId = rotation?.lastVendorId;
+
+    let nextVendor: typeof vendors[0];
+    if (lastVendorId) {
+      const lastIndex = vendors.findIndex(v => v.vendorId === lastVendorId);
+      const nextIndex = (lastIndex + 1) % vendors.length;
+      nextVendor = vendors[nextIndex];
+    } else {
+      nextVendor = vendors[0];
+    }
+
+    await storage.upsertVendorLeadRotation(zipCode, category, nextVendor.vendorId);
+    return { assignedVendorId: nextVendor.vendorId, status: 'assigned' };
+  }
+
+  app.post("/api/vendor-leads/submit", async (req, res) => {
+    try {
+      const schema = z.object({
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        email: z.string().email(),
+        phone: z.string().optional().nullable(),
+        zipCode: z.string().regex(/^\d{5}$/, "Invalid zip code"),
+        category: z.string().min(1),
+        description: z.string().optional().nullable(),
+        urgency: z.enum(['low', 'medium', 'high', 'emergency']).optional().default('medium'),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
+      const data = parsed.data;
+      const { assignedVendorId, status } = await assignVendorLead(data.zipCode, data.category);
+
+      const lead = await storage.createVendorLead({
+        ...data,
+        phone: data.phone || null,
+        description: data.description || null,
+        status,
+        assignedVendorId,
+      });
+
+      if (assignedVendorId) {
+        try {
+          const vendor = await storage.getUser(assignedVendorId);
+          if (vendor) {
+            const subs = await storage.getPushSubscriptionsByUser(assignedVendorId);
+            await notifyVendorOfNewLead(
+              vendor,
+              { zipCode: data.zipCode, category: data.category, firstName: data.firstName, lastName: data.lastName, urgency: data.urgency, description: data.description },
+              subs,
+              async (subId) => storage.deletePushSubscription(subId)
+            );
+          }
+        } catch (notifErr) {
+          console.error('Error sending vendor lead notification:', notifErr);
+        }
+      }
+
+      res.status(201).json({ success: true, assigned: !!assignedVendorId });
+    } catch (error) {
+      console.error('Error submitting vendor lead:', error);
+      res.status(500).json({ error: 'Failed to submit service request' });
+    }
+  });
+
+  app.get("/api/vendor/leads", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'vendor') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const leads = await storage.getVendorLeadsByVendor(req.user.id);
+      res.json(leads);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch vendor leads' });
+    }
+  });
+
+  app.patch("/api/vendor/leads/:id/status", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'vendor') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const { status } = req.body;
+      if (!['accepted', 'rejected', 'converted'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+      }
+      const lead = await storage.getVendorLead(Number(req.params.id));
+      if (!lead || lead.assignedVendorId !== req.user.id) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+      const updated = await storage.updateVendorLeadStatus(lead.id, status);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update lead status' });
+    }
+  });
+
+  app.get("/api/vendor/leads/stats", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'vendor') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const stats = await storage.getVendorLeadStats(req.user.id);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch vendor lead stats' });
+    }
+  });
+
+  app.get("/api/vendor/leads/response-metrics", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'vendor') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const metrics = await storage.getVendorResponseMetrics(req.user.id);
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch response metrics' });
+    }
+  });
+
+  app.get("/api/leads/response-metrics", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'agent') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const metrics = await storage.getAgentResponseMetrics(req.user.id);
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch response metrics' });
     }
   });
 

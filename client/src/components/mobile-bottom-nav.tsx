@@ -182,20 +182,32 @@ export function MobileBottomNav() {
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t md:hidden">
         <div className="flex items-center justify-around px-1 pt-1 pb-safe">
-          {primary.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-col items-center gap-0.5 py-1 px-2 min-w-[60px] rounded-lg transition-all active:scale-90 ${
-                isActive(item.href)
-                  ? "text-primary"
-                  : "text-muted-foreground"
-              }`}
-            >
-              <item.icon className={`h-5 w-5 ${isActive(item.href) ? "stroke-[2.5]" : ""}`} />
-              <span className="text-[10px] leading-tight font-medium">{item.label}</span>
-            </Link>
-          ))}
+          {primary.map((item) => {
+            const showBadge = newLeadCount > 0 && (
+              (item.href === "/lead-gen") || (item.href === "/vendor")
+            );
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex flex-col items-center gap-0.5 py-1 px-2 min-w-[60px] rounded-lg transition-all active:scale-90 ${
+                  isActive(item.href)
+                    ? "text-primary"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <div className="relative">
+                  <item.icon className={`h-5 w-5 ${isActive(item.href) ? "stroke-[2.5]" : ""}`} />
+                  {showBadge && (
+                    <span className="absolute -top-1.5 -right-2 h-4 min-w-[16px] px-0.5 flex items-center justify-center text-[9px] font-bold bg-red-500 text-white rounded-full leading-none">
+                      {newLeadCount > 99 ? "99+" : newLeadCount}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] leading-tight font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
           <button
             onClick={() => setShowMore(!showMore)}
             className={`flex flex-col items-center gap-0.5 py-1 px-2 min-w-[60px] rounded-lg transition-all active:scale-90 ${

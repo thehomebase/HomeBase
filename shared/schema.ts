@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, boolean, json, date, time, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, integer, boolean, json, date, time, doublePrecision, uniqueIndex } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from "zod";
 
@@ -585,6 +585,8 @@ export const leads = pgTable("leads", {
   timeframe: text("timeframe"),
   status: text("status", { enum: ['new', 'assigned', 'accepted', 'rejected', 'converted'] }).notNull().default('new'),
   assignedAgentId: integer("assigned_agent_id"),
+  assignedAt: timestamp("assigned_at"),
+  respondedAt: timestamp("responded_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -781,3 +783,60 @@ export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions
 });
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+
+export const vendorZipCodes = pgTable("vendor_zip_codes", {
+  id: serial("id").primaryKey(),
+  vendorId: integer("vendor_id").notNull(),
+  zipCode: text("zip_code").notNull(),
+  category: text("category").notNull(),
+  isActive: boolean("is_active").default(true),
+  monthlyRate: integer("monthly_rate").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("vendor_zip_unique").on(table.vendorId, table.zipCode, table.category),
+]);
+
+export const vendorLeads = pgTable("vendor_leads", {
+  id: serial("id").primaryKey(),
+  zipCode: text("zip_code").notNull(),
+  category: text("category").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  description: text("description"),
+  urgency: text("urgency", { enum: ['low', 'medium', 'high', 'emergency'] }).notNull().default('medium'),
+  status: text("status", { enum: ['new', 'assigned', 'accepted', 'rejected', 'converted'] }).notNull().default('new'),
+  assignedVendorId: integer("assigned_vendor_id"),
+  assignedAt: timestamp("assigned_at"),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const vendorLeadRotations = pgTable("vendor_lead_rotations", {
+  id: serial("id").primaryKey(),
+  zipCode: text("zip_code").notNull(),
+  category: text("category").notNull(),
+  lastVendorId: integer("last_vendor_id"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertVendorZipCodeSchema = createInsertSchema(vendorZipCodes).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertVendorLeadSchema = createInsertSchema(vendorLeads).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertVendorLeadRotationSchema = createInsertSchema(vendorLeadRotations).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type VendorZipCode = typeof vendorZipCodes.$inferSelect;
+export type InsertVendorZipCode = z.infer<typeof insertVendorZipCodeSchema>;
+export type VendorLead = typeof vendorLeads.$inferSelect;
+export type InsertVendorLead = z.infer<typeof insertVendorLeadSchema>;
+export type VendorLeadRotation = typeof vendorLeadRotations.$inferSelect;
+export type InsertVendorLeadRotation = z.infer<typeof insertVendorLeadRotationSchema>;

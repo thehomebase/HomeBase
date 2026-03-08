@@ -31,6 +31,7 @@ import {
   Lock,
   Bell,
   BellOff,
+  Clock,
 } from "lucide-react";
 import type { Lead } from "@shared/schema";
 import { isPushSupported, subscribeToPush, unsubscribeFromPush, isCurrentlySubscribed, getPushPermissionState } from "@/lib/push-notifications";
@@ -42,6 +43,16 @@ const STATUS_COLORS: Record<string, string> = {
   rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
   converted: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
 };
+
+function formatResponseTime(ms: number): string {
+  if (ms <= 0) return "N/A";
+  const minutes = Math.floor(ms / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  return `${minutes}m`;
+}
 
 const TYPE_LABELS: Record<string, string> = {
   buyer: "Buyer",
@@ -202,6 +213,10 @@ export default function LeadGenerationPage() {
     },
   });
 
+  const { data: responseMetrics } = useQuery<{ avgResponseMs: number; fastestMs: number; slowestMs: number; totalResponded: number; responseRate: number }>({
+    queryKey: ["/api/leads/response-metrics"],
+  });
+
   const totalLeads = stats?.total ?? 0;
   const newLeads = stats?.new ?? 0;
   const acceptedLeads = stats?.accepted ?? 0;
@@ -317,6 +332,35 @@ export default function LeadGenerationPage() {
           </CardContent>
         </Card>
       </div>
+
+      {responseMetrics && responseMetrics.totalResponded > 0 && (
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Clock className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Response Metrics</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div>
+                <p className="text-lg font-semibold">{formatResponseTime(responseMetrics.avgResponseMs)}</p>
+                <p className="text-xs text-muted-foreground">Avg Response</p>
+              </div>
+              <div>
+                <p className="text-lg font-semibold">{formatResponseTime(responseMetrics.fastestMs)}</p>
+                <p className="text-xs text-muted-foreground">Fastest</p>
+              </div>
+              <div>
+                <p className="text-lg font-semibold">{formatResponseTime(responseMetrics.slowestMs)}</p>
+                <p className="text-xs text-muted-foreground">Slowest</p>
+              </div>
+              <div>
+                <p className="text-lg font-semibold">{Math.round(responseMetrics.responseRate)}%</p>
+                <p className="text-xs text-muted-foreground">Response Rate</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>

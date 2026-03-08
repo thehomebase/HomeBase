@@ -76,6 +76,7 @@ import DripCampaignsPage from "@/pages/drip-campaigns-page";
 import { TopAgentsPage, AgentReviewsPage } from "@/pages/agent-reviews-page";
 import LeadGenerationPage from "@/pages/lead-generation-page";
 import LeadSubmitPage from "@/pages/lead-submit-page";
+import FindContractorPage from "@/pages/find-contractor-page";
 import VendorRatingsPage from "@/pages/vendor-ratings-page";
 import BiometricSettingsPage from "@/pages/biometric-settings-page";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
@@ -158,8 +159,24 @@ function Layout({ children }: { children: React.ReactNode }) {
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Vendor Portal">
                             <Link href="/vendor" className="flex items-center gap-2">
-                              <Wrench className="h-4 w-4" />
-                              {isSidebarOpen && <span>Vendor Portal</span>}
+                              <div className="relative">
+                                <Wrench className="h-4 w-4" />
+                                {newLeadCount > 0 && !isSidebarOpen && (
+                                  <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-0.5 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
+                                    {newLeadCount > 99 ? "99+" : newLeadCount}
+                                  </span>
+                                )}
+                              </div>
+                              {isSidebarOpen && (
+                                <span className="flex items-center gap-2">
+                                  Vendor Portal
+                                  {newLeadCount > 0 && (
+                                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                                      {newLeadCount}
+                                    </span>
+                                  )}
+                                </span>
+                              )}
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -428,6 +445,7 @@ function Router() {
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/find-agent" component={LeadSubmitPage} />
+      <Route path="/find-contractor" component={FindContractorPage} />
       <Route path="/agents/:agentId/reviews" component={AgentReviewsPage} />
       <Route path="/top-agents" component={TopAgentsPage} />
       <Route path="/auth" component={AuthPage} />

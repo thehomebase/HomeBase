@@ -15,6 +15,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
   LayoutDashboard,
   FileText,
   Gavel,
@@ -28,8 +36,18 @@ import {
   ExternalLink,
   BookOpen,
   Eye,
+  MapPin,
+  Zap,
+  TrendingUp,
+  Trash2,
+  Plus,
+  Users,
 } from "lucide-react";
 import { SiGoogle, SiYelp } from "react-icons/si";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import type { VendorLead, VendorZipCode } from "@shared/schema";
 
 function DashboardTab({ profile, bidRequests, bids }: {
   profile: Contractor | null;
@@ -672,6 +690,436 @@ function ReviewsTab({ profile }: { profile: Contractor | null }) {
   );
 }
 
+const SERVICE_CATEGORIES = [
+  { value: "home_inspector", label: "Home Inspector" },
+  { value: "roofer", label: "Roofer" },
+  { value: "plumber", label: "Plumber" },
+  { value: "electrician", label: "Electrician" },
+  { value: "hvac", label: "HVAC" },
+  { value: "painter", label: "Painter" },
+  { value: "landscaper", label: "Landscaper" },
+  { value: "handyman", label: "Handyman" },
+  { value: "mover", label: "Mover" },
+  { value: "cleaner", label: "Cleaner" },
+  { value: "pest_control", label: "Pest Control" },
+  { value: "pool_maintenance", label: "Pool Maintenance" },
+  { value: "windows", label: "Windows" },
+  { value: "title_company", label: "Title Company" },
+  { value: "mortgage_lender", label: "Mortgage Lender" },
+  { value: "appraiser", label: "Appraiser" },
+  { value: "photographer", label: "Photographer" },
+  { value: "stager", label: "Stager" },
+  { value: "other", label: "Other" },
+];
+
+function formatResponseTime(ms: number): string {
+  if (ms <= 0) return "N/A";
+  const minutes = Math.floor(ms / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  return `${minutes}m`;
+}
+
+function LeadsTab() {
+  const { toast } = useToast();
+
+  const { data: leads = [], isLoading } = useQuery<VendorLead[]>({
+    queryKey: ["/api/vendor/leads"],
+  });
+
+  const { data: stats } = useQuery<{ total: number; new: number; accepted: number; rejected: number; converted: number }>({
+    queryKey: ["/api/vendor/leads/stats"],
+  });
+
+  const { data: metrics } = useQuery<{ avgResponseMs: number; fastestMs: number; slowestMs: number; totalResponded: number; responseRate: number }>({
+    queryKey: ["/api/vendor/leads/response-metrics"],
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/vendor/leads/${id}/status`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/leads/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/leads/response-metrics"] });
+      toast({ title: "Lead updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update lead", variant: "destructive" });
+    },
+  });
+
+  const urgencyColors: Record<string, string> = {
+    low: "bg-gray-100 text-gray-700",
+    medium: "bg-blue-100 text-blue-700",
+    high: "bg-orange-100 text-orange-700",
+    emergency: "bg-red-100 text-red-700",
+  };
+
+  if (isLoading) return <Skeleton className="h-64" />;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-4 text-center">
+            <p className="text-2xl font-bold">{stats?.total ?? 0}</p>
+            <p className="text-xs text-muted-foreground">Total Leads</p>
+          </CardContent>
+        </Card>
+        <Card className="border-blue-200">
+          <CardContent className="pt-4 pb-4 text-center">
+            <p className="text-2xl font-bold text-blue-600">{stats?.new ?? 0}</p>
+            <p className="text-xs text-muted-foreground">Pending</p>
+          </CardContent>
+        </Card>
+        <Card className="border-green-200">
+          <CardContent className="pt-4 pb-4 text-center">
+            <p className="text-2xl font-bold text-green-600">{stats?.accepted ?? 0}</p>
+            <p className="text-xs text-muted-foreground">Accepted</p>
+          </CardContent>
+        </Card>
+        <Card className="border-red-200">
+          <CardContent className="pt-4 pb-4 text-center">
+            <p className="text-2xl font-bold text-red-600">{stats?.rejected ?? 0}</p>
+            <p className="text-xs text-muted-foreground">Declined</p>
+          </CardContent>
+        </Card>
+        <Card className="border-purple-200">
+          <CardContent className="pt-4 pb-4 text-center">
+            <p className="text-2xl font-bold text-purple-600">{stats?.converted ?? 0}</p>
+            <p className="text-xs text-muted-foreground">Converted</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {metrics && metrics.totalResponded > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" /> Response Metrics
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div>
+                <p className="text-lg font-semibold">{formatResponseTime(metrics.avgResponseMs)}</p>
+                <p className="text-xs text-muted-foreground">Avg Response</p>
+              </div>
+              <div>
+                <p className="text-lg font-semibold">{formatResponseTime(metrics.fastestMs)}</p>
+                <p className="text-xs text-muted-foreground">Fastest</p>
+              </div>
+              <div>
+                <p className="text-lg font-semibold">{formatResponseTime(metrics.slowestMs)}</p>
+                <p className="text-xs text-muted-foreground">Slowest</p>
+              </div>
+              <div>
+                <p className="text-lg font-semibold">{Math.round(metrics.responseRate)}%</p>
+                <p className="text-xs text-muted-foreground">Response Rate</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {leads.length === 0 ? (
+        <Card>
+          <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+            <MapPin className="h-10 w-10 mx-auto mb-3 opacity-50" />
+            <p className="font-medium">No leads yet</p>
+            <p className="text-sm">Claim zip codes to start receiving service requests from homeowners.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {leads.map((lead) => {
+            const categoryLabel = SERVICE_CATEGORIES.find(c => c.value === lead.category)?.label || lead.category;
+            const timeSinceAssigned = lead.assignedAt ? Math.floor((Date.now() - new Date(lead.assignedAt).getTime()) / 60000) : null;
+
+            return (
+              <Card key={lead.id} className={lead.status === 'assigned' ? 'border-primary/30' : ''}>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">{lead.firstName} {lead.lastName}</span>
+                        <Badge variant="outline" className="text-xs">{categoryLabel}</Badge>
+                        <Badge className={`text-xs ${urgencyColors[lead.urgency] || ''}`}>{lead.urgency}</Badge>
+                        {lead.status === 'assigned' && timeSinceAssigned !== null && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {timeSinceAssigned < 60 ? `${timeSinceAssigned}m ago` : `${Math.floor(timeSinceAssigned / 60)}h ago`}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {lead.zipCode} &bull; {lead.email}{lead.phone ? ` &bull; ${lead.phone}` : ''}
+                      </p>
+                      {lead.description && (
+                        <p className="text-sm mt-1">{lead.description}</p>
+                      )}
+                      {lead.respondedAt && (
+                        <p className="text-xs text-muted-foreground">
+                          Responded in {formatResponseTime(new Date(lead.respondedAt).getTime() - new Date(lead.assignedAt!).getTime())}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {lead.status === 'assigned' && (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => statusMutation.mutate({ id: lead.id, status: 'accepted' })}
+                            disabled={statusMutation.isPending}
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-1" /> Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => statusMutation.mutate({ id: lead.id, status: 'rejected' })}
+                            disabled={statusMutation.isPending}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" /> Decline
+                          </Button>
+                        </>
+                      )}
+                      {lead.status === 'accepted' && (
+                        <Badge className="bg-green-100 text-green-700">Accepted</Badge>
+                      )}
+                      {lead.status === 'rejected' && (
+                        <Badge className="bg-red-100 text-red-700">Declined</Badge>
+                      )}
+                      {lead.status === 'converted' && (
+                        <Badge className="bg-purple-100 text-purple-700">Converted</Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const claimZipSchema = z.object({
+  zipCode: z.string().min(5, "Enter a 5-digit zip code").max(5),
+  category: z.string().min(1, "Select a category"),
+});
+
+function ZipCodesTab() {
+  const { toast } = useToast();
+  const [showPricing, setShowPricing] = useState(false);
+
+  const { data: zipCodes = [], isLoading } = useQuery<VendorZipCode[]>({
+    queryKey: ["/api/vendor/zip-codes"],
+  });
+
+  const form = useForm<z.infer<typeof claimZipSchema>>({
+    resolver: zodResolver(claimZipSchema),
+    defaultValues: { zipCode: "", category: "" },
+  });
+
+  const watchZip = form.watch("zipCode");
+  const watchCat = form.watch("category");
+
+  const { data: pricing } = useQuery<{
+    currentVendors: number; maxVendors: number; isFull: boolean; alreadyClaimed: boolean;
+    monthlyRate: number; freeSlots: number; totalClaimed: number; freeEligible: boolean;
+  }>({
+    queryKey: ["/api/vendor/zip-codes/pricing", watchZip, watchCat],
+    queryFn: async () => {
+      const res = await fetch(`/api/vendor/zip-codes/pricing?zipCode=${encodeURIComponent(watchZip)}&category=${encodeURIComponent(watchCat)}`);
+      if (!res.ok) throw new Error("Failed to fetch pricing");
+      return res.json();
+    },
+    enabled: watchZip.length === 5 && watchCat.length > 0,
+  });
+
+  const claimMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof claimZipSchema>) => {
+      const res = await apiRequest("POST", "/api/vendor/zip-codes/claim", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/zip-codes"] });
+      form.reset();
+      toast({ title: "Zip code claimed!" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to claim", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const releaseMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/vendor/zip-codes/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/zip-codes"] });
+      toast({ title: "Zip code released" });
+    },
+  });
+
+  if (isLoading) return <Skeleton className="h-64" />;
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Plus className="h-5 w-5" /> Claim a Zip Code
+          </CardTitle>
+          <CardDescription>
+            Claim zip codes in your service area to receive leads from homeowners. First 3 zip codes are free (in areas with low competition).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit((data) => claimMutation.mutate(data))} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="zipCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zip Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. 75201" maxLength={5} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Service Category</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {SERVICE_CATEGORIES.map((cat) => (
+                            <SelectItem key={cat.value} value={cat.value}>
+                              {cat.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {pricing && (
+                <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Vendors in this zip+category:</span>
+                    <span className="font-medium flex items-center gap-1">
+                      <Users className="h-3.5 w-3.5" /> {pricing.currentVendors} / {pricing.maxVendors}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Monthly cost:</span>
+                    <span className="font-semibold text-base">
+                      {pricing.monthlyRate === 0 ? (
+                        <span className="text-green-600">Free</span>
+                      ) : (
+                        `$${(pricing.monthlyRate / 100).toFixed(2)}/mo`
+                      )}
+                    </span>
+                  </div>
+                  {pricing.freeSlots > 0 && pricing.freeEligible && (
+                    <p className="text-xs text-green-600">You have {pricing.freeSlots} free slot{pricing.freeSlots !== 1 ? 's' : ''} remaining.</p>
+                  )}
+                  {!pricing.freeEligible && pricing.freeSlots > 0 && (
+                    <p className="text-xs text-amber-600">This zip is too competitive for a free slot. Paid tier applies.</p>
+                  )}
+                  {pricing.isFull && (
+                    <p className="text-xs text-red-600">This zip code is full for this category.</p>
+                  )}
+                  {pricing.alreadyClaimed && (
+                    <p className="text-xs text-red-600">You already claimed this zip code for this category.</p>
+                  )}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                disabled={claimMutation.isPending || pricing?.isFull || pricing?.alreadyClaimed}
+                className="w-full md:w-auto"
+              >
+                {claimMutation.isPending ? "Claiming..." : "Claim Zip Code"}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <div>
+        <h3 className="font-semibold mb-3">Your Claimed Zip Codes ({zipCodes.length})</h3>
+        {zipCodes.length === 0 ? (
+          <Card>
+            <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+              <MapPin className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p>No zip codes claimed yet. Claim one above to start receiving leads!</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {zipCodes.map((zc) => {
+              const catLabel = SERVICE_CATEGORIES.find(c => c.value === zc.category)?.label || zc.category;
+              return (
+                <Card key={zc.id}>
+                  <CardContent className="pt-4 pb-4 flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-primary" />
+                        <span className="font-semibold">{zc.zipCode}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{catLabel}</p>
+                      <p className="text-xs mt-1">
+                        {zc.monthlyRate === 0 ? (
+                          <span className="text-green-600 font-medium">Free</span>
+                        ) : (
+                          <span>${(zc.monthlyRate! / 100).toFixed(2)}/mo</span>
+                        )}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => releaseMutation.mutate(zc.id)}
+                      disabled={releaseMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function VendorPortal() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -704,10 +1152,18 @@ export default function VendorPortal() {
   return (
     <div className="p-4 md:p-6 space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5 max-w-xl">
+        <TabsList className="flex w-full max-w-3xl overflow-x-auto">
           <TabsTrigger value="dashboard" className="flex items-center gap-1">
             <LayoutDashboard className="h-4 w-4" />
             <span className="hidden sm:inline">Dashboard</span>
+          </TabsTrigger>
+          <TabsTrigger value="leads" className="flex items-center gap-1">
+            <Zap className="h-4 w-4" />
+            <span className="hidden sm:inline">Leads</span>
+          </TabsTrigger>
+          <TabsTrigger value="zip-codes" className="flex items-center gap-1">
+            <MapPin className="h-4 w-4" />
+            <span className="hidden sm:inline">Zip Codes</span>
           </TabsTrigger>
           <TabsTrigger value="requests" className="flex items-center gap-1">
             <FileText className="h-4 w-4" />
@@ -729,6 +1185,12 @@ export default function VendorPortal() {
 
         <TabsContent value="dashboard">
           <DashboardTab profile={profile ?? null} bidRequests={bidRequests} bids={bids} />
+        </TabsContent>
+        <TabsContent value="leads">
+          <LeadsTab />
+        </TabsContent>
+        <TabsContent value="zip-codes">
+          <ZipCodesTab />
         </TabsContent>
         <TabsContent value="requests">
           <BidRequestsTab bidRequests={bidRequests} profile={profile ?? null} />

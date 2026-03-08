@@ -122,3 +122,58 @@ export async function notifyAgentOfNewLead(
 
   return { sms: smsSent, push: pushResult };
 }
+
+interface VendorLeadNotificationData {
+  zipCode: string;
+  category: string;
+  firstName?: string;
+  lastName?: string;
+  urgency?: string;
+  description?: string | null;
+}
+
+export async function notifyVendorOfNewLead(
+  vendor: AgentData,
+  lead: VendorLeadNotificationData,
+  pushSubscriptions: PushSubscriptionRecord[],
+  onExpiredSub?: (subId: number) => Promise<void>
+): Promise<{ sms: boolean; push: { sent: number; failed: number } }> {
+  const categoryLabel = lead.category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  const leadName = lead.firstName && lead.lastName
+    ? `${lead.firstName} ${lead.lastName}`
+    : 'A homeowner';
+
+  const urgencyText = lead.urgency === 'emergency' ? ' (URGENT)' : lead.urgency === 'high' ? ' (High Priority)' : '';
+
+  const smsBody = `🔧 HomeBase: New ${categoryLabel} service request in ${lead.zipCode}${urgencyText}! ${leadName} needs your help. Log in to view details and accept.`;
+
+  const pushPayload: PushPayload = {
+    title: `New ${categoryLabel} request in ${lead.zipCode}${urgencyText}`,
+    body: `${leadName} is looking for a ${categoryLabel.toLowerCase()}.${lead.description ? ` "${lead.description.substring(0, 80)}..."` : ''}`,
+    url: '/vendor',
+  };
+
+  let smsSent = false;
+  const vendorPhone = vendor.mobilePhone || vendor.phone;
+  if (vendorPhone) {
+    try {
+      await sendSMS(vendorPhone, smsBody);
+      smsSent = true;
+      console.log(`[Notifications] SMS sent to vendor ${vendor.id} for lead in ${lead.zipCode}`);
+    } catch (err: any) {
+      console.error(`[Notifications] SMS failed for vendor ${vendor.id}:`, err.message);
+    }
+  }
+
+  const pushResult = await sendPushNotification(
+    pushSubscriptions,
+    pushPayload,
+    onExpiredSub
+  );
+
+  if (pushResult.sent > 0) {
+    console.log(`[Notifications] Push sent to ${pushResult.sent} device(s) for vendor ${vendor.id}`);
+  }
+
+  return { sms: smsSent, push: pushResult };
+}
