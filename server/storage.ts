@@ -42,6 +42,7 @@ import {
   type Lead, type InsertLead,
   type LeadRotation, type InsertLeadRotation,
   type AgentReview, type InsertAgentReview,
+  type VendorRating, type InsertVendorRating,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -300,6 +301,13 @@ export interface IStorage {
   getAgentReview(id: number): Promise<AgentReview | undefined>;
   getPublicAgentProfile(agentId: number): Promise<{ user: User; avgRating: number; reviewCount: number } | undefined>;
   getTopAgents(limit: number): Promise<{ user: User; avgRating: number; reviewCount: number }[]>;
+
+  createVendorRating(data: InsertVendorRating): Promise<VendorRating>;
+  getVendorRatings(contractorId: number): Promise<VendorRating[]>;
+  getVendorRating(id: number): Promise<VendorRating | undefined>;
+  getVendorRatingsByAgent(agentId: number): Promise<VendorRating[]>;
+  deleteVendorRating(id: number): Promise<void>;
+  getVendorPerformanceStats(contractorId: number): Promise<{ avgOverall: number; avgQuality: number; avgCommunication: number; avgTimeliness: number; avgValue: number; totalRatings: number; recommendRate: number }>;
 
 }
 
@@ -3991,6 +3999,80 @@ export class DatabaseStorage implements IStorage {
       avgRating: Number(Number(row.avg_rating).toFixed(1)),
       reviewCount: Number(row.review_count),
     }));
+  }
+
+  private mapVendorRatingRow(row: any): VendorRating {
+    return {
+      id: Number(row.id),
+      contractorId: Number(row.contractor_id),
+      agentId: Number(row.agent_id),
+      overallRating: Number(row.overall_rating),
+      qualityRating: row.quality_rating != null ? Number(row.quality_rating) : null,
+      communicationRating: row.communication_rating != null ? Number(row.communication_rating) : null,
+      timelinessRating: row.timelines_rating != null ? Number(row.timelines_rating) : null,
+      valueRating: row.value_rating != null ? Number(row.value_rating) : null,
+      title: row.title ? String(row.title) : null,
+      comment: String(row.comment),
+      transactionId: row.transaction_id ? Number(row.transaction_id) : null,
+      bidId: row.bid_id ? Number(row.bid_id) : null,
+      wouldRecommend: row.would_recommend === true || row.would_recommend === 't',
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+    };
+  }
+
+  async createVendorRating(data: InsertVendorRating): Promise<VendorRating> {
+    const result = await db.execute(sql`
+      INSERT INTO vendor_ratings (contractor_id, agent_id, overall_rating, quality_rating, communication_rating, timelines_rating, value_rating, title, comment, transaction_id, bid_id, would_recommend)
+      VALUES (${data.contractorId}, ${data.agentId}, ${data.overallRating}, ${data.qualityRating ?? null}, ${data.communicationRating ?? null}, ${data.timelinessRating ?? null}, ${data.valueRating ?? null}, ${data.title || null}, ${data.comment}, ${data.transactionId || null}, ${data.bidId || null}, ${data.wouldRecommend ?? true})
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to create vendor rating');
+    return this.mapVendorRatingRow(result.rows[0]);
+  }
+
+  async getVendorRatings(contractorId: number): Promise<VendorRating[]> {
+    const result = await db.execute(sql`SELECT * FROM vendor_ratings WHERE contractor_id = ${contractorId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => this.mapVendorRatingRow(row));
+  }
+
+  async getVendorRating(id: number): Promise<VendorRating | undefined> {
+    const result = await db.execute(sql`SELECT * FROM vendor_ratings WHERE id = ${id} LIMIT 1`);
+    if (!result.rows[0]) return undefined;
+    return this.mapVendorRatingRow(result.rows[0]);
+  }
+
+  async getVendorRatingsByAgent(agentId: number): Promise<VendorRating[]> {
+    const result = await db.execute(sql`SELECT * FROM vendor_ratings WHERE agent_id = ${agentId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => this.mapVendorRatingRow(row));
+  }
+
+  async deleteVendorRating(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM vendor_ratings WHERE id = ${id}`);
+  }
+
+  async getVendorPerformanceStats(contractorId: number): Promise<{ avgOverall: number; avgQuality: number; avgCommunication: number; avgTimeliness: number; avgValue: number; totalRatings: number; recommendRate: number }> {
+    const result = await db.execute(sql`
+      SELECT
+        COALESCE(AVG(overall_rating), 0) as avg_overall,
+        COALESCE(AVG(quality_rating), 0) as avg_quality,
+        COALESCE(AVG(communication_rating), 0) as avg_communication,
+        COALESCE(AVG(timelines_rating), 0) as avg_timeliness,
+        COALESCE(AVG(value_rating), 0) as avg_value,
+        COUNT(*) as total_ratings,
+        COALESCE(AVG(CASE WHEN would_recommend = true THEN 100.0 ELSE 0.0 END), 0) as recommend_rate
+      FROM vendor_ratings
+      WHERE contractor_id = ${contractorId}
+    `);
+    const row = result.rows[0];
+    return {
+      avgOverall: row ? Number(Number(row.avg_overall).toFixed(1)) : 0,
+      avgQuality: row ? Number(Number(row.avg_quality).toFixed(1)) : 0,
+      avgCommunication: row ? Number(Number(row.avg_communication).toFixed(1)) : 0,
+      avgTimeliness: row ? Number(Number(row.avg_timeliness).toFixed(1)) : 0,
+      avgValue: row ? Number(Number(row.avg_value).toFixed(1)) : 0,
+      totalRatings: row ? Number(row.total_ratings) : 0,
+      recommendRate: row ? Number(Number(row.recommend_rate).toFixed(1)) : 0,
+    };
   }
 
 }

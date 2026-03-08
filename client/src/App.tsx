@@ -76,6 +76,7 @@ import DripCampaignsPage from "@/pages/drip-campaigns-page";
 import { TopAgentsPage, AgentReviewsPage } from "@/pages/agent-reviews-page";
 import LeadGenerationPage from "@/pages/lead-generation-page";
 import LeadSubmitPage from "@/pages/lead-submit-page";
+import VendorRatingsPage from "@/pages/vendor-ratings-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -114,14 +115,24 @@ function Layout({ children }: { children: React.ReactNode }) {
                 <SidebarGroup>
                   <SidebarMenu>
                     {isVendor && (
-                      <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Vendor Portal">
-                          <Link href="/vendor" className="flex items-center gap-2">
-                            <Wrench className="h-4 w-4" />
-                            {isSidebarOpen && <span>Vendor Portal</span>}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
+                      <>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Vendor Portal">
+                            <Link href="/vendor" className="flex items-center gap-2">
+                              <Wrench className="h-4 w-4" />
+                              {isSidebarOpen && <span>Vendor Portal</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="My Ratings">
+                            <Link href="/vendor-ratings" className="flex items-center gap-2">
+                              <BarChart3 className="h-4 w-4" />
+                              {isSidebarOpen && <span>My Ratings</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </>
                     )}
                     {isClient && (
                       <SidebarMenuItem>
@@ -388,6 +399,9 @@ function Router() {
         <>
           <Route path="/vendor">
             <ProtectedRoute path="/vendor" component={VendorPortal} />
+          </Route>
+          <Route path="/vendor-ratings">
+            <ProtectedRoute path="/vendor-ratings" component={VendorRatingsPage} />
           </Route>
           <Route path="/billing">
             <ProtectedRoute path="/billing" component={BillingPage} />

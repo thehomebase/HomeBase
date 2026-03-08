@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema, insertVendorRatingSchema } from "@shared/schema";
 import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -1135,6 +1135,148 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error removing recommendation:', error);
       res.status(500).json({ error: 'Failed to remove recommendation' });
+    }
+  });
+
+  // Vendor Ratings
+  app.post("/api/contractors/:id/ratings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const contractorId = Number(req.params.id);
+      if (isNaN(contractorId)) return res.status(400).json({ error: 'Invalid contractor ID' });
+
+      const contractor = await storage.getContractor(contractorId);
+      if (!contractor) return res.status(404).json({ error: 'Contractor not found' });
+
+      const ratingFields = [req.body.overallRating, req.body.qualityRating, req.body.communicationRating, req.body.timelinessRating, req.body.valueRating];
+      for (const val of ratingFields) {
+        if (val !== undefined && val !== null && (val < 1 || val > 5)) {
+          return res.status(400).json({ error: 'Rating values must be between 1 and 5' });
+        }
+      }
+      if (!req.body.overallRating || req.body.overallRating < 1 || req.body.overallRating > 5) {
+        return res.status(400).json({ error: 'Overall rating (1-5) is required' });
+      }
+
+      if (req.body.transactionId) {
+        const transaction = await storage.getTransaction(Number(req.body.transactionId));
+        if (!transaction || transaction.agentId !== req.user.id) {
+          return res.status(403).json({ error: 'Transaction not found or does not belong to you' });
+        }
+      }
+
+      const existingRatings = await storage.getVendorRatings(contractorId);
+      const duplicate = existingRatings.find(r =>
+        r.agentId === req.user.id &&
+        r.contractorId === contractorId &&
+        (req.body.transactionId ? r.transactionId === Number(req.body.transactionId) : !r.transactionId)
+      );
+      if (duplicate) {
+        return res.status(409).json({ error: 'You have already rated this vendor for this transaction' });
+      }
+
+      const parsed = insertVendorRatingSchema.safeParse({
+        ...req.body,
+        contractorId,
+        agentId: req.user.id,
+      });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
+      const rating = await storage.createVendorRating(parsed.data);
+      res.status(201).json(rating);
+    } catch (error) {
+      console.error('Error creating vendor rating:', error);
+      res.status(500).json({ error: 'Failed to create vendor rating' });
+    }
+  });
+
+  app.get("/api/contractors/:id/ratings", async (req, res) => {
+    try {
+      const contractorId = Number(req.params.id);
+      if (isNaN(contractorId)) return res.status(400).json({ error: 'Invalid contractor ID' });
+
+      const ratings = await storage.getVendorRatings(contractorId);
+      res.json(ratings);
+    } catch (error) {
+      console.error('Error fetching vendor ratings:', error);
+      res.status(500).json({ error: 'Failed to fetch vendor ratings' });
+    }
+  });
+
+  app.get("/api/contractors/:id/performance", async (req, res) => {
+    try {
+      const contractorId = Number(req.params.id);
+      if (isNaN(contractorId)) return res.status(400).json({ error: 'Invalid contractor ID' });
+
+      const stats = await storage.getVendorPerformanceStats(contractorId);
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching vendor performance:', error);
+      res.status(500).json({ error: 'Failed to fetch vendor performance' });
+    }
+  });
+
+  app.delete("/api/contractors/:id/ratings/:ratingId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const ratingId = Number(req.params.ratingId);
+      if (isNaN(ratingId)) return res.status(400).json({ error: 'Invalid rating ID' });
+
+      const contractorId = Number(req.params.id);
+      const rating = await storage.getVendorRating(ratingId);
+      if (!rating) return res.status(404).json({ error: 'Rating not found' });
+
+      if (rating.contractorId !== contractorId) {
+        return res.status(400).json({ error: 'Rating does not belong to this contractor' });
+      }
+
+      if (rating.agentId !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized to delete this rating' });
+      }
+
+      await storage.deleteVendorRating(ratingId);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting vendor rating:', error);
+      res.status(500).json({ error: 'Failed to delete vendor rating' });
+    }
+  });
+
+  app.get("/api/vendor/my-ratings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const contractor = await storage.getContractorByVendorUserId(req.user.id);
+      if (!contractor) return res.status(404).json({ error: 'No vendor profile found' });
+
+      const ratings = await storage.getVendorRatings(contractor.id);
+      res.json(ratings);
+    } catch (error) {
+      console.error('Error fetching vendor ratings:', error);
+      res.status(500).json({ error: 'Failed to fetch vendor ratings' });
+    }
+  });
+
+  app.get("/api/vendor/my-performance", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const contractor = await storage.getContractorByVendorUserId(req.user.id);
+      if (!contractor) return res.status(404).json({ error: 'No vendor profile found' });
+
+      const stats = await storage.getVendorPerformanceStats(contractor.id);
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching vendor performance:', error);
+      res.status(500).json({ error: 'Failed to fetch vendor performance' });
     }
   });
 

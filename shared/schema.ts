@@ -607,6 +607,28 @@ export const agentReviews = pgTable("agent_reviews", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const vendorRatings = pgTable("vendor_ratings", {
+  id: serial("id").primaryKey(),
+  contractorId: integer("contractor_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  overallRating: integer("overall_rating").notNull(),
+  qualityRating: integer("quality_rating"),
+  communicationRating: integer("communication_rating"),
+  timelinessRating: integer("timelines_rating"),
+  valueRating: integer("value_rating"),
+  title: text("title"),
+  comment: text("comment").notNull(),
+  transactionId: integer("transaction_id"),
+  bidId: integer("bid_id"),
+  wouldRecommend: boolean("would_recommend").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertVendorRatingSchema = createInsertSchema(vendorRatings).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertDripCampaignSchema = createInsertSchema(dripCampaigns).omit({
   id: true,
   createdAt: true,
@@ -728,3 +750,5 @@ export type LeadRotation = typeof leadRotations.$inferSelect;
 export type InsertLeadRotation = z.infer<typeof insertLeadRotationSchema>;
 export type AgentReview = typeof agentReviews.$inferSelect;
 export type InsertAgentReview = z.infer<typeof insertAgentReviewSchema>;
+export type VendorRating = typeof vendorRatings.$inferSelect;
+export type InsertVendorRating = z.infer<typeof insertVendorRatingSchema>;
