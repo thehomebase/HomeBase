@@ -11,8 +11,41 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+export function isIOS(): boolean {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+export function isStandalone(): boolean {
+  return (window.matchMedia('(display-mode: standalone)').matches) ||
+    ('standalone' in (navigator as any) && (navigator as any).standalone === true);
+}
+
 export function isPushSupported(): boolean {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+
+export function getPushUnsupportedReason(): string | null {
+  if (isPushSupported()) return null;
+
+  if (isIOS()) {
+    if (!isStandalone()) {
+      return "On iOS, push notifications require the app to be added to your Home Screen. Tap the Share button, then 'Add to Home Screen'.";
+    }
+    return "Push notifications require iOS 16.4 or later. Please update your device.";
+  }
+
+  if (!('serviceWorker' in navigator)) {
+    return "Your browser does not support service workers needed for push notifications.";
+  }
+  if (!('PushManager' in window)) {
+    return "Your browser does not support push notifications.";
+  }
+  if (!('Notification' in window)) {
+    return "Your browser does not support notifications.";
+  }
+
+  return "Push notifications are not supported on this browser.";
 }
 
 export async function getPushPermissionState(): Promise<NotificationPermission> {

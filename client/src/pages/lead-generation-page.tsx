@@ -34,7 +34,7 @@ import {
   Clock,
 } from "lucide-react";
 import type { Lead } from "@shared/schema";
-import { isPushSupported, subscribeToPush, unsubscribeFromPush, isCurrentlySubscribed, getPushPermissionState } from "@/lib/push-notifications";
+import { isPushSupported, subscribeToPush, unsubscribeFromPush, isCurrentlySubscribed, getPushPermissionState, getPushUnsupportedReason, isIOS } from "@/lib/push-notifications";
 
 const STATUS_COLORS: Record<string, string> = {
   new: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -104,6 +104,7 @@ export default function LeadGenerationPage() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
+  const [pushUnsupportedMsg, setPushUnsupportedMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const checkPush = async () => {
@@ -112,6 +113,8 @@ export default function LeadGenerationPage() {
       if (supported) {
         const subscribed = await isCurrentlySubscribed();
         setPushEnabled(subscribed);
+      } else {
+        setPushUnsupportedMsg(getPushUnsupportedReason());
       }
     };
     checkPush();
@@ -517,7 +520,7 @@ export default function LeadGenerationPage() {
           </div>
 
           <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30">
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-blue-500/10 rounded-lg">
@@ -527,7 +530,7 @@ export default function LeadGenerationPage() {
                     <p className="font-semibold text-sm">Lead Notifications</p>
                     <p className="text-xs text-muted-foreground">
                       {!pushSupported
-                        ? "Not supported on this browser"
+                        ? (isIOS() ? "Requires Add to Home Screen" : "Not available in this browser")
                         : pushEnabled
                           ? "You'll get push + SMS alerts for new leads"
                           : "Enable to get instant alerts when leads arrive"
@@ -543,6 +546,11 @@ export default function LeadGenerationPage() {
                   />
                 )}
               </div>
+              {!pushSupported && pushUnsupportedMsg && (
+                <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 leading-relaxed">
+                  {pushUnsupportedMsg}
+                </div>
+              )}
             </CardContent>
           </Card>
 
