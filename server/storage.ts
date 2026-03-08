@@ -16,7 +16,7 @@ interface StorageDocument {
 import {
   users, transactions, checklists, messages, clients, documents, contractors, contractorReviews,
   propertyViewings, propertyFeedback, showingRequests, savedProperties, communications, smsOptOuts,
-  emailSnippets, emailTracking,
+  emailSnippets, emailTracking, inspectionItems, bidRequests, bids,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
   type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
   type ShowingRequest, type SavedProperty, type InsertSavedProperty,
@@ -24,6 +24,9 @@ import {
   type AgentPhoneNumber,
   type EmailSnippet, type InsertEmailSnippet,
   type EmailTracking, type InsertEmailTracking,
+  type InspectionItem, type InsertInspectionItem,
+  type BidRequest, type InsertBidRequest,
+  type Bid, type InsertBid,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -166,6 +169,27 @@ export interface IStorage {
   recordEmailOpen(trackingId: string): Promise<void>;
   getEmailTrackingByUser(userId: number): Promise<EmailTracking[]>;
   updateEmailTrackingMessageId(trackingId: string, gmailMessageId: string): Promise<void>;
+
+  // Inspection item operations
+  createInspectionItem(item: InsertInspectionItem): Promise<InspectionItem>;
+  getInspectionItemsByTransaction(transactionId: number): Promise<InspectionItem[]>;
+  updateInspectionItem(id: number, data: Partial<InspectionItem>): Promise<InspectionItem>;
+  deleteInspectionItem(id: number): Promise<void>;
+
+  // Bid request operations
+  createBidRequest(request: InsertBidRequest): Promise<BidRequest>;
+  getBidRequestsByTransaction(transactionId: number): Promise<BidRequest[]>;
+  getBidRequestsByContractor(contractorId: number): Promise<BidRequest[]>;
+  updateBidRequest(id: number, data: Partial<BidRequest>): Promise<BidRequest>;
+
+  // Bid operations
+  createBid(bid: InsertBid): Promise<Bid>;
+  getBidsByBidRequest(bidRequestId: number): Promise<Bid[]>;
+  getBidsByContractor(contractorId: number): Promise<Bid[]>;
+  updateBid(id: number, data: Partial<Bid>): Promise<Bid>;
+
+  // Contractor by vendor user
+  getContractorByVendorUserId(vendorUserId: number): Promise<Contractor | undefined>;
 
 }
 
@@ -1916,13 +1940,15 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(sql`
         INSERT INTO contractors (
           name, category, phone, email, website, address, city, state, zip_code,
-          description, google_maps_url, agent_id, agent_rating, agent_notes
+          description, google_maps_url, yelp_url, bbb_url, agent_id, agent_rating, agent_notes, vendor_user_id
         ) VALUES (
           ${contractor.name}, ${contractor.category}, ${contractor.phone || null},
           ${contractor.email || null}, ${contractor.website || null}, ${contractor.address || null},
           ${contractor.city || null}, ${contractor.state || null}, ${contractor.zipCode || null},
           ${contractor.description || null}, ${contractor.googleMapsUrl || null},
-          ${contractor.agentId}, ${contractor.agentRating || null}, ${contractor.agentNotes || null}
+          ${contractor.yelpUrl || null}, ${contractor.bbbUrl || null},
+          ${contractor.agentId}, ${contractor.agentRating || null}, ${contractor.agentNotes || null},
+          ${contractor.vendorUserId || null}
         )
         RETURNING *
       `);
@@ -2041,6 +2067,8 @@ export class DatabaseStorage implements IStorage {
       description: row.description ? String(row.description) : null,
       googleMapsUrl: row.google_maps_url ? String(row.google_maps_url) : null,
       yelpUrl: row.yelp_url ? String(row.yelp_url) : null,
+      bbbUrl: row.bbb_url ? String(row.bbb_url) : null,
+      vendorUserId: row.vendor_user_id ? Number(row.vendor_user_id) : null,
       agentId: Number(row.agent_id),
       agentRating: row.agent_rating ? Number(row.agent_rating) : null,
       agentNotes: row.agent_notes ? String(row.agent_notes) : null,
@@ -2903,6 +2931,254 @@ export class DatabaseStorage implements IStorage {
       longitude: row.longitude ? Number(row.longitude) : null,
       updatedAt: row.updated_at ? new Date(row.updated_at) : null
     };
+  }
+
+  private mapInspectionItemRow(row: any): InspectionItem {
+    return {
+      id: Number(row.id),
+      transactionId: Number(row.transaction_id),
+      category: String(row.category),
+      description: String(row.description),
+      severity: String(row.severity),
+      location: row.location ? String(row.location) : null,
+      status: String(row.status),
+      notes: row.notes ? String(row.notes) : null,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+    };
+  }
+
+  private mapBidRequestRow(row: any): BidRequest {
+    return {
+      id: Number(row.id),
+      transactionId: Number(row.transaction_id),
+      inspectionItemId: Number(row.inspection_item_id),
+      contractorId: Number(row.contractor_id),
+      status: String(row.status),
+      sentAt: row.sent_at ? new Date(row.sent_at) : null,
+      expiresAt: row.expires_at ? new Date(row.expires_at) : null,
+      notes: row.notes ? String(row.notes) : null,
+    };
+  }
+
+  private mapBidRow(row: any): Bid {
+    return {
+      id: Number(row.id),
+      bidRequestId: Number(row.bid_request_id),
+      contractorId: Number(row.contractor_id),
+      amount: Number(row.amount),
+      estimatedDays: row.estimated_days ? Number(row.estimated_days) : null,
+      description: row.description ? String(row.description) : null,
+      warranty: row.warranty ? String(row.warranty) : null,
+      status: String(row.status),
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null,
+    };
+  }
+
+  async createInspectionItem(item: InsertInspectionItem): Promise<InspectionItem> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO inspection_items (transaction_id, category, description, severity, location, status, notes)
+        VALUES (${item.transactionId}, ${item.category}, ${item.description}, ${item.severity}, ${item.location || null}, ${item.status || 'pending_review'}, ${item.notes || null})
+        RETURNING *
+      `);
+      return this.mapInspectionItemRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in createInspectionItem:', error);
+      throw error;
+    }
+  }
+
+  async getInspectionItemsByTransaction(transactionId: number): Promise<InspectionItem[]> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM inspection_items WHERE transaction_id = ${transactionId} ORDER BY created_at DESC`
+      );
+      return (result.rows as any[]).map(row => this.mapInspectionItemRow(row));
+    } catch (error) {
+      console.error('Error in getInspectionItemsByTransaction:', error);
+      return [];
+    }
+  }
+
+  async updateInspectionItem(id: number, data: Partial<InspectionItem>): Promise<InspectionItem> {
+    try {
+      const updateParts: any[] = [];
+      if (data.category !== undefined) updateParts.push(sql`category = ${data.category}`);
+      if (data.description !== undefined) updateParts.push(sql`description = ${data.description}`);
+      if (data.severity !== undefined) updateParts.push(sql`severity = ${data.severity}`);
+      if (data.location !== undefined) updateParts.push(sql`location = ${data.location}`);
+      if (data.status !== undefined) updateParts.push(sql`status = ${data.status}`);
+      if (data.notes !== undefined) updateParts.push(sql`notes = ${data.notes}`);
+
+      if (updateParts.length === 0) {
+        const result = await db.execute(sql`SELECT * FROM inspection_items WHERE id = ${id}`);
+        if (!result.rows[0]) throw new Error('Inspection item not found');
+        return this.mapInspectionItemRow(result.rows[0]);
+      }
+
+      const result = await db.execute(sql`
+        UPDATE inspection_items
+        SET ${sql.join(updateParts, sql`, `)}
+        WHERE id = ${id}
+        RETURNING *
+      `);
+      if (!result.rows[0]) throw new Error('Inspection item not found');
+      return this.mapInspectionItemRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in updateInspectionItem:', error);
+      throw error;
+    }
+  }
+
+  async deleteInspectionItem(id: number): Promise<void> {
+    try {
+      await db.execute(sql`DELETE FROM bid_requests WHERE inspection_item_id = ${id}`);
+      await db.execute(sql`DELETE FROM inspection_items WHERE id = ${id}`);
+    } catch (error) {
+      console.error('Error in deleteInspectionItem:', error);
+      throw error;
+    }
+  }
+
+  async createBidRequest(request: InsertBidRequest): Promise<BidRequest> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO bid_requests (transaction_id, inspection_item_id, contractor_id, status, expires_at, notes)
+        VALUES (${request.transactionId}, ${request.inspectionItemId}, ${request.contractorId}, ${request.status || 'pending'}, ${request.expiresAt || null}, ${request.notes || null})
+        RETURNING *
+      `);
+      return this.mapBidRequestRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in createBidRequest:', error);
+      throw error;
+    }
+  }
+
+  async getBidRequestsByTransaction(transactionId: number): Promise<BidRequest[]> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM bid_requests WHERE transaction_id = ${transactionId} ORDER BY sent_at DESC`
+      );
+      return (result.rows as any[]).map(row => this.mapBidRequestRow(row));
+    } catch (error) {
+      console.error('Error in getBidRequestsByTransaction:', error);
+      return [];
+    }
+  }
+
+  async getBidRequestsByContractor(contractorId: number): Promise<BidRequest[]> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM bid_requests WHERE contractor_id = ${contractorId} ORDER BY sent_at DESC`
+      );
+      return (result.rows as any[]).map(row => this.mapBidRequestRow(row));
+    } catch (error) {
+      console.error('Error in getBidRequestsByContractor:', error);
+      return [];
+    }
+  }
+
+  async updateBidRequest(id: number, data: Partial<BidRequest>): Promise<BidRequest> {
+    try {
+      const updateParts: any[] = [];
+      if (data.status !== undefined) updateParts.push(sql`status = ${data.status}`);
+      if (data.expiresAt !== undefined) updateParts.push(sql`expires_at = ${data.expiresAt}`);
+      if (data.notes !== undefined) updateParts.push(sql`notes = ${data.notes}`);
+
+      if (updateParts.length === 0) {
+        const result = await db.execute(sql`SELECT * FROM bid_requests WHERE id = ${id}`);
+        if (!result.rows[0]) throw new Error('Bid request not found');
+        return this.mapBidRequestRow(result.rows[0]);
+      }
+
+      const result = await db.execute(sql`
+        UPDATE bid_requests
+        SET ${sql.join(updateParts, sql`, `)}
+        WHERE id = ${id}
+        RETURNING *
+      `);
+      if (!result.rows[0]) throw new Error('Bid request not found');
+      return this.mapBidRequestRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in updateBidRequest:', error);
+      throw error;
+    }
+  }
+
+  async createBid(bid: InsertBid): Promise<Bid> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO bids (bid_request_id, contractor_id, amount, estimated_days, description, warranty, status)
+        VALUES (${bid.bidRequestId}, ${bid.contractorId}, ${bid.amount}, ${bid.estimatedDays || null}, ${bid.description || null}, ${bid.warranty || null}, ${bid.status || 'submitted'})
+        RETURNING *
+      `);
+      return this.mapBidRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in createBid:', error);
+      throw error;
+    }
+  }
+
+  async getBidsByBidRequest(bidRequestId: number): Promise<Bid[]> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM bids WHERE bid_request_id = ${bidRequestId} ORDER BY created_at DESC`
+      );
+      return (result.rows as any[]).map(row => this.mapBidRow(row));
+    } catch (error) {
+      console.error('Error in getBidsByBidRequest:', error);
+      return [];
+    }
+  }
+
+  async getBidsByContractor(contractorId: number): Promise<Bid[]> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM bids WHERE contractor_id = ${contractorId} ORDER BY created_at DESC`
+      );
+      return (result.rows as any[]).map(row => this.mapBidRow(row));
+    } catch (error) {
+      console.error('Error in getBidsByContractor:', error);
+      return [];
+    }
+  }
+
+  async updateBid(id: number, data: Partial<Bid>): Promise<Bid> {
+    try {
+      const updateParts: any[] = [];
+      if (data.amount !== undefined) updateParts.push(sql`amount = ${data.amount}`);
+      if (data.estimatedDays !== undefined) updateParts.push(sql`estimated_days = ${data.estimatedDays}`);
+      if (data.description !== undefined) updateParts.push(sql`description = ${data.description}`);
+      if (data.warranty !== undefined) updateParts.push(sql`warranty = ${data.warranty}`);
+      if (data.status !== undefined) updateParts.push(sql`status = ${data.status}`);
+      updateParts.push(sql`updated_at = NOW()`);
+
+      const result = await db.execute(sql`
+        UPDATE bids
+        SET ${sql.join(updateParts, sql`, `)}
+        WHERE id = ${id}
+        RETURNING *
+      `);
+      if (!result.rows[0]) throw new Error('Bid not found');
+      return this.mapBidRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in updateBid:', error);
+      throw error;
+    }
+  }
+
+  async getContractorByVendorUserId(vendorUserId: number): Promise<Contractor | undefined> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM contractors WHERE vendor_user_id = ${vendorUserId} LIMIT 1`
+      );
+      if (!result.rows?.length) return undefined;
+      return this.mapContractorRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in getContractorByVendorUserId:', error);
+      return undefined;
+    }
   }
 
 }

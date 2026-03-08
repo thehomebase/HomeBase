@@ -164,7 +164,7 @@ export function setupAuth(app: Express) {
         password: await hashPassword(req.body.password),
         firstName: req.body.firstName,
         lastName: req.body.lastName,
-        role: req.body.role || 'client'
+        role: ['agent', 'client', 'vendor'].includes(req.body.role) ? req.body.role : 'client'
       });
 
       console.log('User created successfully:', { id: user.id, email: user.email });

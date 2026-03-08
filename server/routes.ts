@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema } from "@shared/schema";
 import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -998,7 +998,7 @@ export function registerRoutes(app: Express): Server {
       }
       
       const allowedFields = ['name', 'category', 'phone', 'email', 'website', 'address', 
-        'city', 'state', 'zipCode', 'description', 'googleMapsUrl', 'agentRating', 'agentNotes'];
+        'city', 'state', 'zipCode', 'description', 'googleMapsUrl', 'yelpUrl', 'bbbUrl', 'vendorUserId', 'agentRating', 'agentNotes'];
       const sanitizedData: Record<string, any> = {};
       for (const field of allowedFields) {
         if (req.body[field] !== undefined) {
@@ -2696,6 +2696,307 @@ export function registerRoutes(app: Express): Server {
       res.json({ transaction, documents, checklist, timeline });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============ Inspection Items ============
+  app.post("/api/transactions/:id/parse-inspection", upload.single('file'), async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+      const { parseInspectionReport } = await import("./inspection-parser");
+      let text = "";
+      if (req.file.mimetype === 'application/pdf') {
+        try {
+          const pdfParseModule = await import("pdf-parse");
+          const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
+          const pdfData = await pdfParseFn(req.file.buffer);
+          text = pdfData.text || "";
+        } catch (pdfErr) {
+          console.error('PDF parse error:', pdfErr);
+          return res.status(400).json({ error: 'Failed to parse PDF file' });
+        }
+      } else {
+        text = req.file.buffer.toString('utf-8');
+      }
+      const items = parseInspectionReport(text);
+      res.json({ items, transactionId: Number(req.params.id) });
+    } catch (error) {
+      console.error('Error parsing inspection report:', error);
+      res.status(500).json({ error: 'Failed to parse inspection report' });
+    }
+  });
+
+  app.post("/api/transactions/:id/inspection-items", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const transactionId = Number(req.params.id);
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction || transaction.agentId !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      const items = req.body.items;
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'Items array is required' });
+      }
+      const created = [];
+      for (const item of items) {
+        const parsed = insertInspectionItemSchema.safeParse({
+          ...item,
+          transactionId,
+          status: item.status || 'approved',
+        });
+        if (!parsed.success) {
+          console.error('Validation error for inspection item:', parsed.error);
+          continue;
+        }
+        const createdItem = await storage.createInspectionItem(parsed.data);
+        created.push(createdItem);
+      }
+      res.status(201).json(created);
+    } catch (error) {
+      console.error('Error saving inspection items:', error);
+      res.status(500).json({ error: 'Failed to save inspection items' });
+    }
+  });
+
+  app.get("/api/transactions/:id/inspection-items", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const transactionId = Number(req.params.id);
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction || (req.user.role === "agent" && transaction.agentId !== req.user.id)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      const items = await storage.getInspectionItemsByTransaction(transactionId);
+      res.json(items);
+    } catch (error) {
+      console.error('Error fetching inspection items:', error);
+      res.status(500).json({ error: 'Failed to fetch inspection items' });
+    }
+  });
+
+  app.patch("/api/inspection-items/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const id = Number(req.params.id);
+      const allowedFields = ['category', 'description', 'severity', 'location', 'status', 'notes'];
+      const sanitizedData: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          sanitizedData[field] = req.body[field];
+        }
+      }
+      const updated = await storage.updateInspectionItem(id, sanitizedData);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating inspection item:', error);
+      res.status(500).json({ error: 'Failed to update inspection item' });
+    }
+  });
+
+  app.delete("/api/inspection-items/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      await storage.deleteInspectionItem(Number(req.params.id));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting inspection item:', error);
+      res.status(500).json({ error: 'Failed to delete inspection item' });
+    }
+  });
+
+  // ============ Bid Requests ============
+  app.post("/api/inspection-items/:id/send-bids", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const inspectionItemId = Number(req.params.id);
+      const { contractorIds, transactionId } = req.body;
+      if (!Array.isArray(contractorIds) || contractorIds.length === 0) {
+        return res.status(400).json({ error: 'contractorIds array is required' });
+      }
+      if (!transactionId) {
+        return res.status(400).json({ error: 'transactionId is required' });
+      }
+      const transaction = await storage.getTransaction(Number(transactionId));
+      if (!transaction || transaction.agentId !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized for this transaction' });
+      }
+      const createdRequests = [];
+      for (const contractorId of contractorIds) {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+        const parsed = insertBidRequestSchema.safeParse({
+          transactionId: Number(transactionId),
+          inspectionItemId,
+          contractorId: Number(contractorId),
+          status: 'pending',
+          expiresAt,
+          notes: req.body.notes || null,
+        });
+        if (!parsed.success) {
+          console.error('Validation error for bid request:', parsed.error);
+          continue;
+        }
+        const created = await storage.createBidRequest(parsed.data);
+        createdRequests.push(created);
+      }
+      await storage.updateInspectionItem(inspectionItemId, { status: 'sent_for_bids' });
+      res.status(201).json(createdRequests);
+    } catch (error) {
+      console.error('Error sending bid requests:', error);
+      res.status(500).json({ error: 'Failed to send bid requests' });
+    }
+  });
+
+  app.get("/api/transactions/:id/bid-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const transactionId = Number(req.params.id);
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction || (req.user.role === "agent" && transaction.agentId !== req.user.id)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      const bidRequests = await storage.getBidRequestsByTransaction(transactionId);
+      res.json(bidRequests);
+    } catch (error) {
+      console.error('Error fetching bid requests:', error);
+      res.status(500).json({ error: 'Failed to fetch bid requests' });
+    }
+  });
+
+  // ============ Vendor Portal ============
+  app.get("/api/vendor/bid-requests", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") return res.sendStatus(401);
+    try {
+      const contractor = await storage.getContractorByVendorUserId(req.user.id);
+      if (!contractor) {
+        return res.json([]);
+      }
+      const bidRequests = await storage.getBidRequestsByContractor(contractor.id);
+      res.json(bidRequests);
+    } catch (error) {
+      console.error('Error fetching vendor bid requests:', error);
+      res.status(500).json({ error: 'Failed to fetch bid requests' });
+    }
+  });
+
+  app.get("/api/vendor/profile", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") return res.sendStatus(401);
+    try {
+      const contractor = await storage.getContractorByVendorUserId(req.user.id);
+      if (!contractor) {
+        return res.json(null);
+      }
+      res.json(contractor);
+    } catch (error) {
+      console.error('Error fetching vendor profile:', error);
+      res.status(500).json({ error: 'Failed to fetch vendor profile' });
+    }
+  });
+
+  app.patch("/api/vendor/profile", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") return res.sendStatus(401);
+    try {
+      const contractor = await storage.getContractorByVendorUserId(req.user.id);
+      if (!contractor) {
+        return res.status(404).json({ error: 'No vendor profile found' });
+      }
+      const allowedFields = ['name', 'category', 'phone', 'email', 'website', 'address',
+        'city', 'state', 'zipCode', 'description', 'googleMapsUrl', 'yelpUrl', 'bbbUrl'];
+      const sanitizedData: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          sanitizedData[field] = req.body[field];
+        }
+      }
+      const updated = await storage.updateContractor(contractor.id, sanitizedData);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating vendor profile:', error);
+      res.status(500).json({ error: 'Failed to update vendor profile' });
+    }
+  });
+
+  // ============ Bids ============
+  app.post("/api/bids", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") return res.sendStatus(401);
+    try {
+      const contractor = await storage.getContractorByVendorUserId(req.user.id);
+      if (!contractor) {
+        return res.status(403).json({ error: 'No vendor profile linked' });
+      }
+      const parsed = insertBidSchema.safeParse({
+        ...req.body,
+        contractorId: contractor.id,
+      });
+      if (!parsed.success) {
+        return res.status(400).json(parsed.error);
+      }
+      const bid = await storage.createBid(parsed.data);
+      await storage.updateBidRequest(parsed.data.bidRequestId, { status: 'bid_submitted' });
+      res.status(201).json(bid);
+    } catch (error) {
+      console.error('Error creating bid:', error);
+      res.status(500).json({ error: 'Failed to create bid' });
+    }
+  });
+
+  app.get("/api/transactions/:id/bids", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const transactionId = Number(req.params.id);
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction || (req.user.role === "agent" && transaction.agentId !== req.user.id)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      const bidRequests = await storage.getBidRequestsByTransaction(transactionId);
+      const allBids = [];
+      for (const br of bidRequests) {
+        const bids = await storage.getBidsByBidRequest(br.id);
+        allBids.push(...bids);
+      }
+      res.json(allBids);
+    } catch (error) {
+      console.error('Error fetching bids:', error);
+      res.status(500).json({ error: 'Failed to fetch bids' });
+    }
+  });
+
+  app.patch("/api/bids/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const id = Number(req.params.id);
+      const allowedFields = ['status'];
+      const sanitizedData: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          sanitizedData[field] = req.body[field];
+        }
+      }
+      sanitizedData.updatedAt = new Date();
+      const updated = await storage.updateBid(id, sanitizedData);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating bid:', error);
+      res.status(500).json({ error: 'Failed to update bid' });
+    }
+  });
+
+  app.get("/api/vendor/bids", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") return res.sendStatus(401);
+    try {
+      const contractor = await storage.getContractorByVendorUserId(req.user.id);
+      if (!contractor) {
+        return res.json([]);
+      }
+      const bids = await storage.getBidsByContractor(contractor.id);
+      res.json(bids);
+    } catch (error) {
+      console.error('Error fetching vendor bids:', error);
+      res.status(500).json({ error: 'Failed to fetch vendor bids' });
     }
   });
 

@@ -26,7 +26,7 @@ Preferred communication style: Simple, everyday language.
 ### Data Storage
 - **Database**: PostgreSQL (Neon serverless)
 - **ORM**: Drizzle ORM
-- **Key Models**: Users, Transactions, Clients, Documents, Checklists, Contractors, Messages, Saved Properties, Communications, Agent Phone Numbers, Email Snippets, Email Tracking.
+- **Key Models**: Users (agent/client/vendor roles), Transactions, Clients, Documents, Checklists, Contractors, Messages, Saved Properties, Communications, Agent Phone Numbers, Email Snippets, Email Tracking, Inspection Items, Bid Requests, Bids.
 
 ### Key Features
 - **Contract Upload**: Extracts data from PDF contracts (e.g., purchase price, dates, contacts) using `pdf-parse` and regex. Documents are processed in-memory for privacy.
@@ -35,6 +35,9 @@ Preferred communication style: Simple, everyday language.
 - **Showing Requests**: Clients can request showings for saved properties, which agents view on a map.
 - **Transaction Timeline & Risk Alerts**: Analyzes transaction dates and document statuses to generate proactive deadline alerts. Color-coded risk levels (green/yellow/orange/red). Dashboard-level alert summary across all active transactions.
 - **Client Portal**: Clients see a read-only "My Transaction" view with status progress, key dates, financial summary, document statuses with signing links, and timeline events.
+- **Inspection Bid System**: Agents upload inspection report PDFs, which are parsed (rule-based, no AI) to extract repair items by category and severity. Agents review/edit/approve items, then send selected items to relevant vendors for competitive bids. Includes bid comparison view with accept/reject per vendor.
+- **Vendor Portal**: Vendors register with a dedicated role and get their own dashboard showing incoming bid requests, bid submission forms, profile management (with Google/Yelp/BBB verification links), and reviews.
+- **Contractor Verification Badges**: Contractors display "Google Listed", "Yelp Listed", and "BBB Accredited" badges linking to their external profiles for third-party trust signals.
 - **Client Communications**:
     - **SMS**: Via Twilio, with agent-specific phone numbers, opt-out handling, rate limiting, and content filtering.
     - **Email**: Via agent's linked Gmail account (Google OAuth), including full inbox view, compose, reply, forward, email snippets/templates, read receipts (tracking pixel), and Gmail-like bulk actions (checkbox selection with archive, delete, mark read/unread, star, label).

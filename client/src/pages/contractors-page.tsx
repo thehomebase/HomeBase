@@ -172,17 +172,18 @@ function ContractorCard({
             </div>
           )}
         </div>
-        {(contractor.googleMapsUrl || contractor.yelpUrl) && (
-          <div className="flex items-center gap-2 mt-3 pt-2 border-t" onClick={(e) => e.stopPropagation()}>
+        {(contractor.googleMapsUrl || contractor.yelpUrl || contractor.bbbUrl) && (
+          <div className="flex items-center gap-2 mt-3 pt-2 border-t flex-wrap" onClick={(e) => e.stopPropagation()}>
             {contractor.googleMapsUrl && (
               <a 
                 href={contractor.googleMapsUrl} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
               >
-                <SiGoogle className="h-3 w-3" />
-                Google
+                <Badge variant="outline" className="text-blue-600 border-blue-600 hover:bg-blue-50 cursor-pointer gap-1">
+                  <SiGoogle className="h-3 w-3" />
+                  Google Listed
+                </Badge>
               </a>
             )}
             {contractor.yelpUrl && (
@@ -190,10 +191,23 @@ function ContractorCard({
                 href={contractor.yelpUrl} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-red-600 hover:underline"
               >
-                <SiYelp className="h-3 w-3" />
-                Yelp
+                <Badge variant="outline" className="text-red-600 border-red-600 hover:bg-red-50 cursor-pointer gap-1">
+                  <SiYelp className="h-3 w-3" />
+                  Yelp Listed
+                </Badge>
+              </a>
+            )}
+            {contractor.bbbUrl && (
+              <a 
+                href={contractor.bbbUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+              >
+                <Badge variant="outline" className="text-green-700 border-green-700 hover:bg-green-50 cursor-pointer gap-1">
+                  <Award className="h-3 w-3" />
+                  BBB Accredited
+                </Badge>
               </a>
             )}
           </div>
@@ -225,6 +239,7 @@ function ContractorForm({
     description: contractor?.description || "",
     googleMapsUrl: contractor?.googleMapsUrl || "",
     yelpUrl: contractor?.yelpUrl || "",
+    bbbUrl: contractor?.bbbUrl || "",
     agentRating: contractor?.agentRating || 0,
     agentNotes: contractor?.agentNotes || ""
   });
@@ -306,6 +321,16 @@ function ContractorForm({
             onChange={(e) => setForm({ ...form, yelpUrl: e.target.value })}
             placeholder="Link to view reviews on Yelp"
             data-testid="input-contractor-yelp-url"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="bbbUrl">BBB Link</Label>
+          <Input
+            id="bbbUrl"
+            value={form.bbbUrl}
+            onChange={(e) => setForm({ ...form, bbbUrl: e.target.value })}
+            placeholder="Link to BBB profile"
+            data-testid="input-contractor-bbb-url"
           />
         </div>
         <div className="space-y-2">
@@ -539,6 +564,14 @@ function ContractorDetail({
             <SiYelp className="h-4 w-4 text-red-500" />
             <a href={contractor.yelpUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
               View on Yelp <ExternalLink className="h-3 w-3 inline" />
+            </a>
+          </div>
+        )}
+        {contractor.bbbUrl && (
+          <div className="flex items-center gap-2">
+            <Award className="h-4 w-4 text-green-700" />
+            <a href={contractor.bbbUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              View on BBB <ExternalLink className="h-3 w-3 inline" />
             </a>
           </div>
         )}

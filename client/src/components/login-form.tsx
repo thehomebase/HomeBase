@@ -140,6 +140,7 @@ export function LoginForm({
                 <SelectContent>
                   <SelectItem value="agent">Agent</SelectItem>
                   <SelectItem value="client">Client</SelectItem>
+                  <SelectItem value="vendor">Vendor</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -127,6 +127,8 @@ export const contractors = pgTable("contractors", {
   description: text("description"),
   googleMapsUrl: text("google_maps_url"),
   yelpUrl: text("yelp_url"),
+  bbbUrl: text("bbb_url"),
+  vendorUserId: integer("vendor_user_id"),
   agentId: integer("agent_id").notNull(),
   agentRating: integer("agent_rating"),
   agentNotes: text("agent_notes"),
@@ -193,6 +195,42 @@ export const showingRequests = pgTable("showing_requests", {
   responseNotes: text("response_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
+});
+
+export const inspectionItems = pgTable("inspection_items", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").notNull(),
+  category: text("category", { enum: ['roof', 'plumbing', 'electrical', 'hvac', 'foundation', 'exterior', 'interior', 'appliances', 'other'] }).notNull(),
+  description: text("description").notNull(),
+  severity: text("severity", { enum: ['minor', 'moderate', 'major', 'safety'] }).notNull(),
+  location: text("location"),
+  status: text("status", { enum: ['pending_review', 'approved', 'sent_for_bids', 'bids_received', 'accepted', 'declined'] }).notNull().default('pending_review'),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const bidRequests = pgTable("bid_requests", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").notNull(),
+  inspectionItemId: integer("inspection_item_id").notNull(),
+  contractorId: integer("contractor_id").notNull(),
+  status: text("status", { enum: ['pending', 'viewed', 'bid_submitted', 'declined', 'expired'] }).notNull().default('pending'),
+  sentAt: timestamp("sent_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  notes: text("notes"),
+});
+
+export const bids = pgTable("bids", {
+  id: serial("id").primaryKey(),
+  bidRequestId: integer("bid_request_id").notNull(),
+  contractorId: integer("contractor_id").notNull(),
+  amount: integer("amount").notNull(),
+  estimatedDays: integer("estimated_days"),
+  description: text("description"),
+  warranty: text("warranty"),
+  status: text("status", { enum: ['submitted', 'accepted', 'rejected', 'withdrawn'] }).notNull().default('submitted'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 const checklistItemSchema = z.object({
@@ -397,6 +435,20 @@ export const insertEmailTrackingSchema = createInsertSchema(emailTracking).omit(
   openCount: true,
 });
 
+export const insertInspectionItemSchema = createInsertSchema(inspectionItems).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertBidRequestSchema = createInsertSchema(bidRequests).omit({
+  id: true,
+  sentAt: true,
+});
+export const insertBidSchema = createInsertSchema(bids).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertSavedPropertySchema = createInsertSchema(savedProperties).omit({
   id: true,
   createdAt: true,
@@ -433,3 +485,9 @@ export type EmailSnippet = typeof emailSnippets.$inferSelect;
 export type InsertEmailSnippet = z.infer<typeof insertEmailSnippetSchema>;
 export type EmailTracking = typeof emailTracking.$inferSelect;
 export type InsertEmailTracking = z.infer<typeof insertEmailTrackingSchema>;
+export type InspectionItem = typeof inspectionItems.$inferSelect;
+export type InsertInspectionItem = z.infer<typeof insertInspectionItemSchema>;
+export type BidRequest = typeof bidRequests.$inferSelect;
+export type InsertBidRequest = z.infer<typeof insertBidRequestSchema>;
+export type Bid = typeof bids.$inferSelect;
+export type InsertBid = z.infer<typeof insertBidSchema>;

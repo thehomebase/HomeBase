@@ -57,12 +57,16 @@ import MapPage from "@/pages/map-page";
 import PropertySearchPage from "@/pages/property-search-page";
 import MailPage from "@/pages/mail-page";
 import ClientTransactionPage from "@/pages/client-transaction-page";
+import VendorPortal from "@/pages/vendor-portal";
+import InspectionReviewPage from "@/pages/inspection-review-page";
+import BidComparisonPage from "@/pages/bid-comparison-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
   const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
   const isClient = user?.role === 'client';
+  const isVendor = user?.role === 'vendor';
 
   // Update sidebar state when mobile status changes
   React.useEffect(() => {
@@ -93,6 +97,16 @@ function Layout({ children }: { children: React.ReactNode }) {
               <SidebarContent>
                 <SidebarGroup>
                   <SidebarMenu>
+                    {isVendor && (
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Vendor Portal">
+                          <Link href="/vendor" className="flex items-center gap-2">
+                            <Wrench className="h-4 w-4" />
+                            {isSidebarOpen && <span>Vendor Portal</span>}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )}
                     {isClient && (
                       <SidebarMenuItem>
                         <SidebarMenuButton asChild tooltip="My Transaction">
@@ -103,7 +117,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     )}
-                    {!isClient && (
+                    {!isClient && !isVendor && (
                       <>
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Transactions">
@@ -274,8 +288,23 @@ function Router() {
         <ProtectedRoute path="/calendar" component={CalendarPage} />
       </Route>
 
-      {user?.role === "agent" ? (
+      {user?.role === "vendor" ? (
         <>
+          <Route path="/vendor">
+            <ProtectedRoute path="/vendor" component={VendorPortal} />
+          </Route>
+          <Route path="/">
+            <ProtectedRoute path="/" component={VendorPortal} />
+          </Route>
+        </>
+      ) : user?.role === "agent" ? (
+        <>
+          <Route path="/transactions/:id/inspection">
+            <ProtectedRoute path="/transactions/:id/inspection" component={InspectionReviewPage} />
+          </Route>
+          <Route path="/transactions/:id/bids">
+            <ProtectedRoute path="/transactions/:id/bids" component={BidComparisonPage} />
+          </Route>
           <Route path="/transactions/:id">
             <ProtectedRoute path="/transactions/:id" component={TransactionPage} />
           </Route>
@@ -285,8 +314,8 @@ function Router() {
           <Route path="/clients">
             <ProtectedRoute path="/clients" component={ClientsPage} />
           </Route>
-          <Route path="/clients/:id"> {/* Added route for individual client pages */}
-            <ProtectedRoute path="/clients/:id" component={ClientPage} /> {/* Added route for individual client pages */}
+          <Route path="/clients/:id">
+            <ProtectedRoute path="/clients/:id" component={ClientPage} />
           </Route>
           <Route path="/data">
             <ProtectedRoute path="/data" component={DataPage} />
