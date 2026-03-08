@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Search, MapPin, School, Building, Loader2, Home, Star, ThumbsUp, ThumbsDown, Plus, RefreshCw, PanelRightClose, PanelRightOpen, X, Calendar, Clock, Bell, Check, XCircle, Route, Navigation, Square, CheckSquare, Edit2, Trash2, Ban, CheckCircle, MoreVertical, ExternalLink, Heart } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Transaction, PropertyViewing, Client, ShowingRequest } from "@shared/schema";
@@ -42,11 +43,15 @@ interface NearbyPlace {
   distance?: number;
 }
 
-function MapController({ center, zoom }: { center: [number, number]; zoom?: number }) {
+function MapController({ center, zoom, isMobile }: { center: [number, number]; zoom?: number; isMobile?: boolean }) {
   const map = useMap();
   useEffect(() => {
     map.setView(center, zoom || 15);
   }, [center, zoom, map]);
+  useEffect(() => {
+    const timer = setTimeout(() => map.invalidateSize(), 200);
+    return () => clearTimeout(timer);
+  }, [map, isMobile]);
   return null;
 }
 
@@ -128,6 +133,7 @@ interface SavedPropertyWithCoords {
 export default function MapPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const isAgent = user?.role === "agent";
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -755,7 +761,7 @@ export default function MapPage() {
   const savedPropsWithValidCoords = savedPropsWithCoords.filter(p => p.latitude && p.longitude);
 
   return (
-    <div style={{ position: "fixed", top: 0, left: "60px", right: 0, bottom: 0 }}>
+    <div style={{ position: "fixed", top: 0, left: isMobile ? 0 : "60px", right: 0, bottom: isMobile ? "80px" : 0 }}>
       <MapContainer
         center={mapCenter}
         zoom={mapZoom}
@@ -765,7 +771,7 @@ export default function MapPage() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <MapController center={mapCenter} zoom={mapZoom} />
+        <MapController center={mapCenter} zoom={mapZoom} isMobile={isMobile} />
         
         {selectedLocation && (
           <>
@@ -992,26 +998,26 @@ export default function MapPage() {
         )}
       </MapContainer>
 
-      <div className="absolute top-4 z-[1000] flex flex-col gap-2" style={{ left: "180px" }}>
+      <div className={`absolute top-4 z-[1000] flex flex-col gap-2 ${isMobile ? "left-3 right-3" : ""}`} style={isMobile ? undefined : { left: "180px" }}>
         <div className="flex gap-2">
-          <div className="relative">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search for an address..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && searchAddress()}
-              className="pl-10 w-80 bg-background shadow-lg"
+              className={`pl-10 bg-background shadow-lg ${isMobile ? "w-full" : "w-80"}`}
               data-testid="input-address-search"
             />
           </div>
-          <Button onClick={searchAddress} disabled={isSearching} className="shadow-lg" data-testid="button-search">
+          <Button onClick={searchAddress} disabled={isSearching} className="shadow-lg shrink-0" data-testid="button-search">
             {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
           </Button>
         </div>
 
         {searchResults.length > 0 && (
-          <Card className="w-96 bg-background shadow-lg">
+          <Card className={`bg-background shadow-lg ${isMobile ? "w-full" : "w-96"}`}>
             <CardContent className="p-2">
               {searchResults.map((result) => (
                 <button key={result.place_id} onClick={() => selectLocation(result)} className="w-full text-left p-3 hover:bg-muted rounded-md flex items-start gap-3" data-testid={`search-result-${result.place_id}`}>
@@ -1027,11 +1033,11 @@ export default function MapPage() {
         )}
 
         {isAgent && (
-          <div className="flex items-center gap-1 bg-background rounded-lg p-1 shadow-lg">
+          <div className="flex items-center gap-1 bg-background rounded-lg p-1 shadow-lg overflow-x-auto whitespace-nowrap">
             <Button
               size="sm"
               variant={mapDisplayFilter === "showings" ? "default" : "ghost"}
-              className="h-7 text-xs"
+              className="h-7 text-xs shrink-0"
               onClick={() => { setMapDisplayFilter("showings"); setSelectedClientFilter("all"); }}
               data-testid="filter-showings"
             >
@@ -1040,7 +1046,7 @@ export default function MapPage() {
             <Button
               size="sm"
               variant={mapDisplayFilter === "clients" ? "default" : "ghost"}
-              className="h-7 text-xs"
+              className="h-7 text-xs shrink-0"
               onClick={() => setMapDisplayFilter("clients")}
               data-testid="filter-clients"
             >
@@ -1050,7 +1056,7 @@ export default function MapPage() {
             <Button
               size="sm"
               variant={mapDisplayFilter === "listings" ? "default" : "ghost"}
-              className="h-7 text-xs"
+              className="h-7 text-xs shrink-0"
               onClick={() => setMapDisplayFilter("listings")}
               data-testid="filter-listings"
             >
@@ -1059,7 +1065,7 @@ export default function MapPage() {
             <Button
               size="sm"
               variant={mapDisplayFilter === "saved" ? "default" : "ghost"}
-              className="h-7 text-xs"
+              className="h-7 text-xs shrink-0"
               onClick={() => setMapDisplayFilter("saved")}
               data-testid="filter-saved"
             >
@@ -1102,7 +1108,7 @@ export default function MapPage() {
         </div>
       </div>
 
-      <div className="absolute top-4 right-4 z-[1000] flex gap-2">
+      <div className={`absolute z-[1000] flex gap-2 ${isMobile ? "top-[120px] right-3" : "top-4 right-4"}`}>
         {isAgent && !routePlanningMode && viewingsWithCoords.length >= 2 && (
           <Button 
             variant="outline" 
@@ -1266,7 +1272,7 @@ export default function MapPage() {
         </Button>
       </div>
 
-      <div className={`absolute top-0 right-0 h-full w-80 bg-background border-l shadow-xl z-[1001] transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`absolute top-0 right-0 h-full bg-background border-l shadow-xl z-[1001] transform transition-transform duration-300 ease-in-out ${isMobile ? "w-full" : "w-80"} ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="font-semibold">Properties</h2>
           <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)} data-testid="button-close-sidebar"><X className="h-4 w-4" /></Button>
@@ -1685,7 +1691,7 @@ export default function MapPage() {
       </Dialog>
 
       {showRequestsPanel && (
-        <div className="absolute top-16 right-4 z-[1002] w-80 bg-background rounded-lg shadow-xl border max-h-96 overflow-y-auto">
+        <div className={`absolute top-16 z-[1002] bg-background rounded-lg shadow-xl border max-h-96 overflow-y-auto ${isMobile ? "left-3 right-3" : "right-4 w-80"}`}>
           <div className="flex items-center justify-between p-3 border-b sticky top-0 bg-background">
             <h3 className="font-semibold flex items-center gap-2">
               <Bell className="h-4 w-4" /> Showing Requests
