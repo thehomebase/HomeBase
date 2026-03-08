@@ -240,7 +240,7 @@ function MaintenanceDialog({
             <Label htmlFor="m-description">Description *</Label>
             <Textarea id="m-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required rows={2} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="m-date">Service Date</Label>
               <Input id="m-date" type="date" value={form.serviceDate} onChange={(e) => setForm({ ...form, serviceDate: e.target.value })} />

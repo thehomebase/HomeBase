@@ -1230,29 +1230,28 @@ export default function MailPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <div>
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Mail className="h-6 w-6" /> Mail
+            <Mail className="h-6 w-6 shrink-0" /> Mail
           </h1>
-          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
-            <Link2 className="h-3 w-3" /> {gmailEmail}
+          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1 truncate">
+            <Link2 className="h-3 w-3 shrink-0" /> {gmailEmail}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
           <Button size="sm" onClick={() => openCompose()}>
-            <PenSquare className="h-4 w-4 mr-2" /> Compose
+            <PenSquare className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Compose</span>
           </Button>
           <Button variant="outline" size="sm" onClick={() => setViewMode("snippets")}>
-            <FileText className="h-4 w-4 mr-2" /> Snippets
+            <FileText className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Snippets</span>
           </Button>
           <Button variant="outline" size="sm" onClick={() => setViewMode("tracking")}>
-            <Eye className="h-4 w-4 mr-2" /> Tracking
+            <Eye className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Tracking</span>
           </Button>
           <Button variant="outline" size="sm"
             onClick={() => inboxQuery.refetch()} disabled={inboxQuery.isFetching}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${inboxQuery.isFetching ? "animate-spin" : ""}`} />
-            Refresh
+            <RefreshCw className={`h-4 w-4 ${inboxQuery.isFetching ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </div>
