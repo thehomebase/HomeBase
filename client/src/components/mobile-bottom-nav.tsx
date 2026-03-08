@@ -27,7 +27,6 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { BiometricSetupDialog } from "@/components/biometric-setup";
 
 interface NavItem {
   icon: LucideIcon;
@@ -103,9 +102,8 @@ function getNavItems(role: string | undefined): { primary: NavItem[]; overflow: 
 
 export function MobileBottomNav() {
   const { user, logoutMutation } = useAuth();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [showMore, setShowMore] = useState(false);
-  const [showBiometric, setShowBiometric] = useState(false);
 
   if (!user) return null;
 
@@ -154,7 +152,7 @@ export function MobileBottomNav() {
               <button
                 onClick={() => {
                   setShowMore(false);
-                  setTimeout(() => setShowBiometric(true), 150);
+                  setLocation("/settings/biometric");
                 }}
                 className="flex items-center gap-3 w-full p-3 rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-transform"
               >
@@ -172,8 +170,6 @@ export function MobileBottomNav() {
           </div>
         </div>
       )}
-
-      <BiometricSetupDialog open={showBiometric} onOpenChange={setShowBiometric} />
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t md:hidden">
         <div className="flex items-center justify-around px-1 pt-1 pb-safe">

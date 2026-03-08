@@ -77,6 +77,7 @@ import { TopAgentsPage, AgentReviewsPage } from "@/pages/agent-reviews-page";
 import LeadGenerationPage from "@/pages/lead-generation-page";
 import LeadSubmitPage from "@/pages/lead-submit-page";
 import VendorRatingsPage from "@/pages/vendor-ratings-page";
+import BiometricSettingsPage from "@/pages/biometric-settings-page";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { BiometricSetupButton } from "@/components/biometric-setup";
 
@@ -397,6 +398,9 @@ function Router() {
       </Route>
       <Route path="/calendar">
         <ProtectedRoute path="/calendar" component={CalendarPage} />
+      </Route>
+      <Route path="/settings/biometric">
+        <ProtectedRoute path="/settings/biometric" component={BiometricSettingsPage} />
       </Route>
 
       {user?.role === "vendor" ? (
