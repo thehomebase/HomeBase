@@ -868,6 +868,42 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/dashboard", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const data = await storage.getDashboardData(req.user.id, req.user.role);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      res.status(500).json({ error: 'Failed to load dashboard data' });
+    }
+  });
+
+  app.get("/api/dashboard/preferences", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const prefs = await storage.getDashboardPreferences(req.user.id);
+      res.json(prefs || { widgets: [] });
+    } catch (error) {
+      res.json({ widgets: [] });
+    }
+  });
+
+  app.patch("/api/dashboard/preferences", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const { widgets } = req.body;
+    if (!Array.isArray(widgets) || !widgets.every((w: any) => typeof w === "string")) {
+      return res.status(400).json({ error: "widgets must be an array of strings" });
+    }
+    try {
+      const result = await storage.updateDashboardPreferences(req.user.id, { widgets });
+      res.json(result);
+    } catch (error) {
+      console.error('Error saving dashboard preferences:', error);
+      res.status(500).json({ error: 'Failed to save preferences' });
+    }
+  });
+
   app.get("/api/communications/metrics", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (!["agent", "vendor", "lender"].includes(req.user.role)) return res.sendStatus(403);

@@ -26,6 +26,7 @@ export const users = pgTable("users", {
   claimedAccessCode: text("claimed_access_code"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
+  dashboardPreferences: json("dashboard_preferences"),
 });
 
 export const clients = pgTable("clients", {

@@ -51,7 +51,8 @@ import {
   CreditCard,
   Bell,
   MapPin,
-  Star
+  Star,
+  LayoutDashboard
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -77,6 +78,7 @@ import BillingPage from "@/pages/billing-page";
 import DripCampaignsPage from "@/pages/drip-campaigns-page";
 import { TopAgentsPage, AgentReviewsPage } from "@/pages/agent-reviews-page";
 import LeadGenerationPage from "@/pages/lead-generation-page";
+import DashboardPage from "@/pages/dashboard-page";
 import LeadSubmitPage from "@/pages/lead-submit-page";
 import FindContractorPage from "@/pages/find-contractor-page";
 import VendorRatingsPage from "@/pages/vendor-ratings-page";
@@ -160,6 +162,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                     {isVendor && (
                       <>
                         <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Dashboard">
+                            <Link href="/dashboard" className="flex items-center gap-2">
+                              <LayoutDashboard className="h-4 w-4" />
+                              {isSidebarOpen && <span>Dashboard</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Vendor Portal">
                             <Link href="/vendor" className="flex items-center gap-2">
                               <div className="relative">
@@ -194,27 +204,55 @@ function Layout({ children }: { children: React.ReactNode }) {
                       </>
                     )}
                     {isLender && (
-                      <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Loan Pipeline">
-                          <Link href="/lender-portal" className="flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
-                            {isSidebarOpen && <span>Loan Pipeline</span>}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
+                      <>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Dashboard">
+                            <Link href="/dashboard" className="flex items-center gap-2">
+                              <LayoutDashboard className="h-4 w-4" />
+                              {isSidebarOpen && <span>Dashboard</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Loan Pipeline">
+                            <Link href="/lender-portal" className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              {isSidebarOpen && <span>Loan Pipeline</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </>
                     )}
                     {isClient && (
-                      <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="My Transaction">
-                          <Link href="/my-transaction" className="flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
-                            {isSidebarOpen && <span>My Transaction</span>}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
+                      <>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Dashboard">
+                            <Link href="/dashboard" className="flex items-center gap-2">
+                              <LayoutDashboard className="h-4 w-4" />
+                              {isSidebarOpen && <span>Dashboard</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="My Transaction">
+                            <Link href="/my-transaction" className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              {isSidebarOpen && <span>My Transaction</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </>
                     )}
                     {!isClient && !isVendor && !isLender && (
                       <>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Dashboard">
+                            <Link href="/dashboard" className="flex items-center gap-2">
+                              <LayoutDashboard className="h-4 w-4" />
+                              {isSidebarOpen && <span>Dashboard</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Transactions">
                             <Link href="/transactions" className="flex items-center gap-2">
@@ -489,6 +527,9 @@ function Router() {
 
       {user?.role === "vendor" ? (
         <>
+          <Route path="/dashboard">
+            <ProtectedRoute path="/dashboard" component={DashboardPage} />
+          </Route>
           <Route path="/vendor">
             <ProtectedRoute path="/vendor" component={VendorPortal} />
           </Route>
@@ -499,11 +540,14 @@ function Router() {
             <ProtectedRoute path="/billing" component={BillingPage} />
           </Route>
           <Route path="/">
-            <ProtectedRoute path="/" component={VendorPortal} />
+            <ProtectedRoute path="/" component={DashboardPage} />
           </Route>
         </>
       ) : user?.role === "lender" ? (
         <>
+          <Route path="/dashboard">
+            <ProtectedRoute path="/dashboard" component={DashboardPage} />
+          </Route>
           <Route path="/lender-portal">
             <ProtectedRoute path="/lender-portal" component={LenderPortal} />
           </Route>
@@ -514,11 +558,14 @@ function Router() {
             <ProtectedRoute path="/billing" component={BillingPage} />
           </Route>
           <Route path="/">
-            <ProtectedRoute path="/" component={LenderPortal} />
+            <ProtectedRoute path="/" component={DashboardPage} />
           </Route>
         </>
       ) : user?.role === "agent" ? (
         <>
+          <Route path="/dashboard">
+            <ProtectedRoute path="/dashboard" component={DashboardPage} />
+          </Route>
           <Route path="/transactions/:id/inspection">
             <ProtectedRoute path="/transactions/:id/inspection" component={InspectionReviewPage} />
           </Route>
@@ -562,13 +609,18 @@ function Router() {
             <ProtectedRoute path="/billing" component={BillingPage} />
           </Route>
           <Route path="/">
-            <ProtectedRoute path="/" component={TransactionsPage} />
+            <ProtectedRoute path="/" component={DashboardPage} />
           </Route>
         </>
       ) : (
-        <Route path="/">
-          <ProtectedRoute path="/" component={CalculatorsPage} />
-        </Route>
+        <>
+          <Route path="/dashboard">
+            <ProtectedRoute path="/dashboard" component={DashboardPage} />
+          </Route>
+          <Route path="/">
+            <ProtectedRoute path="/" component={DashboardPage} />
+          </Route>
+        </>
       )}
       <Route path="*" component={NotFound} />
     </Switch>

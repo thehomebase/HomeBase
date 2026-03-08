@@ -110,6 +110,9 @@ export interface IStorage {
   getPrivateConversations(userId: number): Promise<any[]>;
   markPrivateMessageRead(id: number, userId: number): Promise<any>;
   getCommunicationMetrics(userId: number): Promise<any>;
+  getDashboardData(userId: number, role: string): Promise<any>;
+  getDashboardPreferences(userId: number): Promise<any>;
+  updateDashboardPreferences(userId: number, preferences: any): Promise<any>;
 
   getContactsByTransaction(transactionId: number): Promise<any[]>;
   deleteContact(id: number): Promise<boolean>;
@@ -1268,6 +1271,275 @@ export class DatabaseStorage implements IStorage {
       RETURNING *
     `);
     return result.rows[0] || null;
+  }
+
+  async getDashboardData(userId: number, role: string): Promise<any> {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+    const lastMonthEnd = monthStart;
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+
+    if (role === "agent") {
+      const txResult = await db.execute(sql`
+        SELECT status, COUNT(*)::int as count, COALESCE(SUM(contract_price), 0)::bigint as total_value
+        FROM transactions WHERE agent_id = ${userId}
+        GROUP BY status
+      `);
+      const stages: Record<string, number> = {};
+      let activeCount = 0;
+      let totalPipeline = 0;
+      let closedCount = 0;
+      for (const row of txResult.rows as any[]) {
+        stages[row.status] = row.count;
+        if (row.status !== "closed") {
+          activeCount += row.count;
+          totalPipeline += Number(row.total_value);
+        } else {
+          closedCount = row.count;
+        }
+      }
+
+      const closingThisMonth = await db.execute(sql`
+        SELECT COUNT(*)::int as count FROM transactions
+        WHERE agent_id = ${userId} AND closing_date >= ${monthStart}::timestamp
+        AND closing_date < ${new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()}::timestamp
+      `);
+
+      const closedLastMonth = await db.execute(sql`
+        SELECT COUNT(*)::int as count FROM transactions
+        WHERE agent_id = ${userId} AND status = 'closed'
+        AND updated_at >= ${lastMonthStart}::timestamp AND updated_at < ${lastMonthEnd}::timestamp
+      `);
+
+      const clientsResult = await db.execute(sql`
+        SELECT COUNT(*)::int as total,
+          COUNT(*) FILTER (WHERE created_at >= ${monthStart}::timestamp)::int as new_this_month,
+          COUNT(*) FILTER (WHERE created_at >= ${lastMonthStart}::timestamp AND created_at < ${lastMonthEnd}::timestamp)::int as last_month
+        FROM clients WHERE agent_id = ${userId}
+      `);
+
+      const leadsResult = await db.execute(sql`
+        SELECT
+          COUNT(*)::int as total,
+          COUNT(*) FILTER (WHERE status = 'new')::int as new_leads,
+          COUNT(*) FILTER (WHERE status = 'converted')::int as converted,
+          COUNT(*) FILTER (WHERE created_at >= ${monthStart}::timestamp)::int as this_month
+        FROM leads WHERE assigned_agent_id = ${userId}
+      `);
+
+      const unreadResult = await db.execute(sql`
+        SELECT COUNT(*)::int as count FROM private_messages
+        WHERE recipient_id = ${userId} AND read = false
+      `);
+
+      const activityResult = await db.execute(sql`
+        SELECT
+          EXTRACT(HOUR FROM timestamp::timestamp)::int as hour,
+          COUNT(*)::int as count
+        FROM private_messages
+        WHERE (sender_id = ${userId} OR recipient_id = ${userId})
+        AND timestamp >= ${last24h}
+        GROUP BY EXTRACT(HOUR FROM timestamp::timestamp)
+        ORDER BY hour
+      `);
+      const activityChart = Array.from({ length: 24 }, (_, i) => ({
+        hour: i,
+        count: 0,
+      }));
+      for (const row of activityResult.rows as any[]) {
+        activityChart[row.hour].count = row.count;
+      }
+
+      const smsActivity = await db.execute(sql`
+        SELECT
+          EXTRACT(HOUR FROM created_at)::int as hour,
+          COUNT(*)::int as count
+        FROM communications
+        WHERE agent_id = ${userId} AND created_at >= ${last24h}::timestamp
+        GROUP BY EXTRACT(HOUR FROM created_at)
+      `);
+      for (const row of smsActivity.rows as any[]) {
+        if (activityChart[row.hour]) {
+          activityChart[row.hour].count += row.count;
+        }
+      }
+
+      const upcomingDeadlines = await db.execute(sql`
+        SELECT d.name, d.deadline, d.status, t.street_name, t.id as transaction_id
+        FROM documents d
+        JOIN transactions t ON d.transaction_id = t.id
+        WHERE t.agent_id = ${userId}
+        AND d.deadline IS NOT NULL
+        AND d.deadline >= ${todayStart}::date
+        AND d.status != 'complete'
+        ORDER BY d.deadline ASC
+        LIMIT 5
+      `);
+
+      const recentActivity = await db.execute(sql`
+        (SELECT 'transaction' as type, street_name as title,
+          COALESCE(updated_at, NOW()) as activity_time, status as detail
+        FROM transactions WHERE agent_id = ${userId}
+        ORDER BY COALESCE(updated_at, NOW()) DESC LIMIT 5)
+        UNION ALL
+        (SELECT 'lead' as type, first_name || ' ' || last_name as title,
+          created_at as activity_time, status as detail
+        FROM leads WHERE assigned_agent_id = ${userId}
+        ORDER BY created_at DESC LIMIT 5)
+        ORDER BY activity_time DESC LIMIT 10
+      `);
+
+      const clients = (clientsResult.rows[0] as any) || {};
+      const leads = (leadsResult.rows[0] as any) || {};
+      const prevClosedCount = ((closedLastMonth.rows[0] as any)?.count) || 0;
+
+      return {
+        role: "agent",
+        transactions: {
+          active: activeCount,
+          closed: closedCount,
+          stages,
+          pipelineValue: totalPipeline,
+          closingThisMonth: (closingThisMonth.rows[0] as any)?.count || 0,
+          closedChangePercent: prevClosedCount > 0 ? Math.round(((closedCount - prevClosedCount) / prevClosedCount) * 100) : 0,
+        },
+        clients: {
+          total: clients.total || 0,
+          newThisMonth: clients.new_this_month || 0,
+          changePercent: clients.last_month > 0 ? Math.round(((clients.new_this_month - clients.last_month) / clients.last_month) * 100) : 0,
+        },
+        leads: {
+          total: leads.total || 0,
+          new: leads.new_leads || 0,
+          converted: leads.converted || 0,
+          conversionRate: leads.total > 0 ? Math.round((leads.converted / leads.total) * 100) : 0,
+          thisMonth: leads.this_month || 0,
+        },
+        unreadMessages: (unreadResult.rows[0] as any)?.count || 0,
+        activityChart,
+        upcomingDeadlines: (upcomingDeadlines.rows as any[]).map(d => ({
+          name: d.name,
+          deadline: d.deadline,
+          status: d.status,
+          transactionStreet: d.street_name,
+          transactionId: d.transaction_id,
+        })),
+        recentActivity: (recentActivity.rows as any[]).map(a => ({
+          type: a.type,
+          title: a.title,
+          time: a.activity_time,
+          detail: a.detail,
+        })),
+      };
+    }
+
+    if (role === "vendor") {
+      const bidsResult = await db.execute(sql`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'pending')::int as pending,
+          COUNT(*) FILTER (WHERE status = 'accepted')::int as accepted,
+          COUNT(*)::int as total
+        FROM bids WHERE vendor_id = ${userId}
+      `);
+      const leadsResult = await db.execute(sql`
+        SELECT COUNT(*)::int as total,
+          COUNT(*) FILTER (WHERE status = 'new')::int as new_leads
+        FROM vendor_leads WHERE vendor_id = ${userId}
+      `);
+      const unreadResult = await db.execute(sql`
+        SELECT COUNT(*)::int as count FROM private_messages
+        WHERE recipient_id = ${userId} AND read = false
+      `);
+      const bids = (bidsResult.rows[0] as any) || {};
+      const leads = (leadsResult.rows[0] as any) || {};
+      return {
+        role: "vendor",
+        bids: { pending: bids.pending || 0, accepted: bids.accepted || 0, total: bids.total || 0 },
+        leads: { total: leads.total || 0, new: leads.new_leads || 0 },
+        unreadMessages: (unreadResult.rows[0] as any)?.count || 0,
+      };
+    }
+
+    if (role === "lender") {
+      const pipelineResult = await db.execute(sql`
+        SELECT lender_status, COUNT(*)::int as count
+        FROM transactions
+        WHERE EXISTS (
+          SELECT 1 FROM json_array_elements(participants::json) p
+          WHERE (p->>'userId')::int = ${userId}
+        )
+        GROUP BY lender_status
+      `);
+      const stages: Record<string, number> = {};
+      let total = 0;
+      for (const row of pipelineResult.rows as any[]) {
+        stages[row.lender_status || "unknown"] = row.count;
+        total += row.count;
+      }
+      const unreadResult = await db.execute(sql`
+        SELECT COUNT(*)::int as count FROM private_messages
+        WHERE recipient_id = ${userId} AND read = false
+      `);
+      return {
+        role: "lender",
+        pipeline: { total, stages },
+        unreadMessages: (unreadResult.rows[0] as any)?.count || 0,
+      };
+    }
+
+    if (role === "client") {
+      const txResult = await db.execute(sql`
+        SELECT t.id, t.street_name, t.status, t.closing_date, t.contract_price
+        FROM transactions t
+        JOIN users u ON u.id = ${userId}
+        WHERE t.client_id = u.client_record_id OR t.secondary_client_id = u.client_record_id
+        LIMIT 1
+      `);
+      const tx = (txResult.rows[0] as any) || null;
+      let pendingDocs = 0;
+      if (tx) {
+        const docsResult = await db.execute(sql`
+          SELECT COUNT(*)::int as count FROM documents
+          WHERE transaction_id = ${tx.id} AND status IN ('waiting_signatures', 'waiting_others')
+        `);
+        pendingDocs = (docsResult.rows[0] as any)?.count || 0;
+      }
+      const unreadResult = await db.execute(sql`
+        SELECT COUNT(*)::int as count FROM private_messages
+        WHERE recipient_id = ${userId} AND read = false
+      `);
+      return {
+        role: "client",
+        transaction: tx ? {
+          id: tx.id,
+          streetName: tx.street_name,
+          status: tx.status,
+          closingDate: tx.closing_date,
+          contractPrice: tx.contract_price,
+        } : null,
+        pendingDocuments: pendingDocs,
+        unreadMessages: (unreadResult.rows[0] as any)?.count || 0,
+      };
+    }
+
+    return { role, unreadMessages: 0 };
+  }
+
+  async getDashboardPreferences(userId: number): Promise<any> {
+    const result = await db.execute(sql`
+      SELECT dashboard_preferences FROM users WHERE id = ${userId}
+    `);
+    return (result.rows[0] as any)?.dashboard_preferences || null;
+  }
+
+  async updateDashboardPreferences(userId: number, preferences: any): Promise<any> {
+    await db.execute(sql`
+      UPDATE users SET dashboard_preferences = ${JSON.stringify(preferences)}::jsonb
+      WHERE id = ${userId}
+    `);
+    return preferences;
   }
 
   async getContactsByTransaction(transactionId: number) {
