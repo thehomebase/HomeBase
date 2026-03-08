@@ -4084,6 +4084,26 @@ export function registerRoutes(app: Express): Server {
 
   // ===== Lead Submission Route (PUBLIC, no auth) =====
 
+  async function assignLeadToAgent(zipCode: string): Promise<{ assignedAgentId: number | null; status: string }> {
+    const agents = await storage.getAgentsForZipCode(zipCode);
+    if (agents.length === 0) return { assignedAgentId: null, status: 'new' };
+
+    const rotation = await storage.getLeadRotation(zipCode);
+    const lastAgentId = rotation?.lastAgentId;
+
+    let nextAgent: typeof agents[0];
+    if (lastAgentId) {
+      const lastIndex = agents.findIndex(a => a.agentId === lastAgentId);
+      const nextIndex = (lastIndex + 1) % agents.length;
+      nextAgent = agents[nextIndex];
+    } else {
+      nextAgent = agents[0];
+    }
+
+    await storage.upsertLeadRotation(zipCode, nextAgent.agentId);
+    return { assignedAgentId: nextAgent.agentId, status: 'assigned' };
+  }
+
   app.post("/api/leads/submit", async (req, res) => {
     try {
       const schema = z.object({
@@ -4104,29 +4124,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const data = parsed.data;
-      const agents = await storage.getAgentsForZipCode(data.zipCode);
-
-      let assignedAgentId: number | null = null;
-      let status: string = 'new';
-
-      if (agents.length > 0) {
-        const rotation = await storage.getLeadRotation(data.zipCode);
-        const lastAgentId = rotation?.lastAgentId;
-
-        let nextAgent: typeof agents[0];
-        if (lastAgentId) {
-          const lastIndex = agents.findIndex(a => a.agentId === lastAgentId);
-          const nextIndex = (lastIndex + 1) % agents.length;
-          nextAgent = agents[nextIndex];
-        } else {
-          nextAgent = agents[0];
-        }
-
-        assignedAgentId = nextAgent.agentId;
-        status = 'assigned';
-
-        await storage.upsertLeadRotation(data.zipCode, assignedAgentId);
-      }
+      const { assignedAgentId, status } = await assignLeadToAgent(data.zipCode);
 
       const lead = await storage.createLead({
         ...data,
@@ -4141,6 +4139,84 @@ export function registerRoutes(app: Express): Server {
       res.status(201).json(lead);
     } catch (error) {
       console.error('Error submitting lead:', error);
+      res.status(500).json({ error: 'Failed to submit lead' });
+    }
+  });
+
+  app.post("/api/leads/submit-with-account", async (req, res) => {
+    try {
+      const schema = z.object({
+        email: z.string().email(),
+        password: z.string().min(6),
+        zipCode: z.string().min(1),
+        type: z.enum(['buyer', 'seller', 'both']),
+        message: z.string().optional().nullable(),
+        budget: z.string().optional().nullable(),
+        timeframe: z.string().optional().nullable(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json(parsed.error);
+      }
+
+      const data = parsed.data;
+
+      const existingUser = await storage.getUserByEmail(data.email);
+      if (existingUser) {
+        return res.status(400).json({ error: 'An account with this email already exists. Please log in instead.' });
+      }
+
+      const { hashPassword } = await import('./auth');
+      const user = await storage.createUser({
+        email: data.email,
+        password: await hashPassword(data.password),
+        firstName: 'HomeBase',
+        lastName: 'User',
+        role: 'client',
+      });
+
+      const { assignedAgentId, status } = await assignLeadToAgent(data.zipCode);
+
+      const lead = await storage.createLead({
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: null,
+        zipCode: data.zipCode,
+        type: data.type,
+        message: data.message || null,
+        budget: data.budget || null,
+        timeframe: data.timeframe || null,
+        status,
+        assignedAgentId,
+      });
+
+      if (assignedAgentId) {
+        try {
+          await storage.createCommunication({
+            clientId: null,
+            agentId: assignedAgentId,
+            type: 'reminder',
+            subject: 'New Lead via HomeBase',
+            content: `A new lead is interested in ${data.zipCode} (${data.type}). They've created a HomeBase account and prefer to communicate through the platform. Check your Leads dashboard to connect.`,
+            status: 'sent',
+            externalId: null,
+          });
+        } catch (e) {
+          console.error('Error creating lead notification:', e);
+        }
+      }
+
+      req.login(user, (err) => {
+        if (err) {
+          console.error('Error logging in new lead user:', err);
+          return res.status(201).json({ lead, user: { id: user.id, email: user.email } });
+        }
+        res.status(201).json({ lead, user: { id: user.id, email: user.email } });
+      });
+    } catch (error) {
+      console.error('Error submitting lead with account:', error);
       res.status(500).json({ error: 'Failed to submit lead' });
     }
   });
