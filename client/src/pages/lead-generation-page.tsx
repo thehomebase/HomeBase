@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import {
   Plus,
   Trash2,
@@ -28,8 +29,11 @@ import {
   AlertTriangle,
   Search,
   Lock,
+  Bell,
+  BellOff,
 } from "lucide-react";
 import type { Lead } from "@shared/schema";
+import { isPushSupported, subscribeToPush, unsubscribeFromPush, isCurrentlySubscribed, getPushPermissionState } from "@/lib/push-notifications";
 
 const STATUS_COLORS: Record<string, string> = {
   new: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -86,6 +90,49 @@ export default function LeadGenerationPage() {
   const [activeTab, setActiveTab] = useState("leads");
   const [newZipCode, setNewZipCode] = useState("");
   const [previewZip, setPreviewZip] = useState("");
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+
+  useEffect(() => {
+    const checkPush = async () => {
+      const supported = isPushSupported();
+      setPushSupported(supported);
+      if (supported) {
+        const subscribed = await isCurrentlySubscribed();
+        setPushEnabled(subscribed);
+      }
+    };
+    checkPush();
+  }, []);
+
+  const handlePushToggle = async (enabled: boolean) => {
+    setPushLoading(true);
+    try {
+      if (enabled) {
+        const success = await subscribeToPush();
+        setPushEnabled(success);
+        if (success) {
+          toast({ title: "Push notifications enabled", description: "You'll receive alerts when new leads come in." });
+        } else {
+          const perm = await getPushPermissionState();
+          if (perm === 'denied') {
+            toast({ title: "Notifications blocked", description: "Please enable notifications in your browser settings.", variant: "destructive" });
+          } else {
+            toast({ title: "Could not enable notifications", description: "Please try again.", variant: "destructive" });
+          }
+        }
+      } else {
+        await unsubscribeFromPush();
+        setPushEnabled(false);
+        toast({ title: "Push notifications disabled" });
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to update notification settings.", variant: "destructive" });
+    } finally {
+      setPushLoading(false);
+    }
+  };
 
   const { data: zipData, isLoading: zipCodesLoading } = useQuery<ZipCodesResponse>({
     queryKey: ["/api/leads/zip-codes"],
@@ -424,6 +471,36 @@ export default function LeadGenerationPage() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    {pushEnabled ? <Bell className="h-5 w-5 text-blue-500" /> : <BellOff className="h-5 w-5 text-muted-foreground" />}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm">Lead Notifications</p>
+                    <p className="text-xs text-muted-foreground">
+                      {!pushSupported
+                        ? "Not supported on this browser"
+                        : pushEnabled
+                          ? "You'll get push + SMS alerts for new leads"
+                          : "Enable to get instant alerts when leads arrive"
+                      }
+                    </p>
+                  </div>
+                </div>
+                {pushSupported && (
+                  <Switch
+                    checked={pushEnabled}
+                    onCheckedChange={handlePushToggle}
+                    disabled={pushLoading}
+                  />
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

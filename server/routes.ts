@@ -20,6 +20,7 @@ import {
 import type {
   AuthenticatorTransportFuture,
 } from "@simplewebauthn/server";
+import { notifyAgentOfNewLead } from "./notification-service";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -4581,6 +4582,23 @@ export function registerRoutes(app: Express): Server {
         assignedAgentId,
       });
 
+      if (assignedAgentId) {
+        try {
+          const agent = await storage.getUser(assignedAgentId);
+          if (agent) {
+            const subs = await storage.getPushSubscriptionsByUser(assignedAgentId);
+            await notifyAgentOfNewLead(
+              agent,
+              { zipCode: data.zipCode, type: data.type, firstName: data.firstName, lastName: data.lastName, budget: data.budget, timeframe: data.timeframe, message: data.message },
+              subs,
+              async (subId) => storage.deletePushSubscription(subId)
+            );
+          }
+        } catch (notifErr) {
+          console.error('Error sending lead notification:', notifErr);
+        }
+      }
+
       res.status(201).json(lead);
     } catch (error) {
       console.error('Error submitting lead:', error);
@@ -4650,6 +4668,21 @@ export function registerRoutes(app: Express): Server {
           });
         } catch (e) {
           console.error('Error creating lead notification:', e);
+        }
+
+        try {
+          const agent = await storage.getUser(assignedAgentId);
+          if (agent) {
+            const subs = await storage.getPushSubscriptionsByUser(assignedAgentId);
+            await notifyAgentOfNewLead(
+              agent,
+              { zipCode: data.zipCode, type: data.type, firstName: user.firstName, lastName: user.lastName, budget: data.budget, timeframe: data.timeframe, message: data.message },
+              subs,
+              async (subId) => storage.deletePushSubscription(subId)
+            );
+          }
+        } catch (notifErr) {
+          console.error('Error sending lead push/sms notification:', notifErr);
         }
       }
 
@@ -4857,6 +4890,63 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error deleting review:', error);
       res.status(500).json({ error: 'Failed to delete review' });
+    }
+  });
+
+  // ===== Push Notification Subscription Routes =====
+
+  app.get("/api/push/vapid-key", (req, res) => {
+    const key = process.env.VAPID_PUBLIC_KEY;
+    if (!key) {
+      return res.status(503).json({ error: 'Push notifications not configured' });
+    }
+    res.json({ publicKey: key });
+  });
+
+  app.post("/api/push/subscribe", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const schema = z.object({
+        endpoint: z.string().url(),
+        keys: z.object({
+          p256dh: z.string().min(1),
+          auth: z.string().min(1),
+        }),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid subscription data' });
+      }
+
+      const sub = await storage.savePushSubscription({
+        userId: req.user.id,
+        endpoint: parsed.data.endpoint,
+        p256dh: parsed.data.keys.p256dh,
+        auth: parsed.data.keys.auth,
+      });
+
+      res.status(201).json(sub);
+    } catch (error) {
+      console.error('Error saving push subscription:', error);
+      res.status(500).json({ error: 'Failed to save subscription' });
+    }
+  });
+
+  app.delete("/api/push/unsubscribe", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const { endpoint } = req.body;
+      if (!endpoint) {
+        return res.status(400).json({ error: 'Endpoint is required' });
+      }
+      await storage.deletePushSubscriptionByUserAndEndpoint(req.user.id, endpoint);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error removing push subscription:', error);
+      res.status(500).json({ error: 'Failed to remove subscription' });
     }
   });
 

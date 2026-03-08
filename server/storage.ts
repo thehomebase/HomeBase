@@ -44,6 +44,8 @@ import {
   type AgentReview, type InsertAgentReview,
   type VendorRating, type InsertVendorRating,
   type WebAuthnCredential,
+  type PushSubscription, type InsertPushSubscription,
+  pushSubscriptions,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -319,6 +321,12 @@ export interface IStorage {
   updateWebAuthnCredentialCounter(id: string, counter: number): Promise<void>;
   deleteWebAuthnCredential(id: string): Promise<void>;
 
+  savePushSubscription(sub: InsertPushSubscription): Promise<PushSubscription>;
+  getPushSubscriptionsByUser(userId: number): Promise<PushSubscription[]>;
+  deletePushSubscription(id: number): Promise<void>;
+  deletePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
+  deletePushSubscriptionByUserAndEndpoint(userId: number, endpoint: string): Promise<void>;
+
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -389,7 +397,8 @@ export class DatabaseStorage implements IStorage {
                last_name as "lastName", role, agent_id as "agentId",
                client_record_id as "clientRecordId",
                claimed_transaction_id as "claimedTransactionId",
-               claimed_access_code as "claimedAccessCode"
+               claimed_access_code as "claimedAccessCode",
+               phone, mobile_phone as "mobilePhone"
         FROM users 
         WHERE id = ${id}
       `);
@@ -410,7 +419,9 @@ export class DatabaseStorage implements IStorage {
         agentId: user.agentId ? Number(user.agentId) : null,
         clientRecordId: user.clientRecordId ? Number(user.clientRecordId) : null,
         claimedTransactionId: user.claimedTransactionId ? Number(user.claimedTransactionId) : null,
-        claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null
+        claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null,
+        phone: user.phone ? String(user.phone) : null,
+        mobilePhone: user.mobilePhone ? String(user.mobilePhone) : null,
       };
     } catch (error) {
       console.error('Error in getUser:', error);
@@ -4155,6 +4166,28 @@ export class DatabaseStorage implements IStorage {
 
   async deleteWebAuthnCredential(id: string): Promise<void> {
     await db.execute(sql`DELETE FROM webauthn_credentials WHERE id = ${id}`);
+  }
+
+  async savePushSubscription(sub: InsertPushSubscription): Promise<PushSubscription> {
+    await db.execute(sql`DELETE FROM push_subscriptions WHERE endpoint = ${sub.endpoint}`);
+    const [result] = await db.insert(pushSubscriptions).values(sub).returning();
+    return result;
+  }
+
+  async getPushSubscriptionsByUser(userId: number): Promise<PushSubscription[]> {
+    return await db.select().from(pushSubscriptions).where(sql`${pushSubscriptions.userId} = ${userId}`);
+  }
+
+  async deletePushSubscription(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM push_subscriptions WHERE id = ${id}`);
+  }
+
+  async deletePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
+    await db.execute(sql`DELETE FROM push_subscriptions WHERE endpoint = ${endpoint}`);
+  }
+
+  async deletePushSubscriptionByUserAndEndpoint(userId: number, endpoint: string): Promise<void> {
+    await db.execute(sql`DELETE FROM push_subscriptions WHERE user_id = ${userId} AND endpoint = ${endpoint}`);
   }
 
 }
