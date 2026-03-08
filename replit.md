@@ -39,6 +39,8 @@ Preferred communication style: Simple, everyday language.
 - **Specialized Portals**:
     - **Lender Portal**: Kanban board for loan pipelines, checklist synchronization with agent transactions, and RESPA compliance.
 - **Billing**: Stripe integration for subscriptions and payment management, with a dedicated billing portal.
+- **Encrypted Private Messaging**: 1-on-1 encrypted messaging between all users (agents, clients, vendors, lenders). Messages encrypted at rest using AES-256-GCM with server-managed keys (derived from SESSION_SECRET via scrypt). Each message gets a unique random IV. Encryption/decryption handled entirely server-side — plaintext never stored in DB. Chat UI with conversation list sidebar, real-time polling (3-5s), unread counts, and encryption badges. Start new conversations with any platform user. Auto-marks messages as read when conversation is opened. Mobile-responsive with back-navigation. DB table: `private_messages` (with `encrypted` and `iv` columns). Key files: `client/src/pages/messages-page.tsx`, `server/encryption.ts`.
+- **Lender-to-Contact Auto-Linking**: When an agent invites a lender to a transaction, the lender is automatically added as a "Lender" contact on that transaction (visible in the TransactionContacts component). Duplicate-checked by email to prevent double-adds.
 - **Notifications**: Real-time SMS and Web Push notifications for new leads.
 
 ## External Dependencies

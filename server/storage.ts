@@ -104,6 +104,12 @@ export interface IStorage {
   updateChecklist(id: number, items: ChecklistItem[]): Promise<Checklist>;
   createMessage(message: InsertMessage): Promise<Message>;
   getMessages(transactionId?: number): Promise<Message[]>;
+
+  createPrivateMessage(data: { senderId: number; recipientId: number; content: string; encrypted?: boolean; iv?: string | null }): Promise<any>;
+  getPrivateMessages(userId1: number, userId2: number): Promise<any[]>;
+  getPrivateConversations(userId: number): Promise<any[]>;
+  markPrivateMessageRead(id: number, userId: number): Promise<any>;
+
   getContactsByTransaction(transactionId: number): Promise<any[]>;
   deleteContact(id: number): Promise<boolean>;
   createContact(data: any): Promise<any>;
@@ -1086,6 +1092,115 @@ export class DatabaseStorage implements IStorage {
       console.error('Error in getMessages:', error);
       return [];
     }
+  }
+
+  async createPrivateMessage(data: { senderId: number; recipientId: number; content: string; encrypted?: boolean; iv?: string | null }): Promise<any> {
+    const { encryptMessage } = await import("./encryption");
+    const ts = new Date().toISOString();
+    const { ciphertext, iv } = encryptMessage(data.content);
+    const result = await db.execute(sql`
+      INSERT INTO private_messages (sender_id, recipient_id, content, timestamp, read, encrypted, iv)
+      VALUES (${data.senderId}, ${data.recipientId}, ${ciphertext}, ${ts}, false, true, ${iv})
+      RETURNING *
+    `);
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      senderId: row.sender_id,
+      recipientId: row.recipient_id,
+      content: data.content,
+      timestamp: row.timestamp,
+      read: row.read,
+      encrypted: true,
+      iv: row.iv,
+    };
+  }
+
+  async getPrivateMessages(userId1: number, userId2: number): Promise<any[]> {
+    const { decryptMessage } = await import("./encryption");
+    const result = await db.execute(sql`
+      SELECT pm.*, 
+        s.first_name as sender_first_name, s.last_name as sender_last_name, s.role as sender_role,
+        r.first_name as recipient_first_name, r.last_name as recipient_last_name, r.role as recipient_role
+      FROM private_messages pm
+      JOIN users s ON pm.sender_id = s.id
+      JOIN users r ON pm.recipient_id = r.id
+      WHERE (pm.sender_id = ${userId1} AND pm.recipient_id = ${userId2})
+         OR (pm.sender_id = ${userId2} AND pm.recipient_id = ${userId1})
+      ORDER BY pm.timestamp ASC
+    `);
+    return result.rows.map((row: any) => {
+      const content = row.encrypted && row.iv
+        ? decryptMessage(row.content as string, row.iv as string)
+        : row.content;
+      return {
+        id: row.id,
+        senderId: row.sender_id,
+        recipientId: row.recipient_id,
+        content,
+        timestamp: row.timestamp,
+        read: row.read,
+        encrypted: row.encrypted,
+        iv: row.iv,
+        senderName: `${row.sender_first_name} ${row.sender_last_name}`,
+        senderRole: row.sender_role,
+        recipientName: `${row.recipient_first_name} ${row.recipient_last_name}`,
+        recipientRole: row.recipient_role,
+      };
+    });
+  }
+
+  async getPrivateConversations(userId: number): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        CASE WHEN pm.sender_id = ${userId} THEN pm.recipient_id ELSE pm.sender_id END as other_user_id,
+        pm.content as last_message,
+        pm.timestamp as last_timestamp,
+        u.first_name, u.last_name, u.role, u.email
+      FROM private_messages pm
+      JOIN users u ON u.id = CASE WHEN pm.sender_id = ${userId} THEN pm.recipient_id ELSE pm.sender_id END
+      WHERE pm.sender_id = ${userId} OR pm.recipient_id = ${userId}
+      ORDER BY pm.timestamp DESC
+    `);
+    const convMap = new Map<number, any>();
+    for (const row of result.rows as any[]) {
+      const otherId = row.other_user_id as number;
+      if (!convMap.has(otherId)) {
+        convMap.set(otherId, {
+          userId: otherId,
+          name: `${row.first_name} ${row.last_name}`,
+          role: row.role,
+          email: row.email,
+          lastMessage: row.last_message,
+          lastTimestamp: row.last_timestamp,
+          unreadCount: 0,
+        });
+      }
+    }
+
+    if (convMap.size > 0) {
+      const unreadResult = await db.execute(sql`
+        SELECT sender_id, COUNT(*)::int as cnt
+        FROM private_messages
+        WHERE recipient_id = ${userId} AND read = false
+        GROUP BY sender_id
+      `);
+      for (const row of unreadResult.rows as any[]) {
+        const conv = convMap.get(row.sender_id);
+        if (conv) conv.unreadCount = row.cnt;
+      }
+    }
+
+    return Array.from(convMap.values());
+  }
+
+  async markPrivateMessageRead(id: number, userId: number): Promise<any> {
+    const result = await db.execute(sql`
+      UPDATE private_messages SET read = true
+      WHERE id = ${id} AND recipient_id = ${userId}
+      RETURNING *
+    `);
+    return result.rows[0] || null;
   }
 
   async getContactsByTransaction(transactionId: number) {

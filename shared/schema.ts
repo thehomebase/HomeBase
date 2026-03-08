@@ -9,6 +9,8 @@ export const privateMessages = pgTable("private_messages", {
   content: text("content").notNull(),
   timestamp: text("timestamp").notNull(),
   read: boolean("read").notNull().default(false),
+  encrypted: boolean("encrypted").notNull().default(true),
+  iv: text("iv"),
 });
 
 export const users = pgTable("users", {
@@ -283,6 +285,7 @@ export const insertChecklistSchema = createInsertSchema(checklists).extend({
   items: z.array(checklistItemSchema)
 });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
+export const insertPrivateMessageSchema = createInsertSchema(privateMessages).omit({ id: true });
 export const insertDocumentSchema = createInsertSchema(documents).omit({ 
   id: true,
   createdAt: true,
@@ -693,6 +696,7 @@ export type InsertClient = z.infer<typeof insertClientSchema>;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type InsertChecklist = z.infer<typeof insertChecklistSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type InsertPrivateMessage = z.infer<typeof insertPrivateMessageSchema>;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type InsertContractor = z.infer<typeof insertContractorSchema>;
 export type InsertContractorReview = z.infer<typeof insertContractorReviewSchema>;
@@ -702,6 +706,7 @@ export type Client = typeof clients.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type Checklist = typeof checklists.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+export type PrivateMessage = typeof privateMessages.$inferSelect;
 export type Document = typeof documents.$inferSelect;
 export type Contractor = typeof contractors.$inferSelect;
 export type ContractorReview = typeof contractorReviews.$inferSelect;

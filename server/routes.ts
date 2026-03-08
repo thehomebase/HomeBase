@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
+import { sql } from "drizzle-orm/sql";
 import { setupAuth } from "./auth";
 import { z } from "zod";
 import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema, insertVendorRatingSchema } from "@shared/schema";
@@ -785,6 +787,84 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error creating message:', error);
       res.status(500).send('Error creating message');
+    }
+  });
+
+  app.get("/api/private-messages/conversations", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const conversations = await storage.getPrivateConversations(req.user.id);
+      res.json(conversations);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+      res.status(500).json({ error: 'Failed to fetch conversations' });
+    }
+  });
+
+  app.get("/api/private-messages/users", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const result = await db.execute(sql`
+        SELECT id, first_name, last_name, role, email FROM users WHERE id != ${req.user.id} ORDER BY first_name, last_name
+      `);
+      res.json(result.rows.map((r: any) => ({
+        id: r.id,
+        name: `${r.first_name} ${r.last_name}`,
+        role: r.role,
+        email: r.email,
+      })));
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ error: 'Failed to fetch users' });
+    }
+  });
+
+  app.get("/api/private-messages/:userId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const otherUserId = Number(req.params.userId);
+      if (isNaN(otherUserId)) return res.status(400).json({ error: 'Invalid user ID' });
+      const messages = await storage.getPrivateMessages(req.user.id, otherUserId);
+
+      await db.execute(sql`
+        UPDATE private_messages SET read = true
+        WHERE sender_id = ${otherUserId} AND recipient_id = ${req.user.id} AND read = false
+      `);
+
+      res.json(messages);
+    } catch (error) {
+      console.error('Error fetching private messages:', error);
+      res.status(500).json({ error: 'Failed to fetch messages' });
+    }
+  });
+
+  app.post("/api/private-messages", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const schema = z.object({
+        recipientId: z.number(),
+        content: z.string().min(1),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
+      if (parsed.data.recipientId === req.user.id) {
+        return res.status(400).json({ error: 'Cannot message yourself' });
+      }
+
+      const recipient = await storage.getUser(parsed.data.recipientId);
+      if (!recipient) return res.status(404).json({ error: 'Recipient not found' });
+
+      const message = await storage.createPrivateMessage({
+        senderId: req.user.id,
+        recipientId: parsed.data.recipientId,
+        content: parsed.data.content,
+      });
+
+      res.status(201).json(message);
+    } catch (error) {
+      console.error('Error creating private message:', error);
+      res.status(500).json({ error: 'Failed to send message' });
     }
   });
 
@@ -5453,6 +5533,22 @@ export function registerRoutes(app: Express): Server {
           lenderChecklistItemId: mapping.lenderItemId,
           agentTransactionId: transaction.id,
           agentChecklistItemId: mapping.agentItemId,
+        });
+      }
+
+      const existingContacts = await storage.getContactsByTransaction(transaction.id);
+      const alreadyHasLenderContact = existingContacts.some(
+        (c: any) => c.role === 'Lender' && c.email === lender.email
+      );
+      if (!alreadyHasLenderContact) {
+        await storage.createContact({
+          transactionId: transaction.id,
+          role: 'Lender',
+          firstName: lender.firstName,
+          lastName: lender.lastName,
+          email: lender.email,
+          phone: '',
+          mobilePhone: '',
         });
       }
 
