@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
+import { useLeadAlerts } from "@/hooks/use-lead-alerts";
 
 interface NavItem {
   icon: LucideIcon;
@@ -104,6 +105,7 @@ export function MobileBottomNav() {
   const { user, logoutMutation } = useAuth();
   const [location, setLocation] = useLocation();
   const [showMore, setShowMore] = useState(false);
+  const { newLeadCount } = useLeadAlerts();
 
   if (!user) return null;
 
@@ -143,7 +145,14 @@ export function MobileBottomNav() {
                       : "text-muted-foreground hover:bg-muted"
                   }`}
                 >
-                  <item.icon className="h-5 w-5" />
+                  <div className="relative">
+                    <item.icon className="h-5 w-5" />
+                    {item.href === "/lead-gen" && newLeadCount > 0 && (
+                      <span className="absolute -top-1.5 -right-2 h-4 min-w-[16px] px-0.5 flex items-center justify-center text-[9px] font-bold bg-red-500 text-white rounded-full leading-none">
+                        {newLeadCount > 99 ? "99+" : newLeadCount}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[10px] leading-tight text-center">{item.label}</span>
                 </Link>
               ))}
@@ -193,7 +202,12 @@ export function MobileBottomNav() {
               showMore ? "text-primary" : "text-muted-foreground"
             }`}
           >
-            <MoreHorizontal className={`h-5 w-5 ${showMore ? "stroke-[2.5]" : ""}`} />
+            <div className="relative">
+              <MoreHorizontal className={`h-5 w-5 ${showMore ? "stroke-[2.5]" : ""}`} />
+              {newLeadCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-background" />
+              )}
+            </div>
             <span className="text-[10px] leading-tight font-medium">More</span>
           </button>
         </div>

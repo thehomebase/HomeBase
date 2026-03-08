@@ -80,6 +80,41 @@ import VendorRatingsPage from "@/pages/vendor-ratings-page";
 import BiometricSettingsPage from "@/pages/biometric-settings-page";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { BiometricSetupButton } from "@/components/biometric-setup";
+import { useLeadAlerts } from "@/hooks/use-lead-alerts";
+
+function LeadAlertBanner() {
+  const { newLeadCount, isAgent } = useLeadAlerts();
+  const [dismissedAt, setDismissedAt] = React.useState(0);
+
+  React.useEffect(() => {
+    if (newLeadCount > dismissedAt && dismissedAt > 0) {
+      setDismissedAt(0);
+    }
+  }, [newLeadCount, dismissedAt]);
+
+  if (!isAgent || newLeadCount === 0 || (dismissedAt > 0 && newLeadCount <= dismissedAt)) return null;
+
+  return (
+    <div className="bg-primary text-primary-foreground px-4 py-2 flex items-center justify-between gap-3 text-sm">
+      <div className="flex items-center gap-2">
+        <MapPin className="h-4 w-4 shrink-0" />
+        <span className="font-medium">
+          {newLeadCount === 1
+            ? "You have 1 new lead waiting for you!"
+            : `You have ${newLeadCount} new leads waiting for you!`}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <Link href="/lead-gen" className="underline font-semibold hover:opacity-80">
+          View Leads
+        </Link>
+        <button onClick={() => setDismissedAt(newLeadCount)} className="opacity-70 hover:opacity-100 ml-1">
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -87,6 +122,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
   const isClient = user?.role === 'client';
   const isVendor = user?.role === 'vendor';
+  const { newLeadCount } = useLeadAlerts();
 
   // Update sidebar state when mobile status changes
   React.useEffect(() => {
@@ -280,8 +316,24 @@ function Layout({ children }: { children: React.ReactNode }) {
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Lead Gen">
                             <Link href="/lead-gen" className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4" />
-                              {isSidebarOpen && <span>Lead Gen</span>}
+                              <div className="relative">
+                                <MapPin className="h-4 w-4" />
+                                {newLeadCount > 0 && !isSidebarOpen && (
+                                  <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-0.5 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
+                                    {newLeadCount > 99 ? "99+" : newLeadCount}
+                                  </span>
+                                )}
+                              </div>
+                              {isSidebarOpen && (
+                                <span className="flex items-center gap-2">
+                                  Lead Gen
+                                  {newLeadCount > 0 && (
+                                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                                      {newLeadCount}
+                                    </span>
+                                  )}
+                                </span>
+                              )}
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -356,6 +408,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <main className="flex-1 min-h-screen w-full overflow-x-hidden relative">
+          {user && <LeadAlertBanner />}
           <div className={`w-full ${isMobile && user ? 'pb-20' : ''}`}>
             {children}
           </div>
