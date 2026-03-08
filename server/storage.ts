@@ -109,6 +109,7 @@ export interface IStorage {
   getPrivateMessages(userId1: number, userId2: number): Promise<any[]>;
   getPrivateConversations(userId: number): Promise<any[]>;
   markPrivateMessageRead(id: number, userId: number): Promise<any>;
+  getCommunicationMetrics(userId: number): Promise<any>;
 
   getContactsByTransaction(transactionId: number): Promise<any[]>;
   deleteContact(id: number): Promise<boolean>;
@@ -1139,11 +1140,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPrivateConversations(userId: number): Promise<any[]> {
+    const { decryptMessage } = await import("./encryption");
     const result = await db.execute(sql`
       SELECT 
         CASE WHEN pm.sender_id = ${userId} THEN pm.recipient_id ELSE pm.sender_id END as other_user_id,
         pm.content as last_message,
         pm.timestamp as last_timestamp,
+        pm.encrypted as last_encrypted,
+        pm.iv as last_iv,
         u.first_name, u.last_name, u.role, u.email
       FROM private_messages pm
       JOIN users u ON u.id = CASE WHEN pm.sender_id = ${userId} THEN pm.recipient_id ELSE pm.sender_id END
@@ -1154,12 +1158,15 @@ export class DatabaseStorage implements IStorage {
     for (const row of result.rows as any[]) {
       const otherId = row.other_user_id as number;
       if (!convMap.has(otherId)) {
+        const lastMessage = row.last_encrypted && row.last_iv
+          ? decryptMessage(row.last_message as string, row.last_iv as string)
+          : row.last_message;
         convMap.set(otherId, {
           userId: otherId,
           name: `${row.first_name} ${row.last_name}`,
           role: row.role,
           email: row.email,
-          lastMessage: row.last_message,
+          lastMessage,
           lastTimestamp: row.last_timestamp,
           unreadCount: 0,
         });
@@ -1180,6 +1187,78 @@ export class DatabaseStorage implements IStorage {
     }
 
     return Array.from(convMap.values());
+  }
+
+  async getCommunicationMetrics(userId: number): Promise<any> {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).toISOString();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const smsResult = await db.execute(sql`
+      SELECT 
+        COUNT(*) FILTER (WHERE created_at >= ${todayStart}::timestamp)::int as sms_today,
+        COUNT(*) FILTER (WHERE created_at >= ${weekStart}::timestamp)::int as sms_week,
+        COUNT(*) FILTER (WHERE created_at >= ${monthStart}::timestamp)::int as sms_month,
+        COUNT(*)::int as sms_total
+      FROM communications 
+      WHERE agent_id = ${userId} AND type = 'sms' AND status = 'sent'
+    `);
+
+    const emailResult = await db.execute(sql`
+      SELECT 
+        COUNT(*) FILTER (WHERE sent_at >= ${todayStart}::timestamp)::int as email_today,
+        COUNT(*) FILTER (WHERE sent_at >= ${weekStart}::timestamp)::int as email_week,
+        COUNT(*) FILTER (WHERE sent_at >= ${monthStart}::timestamp)::int as email_month,
+        COUNT(*)::int as email_total
+      FROM email_tracking WHERE user_id = ${userId}
+    `);
+
+    const pmResult = await db.execute(sql`
+      SELECT 
+        COUNT(*) FILTER (WHERE timestamp >= ${todayStart})::int as pm_today,
+        COUNT(*) FILTER (WHERE timestamp >= ${weekStart})::int as pm_week,
+        COUNT(*) FILTER (WHERE timestamp >= ${monthStart})::int as pm_month,
+        COUNT(*)::int as pm_total
+      FROM private_messages WHERE sender_id = ${userId}
+    `);
+
+    const recipientsResult = await db.execute(sql`
+      SELECT COUNT(DISTINCT recipient_id)::int as unique_recipients
+      FROM private_messages WHERE sender_id = ${userId}
+    `);
+
+    const smsRecipientsResult = await db.execute(sql`
+      SELECT COUNT(DISTINCT client_id)::int as unique_sms_contacts
+      FROM communications WHERE agent_id = ${userId} AND type = 'sms'
+    `);
+
+    const sms = (smsResult.rows[0] as any) || {};
+    const email = (emailResult.rows[0] as any) || {};
+    const pm = (pmResult.rows[0] as any) || {};
+
+    return {
+      sms: {
+        today: sms.sms_today || 0,
+        thisWeek: sms.sms_week || 0,
+        thisMonth: sms.sms_month || 0,
+        total: sms.sms_total || 0,
+        uniqueContacts: (smsRecipientsResult.rows[0] as any)?.unique_sms_contacts || 0,
+      },
+      email: {
+        today: email.email_today || 0,
+        thisWeek: email.email_week || 0,
+        thisMonth: email.email_month || 0,
+        total: email.email_total || 0,
+      },
+      privateMessages: {
+        today: pm.pm_today || 0,
+        thisWeek: pm.pm_week || 0,
+        thisMonth: pm.pm_month || 0,
+        total: pm.pm_total || 0,
+        uniqueRecipients: (recipientsResult.rows[0] as any)?.unique_recipients || 0,
+      },
+    };
   }
 
   async markPrivateMessageRead(id: number, userId: number): Promise<any> {

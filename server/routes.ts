@@ -868,6 +868,22 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/communications/metrics", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (!["agent", "vendor", "lender"].includes(req.user.role)) return res.sendStatus(403);
+    try {
+      const metrics = await storage.getCommunicationMetrics(req.user.id);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Error fetching communication metrics:', error);
+      res.json({
+        sms: { today: 0, thisWeek: 0, thisMonth: 0, total: 0, uniqueContacts: 0 },
+        email: { today: 0, thisWeek: 0, thisMonth: 0, total: 0 },
+        privateMessages: { today: 0, thisWeek: 0, thisMonth: 0, total: 0, uniqueRecipients: 0 },
+      });
+    }
+  });
+
   app.post("/api/contacts", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 

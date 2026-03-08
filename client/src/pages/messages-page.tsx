@@ -9,7 +9,7 @@ import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Lock, Send, Plus, Search, ArrowLeft, ShieldCheck, MessageSquare, Circle } from "lucide-react";
+import { Lock, Send, Plus, Search, ArrowLeft, ShieldCheck, MessageSquare, Check, CheckCheck, Mail, Phone, BarChart3, Users, TrendingUp } from "lucide-react";
 
 interface Conversation {
   userId: number;
@@ -43,6 +43,12 @@ interface UserOption {
   email: string;
 }
 
+interface MetricsData {
+  sms: { today: number; thisWeek: number; thisMonth: number; total: number; uniqueContacts: number };
+  email: { today: number; thisWeek: number; thisMonth: number; total: number };
+  privateMessages: { today: number; thisWeek: number; thisMonth: number; total: number; uniqueRecipients: number };
+}
+
 const roleColors: Record<string, string> = {
   agent: "bg-blue-100 text-blue-800",
   client: "bg-green-100 text-green-800",
@@ -64,6 +70,17 @@ function formatTime(ts: string) {
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+function getDateLabel(ts: string): string {
+  const d = new Date(ts);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msgDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.floor((today.getTime() - msgDate.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+}
+
 export default function MessagesPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -72,6 +89,7 @@ export default function MessagesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [userSearch, setUserSearch] = useState("");
+  const [showMetrics, setShowMetrics] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: conversations = [], isLoading: convLoading } = useQuery<Conversation[]>({
@@ -101,6 +119,15 @@ export default function MessagesPage() {
       return res.json();
     },
     enabled: !!user && newChatOpen,
+  });
+
+  const { data: metrics } = useQuery<MetricsData>({
+    queryKey: ["/api/communications/metrics"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/communications/metrics");
+      return res.json();
+    },
+    enabled: !!user && (user.role === "agent" || user.role === "vendor" || user.role === "lender"),
   });
 
   const sendMutation = useMutation({
@@ -152,6 +179,18 @@ export default function MessagesPage() {
 
   const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
 
+  const groupedMessages: { label: string; messages: PrivateMessage[] }[] = [];
+  let lastDateLabel = "";
+  for (const msg of chatMessages) {
+    const label = getDateLabel(msg.timestamp);
+    if (label !== lastDateLabel) {
+      groupedMessages.push({ label, messages: [msg] });
+      lastDateLabel = label;
+    } else {
+      groupedMessages[groupedMessages.length - 1].messages.push(msg);
+    }
+  }
+
   return (
     <main className="container mx-auto px-4 py-4 md:py-8 h-[calc(100vh-120px)] md:h-[calc(100vh-80px)]">
       <div className="flex items-center gap-3 mb-4">
@@ -164,9 +203,80 @@ export default function MessagesPage() {
         {totalUnread > 0 && (
           <Badge variant="destructive" className="ml-auto">{totalUnread} unread</Badge>
         )}
+        {metrics && (
+          <Button
+            variant="outline"
+            size="sm"
+            className={`${totalUnread > 0 ? "" : "ml-auto"} gap-1.5`}
+            onClick={() => setShowMetrics(!showMetrics)}
+          >
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Stats</span>
+          </Button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 h-[calc(100%-48px)]">
+      {showMetrics && metrics && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <Card className="p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <MessageSquare className="h-4 w-4 text-primary" />
+              <span className="text-xs font-medium text-muted-foreground">Messages</span>
+            </div>
+            <div className="text-2xl font-bold">{metrics.privateMessages.thisMonth}</div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[11px] text-muted-foreground">Today: {metrics.privateMessages.today}</span>
+              <span className="text-[11px] text-muted-foreground">Week: {metrics.privateMessages.thisWeek}</span>
+            </div>
+            <div className="flex items-center gap-1 mt-1">
+              <Users className="h-3 w-3 text-muted-foreground" />
+              <span className="text-[11px] text-muted-foreground">{metrics.privateMessages.uniqueRecipients} contacts</span>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Phone className="h-4 w-4 text-blue-600" />
+              <span className="text-xs font-medium text-muted-foreground">SMS Sent</span>
+            </div>
+            <div className="text-2xl font-bold">{metrics.sms.thisMonth}</div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[11px] text-muted-foreground">Today: {metrics.sms.today}</span>
+              <span className="text-[11px] text-muted-foreground">Week: {metrics.sms.thisWeek}</span>
+            </div>
+            <div className="flex items-center gap-1 mt-1">
+              <Users className="h-3 w-3 text-muted-foreground" />
+              <span className="text-[11px] text-muted-foreground">{metrics.sms.uniqueContacts} contacts</span>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Mail className="h-4 w-4 text-green-600" />
+              <span className="text-xs font-medium text-muted-foreground">Emails</span>
+            </div>
+            <div className="text-2xl font-bold">{metrics.email.thisMonth}</div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[11px] text-muted-foreground">Today: {metrics.email.today}</span>
+              <span className="text-[11px] text-muted-foreground">Week: {metrics.email.thisWeek}</span>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="h-4 w-4 text-amber-600" />
+              <span className="text-xs font-medium text-muted-foreground">All-Time</span>
+            </div>
+            <div className="text-2xl font-bold">{metrics.privateMessages.total + metrics.sms.total + metrics.email.total}</div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[11px] text-muted-foreground">Msgs: {metrics.privateMessages.total}</span>
+              <span className="text-[11px] text-muted-foreground">SMS: {metrics.sms.total}</span>
+            </div>
+            <div className="flex items-center gap-1 mt-1">
+              <span className="text-[11px] text-muted-foreground">Emails: {metrics.email.total}</span>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      <div className={`grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 ${showMetrics ? "h-[calc(100%-160px)]" : "h-[calc(100%-48px)]"}`}>
         <Card className={`flex flex-col overflow-hidden ${activeConversation ? "hidden md:flex" : "flex"}`}>
           <div className="p-3 border-b space-y-2">
             <div className="flex gap-2">
@@ -302,8 +412,15 @@ export default function MessagesPage() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm">
-                    {activeUser?.name || chatMessages[0]?.recipientName || chatMessages[0]?.senderName || "Chat"}
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">
+                      {activeUser?.name || chatMessages[0]?.recipientName || chatMessages[0]?.senderName || "Chat"}
+                    </span>
+                    {activeUser && (
+                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${roleColors[activeUser.role] || ""}`}>
+                        {activeUser.role}
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <ShieldCheck className="h-3 w-3 text-green-600" />
@@ -322,37 +439,62 @@ export default function MessagesPage() {
                     <p className="text-xs text-muted-foreground mt-1">Messages are encrypted for your privacy</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-1">
                     <div className="flex justify-center mb-4">
                       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full">
                         <Lock className="h-3 w-3 text-amber-600" />
                         <span className="text-[11px] text-amber-700">Messages are encrypted and stored securely</span>
                       </div>
                     </div>
-                    {chatMessages.map(msg => {
-                      const isMine = msg.senderId === user?.id;
-                      return (
-                        <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[75%] ${isMine ? "order-2" : ""}`}>
-                            <div
-                              className={`px-3 py-2 rounded-2xl text-sm ${
-                                isMine
-                                  ? "bg-primary text-primary-foreground rounded-br-md"
-                                  : "bg-muted rounded-bl-md"
-                              }`}
-                            >
-                              {msg.content}
-                            </div>
-                            <div className={`flex items-center gap-1 mt-0.5 ${isMine ? "justify-end" : ""}`}>
-                              <span className="text-[10px] text-muted-foreground">
-                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-                              </span>
-                              {msg.encrypted && <Lock className="h-2.5 w-2.5 text-muted-foreground/50" />}
-                            </div>
-                          </div>
+                    {groupedMessages.map((group) => (
+                      <div key={group.label}>
+                        <div className="flex justify-center my-3">
+                          <span className="text-[11px] text-muted-foreground bg-muted px-3 py-1 rounded-full font-medium">
+                            {group.label}
+                          </span>
                         </div>
-                      );
-                    })}
+                        <div className="space-y-2">
+                          {group.messages.map(msg => {
+                            const isMine = msg.senderId === user?.id;
+                            const senderRole = isMine ? msg.senderRole : msg.senderRole;
+                            return (
+                              <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                                <div className={`max-w-[75%] ${isMine ? "order-2" : ""}`}>
+                                  {!isMine && (
+                                    <div className="flex items-center gap-1.5 mb-0.5 ml-1">
+                                      <span className="text-[11px] font-medium text-muted-foreground">{msg.senderName}</span>
+                                      <Badge variant="outline" className={`text-[9px] px-1 py-0 h-4 ${roleColors[senderRole] || ""}`}>
+                                        {senderRole}
+                                      </Badge>
+                                    </div>
+                                  )}
+                                  <div
+                                    className={`px-3 py-2 rounded-2xl text-sm ${
+                                      isMine
+                                        ? "bg-primary text-primary-foreground rounded-br-md"
+                                        : "bg-muted rounded-bl-md"
+                                    }`}
+                                  >
+                                    {msg.content}
+                                  </div>
+                                  <div className={`flex items-center gap-1 mt-0.5 ${isMine ? "justify-end" : ""}`}>
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                                    </span>
+                                    {isMine && (
+                                      msg.read
+                                        ? <CheckCheck className="h-3 w-3 text-blue-500" />
+                                        : <Check className="h-3 w-3 text-muted-foreground" />
+                                    )}
+                                    {msg.encrypted && <Lock className="h-2.5 w-2.5 text-muted-foreground/50" />}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                     <div ref={messagesEndRef} />
                   </div>
                 )}

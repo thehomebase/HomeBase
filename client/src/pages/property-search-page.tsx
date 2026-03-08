@@ -948,50 +948,92 @@ export default function PropertySearchPage() {
               <p className="text-sm mt-1">Search for listings above, then paste the URL to save it.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {savedProperties.map((prop) => (
-                <div
-                  key={prop.id}
-                  className="flex items-start justify-between gap-3 p-3 border rounded-lg hover:bg-muted/30 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="font-medium text-sm truncate">{formatAddress(prop)}</span>
-                      <Badge variant="outline" className="text-xs shrink-0">{getSourceLabel(prop.source)}</Badge>
-                    </div>
-                    {prop.notes && <p className="text-sm text-muted-foreground ml-6">{prop.notes}</p>}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      variant={prop.showingRequested ? "default" : "outline"}
-                      size="sm"
-                      className={`h-8 text-xs ${prop.showingRequested ? "bg-blue-600 hover:bg-blue-700" : ""}`}
-                      onClick={() => showingToggleMutation.mutate({ id: prop.id, showingRequested: !prop.showingRequested })}
-                      disabled={showingToggleMutation.isPending}
-                    >
-                      <Eye className="h-3 w-3 mr-1" />
-                      {prop.showingRequested ? "Showing Requested" : "Request Showing"}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => window.open(prop.url, "_blank", "noopener,noreferrer")}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => deleteMutation.mutate(prop.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-x-auto border rounded-lg">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50 border-b">
+                    <th className="text-left px-3 py-2.5 font-medium">Address</th>
+                    <th className="text-right px-3 py-2.5 font-medium hidden sm:table-cell">Price</th>
+                    <th className="text-center px-3 py-2.5 font-medium hidden sm:table-cell">Beds/Baths</th>
+                    <th className="text-right px-3 py-2.5 font-medium hidden md:table-cell">Sqft</th>
+                    <th className="text-center px-3 py-2.5 font-medium hidden md:table-cell">Source</th>
+                    <th className="text-center px-3 py-2.5 font-medium">Status</th>
+                    <th className="text-center px-3 py-2.5 font-medium w-[100px]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {savedProperties.map((prop, i) => {
+                    const notesParts = (prop.notes || "").split(" · ");
+                    const priceMatch = notesParts.find(p => p.startsWith("$"));
+                    const bedBathMatch = notesParts.find(p => /\d+bd\/\d+ba/.test(p));
+                    const sqftMatch = notesParts.find(p => /sqft/i.test(p));
+                    return (
+                      <tr key={prop.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? '' : 'bg-muted/10'}`}>
+                        <td className="px-3 py-2.5">
+                          <div className="font-medium truncate max-w-[220px]">{prop.streetAddress || formatAddress(prop)}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {[prop.city, prop.state, prop.zipCode].filter(Boolean).join(", ") || "—"}
+                          </div>
+                          <div className="sm:hidden text-xs text-muted-foreground mt-0.5">
+                            {[priceMatch, bedBathMatch, sqftMatch].filter(Boolean).join(" · ")}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-semibold text-primary whitespace-nowrap hidden sm:table-cell">
+                          {priceMatch || "—"}
+                        </td>
+                        <td className="px-3 py-2.5 text-center hidden sm:table-cell">
+                          {bedBathMatch || "—"}
+                        </td>
+                        <td className="px-3 py-2.5 text-right hidden md:table-cell whitespace-nowrap">
+                          {sqftMatch?.replace(" sqft", "") || "—"}
+                        </td>
+                        <td className="px-3 py-2.5 text-center hidden md:table-cell">
+                          <Badge variant="outline" className="text-xs">{getSourceLabel(prop.source)}</Badge>
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          {prop.showingRequested ? (
+                            <Badge className="text-xs bg-blue-600 hover:bg-blue-700 cursor-pointer" onClick={() => showingToggleMutation.mutate({ id: prop.id, showingRequested: false })}>
+                              <Eye className="h-3 w-3 mr-1" />
+                              Showing
+                            </Badge>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={() => showingToggleMutation.mutate({ id: prop.id, showingRequested: true })}
+                              disabled={showingToggleMutation.isPending}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              Request
+                            </Button>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => window.open(prop.url, "_blank", "noopener,noreferrer")}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => deleteMutation.mutate(prop.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>
