@@ -1238,7 +1238,9 @@ export class DatabaseStorage implements IStorage {
             COUNT(*) FILTER (WHERE timestamp >= ${weekStart})::int as pm_week,
             COUNT(*) FILTER (WHERE timestamp >= ${monthStart})::int as pm_month,
             COUNT(*)::int as pm_total
-          FROM private_messages WHERE sender_id = ${userId} AND recipient_id = ${contactId}
+          FROM private_messages
+          WHERE ((sender_id = ${userId} AND recipient_id = ${contactId})
+              OR (sender_id = ${contactId} AND recipient_id = ${userId}))
         `)
       : await db.execute(sql`
           SELECT 
@@ -1267,49 +1269,59 @@ export class DatabaseStorage implements IStorage {
           FROM communications WHERE agent_id = ${userId} AND type = 'sms'
         `);
 
-    const hourlyResult = contactId
+    const pmHourlyResult = contactId
       ? await db.execute(sql`
-          SELECT 
-            EXTRACT(HOUR FROM timestamp)::int as hour,
-            COUNT(*)::int as count
+          SELECT EXTRACT(HOUR FROM timestamp)::int as hour, COUNT(*)::int as count
           FROM private_messages
           WHERE ((sender_id = ${userId} AND recipient_id = ${contactId})
               OR (sender_id = ${contactId} AND recipient_id = ${userId}))
             AND timestamp >= ${todayStart}
           GROUP BY hour
-          UNION ALL
-          SELECT 
-            EXTRACT(HOUR FROM created_at)::int as hour,
-            COUNT(*)::int as count
+        `)
+      : await db.execute(sql`
+          SELECT EXTRACT(HOUR FROM timestamp)::int as hour, COUNT(*)::int as count
+          FROM private_messages
+          WHERE sender_id = ${userId} AND timestamp >= ${todayStart}
+          GROUP BY hour
+        `);
+
+    const smsHourlyResult = contactId
+      ? await db.execute(sql`
+          SELECT EXTRACT(HOUR FROM created_at)::int as hour, COUNT(*)::int as count
           FROM communications
           WHERE agent_id = ${userId} AND client_id = ${contactId} AND status = 'sent'
             AND created_at >= ${todayStart}::timestamp
           GROUP BY hour
         `)
       : await db.execute(sql`
-          SELECT 
-            EXTRACT(HOUR FROM timestamp)::int as hour,
-            COUNT(*)::int as count
-          FROM private_messages
-          WHERE sender_id = ${userId}
-            AND timestamp >= ${todayStart}
-          GROUP BY hour
-          UNION ALL
-          SELECT 
-            EXTRACT(HOUR FROM created_at)::int as hour,
-            COUNT(*)::int as count
+          SELECT EXTRACT(HOUR FROM created_at)::int as hour, COUNT(*)::int as count
           FROM communications
           WHERE agent_id = ${userId} AND status = 'sent'
             AND created_at >= ${todayStart}::timestamp
           GROUP BY hour
         `);
 
-    const hourlyData: { hour: number; count: number }[] = Array.from({ length: 24 }, (_, i) => ({ hour: i, count: 0 }));
-    for (const row of hourlyResult.rows as any[]) {
+    const emailHourlyResult = contactId
+      ? { rows: [] }
+      : await db.execute(sql`
+          SELECT EXTRACT(HOUR FROM sent_at)::int as hour, COUNT(*)::int as count
+          FROM email_tracking
+          WHERE user_id = ${userId} AND sent_at >= ${todayStart}::timestamp
+          GROUP BY hour
+        `);
+
+    const hourlyData: { hour: number; messages: number; sms: number; emails: number }[] = Array.from({ length: 24 }, (_, i) => ({ hour: i, messages: 0, sms: 0, emails: 0 }));
+    for (const row of pmHourlyResult.rows as any[]) {
       const h = row.hour;
-      if (h >= 0 && h < 24) {
-        hourlyData[h].count += row.count;
-      }
+      if (h >= 0 && h < 24) hourlyData[h].messages += row.count;
+    }
+    for (const row of smsHourlyResult.rows as any[]) {
+      const h = row.hour;
+      if (h >= 0 && h < 24) hourlyData[h].sms += row.count;
+    }
+    for (const row of emailHourlyResult.rows as any[]) {
+      const h = row.hour;
+      if (h >= 0 && h < 24) hourlyData[h].emails += row.count;
     }
 
     const sms = (smsResult.rows[0] as any) || {};
@@ -1411,36 +1423,39 @@ export class DatabaseStorage implements IStorage {
         WHERE recipient_id = ${userId} AND read = false
       `);
 
-      const activityResult = await db.execute(sql`
-        SELECT
-          EXTRACT(HOUR FROM timestamp::timestamp)::int as hour,
-          COUNT(*)::int as count
+      const pmActivityResult = await db.execute(sql`
+        SELECT EXTRACT(HOUR FROM timestamp::timestamp)::int as hour, COUNT(*)::int as count
         FROM private_messages
         WHERE (sender_id = ${userId} OR recipient_id = ${userId})
         AND timestamp >= ${last24h}
         GROUP BY EXTRACT(HOUR FROM timestamp::timestamp)
-        ORDER BY hour
       `);
-      const activityChart = Array.from({ length: 24 }, (_, i) => ({
-        hour: i,
-        count: 0,
-      }));
-      for (const row of activityResult.rows as any[]) {
-        activityChart[row.hour].count = row.count;
-      }
-
-      const smsActivity = await db.execute(sql`
-        SELECT
-          EXTRACT(HOUR FROM created_at)::int as hour,
-          COUNT(*)::int as count
+      const smsActivityResult = await db.execute(sql`
+        SELECT EXTRACT(HOUR FROM created_at)::int as hour, COUNT(*)::int as count
         FROM communications
         WHERE agent_id = ${userId} AND created_at >= ${last24h}::timestamp
         GROUP BY EXTRACT(HOUR FROM created_at)
       `);
-      for (const row of smsActivity.rows as any[]) {
-        if (activityChart[row.hour]) {
-          activityChart[row.hour].count += row.count;
-        }
+      const emailActivityResult = await db.execute(sql`
+        SELECT EXTRACT(HOUR FROM sent_at)::int as hour, COUNT(*)::int as count
+        FROM email_tracking
+        WHERE user_id = ${userId} AND sent_at >= ${last24h}::timestamp
+        GROUP BY EXTRACT(HOUR FROM sent_at)
+      `);
+      const activityChart = Array.from({ length: 24 }, (_, i) => ({
+        hour: i,
+        messages: 0,
+        sms: 0,
+        emails: 0,
+      }));
+      for (const row of pmActivityResult.rows as any[]) {
+        if (activityChart[row.hour]) activityChart[row.hour].messages = row.count;
+      }
+      for (const row of smsActivityResult.rows as any[]) {
+        if (activityChart[row.hour]) activityChart[row.hour].sms = row.count;
+      }
+      for (const row of emailActivityResult.rows as any[]) {
+        if (activityChart[row.hour]) activityChart[row.hour].emails = row.count;
       }
 
       const upcomingDeadlines = await db.execute(sql`

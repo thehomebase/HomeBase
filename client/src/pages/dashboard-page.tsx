@@ -6,17 +6,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Link } from "wouter";
 import { useState } from "react";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer
 } from "recharts";
 import {
   LayoutDashboard, TrendingUp, TrendingDown, Users, FileText, MessageSquare,
   Target, DollarSign, CalendarClock, ArrowRight, Plus, Send, Settings,
-  X, Clock, AlertTriangle, Briefcase, Zap, CheckCircle2, Minus
+  X, Clock, AlertTriangle, Briefcase, Zap, CheckCircle2, Minus, Phone, Mail, TrendingUp as TrendUp
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
@@ -25,6 +26,7 @@ import {
 const AGENT_WIDGETS = [
   { id: "pipeline", label: "Deal Pipeline" },
   { id: "stats", label: "Key Metrics" },
+  { id: "communications", label: "Communications" },
   { id: "activity_chart", label: "Activity Chart (24h)" },
   { id: "leads", label: "Leads Overview" },
   { id: "deadlines", label: "Upcoming Deadlines" },
@@ -34,12 +36,14 @@ const AGENT_WIDGETS = [
 
 const VENDOR_WIDGETS = [
   { id: "stats", label: "Key Metrics" },
+  { id: "communications", label: "Communications" },
   { id: "bids", label: "Bids Overview" },
   { id: "quick_actions", label: "Quick Actions" },
 ];
 
 const LENDER_WIDGETS = [
   { id: "stats", label: "Key Metrics" },
+  { id: "communications", label: "Communications" },
   { id: "pipeline", label: "Loan Pipeline" },
   { id: "quick_actions", label: "Quick Actions" },
 ];
@@ -112,8 +116,8 @@ function StatCard({ icon: Icon, label, value, subValue, change, accent }: {
   );
 }
 
-function ActivityChart({ data }: { data: { hour: number; count: number }[] }) {
-  const maxCount = Math.max(...data.map(d => d.count), 1);
+function ActivityChart({ data }: { data: { hour: number; messages: number; sms: number; emails: number }[] }) {
+  const total = data.reduce((s, d) => s + d.messages + d.sms + d.emails, 0);
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between mb-4">
@@ -121,11 +125,9 @@ function ActivityChart({ data }: { data: { hour: number; count: number }[] }) {
           <h3 className="font-semibold text-sm">Activity</h3>
           <p className="text-xs text-muted-foreground">Messages & communications in the last 24 hours</p>
         </div>
-        <div className="flex gap-3">
-          <div className="text-right">
-            <p className="text-2xl font-bold">{data.reduce((s, d) => s + d.count, 0)}</p>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total</p>
-          </div>
+        <div className="text-right">
+          <p className="text-2xl font-bold">{total}</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total</p>
         </div>
       </div>
       <div className="h-[180px]">
@@ -139,19 +141,191 @@ function ActivityChart({ data }: { data: { hour: number; count: number }[] }) {
               tickFormatter={(h) => `${h}:00`}
               interval={3}
             />
-            <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+            <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} allowDecimals={false} />
             <Tooltip
               labelFormatter={(h) => `${h}:00`}
               contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))" }}
             />
-            <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={20}>
-              {data.map((entry, i) => (
-                <Cell key={i} fill={entry.count > 0 ? "hsl(var(--primary))" : "hsl(var(--muted))"} />
-              ))}
-            </Bar>
+            <Bar dataKey="messages" stackId="a" fill="#6366f1" maxBarSize={20} name="Messages" />
+            <Bar dataKey="sms" stackId="a" fill="#3b82f6" maxBarSize={20} name="SMS" />
+            <Bar dataKey="emails" stackId="a" fill="#10b981" maxBarSize={20} name="Emails" radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
+      <div className="flex gap-4 mt-3 pt-3 border-t justify-center">
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "#6366f1" }} /><span className="text-xs text-muted-foreground">Messages</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "#3b82f6" }} /><span className="text-xs text-muted-foreground">SMS</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "#10b981" }} /><span className="text-xs text-muted-foreground">Emails</span></div>
+      </div>
+    </Card>
+  );
+}
+
+interface Conversation {
+  userId: number;
+  firstName: string;
+  lastName: string;
+  role: string;
+  unreadCount: number;
+}
+
+function CommunicationsWidget() {
+  const [contactId, setContactId] = useState<string>("all");
+
+  const { data: conversations = [] } = useQuery<Conversation[]>({
+    queryKey: ["/api/private-messages/conversations"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/private-messages/conversations");
+      return res.json();
+    },
+  });
+
+  const metricsUrl = contactId !== "all"
+    ? `/api/communications/metrics?contactId=${contactId}`
+    : "/api/communications/metrics";
+
+  const { data: metrics, isLoading } = useQuery<any>({
+    queryKey: ["/api/communications/metrics", contactId],
+    queryFn: async () => {
+      const res = await apiRequest("GET", metricsUrl);
+      return res.json();
+    },
+  });
+
+  const hourly = metrics?.hourlyActivity || [];
+  const totalToday = hourly.reduce((s: number, h: any) => s + (h.messages || 0) + (h.sms || 0) + (h.emails || 0), 0);
+  const isFiltered = contactId !== "all";
+  const selectedContact = conversations.find(c => c.userId === Number(contactId));
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="h-4 w-4 text-primary" />
+          <h3 className="font-semibold text-sm">Communications</h3>
+        </div>
+        <Link href="/messages">
+          <Button variant="ghost" size="sm" className="text-xs h-7 gap-1">
+            View All <ArrowRight className="h-3 w-3" />
+          </Button>
+        </Link>
+      </div>
+
+      <div className="mb-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1.5">FILTER BY</div>
+        <Select value={contactId} onValueChange={setContactId}>
+          <SelectTrigger className="h-8 text-sm">
+            <SelectValue placeholder="All Contacts (Total)" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Contacts (Total)</SelectItem>
+            {conversations.map(c => (
+              <SelectItem key={c.userId} value={String(c.userId)}>
+                {c.firstName} {c.lastName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+        </div>
+      ) : metrics ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <div className="flex items-center gap-1.5 mb-1">
+                <MessageSquare className="h-3.5 w-3.5 text-indigo-500" />
+                <span className="text-xs font-medium text-muted-foreground">Messages</span>
+              </div>
+              <p className="text-2xl font-bold">{metrics.privateMessages?.total || 0}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Today: {metrics.privateMessages?.today || 0}  Week: {metrics.privateMessages?.thisWeek || 0}
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Phone className="h-3.5 w-3.5 text-blue-500" />
+                <span className="text-xs font-medium text-muted-foreground">SMS Sent</span>
+              </div>
+              <p className="text-2xl font-bold">{metrics.sms?.total || 0}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Today: {metrics.sms?.today || 0}  Week: {metrics.sms?.thisWeek || 0}
+              </p>
+            </div>
+            {!isFiltered && (
+              <div className="p-3 rounded-lg bg-muted/40 border">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Mail className="h-3.5 w-3.5 text-emerald-500" />
+                  <span className="text-xs font-medium text-muted-foreground">Emails</span>
+                </div>
+                <p className="text-2xl font-bold">{metrics.email?.total || 0}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Today: {metrics.email?.today || 0}  Week: {metrics.email?.thisWeek || 0}
+                </p>
+              </div>
+            )}
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <div className="flex items-center gap-1.5 mb-1">
+                <TrendUp className="h-3.5 w-3.5 text-amber-500" />
+                <span className="text-xs font-medium text-muted-foreground">All-Time</span>
+              </div>
+              <p className="text-2xl font-bold">
+                {(metrics.privateMessages?.total || 0) + (metrics.sms?.total || 0) + (metrics.email?.total || 0)}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Msgs: {metrics.privateMessages?.total || 0}  SMS: {metrics.sms?.total || 0}
+                {!isFiltered && `  Emails: ${metrics.email?.total || 0}`}
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-sm font-semibold">Activity</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {selectedContact ? `${selectedContact.firstName} ${selectedContact.lastName} — ` : ""}Hourly breakdown today
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xl font-bold">{totalToday}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Today</p>
+              </div>
+            </div>
+            <div className="h-[160px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={hourly} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <XAxis
+                    dataKey="hour"
+                    tick={{ fontSize: 10 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(h) => `${h}:00`}
+                    interval={3}
+                  />
+                  <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip
+                    labelFormatter={(h) => `${h}:00`}
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))" }}
+                  />
+                  <Bar dataKey="messages" stackId="a" fill="#6366f1" maxBarSize={20} name="Messages" />
+                  <Bar dataKey="sms" stackId="a" fill="#3b82f6" maxBarSize={20} name="SMS" />
+                  <Bar dataKey="emails" stackId="a" fill="#10b981" maxBarSize={20} name="Emails" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex gap-4 mt-2 pt-2 border-t justify-center">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "#6366f1" }} /><span className="text-xs text-muted-foreground">Messages</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "#3b82f6" }} /><span className="text-xs text-muted-foreground">SMS</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "#10b981" }} /><span className="text-xs text-muted-foreground">Emails</span></div>
+            </div>
+          </div>
+        </>
+      ) : null}
     </Card>
   );
 }
@@ -539,6 +713,12 @@ export default function DashboardPage() {
             )}
           </div>
 
+          {isWidgetVisible("communications") && (
+            <div className="mb-6">
+              <CommunicationsWidget />
+            </div>
+          )}
+
           {isWidgetVisible("activity_chart") && dashData.activityChart && (
             <div className="mb-6">
               <ActivityChart data={dashData.activityChart} />
@@ -585,6 +765,11 @@ export default function DashboardPage() {
               />
             </div>
           )}
+          {isWidgetVisible("communications") && (
+            <div className="mb-6">
+              <CommunicationsWidget />
+            </div>
+          )}
           {isWidgetVisible("bids") && dashData.leads && (
             <Card className="p-4 mb-6">
               <h3 className="font-semibold text-sm mb-3">Leads</h3>
@@ -620,6 +805,11 @@ export default function DashboardPage() {
                 value={dashData.unreadMessages || 0}
                 accent="border-l-amber-500"
               />
+            </div>
+          )}
+          {isWidgetVisible("communications") && (
+            <div className="mb-6">
+              <CommunicationsWidget />
             </div>
           )}
           {isWidgetVisible("pipeline") && dashData.pipeline?.stages && (

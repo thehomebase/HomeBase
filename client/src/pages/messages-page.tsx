@@ -48,7 +48,7 @@ interface MetricsData {
   sms: { today: number; thisWeek: number; thisMonth: number; total: number; uniqueContacts: number };
   email: { today: number; thisWeek: number; thisMonth: number; total: number };
   privateMessages: { today: number; thisWeek: number; thisMonth: number; total: number; uniqueRecipients: number };
-  hourlyActivity?: { hour: number; count: number }[];
+  hourlyActivity?: { hour: number; messages: number; sms: number; emails: number }[];
 }
 
 const roleColors: Record<string, string> = {
@@ -92,8 +92,8 @@ function formatHour(h: number) {
 
 function ContactActivityChart({ metrics }: { metrics: MetricsData }) {
   const hourly = metrics.hourlyActivity || [];
-  const total = hourly.reduce((s, h) => s + h.count, 0);
-  const chartData = hourly.map(h => ({ name: formatHour(h.hour), count: h.count }));
+  const total = hourly.reduce((s, h) => s + h.messages + h.sms + h.emails, 0);
+  const chartData = hourly.map(h => ({ name: formatHour(h.hour), messages: h.messages, sms: h.sms, emails: h.emails }));
 
   return (
     <Card className="p-3 mb-3">
@@ -112,12 +112,10 @@ function ContactActivityChart({ metrics }: { metrics: MetricsData }) {
           <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
             <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={3} />
             <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
-            <Tooltip
-              contentStyle={{ fontSize: 11, borderRadius: 8 }}
-              labelFormatter={(l) => `${l}`}
-              formatter={(v: number) => [v, "Activity"]}
-            />
-            <Bar dataKey="count" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+            <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+            <Bar dataKey="messages" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} name="Messages" />
+            <Bar dataKey="sms" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} name="SMS" />
+            <Bar dataKey="emails" stackId="a" fill="#10b981" radius={[2, 2, 0, 0]} name="Emails" />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -427,20 +425,27 @@ export default function MessagesPage() {
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold">
-                    {metrics.hourlyActivity.reduce((s, h) => s + h.count, 0)}
+                    {metrics.hourlyActivity.reduce((s, h) => s + h.messages + h.sms + h.emails, 0)}
                   </div>
                   <div className="text-[10px] text-muted-foreground uppercase font-medium">Today</div>
                 </div>
               </div>
               <div className="h-[100px] mt-1">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={metrics.hourlyActivity.map(h => ({ name: formatHour(h.hour), count: h.count }))} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <BarChart data={metrics.hourlyActivity.map(h => ({ name: formatHour(h.hour), messages: h.messages, sms: h.sms, emails: h.emails }))} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={3} />
                     <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
-                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} formatter={(v: number) => [v, "Activity"]} />
-                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                    <Bar dataKey="messages" stackId="a" fill="#6366f1" name="Messages" />
+                    <Bar dataKey="sms" stackId="a" fill="#3b82f6" name="SMS" />
+                    <Bar dataKey="emails" stackId="a" fill="#10b981" name="Emails" />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+              <div className="flex gap-3 mt-2 pt-2 border-t justify-center">
+                <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-sm" style={{ background: "#6366f1" }} /><span className="text-[10px] text-muted-foreground">Messages</span></div>
+                <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-sm" style={{ background: "#3b82f6" }} /><span className="text-[10px] text-muted-foreground">SMS</span></div>
+                <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-sm" style={{ background: "#10b981" }} /><span className="text-[10px] text-muted-foreground">Emails</span></div>
               </div>
             </Card>
           )}
