@@ -5,6 +5,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { Server as HttpServer } from "http";
 import WebSocket from 'ws';
 import { WebhookHandlers } from "./webhookHandlers";
+import { startDripScheduler } from "./drip-scheduler";
 
 // Add startup message to verify nodemon restarts
 log(`Server starting... [${new Date().toISOString()}]`);
@@ -190,7 +191,8 @@ async function initStripe() {
       serveStatic(app);
     }
 
-    // Graceful shutdown handlers
+    startDripScheduler();
+
     const shutdown = () => {
       log('Graceful shutdown initiated...');
       server.close(() => {

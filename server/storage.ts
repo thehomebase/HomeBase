@@ -18,6 +18,7 @@ import {
   propertyViewings, propertyFeedback, showingRequests, savedProperties, communications, smsOptOuts,
   emailSnippets, emailTracking, inspectionItems, bidRequests, bids,
   homeTeamMembers, homeownerHomes, homeMaintenanceRecords, referralCodes, referralCredits,
+  dripCampaigns, dripSteps, dripEnrollments, clientSpecialDates,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
   type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
   type ShowingRequest, type SavedProperty, type InsertSavedProperty,
@@ -33,6 +34,10 @@ import {
   type MaintenanceRecord, type InsertMaintenanceRecord,
   type ReferralCode, type InsertReferralCode,
   type ReferralCredit, type InsertReferralCredit,
+  type DripCampaign, type InsertDripCampaign,
+  type DripStep, type InsertDripStep,
+  type DripEnrollment, type InsertDripEnrollment,
+  type ClientSpecialDate, type InsertClientSpecialDate,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -232,6 +237,39 @@ export interface IStorage {
   // Marketplace operations
   getMarketplaceContractors(filters?: { category?: string; search?: string; limit?: number; offset?: number }): Promise<Contractor[]>;
   getMarketplaceContractorCount(filters?: { category?: string; search?: string }): Promise<number>;
+
+  // Drip Campaign operations
+  createDripCampaign(data: InsertDripCampaign): Promise<DripCampaign>;
+  getDripCampaign(id: number): Promise<DripCampaign | undefined>;
+  getDripCampaignsByAgent(agentId: number): Promise<DripCampaign[]>;
+  updateDripCampaign(id: number, data: Partial<DripCampaign>): Promise<DripCampaign>;
+  deleteDripCampaign(id: number): Promise<void>;
+
+  // Drip Step operations
+  createDripStep(data: InsertDripStep): Promise<DripStep>;
+  getDripStepsByCampaign(campaignId: number): Promise<DripStep[]>;
+  updateDripStep(id: number, data: Partial<DripStep>): Promise<DripStep>;
+  deleteDripStep(id: number): Promise<void>;
+  reorderDripSteps(campaignId: number, stepIds: number[]): Promise<DripStep[]>;
+
+  // Drip Enrollment operations
+  createDripEnrollment(data: InsertDripEnrollment): Promise<DripEnrollment>;
+  getDripEnrollment(id: number): Promise<DripEnrollment | undefined>;
+  getDripEnrollmentsByAgent(agentId: number): Promise<DripEnrollment[]>;
+  getDripEnrollmentsByClient(clientId: number): Promise<DripEnrollment[]>;
+  getDripEnrollmentsByCampaign(campaignId: number): Promise<DripEnrollment[]>;
+  updateDripEnrollmentStatus(id: number, status: string): Promise<DripEnrollment>;
+  advanceDripEnrollmentStep(id: number, nextActionAt: Date | null): Promise<DripEnrollment>;
+  getDueEnrollments(): Promise<DripEnrollment[]>;
+
+  // Client Special Date operations
+  createClientSpecialDate(data: InsertClientSpecialDate): Promise<ClientSpecialDate>;
+  getClientSpecialDate(id: number): Promise<ClientSpecialDate | undefined>;
+  getClientSpecialDatesByClient(clientId: number): Promise<ClientSpecialDate[]>;
+  getClientSpecialDatesByAgent(agentId: number): Promise<ClientSpecialDate[]>;
+  updateClientSpecialDate(id: number, data: Partial<ClientSpecialDate>): Promise<ClientSpecialDate>;
+  deleteClientSpecialDate(id: number): Promise<void>;
+  getUpcomingSpecialDates(agentId: number, withinDays: number): Promise<ClientSpecialDate[]>;
 
 }
 
@@ -3438,6 +3476,264 @@ export class DatabaseStorage implements IStorage {
     const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
     const result = await db.execute(sql`SELECT COUNT(*) as count FROM contractors ${whereClause}`);
     return Number((result.rows[0] as any)?.count || 0);
+  }
+
+  private mapCampaignRow(row: any): DripCampaign {
+    return {
+      id: Number(row.id),
+      agentId: Number(row.agent_id),
+      name: String(row.name),
+      description: row.description ? String(row.description) : null,
+      type: String(row.type),
+      status: String(row.status),
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null,
+    };
+  }
+
+  private mapStepRow(row: any): DripStep {
+    return {
+      id: Number(row.id),
+      campaignId: Number(row.campaign_id),
+      stepOrder: Number(row.step_order),
+      delayDays: Number(row.delay_days),
+      method: String(row.method),
+      subject: row.subject ? String(row.subject) : null,
+      content: String(row.content),
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+    };
+  }
+
+  private mapEnrollmentRow(row: any): DripEnrollment {
+    return {
+      id: Number(row.id),
+      campaignId: Number(row.campaign_id),
+      clientId: Number(row.client_id),
+      agentId: Number(row.agent_id),
+      status: String(row.status),
+      currentStepIndex: Number(row.current_step_index),
+      enrolledAt: row.enrolled_at ? new Date(row.enrolled_at) : null,
+      lastActionAt: row.last_action_at ? new Date(row.last_action_at) : null,
+      nextActionAt: row.next_action_at ? new Date(row.next_action_at) : null,
+    };
+  }
+
+  private mapSpecialDateRow(row: any): ClientSpecialDate {
+    return {
+      id: Number(row.id),
+      clientId: Number(row.client_id),
+      agentId: Number(row.agent_id),
+      dateType: String(row.date_type),
+      dateValue: String(row.date_value),
+      year: row.year ? Number(row.year) : null,
+      label: row.label ? String(row.label) : null,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+    };
+  }
+
+  async createDripCampaign(data: InsertDripCampaign): Promise<DripCampaign> {
+    const result = await db.execute(sql`
+      INSERT INTO drip_campaigns (agent_id, name, description, type, status)
+      VALUES (${data.agentId}, ${data.name}, ${data.description || null}, ${data.type || 'custom'}, ${data.status || 'active'})
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to create drip campaign');
+    return this.mapCampaignRow(result.rows[0]);
+  }
+
+  async getDripCampaign(id: number): Promise<DripCampaign | undefined> {
+    const result = await db.execute(sql`SELECT * FROM drip_campaigns WHERE id = ${id} LIMIT 1`);
+    if (!result.rows[0]) return undefined;
+    return this.mapCampaignRow(result.rows[0]);
+  }
+
+  async getDripCampaignsByAgent(agentId: number): Promise<DripCampaign[]> {
+    const result = await db.execute(sql`SELECT * FROM drip_campaigns WHERE agent_id = ${agentId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => this.mapCampaignRow(row));
+  }
+
+  async updateDripCampaign(id: number, data: Partial<DripCampaign>): Promise<DripCampaign> {
+    const parts: any[] = [];
+    if (data.name !== undefined) parts.push(sql`name = ${data.name}`);
+    if (data.description !== undefined) parts.push(sql`description = ${data.description}`);
+    if (data.type !== undefined) parts.push(sql`type = ${data.type}`);
+    if (data.status !== undefined) parts.push(sql`status = ${data.status}`);
+    parts.push(sql`updated_at = NOW()`);
+    const result = await db.execute(sql`UPDATE drip_campaigns SET ${sql.join(parts, sql`, `)} WHERE id = ${id} RETURNING *`);
+    if (!result.rows[0]) throw new Error('Campaign not found');
+    return this.mapCampaignRow(result.rows[0]);
+  }
+
+  async deleteDripCampaign(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM drip_enrollments WHERE campaign_id = ${id}`);
+    await db.execute(sql`DELETE FROM drip_steps WHERE campaign_id = ${id}`);
+    await db.execute(sql`DELETE FROM drip_campaigns WHERE id = ${id}`);
+  }
+
+  async createDripStep(data: InsertDripStep): Promise<DripStep> {
+    const result = await db.execute(sql`
+      INSERT INTO drip_steps (campaign_id, step_order, delay_days, method, subject, content)
+      VALUES (${data.campaignId}, ${data.stepOrder}, ${data.delayDays || 1}, ${data.method || 'email'}, ${data.subject || null}, ${data.content})
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to create drip step');
+    return this.mapStepRow(result.rows[0]);
+  }
+
+  async getDripStepsByCampaign(campaignId: number): Promise<DripStep[]> {
+    const result = await db.execute(sql`SELECT * FROM drip_steps WHERE campaign_id = ${campaignId} ORDER BY step_order ASC`);
+    return (result.rows as any[]).map(row => this.mapStepRow(row));
+  }
+
+  async updateDripStep(id: number, data: Partial<DripStep>): Promise<DripStep> {
+    const parts: any[] = [];
+    if (data.stepOrder !== undefined) parts.push(sql`step_order = ${data.stepOrder}`);
+    if (data.delayDays !== undefined) parts.push(sql`delay_days = ${data.delayDays}`);
+    if (data.method !== undefined) parts.push(sql`method = ${data.method}`);
+    if (data.subject !== undefined) parts.push(sql`subject = ${data.subject}`);
+    if (data.content !== undefined) parts.push(sql`content = ${data.content}`);
+    if (parts.length === 0) throw new Error('No fields to update');
+    const result = await db.execute(sql`UPDATE drip_steps SET ${sql.join(parts, sql`, `)} WHERE id = ${id} RETURNING *`);
+    if (!result.rows[0]) throw new Error('Step not found');
+    return this.mapStepRow(result.rows[0]);
+  }
+
+  async deleteDripStep(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM drip_steps WHERE id = ${id}`);
+  }
+
+  async reorderDripSteps(campaignId: number, stepIds: number[]): Promise<DripStep[]> {
+    for (let i = 0; i < stepIds.length; i++) {
+      await db.execute(sql`UPDATE drip_steps SET step_order = ${i + 1} WHERE id = ${stepIds[i]} AND campaign_id = ${campaignId}`);
+    }
+    return this.getDripStepsByCampaign(campaignId);
+  }
+
+  async createDripEnrollment(data: InsertDripEnrollment): Promise<DripEnrollment> {
+    const result = await db.execute(sql`
+      INSERT INTO drip_enrollments (campaign_id, client_id, agent_id, status, current_step_index, next_action_at)
+      VALUES (${data.campaignId}, ${data.clientId}, ${data.agentId}, ${data.status || 'active'}, ${data.currentStepIndex || 0}, ${data.nextActionAt || null})
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to create enrollment');
+    return this.mapEnrollmentRow(result.rows[0]);
+  }
+
+  async getDripEnrollment(id: number): Promise<DripEnrollment | undefined> {
+    const result = await db.execute(sql`SELECT * FROM drip_enrollments WHERE id = ${id} LIMIT 1`);
+    if (!result.rows[0]) return undefined;
+    return this.mapEnrollmentRow(result.rows[0]);
+  }
+
+  async getDripEnrollmentsByAgent(agentId: number): Promise<DripEnrollment[]> {
+    const result = await db.execute(sql`SELECT * FROM drip_enrollments WHERE agent_id = ${agentId} ORDER BY enrolled_at DESC`);
+    return (result.rows as any[]).map(row => this.mapEnrollmentRow(row));
+  }
+
+  async getDripEnrollmentsByClient(clientId: number): Promise<DripEnrollment[]> {
+    const result = await db.execute(sql`SELECT * FROM drip_enrollments WHERE client_id = ${clientId} ORDER BY enrolled_at DESC`);
+    return (result.rows as any[]).map(row => this.mapEnrollmentRow(row));
+  }
+
+  async getDripEnrollmentsByCampaign(campaignId: number): Promise<DripEnrollment[]> {
+    const result = await db.execute(sql`SELECT * FROM drip_enrollments WHERE campaign_id = ${campaignId} ORDER BY enrolled_at DESC`);
+    return (result.rows as any[]).map(row => this.mapEnrollmentRow(row));
+  }
+
+  async updateDripEnrollmentStatus(id: number, status: string): Promise<DripEnrollment> {
+    const result = await db.execute(sql`UPDATE drip_enrollments SET status = ${status} WHERE id = ${id} RETURNING *`);
+    if (!result.rows[0]) throw new Error('Enrollment not found');
+    return this.mapEnrollmentRow(result.rows[0]);
+  }
+
+  async advanceDripEnrollmentStep(id: number, nextActionAt: Date | null): Promise<DripEnrollment> {
+    const result = await db.execute(sql`
+      UPDATE drip_enrollments 
+      SET current_step_index = current_step_index + 1, 
+          last_action_at = NOW(), 
+          next_action_at = ${nextActionAt}
+      WHERE id = ${id} 
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Enrollment not found');
+    return this.mapEnrollmentRow(result.rows[0]);
+  }
+
+  async getDueEnrollments(): Promise<DripEnrollment[]> {
+    const result = await db.execute(sql`
+      SELECT * FROM drip_enrollments 
+      WHERE status = 'active' AND next_action_at <= NOW()
+      ORDER BY next_action_at ASC
+    `);
+    return (result.rows as any[]).map(row => this.mapEnrollmentRow(row));
+  }
+
+  async createClientSpecialDate(data: InsertClientSpecialDate): Promise<ClientSpecialDate> {
+    const result = await db.execute(sql`
+      INSERT INTO client_special_dates (client_id, agent_id, date_type, date_value, year, label)
+      VALUES (${data.clientId}, ${data.agentId}, ${data.dateType}, ${data.dateValue}, ${data.year || null}, ${data.label || null})
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to create special date');
+    return this.mapSpecialDateRow(result.rows[0]);
+  }
+
+  async getClientSpecialDate(id: number): Promise<ClientSpecialDate | undefined> {
+    const result = await db.execute(sql`SELECT * FROM client_special_dates WHERE id = ${id} LIMIT 1`);
+    if (!result.rows[0]) return undefined;
+    return this.mapSpecialDateRow(result.rows[0]);
+  }
+
+  async getClientSpecialDatesByClient(clientId: number): Promise<ClientSpecialDate[]> {
+    const result = await db.execute(sql`SELECT * FROM client_special_dates WHERE client_id = ${clientId} ORDER BY date_value ASC`);
+    return (result.rows as any[]).map(row => this.mapSpecialDateRow(row));
+  }
+
+  async getClientSpecialDatesByAgent(agentId: number): Promise<ClientSpecialDate[]> {
+    const result = await db.execute(sql`SELECT * FROM client_special_dates WHERE agent_id = ${agentId} ORDER BY date_value ASC`);
+    return (result.rows as any[]).map(row => this.mapSpecialDateRow(row));
+  }
+
+  async updateClientSpecialDate(id: number, data: Partial<ClientSpecialDate>): Promise<ClientSpecialDate> {
+    const parts: any[] = [];
+    if (data.dateType !== undefined) parts.push(sql`date_type = ${data.dateType}`);
+    if (data.dateValue !== undefined) parts.push(sql`date_value = ${data.dateValue}`);
+    if (data.year !== undefined) parts.push(sql`year = ${data.year}`);
+    if (data.label !== undefined) parts.push(sql`label = ${data.label}`);
+    if (parts.length === 0) throw new Error('No fields to update');
+    const result = await db.execute(sql`UPDATE client_special_dates SET ${sql.join(parts, sql`, `)} WHERE id = ${id} RETURNING *`);
+    if (!result.rows[0]) throw new Error('Special date not found');
+    return this.mapSpecialDateRow(result.rows[0]);
+  }
+
+  async deleteClientSpecialDate(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM client_special_dates WHERE id = ${id}`);
+  }
+
+  async getUpcomingSpecialDates(agentId: number, withinDays: number): Promise<ClientSpecialDate[]> {
+    const today = new Date();
+    const dates: ClientSpecialDate[] = [];
+    const allDates = await this.getClientSpecialDatesByAgent(agentId);
+    
+    for (const sd of allDates) {
+      const [month, day] = sd.dateValue.split('-').map(Number);
+      if (!month || !day) continue;
+      
+      const thisYear = today.getFullYear();
+      let nextOccurrence = new Date(thisYear, month - 1, day);
+      if (nextOccurrence < today) {
+        nextOccurrence = new Date(thisYear + 1, month - 1, day);
+      }
+      
+      const diffMs = nextOccurrence.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      
+      if (diffDays <= withinDays) {
+        dates.push(sd);
+      }
+    }
+    
+    return dates;
   }
 
 }

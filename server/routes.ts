@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema } from "@shared/schema";
 import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -3698,6 +3698,306 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error creating portal session:', error);
       res.status(500).json({ error: 'Failed to create portal session' });
+    }
+  });
+
+  // Drip Campaign Routes
+
+  app.get("/api/drip/campaigns", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const campaigns = await storage.getDripCampaignsByAgent(req.user.id);
+      res.json(campaigns);
+    } catch (error) {
+      console.error('Error fetching drip campaigns:', error);
+      res.status(500).json({ error: 'Failed to fetch drip campaigns' });
+    }
+  });
+
+  app.post("/api/drip/campaigns", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const parsed = insertDripCampaignSchema.safeParse({ ...req.body, agentId: req.user.id });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+      const campaign = await storage.createDripCampaign(parsed.data);
+      res.status(201).json(campaign);
+    } catch (error) {
+      console.error('Error creating drip campaign:', error);
+      res.status(500).json({ error: 'Failed to create drip campaign' });
+    }
+  });
+
+  app.get("/api/drip/campaigns/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const campaign = await storage.getDripCampaign(Number(req.params.id));
+      if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+      if (campaign.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      const steps = await storage.getDripStepsByCampaign(campaign.id);
+      res.json({ ...campaign, steps });
+    } catch (error) {
+      console.error('Error fetching drip campaign:', error);
+      res.status(500).json({ error: 'Failed to fetch drip campaign' });
+    }
+  });
+
+  app.patch("/api/drip/campaigns/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const existing = await storage.getDripCampaign(Number(req.params.id));
+      if (!existing) return res.status(404).json({ error: 'Campaign not found' });
+      if (existing.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      const campaign = await storage.updateDripCampaign(Number(req.params.id), req.body);
+      res.json(campaign);
+    } catch (error) {
+      console.error('Error updating drip campaign:', error);
+      res.status(500).json({ error: 'Failed to update drip campaign' });
+    }
+  });
+
+  app.delete("/api/drip/campaigns/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const existing = await storage.getDripCampaign(Number(req.params.id));
+      if (!existing) return res.status(404).json({ error: 'Campaign not found' });
+      if (existing.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      await storage.deleteDripCampaign(Number(req.params.id));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting drip campaign:', error);
+      res.status(500).json({ error: 'Failed to delete drip campaign' });
+    }
+  });
+
+  app.post("/api/drip/campaigns/:id/steps", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const campaignId = Number(req.params.id);
+      const campaign = await storage.getDripCampaign(campaignId);
+      if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+      if (campaign.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      const parsed = insertDripStepSchema.safeParse({ ...req.body, campaignId });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+      const step = await storage.createDripStep(parsed.data);
+      res.status(201).json(step);
+    } catch (error) {
+      console.error('Error creating drip step:', error);
+      res.status(500).json({ error: 'Failed to create drip step' });
+    }
+  });
+
+  app.patch("/api/drip/campaigns/:id/steps/:stepId", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const campaign = await storage.getDripCampaign(Number(req.params.id));
+      if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+      if (campaign.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      const step = await storage.updateDripStep(Number(req.params.stepId), req.body);
+      res.json(step);
+    } catch (error) {
+      console.error('Error updating drip step:', error);
+      res.status(500).json({ error: 'Failed to update drip step' });
+    }
+  });
+
+  app.delete("/api/drip/campaigns/:id/steps/:stepId", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const campaign = await storage.getDripCampaign(Number(req.params.id));
+      if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+      if (campaign.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      await storage.deleteDripStep(Number(req.params.stepId));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting drip step:', error);
+      res.status(500).json({ error: 'Failed to delete drip step' });
+    }
+  });
+
+  app.post("/api/drip/campaigns/:id/enroll", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const campaignId = Number(req.params.id);
+      const campaign = await storage.getDripCampaign(campaignId);
+      if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+      if (campaign.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      const { clientId } = req.body;
+      if (!clientId) return res.status(400).json({ error: 'clientId is required' });
+
+      const steps = await storage.getDripStepsByCampaign(campaignId);
+      const firstStep = steps.sort((a, b) => a.stepOrder - b.stepOrder)[0];
+      const nextActionAt = firstStep
+        ? new Date(Date.now() + firstStep.delayDays * 24 * 60 * 60 * 1000)
+        : null;
+
+      const parsed = insertDripEnrollmentSchema.safeParse({
+        campaignId,
+        clientId: Number(clientId),
+        agentId: req.user.id,
+        status: 'active',
+        currentStepIndex: 0,
+        nextActionAt,
+      });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+      const enrollment = await storage.createDripEnrollment(parsed.data);
+      res.status(201).json(enrollment);
+    } catch (error) {
+      console.error('Error enrolling client:', error);
+      res.status(500).json({ error: 'Failed to enroll client' });
+    }
+  });
+
+  app.get("/api/drip/enrollments", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const enrollments = await storage.getDripEnrollmentsByAgent(req.user.id);
+      res.json(enrollments);
+    } catch (error) {
+      console.error('Error fetching enrollments:', error);
+      res.status(500).json({ error: 'Failed to fetch enrollments' });
+    }
+  });
+
+  app.patch("/api/drip/enrollments/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const { status } = req.body;
+      if (!status || !['active', 'paused', 'completed', 'canceled'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+      }
+      const existing = await storage.getDripEnrollment(Number(req.params.id));
+      if (!existing) return res.status(404).json({ error: 'Enrollment not found' });
+      if (existing.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      const enrollment = await storage.updateDripEnrollmentStatus(Number(req.params.id), status);
+      res.json(enrollment);
+    } catch (error) {
+      console.error('Error updating enrollment:', error);
+      res.status(500).json({ error: 'Failed to update enrollment' });
+    }
+  });
+
+  app.get("/api/drip/special-dates", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const dates = await storage.getClientSpecialDatesByAgent(req.user.id);
+      res.json(dates);
+    } catch (error) {
+      console.error('Error fetching special dates:', error);
+      res.status(500).json({ error: 'Failed to fetch special dates' });
+    }
+  });
+
+  app.post("/api/drip/special-dates", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const parsed = insertClientSpecialDateSchema.safeParse({ ...req.body, agentId: req.user.id });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+      const date = await storage.createClientSpecialDate(parsed.data);
+      res.status(201).json(date);
+    } catch (error) {
+      console.error('Error creating special date:', error);
+      res.status(500).json({ error: 'Failed to create special date' });
+    }
+  });
+
+  app.patch("/api/drip/special-dates/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const existing = await storage.getClientSpecialDate(Number(req.params.id));
+      if (!existing) return res.status(404).json({ error: 'Special date not found' });
+      if (existing.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      const date = await storage.updateClientSpecialDate(Number(req.params.id), req.body);
+      res.json(date);
+    } catch (error) {
+      console.error('Error updating special date:', error);
+      res.status(500).json({ error: 'Failed to update special date' });
+    }
+  });
+
+  app.delete("/api/drip/special-dates/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    try {
+      const existing = await storage.getClientSpecialDate(Number(req.params.id));
+      if (!existing) return res.status(404).json({ error: 'Special date not found' });
+      if (existing.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      await storage.deleteClientSpecialDate(Number(req.params.id));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting special date:', error);
+      res.status(500).json({ error: 'Failed to delete special date' });
+    }
+  });
+
+  app.get("/api/drip/upcoming", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const withinDays = Number(req.query.days) || 30;
+      const upcomingDates = await storage.getUpcomingSpecialDates(req.user.id, withinDays);
+      const dueEnrollments = await storage.getDueEnrollments();
+      const agentDueEnrollments = dueEnrollments.filter(e => e.agentId === req.user.id);
+      res.json({ specialDates: upcomingDates, dueEnrollments: agentDueEnrollments });
+    } catch (error) {
+      console.error('Error fetching upcoming items:', error);
+      res.status(500).json({ error: 'Failed to fetch upcoming items' });
+    }
+  });
+
+  app.post("/api/drip/seed-templates", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const agentId = req.user.id;
+      const templates = [
+        {
+          name: "New Lead Nurture",
+          description: "Automated follow-up sequence for new leads to build rapport and convert to clients",
+          type: "lead_nurture" as const,
+          steps: [
+            { stepOrder: 1, delayDays: 0, method: "email" as const, subject: "Nice to meet you, {{firstName}}!", content: "Hi {{firstName}},\n\nThank you for reaching out! I'm {{agentName}} and I'd love to help you with your real estate needs.\n\nWhat are you looking for in your next home? I'd love to learn more about your goals.\n\nBest regards,\n{{agentName}}" },
+            { stepOrder: 2, delayDays: 3, method: "sms" as const, subject: null, content: "Hi {{firstName}}, it's {{agentName}}! Just checking in - do you have any questions about the market? Happy to help!" },
+            { stepOrder: 3, delayDays: 7, method: "email" as const, subject: "Market update for you, {{firstName}}", content: "Hi {{firstName}},\n\nI wanted to share some exciting updates about the local market. Properties in your area of interest are moving fast!\n\nWould you like to schedule a quick call to discuss your options?\n\nBest,\n{{agentName}}" },
+            { stepOrder: 4, delayDays: 14, method: "reminder" as const, subject: "Follow up with {{firstName}} {{lastName}}", content: "Time to personally reach out to {{firstName}} {{lastName}}. Consider calling to check in on their home search." },
+            { stepOrder: 5, delayDays: 30, method: "email" as const, subject: "Still thinking about making a move, {{firstName}}?", content: "Hi {{firstName}},\n\nI know finding the right home takes time, and I'm here whenever you're ready. In the meantime, feel free to reach out if you have any questions.\n\nWarm regards,\n{{agentName}}" },
+          ],
+        },
+        {
+          name: "Post-Close Follow-Up",
+          description: "Stay in touch with clients after closing to maintain the relationship and generate referrals",
+          type: "post_close" as const,
+          steps: [
+            { stepOrder: 1, delayDays: 1, method: "email" as const, subject: "Congratulations on your new home, {{firstName}}!", content: "Hi {{firstName}},\n\nCongratulations on closing on your new home! It was a pleasure working with you.\n\nIf you need anything as you settle in - contractor recommendations, utility setup help, or anything else - don't hesitate to reach out.\n\nBest,\n{{agentName}}" },
+            { stepOrder: 2, delayDays: 14, method: "sms" as const, subject: null, content: "Hi {{firstName}}! How's the move going? Let me know if you need any help settling in. 🏠" },
+            { stepOrder: 3, delayDays: 30, method: "email" as const, subject: "How's your new home, {{firstName}}?", content: "Hi {{firstName}},\n\nIt's been a month since you moved in! How are you enjoying your new home?\n\nIf you know anyone looking to buy or sell, I'd love a referral. Your recommendation means the world to me.\n\nBest,\n{{agentName}}" },
+            { stepOrder: 4, delayDays: 90, method: "reminder" as const, subject: "Check in with {{firstName}} {{lastName}} - 3 months post-close", content: "It's been 3 months since {{firstName}} {{lastName}} closed. Consider sending a personal note or small gift." },
+            { stepOrder: 5, delayDays: 365, method: "email" as const, subject: "Happy Home Anniversary, {{firstName}}! 🎉", content: "Hi {{firstName}},\n\nCan you believe it's been a year since you closed on your home? Time flies!\n\nI hope you're loving every moment. If you ever need anything real estate related, I'm always here.\n\nCheers,\n{{agentName}}" },
+          ],
+        },
+        {
+          name: "Birthday & Anniversary",
+          description: "Celebrate your clients' special occasions to strengthen relationships",
+          type: "birthday" as const,
+          steps: [
+            { stepOrder: 1, delayDays: 0, method: "email" as const, subject: "Happy Birthday, {{firstName}}! 🎂", content: "Hi {{firstName}},\n\nWishing you a wonderful birthday filled with joy and happiness!\n\nThinking of you today. Hope it's a great one!\n\nWarm wishes,\n{{agentName}}" },
+            { stepOrder: 2, delayDays: 0, method: "sms" as const, subject: null, content: "Happy Birthday, {{firstName}}! 🎂🎉 Wishing you an amazing day! - {{agentName}}" },
+          ],
+        },
+      ];
+
+      const createdCampaigns = [];
+      for (const template of templates) {
+        const { steps, ...campaignData } = template;
+        const campaign = await storage.createDripCampaign({ ...campaignData, agentId, status: 'active' });
+        for (const step of steps) {
+          await storage.createDripStep({ ...step, campaignId: campaign.id, content: step.content });
+        }
+        const campaignWithSteps = await storage.getDripCampaign(campaign.id);
+        const campaignSteps = await storage.getDripStepsByCampaign(campaign.id);
+        createdCampaigns.push({ ...campaignWithSteps, steps: campaignSteps });
+      }
+
+      res.status(201).json(createdCampaigns);
+    } catch (error) {
+      console.error('Error seeding templates:', error);
+      res.status(500).json({ error: 'Failed to seed templates' });
     }
   });
 

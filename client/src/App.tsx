@@ -48,7 +48,8 @@ import {
   Gift,
   Store,
   HardHat,
-  CreditCard
+  CreditCard,
+  Bell
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -69,6 +70,7 @@ import ReferralPage from "@/pages/referral-page";
 import MarketplacePage from "@/pages/marketplace-page";
 import MyTeamPage from "@/pages/my-team-page";
 import BillingPage from "@/pages/billing-page";
+import DripCampaignsPage from "@/pages/drip-campaigns-page";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -240,6 +242,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Drip Campaigns">
+                            <Link href="/drip" className="flex items-center gap-2">
+                              <Bell className="h-4 w-4" />
+                              {isSidebarOpen && <span>Drip Campaigns</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
                       </>
                     )}
                     {(user?.role === 'agent' || user?.role === 'vendor') && (
@@ -396,6 +406,9 @@ function Router() {
           </Route>
           <Route path="/referrals">
             <ProtectedRoute path="/referrals" component={ReferralPage} />
+          </Route>
+          <Route path="/drip">
+            <ProtectedRoute path="/drip" component={DripCampaignsPage} />
           </Route>
           <Route path="/billing">
             <ProtectedRoute path="/billing" component={BillingPage} />

@@ -518,6 +518,70 @@ export const referralCredits = pgTable("referral_credits", {
   appliedAt: timestamp("applied_at"),
 });
 
+export const dripCampaigns = pgTable("drip_campaigns", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type", { enum: ['lead_nurture', 'post_close', 'birthday', 'anniversary', 'custom'] }).notNull().default('custom'),
+  status: text("status", { enum: ['active', 'paused', 'archived'] }).notNull().default('active'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const dripSteps = pgTable("drip_steps", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaign_id").notNull(),
+  stepOrder: integer("step_order").notNull(),
+  delayDays: integer("delay_days").notNull().default(1),
+  method: text("method", { enum: ['email', 'sms', 'reminder'] }).notNull().default('email'),
+  subject: text("subject"),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const dripEnrollments = pgTable("drip_enrollments", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaign_id").notNull(),
+  clientId: integer("client_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  status: text("status", { enum: ['active', 'paused', 'completed', 'canceled'] }).notNull().default('active'),
+  currentStepIndex: integer("current_step_index").notNull().default(0),
+  enrolledAt: timestamp("enrolled_at").defaultNow(),
+  lastActionAt: timestamp("last_action_at"),
+  nextActionAt: timestamp("next_action_at"),
+});
+
+export const clientSpecialDates = pgTable("client_special_dates", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  dateType: text("date_type", { enum: ['birthday', 'anniversary', 'home_purchase', 'custom'] }).notNull(),
+  dateValue: text("date_value").notNull(),
+  year: integer("year"),
+  label: text("label"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDripCampaignSchema = createInsertSchema(dripCampaigns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertDripStepSchema = createInsertSchema(dripSteps).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertDripEnrollmentSchema = createInsertSchema(dripEnrollments).omit({
+  id: true,
+  enrolledAt: true,
+  lastActionAt: true,
+});
+export const insertClientSpecialDateSchema = createInsertSchema(clientSpecialDates).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertHomeTeamMemberSchema = createInsertSchema(homeTeamMembers).omit({
   id: true,
   addedAt: true,
@@ -588,3 +652,11 @@ export type ReferralCode = typeof referralCodes.$inferSelect;
 export type InsertReferralCode = z.infer<typeof insertReferralCodeSchema>;
 export type ReferralCredit = typeof referralCredits.$inferSelect;
 export type InsertReferralCredit = z.infer<typeof insertReferralCreditSchema>;
+export type DripCampaign = typeof dripCampaigns.$inferSelect;
+export type InsertDripCampaign = z.infer<typeof insertDripCampaignSchema>;
+export type DripStep = typeof dripSteps.$inferSelect;
+export type InsertDripStep = z.infer<typeof insertDripStepSchema>;
+export type DripEnrollment = typeof dripEnrollments.$inferSelect;
+export type InsertDripEnrollment = z.infer<typeof insertDripEnrollmentSchema>;
+export type ClientSpecialDate = typeof clientSpecialDates.$inferSelect;
+export type InsertClientSpecialDate = z.infer<typeof insertClientSpecialDateSchema>;
