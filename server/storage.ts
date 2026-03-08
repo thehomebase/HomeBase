@@ -439,23 +439,11 @@ export class DatabaseStorage implements IStorage {
 
   async getUser(id: number): Promise<User | undefined> {
     try {
-      const result = await db.execute(sql`
-        SELECT id, email, password, first_name as "firstName", 
-               last_name as "lastName", role, agent_id as "agentId",
-               client_record_id as "clientRecordId",
-               claimed_transaction_id as "claimedTransactionId",
-               claimed_access_code as "claimedAccessCode",
-               phone, mobile_phone as "mobilePhone"
-        FROM users 
-        WHERE id = ${id}
-      `);
-
-      if (result.rows.length === 0) {
+      const [user] = await db.select().from(users).where(sql`id = ${id}`);
+      if (!user) {
         console.log('No user found with ID:', id);
         return undefined;
       }
-
-      const user = result.rows[0];
       return {
         id: Number(user.id),
         email: String(user.email),
@@ -467,8 +455,8 @@ export class DatabaseStorage implements IStorage {
         clientRecordId: user.clientRecordId ? Number(user.clientRecordId) : null,
         claimedTransactionId: user.claimedTransactionId ? Number(user.claimedTransactionId) : null,
         claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null,
-        phone: user.phone ? String(user.phone) : null,
-        mobilePhone: user.mobilePhone ? String(user.mobilePhone) : null,
+        stripeCustomerId: user.stripeCustomerId ? String(user.stripeCustomerId) : null,
+        stripeSubscriptionId: user.stripeSubscriptionId ? String(user.stripeSubscriptionId) : null,
       };
     } catch (error) {
       console.error('Error in getUser:', error);

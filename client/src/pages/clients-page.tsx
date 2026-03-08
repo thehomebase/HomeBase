@@ -1179,7 +1179,7 @@ export default function ClientsPage() {
                       Add Client
                     </Button>
                   </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Add New Client</DialogTitle>
                   </DialogHeader>
