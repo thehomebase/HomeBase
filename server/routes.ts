@@ -2706,26 +2706,85 @@ export function registerRoutes(app: Express): Server {
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
       }
-      const { parseInspectionReport } = await import("./inspection-parser");
-      let text = "";
+      const transactionId = Number(req.params.id);
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction || transaction.agentId !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized for this transaction' });
+      }
+      const { parseInspectionReport, parseInspectionReportWithPages } = await import("./inspection-parser");
+      let items;
+
       if (req.file.mimetype === 'application/pdf') {
         try {
           const pdfParseModule = await import("pdf-parse");
           const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
           const pdfData = await pdfParseFn(req.file.buffer);
-          text = pdfData.text || "";
+
+          if (pdfData.numpages && pdfData.numpages > 1) {
+            const pageTexts: Array<{ pageNumber: number; text: string }> = [];
+            const fullText = pdfData.text || "";
+            const pageMarkers = fullText.split(/\f/);
+            for (let i = 0; i < pageMarkers.length; i++) {
+              if (pageMarkers[i].trim().length > 0) {
+                pageTexts.push({ pageNumber: i + 1, text: pageMarkers[i] });
+              }
+            }
+            items = pageTexts.length > 1
+              ? parseInspectionReportWithPages(pageTexts)
+              : parseInspectionReport(fullText);
+          } else {
+            items = parseInspectionReport(pdfData.text || "");
+          }
+
+          const fs = await import("fs");
+          const path = await import("path");
+          const uploadDir = path.default.join(process.cwd(), 'uploads', 'inspections');
+          fs.default.mkdirSync(uploadDir, { recursive: true });
+          const fileName = `${transactionId}_${Date.now()}.pdf`;
+          const filePath = path.default.join(uploadDir, fileName);
+          fs.default.writeFileSync(filePath, req.file.buffer);
+          await storage.saveInspectionPdf(transactionId, req.file.originalname || fileName, filePath);
         } catch (pdfErr) {
           console.error('PDF parse error:', pdfErr);
           return res.status(400).json({ error: 'Failed to parse PDF file' });
         }
       } else {
-        text = req.file.buffer.toString('utf-8');
+        const text = req.file.buffer.toString('utf-8');
+        items = parseInspectionReport(text);
       }
-      const items = parseInspectionReport(text);
-      res.json({ items, transactionId: Number(req.params.id) });
+      res.json({ items, transactionId });
     } catch (error) {
       console.error('Error parsing inspection report:', error);
       res.status(500).json({ error: 'Failed to parse inspection report' });
+    }
+  });
+
+  app.get("/api/transactions/:id/inspection-pdf", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const transactionId = Number(req.params.id);
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
+      if (req.user.role === "agent") {
+        if (transaction.agentId !== req.user.id) {
+          return res.status(403).json({ error: 'Not authorized' });
+        }
+      } else {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      const pdfInfo = await storage.getInspectionPdf(transactionId);
+      if (!pdfInfo) return res.status(404).json({ error: 'No inspection PDF found' });
+      const fs = await import("fs");
+      if (!fs.default.existsSync(pdfInfo.filePath)) {
+        return res.status(404).json({ error: 'PDF file not found on disk' });
+      }
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${pdfInfo.fileName}"`);
+      const fileStream = fs.default.createReadStream(pdfInfo.filePath);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error('Error serving inspection PDF:', error);
+      res.status(500).json({ error: 'Failed to serve inspection PDF' });
     }
   });
 
@@ -2868,6 +2927,20 @@ export function registerRoutes(app: Express): Server {
   });
 
   // ============ Vendor Portal ============
+  const CONTRACTOR_TO_INSPECTION_CATEGORIES: Record<string, string[]> = {
+    roofer: ['roof'],
+    plumber: ['plumbing'],
+    electrician: ['electrical'],
+    hvac: ['hvac'],
+    painter: ['interior', 'exterior'],
+    landscaper: ['exterior'],
+    handyman: ['interior', 'exterior', 'appliances', 'other'],
+    pest_control: ['exterior', 'interior', 'foundation'],
+    home_inspector: ['roof', 'plumbing', 'electrical', 'hvac', 'foundation', 'exterior', 'interior', 'appliances', 'other'],
+    cleaner: ['interior'],
+    other: ['roof', 'plumbing', 'electrical', 'hvac', 'foundation', 'exterior', 'interior', 'appliances', 'other'],
+  };
+
   app.get("/api/vendor/bid-requests", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "vendor") return res.sendStatus(401);
     try {
@@ -2876,10 +2949,51 @@ export function registerRoutes(app: Express): Server {
         return res.json([]);
       }
       const bidRequests = await storage.getBidRequestsByContractor(contractor.id);
-      res.json(bidRequests);
+      const allowedCategories = CONTRACTOR_TO_INSPECTION_CATEGORIES[contractor.category] || [];
+
+      const enrichedRequests = [];
+      for (const br of bidRequests) {
+        const items = await storage.getInspectionItemsByTransaction(br.transactionId);
+        const item = items.find(i => i.id === br.inspectionItemId);
+        if (!item) continue;
+        if (allowedCategories.length > 0 && !allowedCategories.includes(item.category)) continue;
+
+        const pdfInfo = await storage.getInspectionPdf(br.transactionId);
+        enrichedRequests.push({
+          ...br,
+          inspectionItem: item,
+          hasPdf: !!pdfInfo,
+        });
+      }
+      res.json(enrichedRequests);
     } catch (error) {
       console.error('Error fetching vendor bid requests:', error);
       res.status(500).json({ error: 'Failed to fetch bid requests' });
+    }
+  });
+
+  app.get("/api/vendor/inspection-pdf/:transactionId", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") return res.sendStatus(401);
+    try {
+      const transactionId = Number(req.params.transactionId);
+      const contractor = await storage.getContractorByVendorUserId(req.user.id);
+      if (!contractor) return res.status(403).json({ error: 'No vendor profile' });
+      const bidRequests = await storage.getBidRequestsByContractor(contractor.id);
+      const hasAccess = bidRequests.some(br => br.transactionId === transactionId);
+      if (!hasAccess) return res.status(403).json({ error: 'Not authorized to view this PDF' });
+
+      const pdfInfo = await storage.getInspectionPdf(transactionId);
+      if (!pdfInfo) return res.status(404).json({ error: 'No inspection PDF found' });
+      const fs = await import("fs");
+      if (!fs.default.existsSync(pdfInfo.filePath)) {
+        return res.status(404).json({ error: 'PDF file not found' });
+      }
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${pdfInfo.fileName}"`);
+      fs.default.createReadStream(pdfInfo.filePath).pipe(res);
+    } catch (error) {
+      console.error('Error serving vendor inspection PDF:', error);
+      res.status(500).json({ error: 'Failed to serve PDF' });
     }
   });
 

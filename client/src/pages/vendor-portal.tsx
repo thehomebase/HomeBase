@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Contractor, ContractorReview, BidRequest, Bid } from "@shared/schema";
+import type { Contractor, ContractorReview, BidRequest, Bid, InspectionItem } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,8 @@ import {
   AlertTriangle,
   DollarSign,
   ExternalLink,
+  BookOpen,
+  Eye,
 } from "lucide-react";
 import { SiGoogle, SiYelp } from "react-icons/si";
 
@@ -99,12 +101,19 @@ function DashboardTab({ profile, bidRequests, bids }: {
   );
 }
 
+type EnrichedBidRequest = BidRequest & {
+  inspectionItem?: InspectionItem;
+  hasPdf?: boolean;
+};
+
 function BidRequestsTab({ bidRequests, profile }: {
-  bidRequests: BidRequest[];
+  bidRequests: EnrichedBidRequest[];
   profile: Contractor | null;
 }) {
   const { toast } = useToast();
-  const [selectedRequest, setSelectedRequest] = useState<BidRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<EnrichedBidRequest | null>(null);
+  const [pdfViewerTxId, setPdfViewerTxId] = useState<number | null>(null);
+  const [pdfViewerPage, setPdfViewerPage] = useState<number | null>(null);
   const [bidAmount, setBidAmount] = useState("");
   const [bidDays, setBidDays] = useState("");
   const [bidDescription, setBidDescription] = useState("");
@@ -184,14 +193,48 @@ function BidRequestsTab({ bidRequests, profile }: {
         <Card key={br.id}>
           <CardContent className="pt-6">
             <div className="flex items-start justify-between">
-              <div className="space-y-1">
+              <div className="space-y-2 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">Request #{br.id}</span>
                   {getStatusBadge(br.status)}
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Transaction #{br.transactionId} · Item #{br.inspectionItemId}
-                </p>
+                {br.inspectionItem ? (
+                  <div className="p-3 bg-muted/50 rounded-lg space-y-1">
+                    <p className="font-medium text-sm">{br.inspectionItem.description}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="secondary" className="text-xs">
+                        {br.inspectionItem.category}
+                      </Badge>
+                      <Badge variant={
+                        br.inspectionItem.severity === 'safety' ? 'destructive' :
+                        br.inspectionItem.severity === 'major' ? 'default' : 'outline'
+                      } className="text-xs">
+                        {br.inspectionItem.severity}
+                      </Badge>
+                      {br.inspectionItem.location && (
+                        <span className="text-xs text-muted-foreground">{br.inspectionItem.location}</span>
+                      )}
+                      {br.inspectionItem.pageNumber && br.hasPdf && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => {
+                            setPdfViewerTxId(br.transactionId);
+                            setPdfViewerPage(br.inspectionItem!.pageNumber!);
+                          }}
+                        >
+                          <BookOpen className="h-3 w-3 mr-1" />
+                          Page {br.inspectionItem.pageNumber}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Transaction #{br.transactionId} · Item #{br.inspectionItemId}
+                  </p>
+                )}
                 {br.notes && <p className="text-sm">{br.notes}</p>}
                 {br.expiresAt && (
                   <p className="text-xs text-muted-foreground">
@@ -199,12 +242,23 @@ function BidRequestsTab({ bidRequests, profile }: {
                   </p>
                 )}
               </div>
-              {(br.status === 'pending' || br.status === 'viewed') && (
-                <Button size="sm" onClick={() => setSelectedRequest(br)}>
-                  <DollarSign className="h-4 w-4 mr-1" />
-                  Submit Bid
-                </Button>
-              )}
+              <div className="flex items-center gap-2 shrink-0 ml-4">
+                {br.hasPdf && (
+                  <Button variant="outline" size="sm" onClick={() => {
+                    setPdfViewerTxId(br.transactionId);
+                    setPdfViewerPage(br.inspectionItem?.pageNumber || null);
+                  }}>
+                    <Eye className="h-4 w-4 mr-1" />
+                    View Report
+                  </Button>
+                )}
+                {(br.status === 'pending' || br.status === 'viewed') && (
+                  <Button size="sm" onClick={() => setSelectedRequest(br)}>
+                    <DollarSign className="h-4 w-4 mr-1" />
+                    Submit Bid
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -262,6 +316,27 @@ function BidRequestsTab({ bidRequests, profile }: {
               {submitBidMutation.isPending ? "Submitting..." : "Submit Bid"}
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={pdfViewerTxId !== null} onOpenChange={() => { setPdfViewerTxId(null); setPdfViewerPage(null); }}>
+        <DialogContent className="max-w-4xl h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Inspection Report {pdfViewerPage ? `- Page ${pdfViewerPage}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            {pdfViewerTxId && (
+              <iframe
+                src={`/api/vendor/inspection-pdf/${pdfViewerTxId}${pdfViewerPage ? `#page=${pdfViewerPage}` : ""}`}
+                className="w-full h-full border rounded-lg"
+                style={{ minHeight: "60vh" }}
+                title="Inspection Report PDF"
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

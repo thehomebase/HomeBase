@@ -3,6 +3,7 @@ export interface ParsedInspectionItem {
   description: string;
   severity: string;
   location: string;
+  pageNumber?: number;
 }
 
 const SECTION_HEADERS: Record<string, string> = {
@@ -473,11 +474,24 @@ export function parseInspectionReport(text: string): ParsedInspectionItem[] {
   return deduplicateItems(allItems);
 }
 
+export function parseInspectionReportWithPages(pageTexts: Array<{ pageNumber: number; text: string }>): ParsedInspectionItem[] {
+  const allItems: ParsedInspectionItem[] = [];
+
+  for (const page of pageTexts) {
+    const items = parseInspectionReport(page.text);
+    for (const item of items) {
+      item.pageNumber = page.pageNumber;
+    }
+    allItems.push(...items);
+  }
+
+  return deduplicateItems(allItems);
+}
+
 export async function parseInspectionPdf(buffer: Buffer): Promise<ParsedInspectionItem[]> {
-  const { PDFParse } = await import("pdf-parse");
-  const uint8 = new Uint8Array(buffer);
-  const parser = new PDFParse(uint8 as any);
-  const pdfResult = await parser.getText();
-  const text = (pdfResult as any).text || "";
+  const pdfParseModule = await import("pdf-parse");
+  const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
+  const pdfData = await pdfParseFn(buffer);
+  const text = pdfData.text || "";
   return parseInspectionReport(text);
 }

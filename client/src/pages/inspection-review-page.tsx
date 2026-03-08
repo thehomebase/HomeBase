@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft, Upload, FileText, Plus, Trash2, Save, Send,
-  AlertTriangle, CheckCircle2, Circle, ShieldAlert, Loader2
+  AlertTriangle, CheckCircle2, Circle, ShieldAlert, Loader2, Eye, BookOpen
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -53,6 +53,7 @@ type ParsedItem = {
   description: string;
   severity: string;
   location: string;
+  pageNumber?: number;
   selected: boolean;
 };
 
@@ -84,6 +85,7 @@ export default function InspectionReviewPage() {
   const [selectedVendors, setSelectedVendors] = useState<Set<number>>(new Set());
   const [bulkSendMode, setBulkSendMode] = useState(false);
   const [addingManual, setAddingManual] = useState(false);
+  const [pdfViewerPage, setPdfViewerPage] = useState<number | null>(null);
   const [manualItem, setManualItem] = useState({
     category: "other",
     description: "",
@@ -224,6 +226,7 @@ export default function InspectionReviewPage() {
       description: item.description,
       severity: item.severity,
       location: item.location || null,
+      pageNumber: item.pageNumber || null,
       status: "approved",
       notes: null,
     }));
@@ -450,6 +453,11 @@ export default function InspectionReviewPage() {
                     />
                   </div>
                 </div>
+                {item.pageNumber && (
+                  <span className="text-xs text-muted-foreground shrink-0 mt-2">
+                    p.{item.pageNumber}
+                  </span>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -528,6 +536,17 @@ export default function InspectionReviewPage() {
                       <Badge variant="outline">{STATUS_LABELS[item.status] || item.status}</Badge>
                       {item.location && (
                         <span className="text-xs text-muted-foreground">{item.location}</span>
+                      )}
+                      {item.pageNumber && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => setPdfViewerPage(item.pageNumber!)}
+                        >
+                          <BookOpen className="h-3 w-3 mr-1" />
+                          Page {item.pageNumber}
+                        </Button>
                       )}
                     </div>
                     {item.notes && (
@@ -698,6 +717,25 @@ export default function InspectionReviewPage() {
               Send to {selectedVendors.size} Vendor{selectedVendors.size !== 1 ? "s" : ""}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={pdfViewerPage !== null} onOpenChange={() => setPdfViewerPage(null)}>
+        <DialogContent className="max-w-4xl h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Inspection Report {pdfViewerPage ? `- Page ${pdfViewerPage}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            <iframe
+              src={`/api/transactions/${transactionId}/inspection-pdf${pdfViewerPage ? `#page=${pdfViewerPage}` : ""}`}
+              className="w-full h-full border rounded-lg"
+              style={{ minHeight: "60vh" }}
+              title="Inspection Report PDF"
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </div>

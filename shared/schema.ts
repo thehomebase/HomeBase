@@ -206,7 +206,16 @@ export const inspectionItems = pgTable("inspection_items", {
   location: text("location"),
   status: text("status", { enum: ['pending_review', 'approved', 'sent_for_bids', 'bids_received', 'accepted', 'declined'] }).notNull().default('pending_review'),
   notes: text("notes"),
+  pageNumber: integer("page_number"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const inspectionPdfs = pgTable("inspection_pdfs", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").notNull(),
+  fileName: text("file_name").notNull(),
+  filePath: text("file_path").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 
 export const bidRequests = pgTable("bid_requests", {
@@ -487,6 +496,7 @@ export type EmailTracking = typeof emailTracking.$inferSelect;
 export type InsertEmailTracking = z.infer<typeof insertEmailTrackingSchema>;
 export type InspectionItem = typeof inspectionItems.$inferSelect;
 export type InsertInspectionItem = z.infer<typeof insertInspectionItemSchema>;
+export type InspectionPdf = typeof inspectionPdfs.$inferSelect;
 export type BidRequest = typeof bidRequests.$inferSelect;
 export type InsertBidRequest = z.infer<typeof insertBidRequestSchema>;
 export type Bid = typeof bids.$inferSelect;

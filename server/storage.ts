@@ -188,6 +188,10 @@ export interface IStorage {
   getBidsByContractor(contractorId: number): Promise<Bid[]>;
   updateBid(id: number, data: Partial<Bid>): Promise<Bid>;
 
+  // Inspection PDF operations
+  saveInspectionPdf(transactionId: number, fileName: string, filePath: string): Promise<void>;
+  getInspectionPdf(transactionId: number): Promise<{ fileName: string; filePath: string } | undefined>;
+
   // Contractor by vendor user
   getContractorByVendorUserId(vendorUserId: number): Promise<Contractor | undefined>;
 
@@ -2943,6 +2947,7 @@ export class DatabaseStorage implements IStorage {
       location: row.location ? String(row.location) : null,
       status: String(row.status),
       notes: row.notes ? String(row.notes) : null,
+      pageNumber: row.page_number ? Number(row.page_number) : null,
       createdAt: row.created_at ? new Date(row.created_at) : null,
     };
   }
@@ -2978,8 +2983,8 @@ export class DatabaseStorage implements IStorage {
   async createInspectionItem(item: InsertInspectionItem): Promise<InspectionItem> {
     try {
       const result = await db.execute(sql`
-        INSERT INTO inspection_items (transaction_id, category, description, severity, location, status, notes)
-        VALUES (${item.transactionId}, ${item.category}, ${item.description}, ${item.severity}, ${item.location || null}, ${item.status || 'pending_review'}, ${item.notes || null})
+        INSERT INTO inspection_items (transaction_id, category, description, severity, location, status, notes, page_number)
+        VALUES (${item.transactionId}, ${item.category}, ${item.description}, ${item.severity}, ${item.location || null}, ${item.status || 'pending_review'}, ${item.notes || null}, ${item.pageNumber || null})
         RETURNING *
       `);
       return this.mapInspectionItemRow(result.rows[0]);
@@ -3038,6 +3043,33 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error in deleteInspectionItem:', error);
       throw error;
+    }
+  }
+
+  async saveInspectionPdf(transactionId: number, fileName: string, filePath: string): Promise<void> {
+    try {
+      await db.execute(sql`DELETE FROM inspection_pdfs WHERE transaction_id = ${transactionId}`);
+      await db.execute(sql`
+        INSERT INTO inspection_pdfs (transaction_id, file_name, file_path)
+        VALUES (${transactionId}, ${fileName}, ${filePath})
+      `);
+    } catch (error) {
+      console.error('Error in saveInspectionPdf:', error);
+      throw error;
+    }
+  }
+
+  async getInspectionPdf(transactionId: number): Promise<{ fileName: string; filePath: string } | undefined> {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM inspection_pdfs WHERE transaction_id = ${transactionId} LIMIT 1`
+      );
+      if (!result.rows[0]) return undefined;
+      const row = result.rows[0] as any;
+      return { fileName: String(row.file_name), filePath: String(row.file_path) };
+    } catch (error) {
+      console.error('Error in getInspectionPdf:', error);
+      return undefined;
     }
   }
 
