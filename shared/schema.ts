@@ -752,3 +752,16 @@ export type AgentReview = typeof agentReviews.$inferSelect;
 export type InsertAgentReview = z.infer<typeof insertAgentReviewSchema>;
 export type VendorRating = typeof vendorRatings.$inferSelect;
 export type InsertVendorRating = z.infer<typeof insertVendorRatingSchema>;
+
+export const webauthnCredentials = pgTable("webauthn_credentials", {
+  id: text("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  publicKey: text("public_key").notNull(),
+  counter: integer("counter").notNull().default(0),
+  deviceType: text("device_type"),
+  backedUp: boolean("backed_up").default(false),
+  transports: text("transports"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type WebAuthnCredential = typeof webauthnCredentials.$inferSelect;

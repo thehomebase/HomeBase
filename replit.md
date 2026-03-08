@@ -56,6 +56,7 @@ Preferred communication style: Simple, everyday language.
 - **Mobile Bottom Navigation**: On mobile screens (below 768px), the sidebar is hidden and replaced with a fixed bottom tab bar. Role-based tabs (4 primary + "More" drawer with remaining links). Located in `client/src/components/mobile-bottom-nav.tsx`.
 - **Touch Behavior**: Tap highlight disabled, overscroll/bounce prevention, safe area handling for iPhone notch/home indicator, scoped user-select prevention on interactive elements only.
 - **Service Worker**: Cache-first for static assets, network-only for API calls, SPA navigation fallback to `/` for offline deep links. Only registered in production.
+- **Biometric Login (WebAuthn)**: Face ID / fingerprint authentication via Web Authentication API. Users register biometric credentials after logging in (sidebar or mobile "More" menu). Login page shows "Sign in with Face ID / Biometrics" button when device supports it. Session-scoped challenges with 2-minute TTL. DB table: `webauthn_credentials`. Key files: `client/src/components/biometric-setup.tsx`, `client/src/components/login-form.tsx`.
 - **Icons**: 192x192 and 512x512 square PNG icons in `client/public/` for PWA compliance.
 
 ## External Dependencies

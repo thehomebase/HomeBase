@@ -7,6 +7,10 @@ import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Fingerprint } from "lucide-react";
+import { startAuthentication } from "@simplewebauthn/browser";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export function LoginForm({
   className,
@@ -15,6 +19,9 @@ export function LoginForm({
   const { loginMutation, registerMutation } = useAuth();
   const [showRegister, setShowRegister] = useState(false);
   const [defaultReferralCode, setDefaultReferralCode] = useState("");
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -22,6 +29,12 @@ export function LoginForm({
     if (ref) {
       setDefaultReferralCode(ref);
       setShowRegister(true);
+    }
+
+    if (window.PublicKeyCredential) {
+      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then((available) => {
+        setBiometricAvailable(available);
+      });
     }
   }, []);
 
@@ -32,6 +45,33 @@ export function LoginForm({
       email: formData.get("email") as string,
       password: formData.get("password") as string,
     });
+  };
+
+  const handleBiometricLogin = async () => {
+    setBiometricLoading(true);
+    try {
+      const optionsRes = await apiRequest("POST", "/api/webauthn/login-options", {});
+      const options = await optionsRes.json();
+
+      const authResponse = await startAuthentication({ optionsJSON: options });
+
+      const verifyRes = await apiRequest("POST", "/api/webauthn/login-verify", {
+        response: authResponse,
+      });
+      const result = await verifyRes.json();
+
+      if (result.verified) {
+        queryClient.setQueryData(["/api/user"], result.user);
+        toast({ title: "Welcome back!", description: "Signed in with biometrics." });
+      }
+    } catch (error: any) {
+      const message = error?.message || "Biometric login failed";
+      if (!message.includes("cancelled") && !message.includes("AbortError")) {
+        toast({ title: "Login failed", description: message, variant: "destructive" });
+      }
+    } finally {
+      setBiometricLoading(false);
+    }
   };
 
   const handleRegister = (e: React.FormEvent<HTMLFormElement>) => {
@@ -93,6 +133,29 @@ export function LoginForm({
           <Button type="submit" className="w-full dark:bg-white dark:text-black" disabled={loginMutation.isPending}>
             Login
           </Button>
+
+          {biometricAvailable && (
+            <>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">or</span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handleBiometricLogin}
+                disabled={biometricLoading}
+              >
+                <Fingerprint className="h-5 w-5" />
+                {biometricLoading ? "Verifying..." : "Sign in with Face ID / Biometrics"}
+              </Button>
+            </>
+          )}
         </div>
       </form>
 

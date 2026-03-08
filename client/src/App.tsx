@@ -78,6 +78,7 @@ import LeadGenerationPage from "@/pages/lead-generation-page";
 import LeadSubmitPage from "@/pages/lead-submit-page";
 import VendorRatingsPage from "@/pages/vendor-ratings-page";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { BiometricSetupButton } from "@/components/biometric-setup";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -337,6 +338,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                       )}
                       {isSidebarOpen && <span className="ml-2">Compact View</span>}
                     </Button>
+                    <BiometricSetupButton compact={!isSidebarOpen} />
                     <Button
                       variant="outline"
                       size={!isSidebarOpen ? "icon" : "sm"}

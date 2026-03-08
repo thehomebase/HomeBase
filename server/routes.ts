@@ -11,6 +11,15 @@ import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, type EmailAttachment } from "./gmail-service";
 import { randomUUID } from "crypto";
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from "@simplewebauthn/server";
+import type {
+  AuthenticatorTransportFuture,
+} from "@simplewebauthn/server";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -90,6 +99,210 @@ const BUYER_CHECKLIST_ITEMS = [
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
+
+  const rpName = "Home-Base";
+  const getWebAuthnConfig = (req: any) => {
+    const host = req.get("host") || "localhost:5000";
+    const rpID = host.split(":")[0];
+    const protocol = req.protocol || (host.includes("localhost") ? "http" : "https");
+    const origin = `${protocol}://${host}`;
+    return { rpID, origin };
+  };
+
+  app.post("/api/webauthn/register-options", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const userCredentials = await storage.getWebAuthnCredentialsByUser(req.user.id);
+      const excludeCredentials = userCredentials.map((cred) => ({
+        id: cred.id,
+        type: "public-key" as const,
+        transports: cred.transports
+          ? (cred.transports.split(",") as AuthenticatorTransportFuture[])
+          : undefined,
+      }));
+
+      const { rpID } = getWebAuthnConfig(req);
+      const options = await generateRegistrationOptions({
+        rpName,
+        rpID,
+        userName: req.user.email,
+        userID: new TextEncoder().encode(String(req.user.id)),
+        attestationType: "none",
+        excludeCredentials,
+        authenticatorSelection: {
+          residentKey: "preferred",
+          userVerification: "preferred",
+        },
+      });
+
+      (req.session as any).webauthnChallenge = options.challenge;
+      (req.session as any).webauthnChallengeExpiry = Date.now() + 120000;
+      res.json(options);
+    } catch (error) {
+      console.error("WebAuthn register options error:", error);
+      res.status(500).json({ error: "Failed to generate registration options" });
+    }
+  });
+
+  app.post("/api/webauthn/register-verify", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const expectedChallenge = (req.session as any).webauthnChallenge;
+      const expiry = (req.session as any).webauthnChallengeExpiry;
+      if (!expectedChallenge || !expiry || Date.now() > expiry) {
+        return res.status(400).json({ error: "No registration challenge found or challenge expired" });
+      }
+
+      const { rpID, origin } = getWebAuthnConfig(req);
+      const verification = await verifyRegistrationResponse({
+        response: req.body,
+        expectedChallenge,
+        expectedOrigin: origin,
+        expectedRPID: rpID,
+      });
+
+      if (!verification.verified || !verification.registrationInfo) {
+        return res.status(400).json({ error: "Registration verification failed" });
+      }
+
+      const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+
+      await storage.createWebAuthnCredential({
+        id: credential.id,
+        userId: req.user.id,
+        publicKey: Buffer.from(credential.publicKey).toString("base64"),
+        counter: credential.counter,
+        deviceType: credentialDeviceType,
+        backedUp: credentialBackedUp,
+        transports: credential.transports
+          ? credential.transports.join(",")
+          : undefined,
+      });
+
+      delete (req.session as any).webauthnChallenge;
+      delete (req.session as any).webauthnChallengeExpiry;
+      res.json({ verified: true });
+    } catch (error) {
+      delete (req.session as any).webauthnChallenge;
+      delete (req.session as any).webauthnChallengeExpiry;
+      console.error("WebAuthn register verify error:", error);
+      res.status(500).json({ error: "Registration verification failed" });
+    }
+  });
+
+  app.post("/api/webauthn/login-options", async (req, res) => {
+    try {
+      const { rpID } = getWebAuthnConfig(req);
+
+      const options = await generateAuthenticationOptions({
+        rpID,
+        userVerification: "preferred",
+      });
+
+      (req.session as any).webauthnChallenge = options.challenge;
+      (req.session as any).webauthnChallengeExpiry = Date.now() + 120000;
+
+      res.json(options);
+    } catch (error) {
+      console.error("WebAuthn login options error:", error);
+      res.status(500).json({ error: "Failed to generate authentication options" });
+    }
+  });
+
+  app.post("/api/webauthn/login-verify", async (req, res) => {
+    try {
+      const { response: authResponse } = req.body;
+      if (!authResponse?.id) {
+        return res.status(400).json({ error: "Invalid authentication response" });
+      }
+
+      const expectedChallenge = (req.session as any).webauthnChallenge;
+      const expiry = (req.session as any).webauthnChallengeExpiry;
+      if (!expectedChallenge || !expiry || Date.now() > expiry) {
+        return res.status(400).json({ error: "No authentication challenge found or challenge expired" });
+      }
+
+      const credential = await storage.getWebAuthnCredential(authResponse.id);
+      if (!credential) {
+        return res.status(400).json({ error: "Credential not found" });
+      }
+
+      const { rpID, origin } = getWebAuthnConfig(req);
+      const verification = await verifyAuthenticationResponse({
+        response: authResponse,
+        expectedChallenge,
+        expectedOrigin: origin,
+        expectedRPID: rpID,
+        credential: {
+          id: credential.id,
+          publicKey: new Uint8Array(Buffer.from(credential.publicKey, "base64")),
+          counter: credential.counter,
+          transports: credential.transports
+            ? (credential.transports.split(",") as AuthenticatorTransportFuture[])
+            : undefined,
+        },
+      });
+
+      delete (req.session as any).webauthnChallenge;
+      delete (req.session as any).webauthnChallengeExpiry;
+
+      if (!verification.verified) {
+        return res.status(400).json({ error: "Authentication failed" });
+      }
+
+      await storage.updateWebAuthnCredentialCounter(
+        credential.id,
+        verification.authenticationInfo.newCounter
+      );
+
+      const user = await storage.getUser(credential.userId);
+      if (!user) {
+        return res.status(400).json({ error: "User not found" });
+      }
+
+      req.login(user, (err) => {
+        if (err) {
+          console.error("WebAuthn login error:", err);
+          return res.status(500).json({ error: "Login failed" });
+        }
+        const { password, ...userWithoutPassword } = user;
+        res.json({ verified: true, user: userWithoutPassword });
+      });
+    } catch (error) {
+      delete (req.session as any).webauthnChallenge;
+      delete (req.session as any).webauthnChallengeExpiry;
+      console.error("WebAuthn login verify error:", error);
+      res.status(500).json({ error: "Authentication verification failed" });
+    }
+  });
+
+  app.get("/api/webauthn/credentials", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const credentials = await storage.getWebAuthnCredentialsByUser(req.user.id);
+      res.json(credentials.map((c) => ({
+        id: c.id,
+        deviceType: c.deviceType,
+        backedUp: c.backedUp,
+        createdAt: c.createdAt,
+      })));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch credentials" });
+    }
+  });
+
+  app.delete("/api/webauthn/credentials/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const credential = await storage.getWebAuthnCredential(req.params.id);
+      if (!credential) return res.status(404).json({ error: "Credential not found" });
+      if (credential.userId !== req.user.id) return res.sendStatus(403);
+      await storage.deleteWebAuthnCredential(req.params.id);
+      res.sendStatus(200);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete credential" });
+    }
+  });
 
   // Clients
   app.get("/api/clients", async (req, res) => {

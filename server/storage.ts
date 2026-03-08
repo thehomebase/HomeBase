@@ -43,6 +43,7 @@ import {
   type LeadRotation, type InsertLeadRotation,
   type AgentReview, type InsertAgentReview,
   type VendorRating, type InsertVendorRating,
+  type WebAuthnCredential,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -308,6 +309,12 @@ export interface IStorage {
   getVendorRatingsByAgent(agentId: number): Promise<VendorRating[]>;
   deleteVendorRating(id: number): Promise<void>;
   getVendorPerformanceStats(contractorId: number): Promise<{ avgOverall: number; avgQuality: number; avgCommunication: number; avgTimeliness: number; avgValue: number; totalRatings: number; recommendRate: number }>;
+
+  createWebAuthnCredential(credential: { id: string; userId: number; publicKey: string; counter: number; deviceType?: string; backedUp?: boolean; transports?: string }): Promise<WebAuthnCredential>;
+  getWebAuthnCredentialsByUser(userId: number): Promise<WebAuthnCredential[]>;
+  getWebAuthnCredential(id: string): Promise<WebAuthnCredential | undefined>;
+  updateWebAuthnCredentialCounter(id: string, counter: number): Promise<void>;
+  deleteWebAuthnCredential(id: string): Promise<void>;
 
 }
 
@@ -4073,6 +4080,63 @@ export class DatabaseStorage implements IStorage {
       totalRatings: row ? Number(row.total_ratings) : 0,
       recommendRate: row ? Number(Number(row.recommend_rate).toFixed(1)) : 0,
     };
+  }
+
+  async createWebAuthnCredential(credential: { id: string; userId: number; publicKey: string; counter: number; deviceType?: string; backedUp?: boolean; transports?: string }): Promise<WebAuthnCredential> {
+    const result = await db.execute(sql`
+      INSERT INTO webauthn_credentials (id, user_id, public_key, counter, device_type, backed_up, transports)
+      VALUES (${credential.id}, ${credential.userId}, ${credential.publicKey}, ${credential.counter}, ${credential.deviceType || null}, ${credential.backedUp || false}, ${credential.transports || null})
+      RETURNING *
+    `);
+    const row = result.rows[0] as any;
+    return {
+      id: row.id,
+      userId: row.user_id,
+      publicKey: row.public_key,
+      counter: row.counter,
+      deviceType: row.device_type,
+      backedUp: row.backed_up,
+      transports: row.transports,
+      createdAt: row.created_at,
+    };
+  }
+
+  async getWebAuthnCredentialsByUser(userId: number): Promise<WebAuthnCredential[]> {
+    const result = await db.execute(sql`SELECT * FROM webauthn_credentials WHERE user_id = ${userId}`);
+    return result.rows.map((row: any) => ({
+      id: row.id,
+      userId: row.user_id,
+      publicKey: row.public_key,
+      counter: row.counter,
+      deviceType: row.device_type,
+      backedUp: row.backed_up,
+      transports: row.transports,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async getWebAuthnCredential(id: string): Promise<WebAuthnCredential | undefined> {
+    const result = await db.execute(sql`SELECT * FROM webauthn_credentials WHERE id = ${id}`);
+    const row = result.rows[0] as any;
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      userId: row.user_id,
+      publicKey: row.public_key,
+      counter: row.counter,
+      deviceType: row.device_type,
+      backedUp: row.backed_up,
+      transports: row.transports,
+      createdAt: row.created_at,
+    };
+  }
+
+  async updateWebAuthnCredentialCounter(id: string, counter: number): Promise<void> {
+    await db.execute(sql`UPDATE webauthn_credentials SET counter = ${counter} WHERE id = ${id}`);
+  }
+
+  async deleteWebAuthnCredential(id: string): Promise<void> {
+    await db.execute(sql`DELETE FROM webauthn_credentials WHERE id = ${id}`);
   }
 
 }

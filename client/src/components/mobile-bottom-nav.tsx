@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
+import { BiometricSetupButton } from "@/components/biometric-setup";
 
 interface NavItem {
   icon: LucideIcon;
@@ -147,7 +148,8 @@ export function MobileBottomNav() {
                 </Link>
               ))}
             </div>
-            <div className="p-3 border-t">
+            <div className="p-3 border-t space-y-2">
+              <BiometricSetupButton />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="flex items-center gap-3 w-full p-3 rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-transform"
