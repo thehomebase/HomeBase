@@ -35,6 +35,12 @@ function render() {
 
 render();
 
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
 // Enhanced Vite HMR setup with explicit handlers
 if (import.meta.hot) {
   import.meta.hot.accept('./App', (newApp) => {

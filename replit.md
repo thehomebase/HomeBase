@@ -51,6 +51,13 @@ Preferred communication style: Simple, everyday language.
 - **Agent Reviews & Testimonials**: Clients and other users can leave star ratings (1-5) and written reviews for agents. Public agent profiles showing average rating and all reviews. "Top Agents" discovery page ranks agents by rating. Self-review prevention and ownership-based delete. DB table: `agent_reviews`. Key files: `client/src/pages/agent-reviews-page.tsx`.
 - **Stripe Billing & Subscriptions**: Stripe integration for payment processing. Agent Plan ($49/mo) and Vendor Plan ($29/mo) subscription products. Stripe Checkout for subscriptions and payment method setup. Billing portal for subscription management. Stripe schema auto-managed by `stripe-replit-sync`. Webhook route registered before `express.json()`. Key files: `server/stripeClient.ts`, `server/webhookHandlers.ts`, `server/seed-products.ts`, `client/src/pages/billing-page.tsx`.
 
+### PWA & Mobile App Experience
+- **Progressive Web App**: Manifest, service worker, and meta tags configured for installability on iOS and Android. App launches in standalone mode without browser chrome.
+- **Mobile Bottom Navigation**: On mobile screens (below 768px), the sidebar is hidden and replaced with a fixed bottom tab bar. Role-based tabs (4 primary + "More" drawer with remaining links). Located in `client/src/components/mobile-bottom-nav.tsx`.
+- **Touch Behavior**: Tap highlight disabled, overscroll/bounce prevention, safe area handling for iPhone notch/home indicator, scoped user-select prevention on interactive elements only.
+- **Service Worker**: Cache-first for static assets, network-only for API calls, SPA navigation fallback to `/` for offline deep links. Only registered in production.
+- **Icons**: 192x192 and 512x512 square PNG icons in `client/public/` for PWA compliance.
+
 ## External Dependencies
 
 - **Neon PostgreSQL**: Serverless database.

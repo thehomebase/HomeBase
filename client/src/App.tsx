@@ -77,6 +77,7 @@ import { TopAgentsPage, AgentReviewsPage } from "@/pages/agent-reviews-page";
 import LeadGenerationPage from "@/pages/lead-generation-page";
 import LeadSubmitPage from "@/pages/lead-submit-page";
 import VendorRatingsPage from "@/pages/vendor-ratings-page";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
@@ -97,14 +98,14 @@ function Layout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
       <div className="flex min-h-screen bg-background">
-        {user && (
+        {user && !isMobile && (
           <div className={`flex-none transition-all duration-200 ease-in-out ${
-            isMobile ? 'w-[60px]' : (isSidebarOpen ? 'w-[220px]' : 'w-[60px]')
+            isSidebarOpen ? 'w-[220px]' : 'w-[60px]'
           }`}>
             <Sidebar
               side="left"
-              collapsible={isMobile ? "none" : "icon"}
-              className="fixed inset-y-0 left-0 z-40 border-r bg-background w-[60px] md:w-auto"
+              collapsible="icon"
+              className="fixed inset-y-0 left-0 z-40 border-r bg-background"
             >
               <SidebarHeader>
                 <div className="flex items-center justify-between p-2">
@@ -352,10 +353,11 @@ function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <main className="flex-1 min-h-screen w-full overflow-x-hidden relative">
-          <div className="w-full">
+          <div className={`w-full ${isMobile && user ? 'pb-20' : ''}`}>
             {children}
           </div>
         </main>
+        {isMobile && <MobileBottomNav />}
       </div>
     </SidebarProvider>
   );
