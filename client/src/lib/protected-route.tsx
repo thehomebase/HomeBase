@@ -39,6 +39,14 @@ export function ProtectedRoute({
     );
   }
 
+  if (user.emailVerified === false && path !== "/verify-email") {
+    return (
+      <Route path={path}>
+        <Redirect to="/verify-email" />
+      </Route>
+    );
+  }
+
   return (
     <Route path={path}>
       <Component />

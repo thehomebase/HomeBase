@@ -103,6 +103,25 @@ const BUYER_CHECKLIST_ITEMS = [
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
+  const verificationExemptPaths = new Set([
+    '/api/user',
+    '/api/login',
+    '/api/logout',
+    '/api/register',
+    '/api/verify-email',
+    '/api/resend-verification',
+  ]);
+
+  app.use('/api', (req, res, next) => {
+    if (verificationExemptPaths.has(req.path)) return next();
+    if (!req.isAuthenticated()) return next();
+    const user = req.user as any;
+    if (user && user.emailVerified === false) {
+      return res.status(403).json({ error: "Email verification required" });
+    }
+    next();
+  });
+
   app.get("/marketing-videos/:filename", (req, res) => {
     const filename = req.params.filename.replace(/[^a-zA-Z0-9_\-\.]/g, "");
     if (!filename.endsWith(".mp4")) return res.status(400).send("Invalid file");
@@ -5701,6 +5720,128 @@ export function registerRoutes(app: Express): Server {
       res.json(result.rows);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch lenders' });
+    }
+  });
+
+  app.post("/api/client-invitations", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+
+    try {
+      const { email, firstName, lastName, clientRecordId } = req.body;
+      if (!email) return res.status(400).json({ error: "Email is required" });
+
+      if (clientRecordId) {
+        const clients = await storage.getClients(req.user.id);
+        const ownsClient = clients.some((c: any) => c.id === clientRecordId);
+        if (!ownsClient) {
+          return res.status(403).json({ error: "Client record does not belong to you" });
+        }
+      }
+
+      const token = randomUUID();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      const invitation = await storage.createClientInvitation({
+        agentId: req.user.id,
+        email: email.toLowerCase().trim(),
+        firstName: firstName || null,
+        lastName: lastName || null,
+        token,
+        status: "pending",
+        clientRecordId: clientRecordId || null,
+        expiresAt,
+      });
+
+      res.status(201).json(invitation);
+    } catch (error) {
+      console.error("Error creating client invitation:", error);
+      res.status(500).json({ error: "Failed to create invitation" });
+    }
+  });
+
+  app.get("/api/client-invitations", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      if (req.user.role === "agent") {
+        const invitations = await storage.getClientInvitationsByAgent(req.user.id);
+        res.json(invitations);
+      } else {
+        const invitations = await storage.getClientInvitationsByEmail(req.user.email);
+        res.json(invitations);
+      }
+    } catch (error) {
+      console.error("Error fetching client invitations:", error);
+      res.status(500).json({ error: "Failed to fetch invitations" });
+    }
+  });
+
+  app.get("/api/client-invitations/pending", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const invitations = await storage.getClientInvitationsByEmail(req.user.email);
+      const pending = invitations.filter(inv => inv.status === "pending" && new Date(inv.expiresAt) > new Date());
+
+      const enriched = await Promise.all(pending.map(async (inv) => {
+        const agent = await storage.getUser(inv.agentId);
+        return {
+          ...inv,
+          agentName: agent ? `${agent.firstName} ${agent.lastName}` : "Unknown Agent",
+        };
+      }));
+
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching pending invitations:", error);
+      res.status(500).json({ error: "Failed to fetch pending invitations" });
+    }
+  });
+
+  app.post("/api/client-invitations/:token/accept", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const invitation = await storage.getClientInvitationByToken(req.params.token);
+      if (!invitation) return res.status(404).json({ error: "Invitation not found" });
+      if (invitation.status !== "pending") return res.status(400).json({ error: "Invitation already processed" });
+      if (new Date(invitation.expiresAt) < new Date()) return res.status(400).json({ error: "Invitation has expired" });
+      if (invitation.email.toLowerCase() !== req.user.email.toLowerCase()) {
+        return res.status(403).json({ error: "This invitation is not for your email address" });
+      }
+
+      await storage.updateUser(req.user.id, {
+        agentId: invitation.agentId,
+        clientRecordId: invitation.clientRecordId,
+      });
+
+      const updated = await storage.updateClientInvitationStatus(invitation.id, "accepted", invitation.clientRecordId || undefined);
+
+      const user = await storage.getUser(req.user.id);
+
+      res.json({ invitation: updated, user });
+    } catch (error) {
+      console.error("Error accepting client invitation:", error);
+      res.status(500).json({ error: "Failed to accept invitation" });
+    }
+  });
+
+  app.post("/api/client-invitations/:token/decline", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const invitation = await storage.getClientInvitationByToken(req.params.token);
+      if (!invitation) return res.status(404).json({ error: "Invitation not found" });
+      if (invitation.email.toLowerCase() !== req.user.email.toLowerCase()) {
+        return res.status(403).json({ error: "This invitation is not for your email address" });
+      }
+
+      const updated = await storage.updateClientInvitationStatus(invitation.id, "declined");
+      res.json(updated);
+    } catch (error) {
+      console.error("Error declining client invitation:", error);
+      res.status(500).json({ error: "Failed to decline invitation" });
     }
   });
 

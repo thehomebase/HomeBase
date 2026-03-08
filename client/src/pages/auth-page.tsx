@@ -8,7 +8,13 @@ export default function AuthPage() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (user) setLocation("/dashboard");
+    if (user) {
+      if (user.emailVerified === false) {
+        setLocation("/verify-email");
+      } else {
+        setLocation("/dashboard");
+      }
+    }
   }, [user, setLocation]);
 
   return (

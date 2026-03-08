@@ -84,6 +84,7 @@ import FindContractorPage from "@/pages/find-contractor-page";
 import VendorRatingsPage from "@/pages/vendor-ratings-page";
 import BiometricSettingsPage from "@/pages/biometric-settings-page";
 import LandingPage from "@/pages/landing-page";
+import VerifyEmailPage from "@/pages/verify-email-page";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { BiometricSetupButton } from "@/components/biometric-setup";
 import { useLeadAlerts } from "@/hooks/use-lead-alerts";
@@ -501,6 +502,7 @@ function Router() {
       <Route path="/agents/:agentId/reviews" component={AgentReviewsPage} />
       <Route path="/top-agents" component={TopAgentsPage} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/messages" component={MessagesPage} />
       <Route path="/property-search">
         <ProtectedRoute path="/property-search" component={PropertySearchPage} />

@@ -27,6 +27,10 @@ export const users = pgTable("users", {
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   dashboardPreferences: json("dashboard_preferences"),
+  emailVerified: boolean("email_verified").default(false),
+  emailVerificationToken: text("email_verification_token"),
+  emailVerificationExpires: timestamp("email_verification_expires"),
+  registrationIp: text("registration_ip"),
 });
 
 export const clients = pgTable("clients", {
@@ -899,3 +903,24 @@ export type LenderChecklist = typeof lenderChecklists.$inferSelect;
 export type InsertLenderChecklist = z.infer<typeof insertLenderChecklistSchema>;
 export type LenderChecklistMapping = typeof lenderChecklistMappings.$inferSelect;
 export type InsertLenderChecklistMapping = z.infer<typeof insertLenderChecklistMappingSchema>;
+
+export const clientInvitations = pgTable("client_invitations", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  email: text("email").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  token: text("token").notNull().unique(),
+  status: text("status").notNull().default("pending"),
+  clientRecordId: integer("client_record_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+export const insertClientInvitationSchema = createInsertSchema(clientInvitations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ClientInvitation = typeof clientInvitations.$inferSelect;
+export type InsertClientInvitation = z.infer<typeof insertClientInvitationSchema>;

@@ -17,11 +17,12 @@ import {
 import {
   LayoutDashboard, TrendingUp, TrendingDown, Users, FileText, MessageSquare,
   Target, DollarSign, CalendarClock, ArrowRight, Plus, Send, Settings,
-  X, Clock, AlertTriangle, Briefcase, Zap, CheckCircle2, Minus, Phone, Mail, TrendingUp as TrendUp
+  X, Clock, AlertTriangle, Briefcase, Zap, CheckCircle2, Minus, Phone, Mail, TrendingUp as TrendUp, UserPlus
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const AGENT_WIDGETS = [
   { id: "pipeline", label: "Deal Pipeline" },
@@ -592,6 +593,94 @@ function SettingsDialog({ role, enabledWidgets, onSave }: {
   );
 }
 
+function PendingInvitationsBanner() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: pendingInvitations = [] } = useQuery<any[]>({
+    queryKey: ["/api/client-invitations/pending"],
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: async (token: string) => {
+      const res = await apiRequest("POST", `/api/client-invitations/${token}/accept`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to accept invitation");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/client-invitations/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      toast({ title: "Invitation Accepted", description: "You are now linked to your agent." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: async (token: string) => {
+      const res = await apiRequest("POST", `/api/client-invitations/${token}/decline`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to decline invitation");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/client-invitations/pending"] });
+      toast({ title: "Invitation Declined" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  if (pendingInvitations.length === 0) return null;
+
+  return (
+    <div className="mb-6 space-y-3">
+      {pendingInvitations.map((inv: any) => (
+        <Card key={inv.id} className="p-4 border-primary/30 bg-primary/5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <UserPlus className="h-5 w-5 text-primary flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm">Agent Invitation</p>
+                <p className="text-sm text-muted-foreground">
+                  <strong>{inv.agentName}</strong> has invited you to connect as their client on HomeBase.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => declineMutation.mutate(inv.token)}
+                disabled={declineMutation.isPending || acceptMutation.isPending}
+              >
+                Decline
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => acceptMutation.mutate(inv.token)}
+                disabled={acceptMutation.isPending || declineMutation.isPending}
+              >
+                {acceptMutation.isPending ? "Accepting..." : "Accept"}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -667,6 +756,8 @@ export default function DashboardPage() {
           onSave={(widgets) => prefsMutation.mutate(widgets)}
         />
       </div>
+
+      <PendingInvitationsBanner />
 
       {role === "agent" && (
         <>

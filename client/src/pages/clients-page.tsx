@@ -21,10 +21,10 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertClientSchema, type Client, type InsertClient } from "@shared/schema";
+import { insertClientSchema, type Client, type InsertClient, type ClientInvitation } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check, Upload, FileSpreadsheet, Info, AlertTriangle, MessageSquare } from "lucide-react";
+import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check, Upload, FileSpreadsheet, Info, AlertTriangle, MessageSquare, Send, UserPlus, Clock } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -941,6 +941,11 @@ export default function ClientsPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteFirstName, setInviteFirstName] = useState("");
+  const [inviteLastName, setInviteLastName] = useState("");
+  const [inviteClientRecordId, setInviteClientRecordId] = useState<number | null>(null);
 
   const handleImportClients = async () => {
     if (!importFile) return;
@@ -985,6 +990,51 @@ export default function ClientsPage() {
     queryKey: ["/api/clients"],
     enabled: !!user,
   });
+
+  const { data: invitations = [] } = useQuery<ClientInvitation[]>({
+    queryKey: ["/api/client-invitations"],
+    enabled: !!user && user.role === "agent",
+  });
+
+  const inviteClientMutation = useMutation({
+    mutationFn: async (data: { email: string; firstName?: string; lastName?: string; clientRecordId?: number | null }) => {
+      const response = await apiRequest("POST", "/api/client-invitations", data);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to send invitation");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/client-invitations"] });
+      setIsInviteDialogOpen(false);
+      setInviteEmail("");
+      setInviteFirstName("");
+      setInviteLastName("");
+      setInviteClientRecordId(null);
+      toast({
+        title: "Invitation Sent",
+        description: "Client invitation has been created successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSendInvite = () => {
+    if (!inviteEmail.trim()) return;
+    inviteClientMutation.mutate({
+      email: inviteEmail.trim(),
+      firstName: inviteFirstName.trim() || undefined,
+      lastName: inviteLastName.trim() || undefined,
+      clientRecordId: inviteClientRecordId,
+    });
+  };
 
   const allLabels = Array.from(
     new Set(clients.flatMap(client => client.labels || []))
@@ -1172,6 +1222,78 @@ export default function ClientsPage() {
                   </DialogContent>
                 </Dialog>
                 
+                <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="whitespace-nowrap font-bold">
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Invite
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Invite Client to HomeBase</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Send an invitation to a client so they can create an account and link to you as their agent.
+                      </p>
+                      <div className="space-y-2">
+                        <Label>Email Address *</Label>
+                        <Input
+                          type="email"
+                          placeholder="client@email.com"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-2">
+                          <Label>First Name</Label>
+                          <Input
+                            placeholder="John"
+                            value={inviteFirstName}
+                            onChange={(e) => setInviteFirstName(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Last Name</Label>
+                          <Input
+                            placeholder="Doe"
+                            value={inviteLastName}
+                            onChange={(e) => setInviteLastName(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Link to Existing Client Record</Label>
+                        <select
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={inviteClientRecordId ?? ""}
+                          onChange={(e) => setInviteClientRecordId(e.target.value ? Number(e.target.value) : null)}
+                        >
+                          <option value="">None (create link later)</option>
+                          {clients.map((c) => (
+                            <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.email ? ` (${c.email})` : ''}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setIsInviteDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleSendInvite}
+                          disabled={!inviteEmail.trim() || inviteClientMutation.isPending}
+                          className="font-bold"
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          {inviteClientMutation.isPending ? "Sending..." : "Send Invitation"}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button className="whitespace-nowrap font-bold">
@@ -1396,6 +1518,47 @@ export default function ClientsPage() {
         {/* Removed duplicate "Add Client" button */}
 
       </div>
+
+      {user?.role === "agent" && invitations.length > 0 && (
+        <Card className="w-full mb-4">
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <UserPlus className="h-4 w-4" />
+              Client Invitations ({invitations.filter(i => i.status === 'pending').length} pending)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 pt-0">
+            <div className="space-y-2">
+              {invitations.slice(0, 5).map((inv) => (
+                <div key={inv.id} className="flex items-center justify-between text-sm border rounded-md px-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <span className="font-medium">{inv.firstName && inv.lastName ? `${inv.firstName} ${inv.lastName}` : inv.email}</span>
+                      {inv.firstName && inv.lastName && <span className="text-muted-foreground ml-2">({inv.email})</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      inv.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      inv.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {inv.status}
+                    </span>
+                    {inv.status === 'pending' && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Expires {format(new Date(inv.expiresAt), 'MMM d')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="w-full min-w-0 overflow-hidden">
         <div className="w-full overflow-x-auto">

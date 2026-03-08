@@ -52,6 +52,7 @@ import {
   type LenderTransaction, type InsertLenderTransaction,
   type LenderChecklist, type InsertLenderChecklist,
   type LenderChecklistMapping, type InsertLenderChecklistMapping,
+  type ClientInvitation, type InsertClientInvitation,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -378,6 +379,12 @@ export interface IStorage {
   getLenderChecklistMappings(lenderTransactionId: number): Promise<LenderChecklistMapping[]>;
   createLenderChecklistMapping(data: InsertLenderChecklistMapping): Promise<LenderChecklistMapping>;
 
+  createClientInvitation(data: InsertClientInvitation): Promise<ClientInvitation>;
+  getClientInvitationsByAgent(agentId: number): Promise<ClientInvitation[]>;
+  getClientInvitationByToken(token: string): Promise<ClientInvitation | undefined>;
+  getClientInvitationsByEmail(email: string): Promise<ClientInvitation[]>;
+  updateClientInvitationStatus(id: number, status: string, clientRecordId?: number): Promise<ClientInvitation>;
+
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -461,6 +468,11 @@ export class DatabaseStorage implements IStorage {
         claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null,
         stripeCustomerId: user.stripeCustomerId ? String(user.stripeCustomerId) : null,
         stripeSubscriptionId: user.stripeSubscriptionId ? String(user.stripeSubscriptionId) : null,
+        dashboardPreferences: user.dashboardPreferences ?? null,
+        emailVerified: user.emailVerified ?? false,
+        emailVerificationToken: user.emailVerificationToken ?? null,
+        emailVerificationExpires: user.emailVerificationExpires ?? null,
+        registrationIp: user.registrationIp ?? null,
       };
     } catch (error) {
       console.error('Error in getUser:', error);
@@ -486,7 +498,14 @@ export class DatabaseStorage implements IStorage {
         agentId: user.agentId ? Number(user.agentId) : null,
         clientRecordId: user.clientRecordId ? Number(user.clientRecordId) : null,
         claimedTransactionId: user.claimedTransactionId ? Number(user.claimedTransactionId) : null,
-        claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null
+        claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null,
+        stripeCustomerId: user.stripeCustomerId ? String(user.stripeCustomerId) : null,
+        stripeSubscriptionId: user.stripeSubscriptionId ? String(user.stripeSubscriptionId) : null,
+        dashboardPreferences: user.dashboardPreferences ?? null,
+        emailVerified: user.emailVerified ?? false,
+        emailVerificationToken: user.emailVerificationToken ?? null,
+        emailVerificationExpires: user.emailVerificationExpires ?? null,
+        registrationIp: user.registrationIp ?? null,
       };
     } catch (error) {
       console.error('Error in getUserByEmail:', error);
@@ -512,7 +531,9 @@ export class DatabaseStorage implements IStorage {
           agentId: null,
           clientRecordId: null,
           claimedTransactionId: null,
-          claimedAccessCode: null
+          claimedAccessCode: null,
+          emailVerified: false,
+          registrationIp: (insertUser as any).registrationIp || null,
         })
         .returning();
 
@@ -530,7 +551,14 @@ export class DatabaseStorage implements IStorage {
         agentId: user.agentId ? Number(user.agentId) : null,
         clientRecordId: user.clientRecordId ? Number(user.clientRecordId) : null,
         claimedTransactionId: user.claimedTransactionId ? Number(user.claimedTransactionId) : null,
-        claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null
+        claimedAccessCode: user.claimedAccessCode ? String(user.claimedAccessCode) : null,
+        stripeCustomerId: user.stripeCustomerId ? String(user.stripeCustomerId) : null,
+        stripeSubscriptionId: user.stripeSubscriptionId ? String(user.stripeSubscriptionId) : null,
+        dashboardPreferences: user.dashboardPreferences ?? null,
+        emailVerified: user.emailVerified ?? false,
+        emailVerificationToken: user.emailVerificationToken ?? null,
+        emailVerificationExpires: user.emailVerificationExpires ?? null,
+        registrationIp: user.registrationIp ?? null,
       };
     } catch (error) {
       console.error('Error in createUser:', error);
@@ -2605,7 +2633,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error('Failed to update user');
       }
 
-      const user = result.rows[0];
+      const user = result.rows[0] as any;
       return {
         id: Number(user.id),
         email: String(user.email),
@@ -2614,8 +2642,16 @@ export class DatabaseStorage implements IStorage {
         lastName: String(user.last_name),
         role: String(user.role),
         agentId: user.agent_id ? Number(user.agent_id) : null,
+        clientRecordId: user.client_record_id ? Number(user.client_record_id) : null,
         claimedTransactionId: user.claimed_transaction_id ? Number(user.claimed_transaction_id) : null,
-        claimedAccessCode: user.claimed_access_code ? String(user.claimed_access_code) : null
+        claimedAccessCode: user.claimed_access_code ? String(user.claimed_access_code) : null,
+        stripeCustomerId: user.stripe_customer_id ? String(user.stripe_customer_id) : null,
+        stripeSubscriptionId: user.stripe_subscription_id ? String(user.stripe_subscription_id) : null,
+        dashboardPreferences: user.dashboard_preferences ?? null,
+        emailVerified: user.email_verified ?? false,
+        emailVerificationToken: user.email_verification_token ?? null,
+        emailVerificationExpires: user.email_verification_expires ?? null,
+        registrationIp: user.registration_ip ?? null,
       };
     } catch (error) {
       console.error('Error in updateUser:', error);
@@ -5122,6 +5158,40 @@ export class DatabaseStorage implements IStorage {
       RETURNING *
     `);
     return result.rows[0] as LenderChecklistMapping;
+  }
+
+  async createClientInvitation(data: InsertClientInvitation): Promise<ClientInvitation> {
+    const result = await db.execute(sql`
+      INSERT INTO client_invitations (agent_id, email, first_name, last_name, token, status, client_record_id, expires_at)
+      VALUES (${data.agentId}, ${data.email}, ${data.firstName || null}, ${data.lastName || null}, ${data.token}, ${data.status || 'pending'}, ${data.clientRecordId || null}, ${data.expiresAt})
+      RETURNING *
+    `);
+    return result.rows[0] as ClientInvitation;
+  }
+
+  async getClientInvitationsByAgent(agentId: number): Promise<ClientInvitation[]> {
+    const result = await db.execute(sql`SELECT * FROM client_invitations WHERE agent_id = ${agentId} ORDER BY created_at DESC`);
+    return result.rows as ClientInvitation[];
+  }
+
+  async getClientInvitationByToken(token: string): Promise<ClientInvitation | undefined> {
+    const result = await db.execute(sql`SELECT * FROM client_invitations WHERE token = ${token} LIMIT 1`);
+    return result.rows[0] as ClientInvitation | undefined;
+  }
+
+  async getClientInvitationsByEmail(email: string): Promise<ClientInvitation[]> {
+    const result = await db.execute(sql`SELECT * FROM client_invitations WHERE email = ${email} AND status = 'pending' ORDER BY created_at DESC`);
+    return result.rows as ClientInvitation[];
+  }
+
+  async updateClientInvitationStatus(id: number, status: string, clientRecordId?: number): Promise<ClientInvitation> {
+    if (clientRecordId !== undefined) {
+      await db.execute(sql`UPDATE client_invitations SET status = ${status}, client_record_id = ${clientRecordId} WHERE id = ${id}`);
+    } else {
+      await db.execute(sql`UPDATE client_invitations SET status = ${status} WHERE id = ${id}`);
+    }
+    const result = await db.execute(sql`SELECT * FROM client_invitations WHERE id = ${id}`);
+    return result.rows[0] as ClientInvitation;
   }
 
 }

@@ -2,7 +2,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
 import session from "express-session";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { scrypt, randomBytes, timingSafeEqual, createHash } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
@@ -15,6 +15,39 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 
+const registrationAttempts = new Map<string, { count: number; firstAttempt: number }>();
+const MAX_REGISTRATIONS_PER_IP = 3;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+function getClientIp(req: import('express').Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || req.socket.remoteAddress || 'unknown';
+}
+
+function checkRegistrationRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const record = registrationAttempts.get(ip);
+  if (!record) return true;
+  if (now - record.firstAttempt > RATE_LIMIT_WINDOW_MS) {
+    registrationAttempts.delete(ip);
+    return true;
+  }
+  return record.count < MAX_REGISTRATIONS_PER_IP;
+}
+
+function recordRegistrationAttempt(ip: string): void {
+  const now = Date.now();
+  const record = registrationAttempts.get(ip);
+  if (!record || now - record.firstAttempt > RATE_LIMIT_WINDOW_MS) {
+    registrationAttempts.set(ip, { count: 1, firstAttempt: now });
+  } else {
+    record.count++;
+  }
+}
+
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
@@ -26,6 +59,14 @@ async function comparePasswords(supplied: string, stored: string) {
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
   return timingSafeEqual(hashedBuf, suppliedBuf);
+}
+
+function generateVerificationCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function hashVerificationCode(code: string): string {
+  return createHash("sha256").update(code).digest("hex");
 }
 
 export function setupAuth(app: Express) {
@@ -143,7 +184,13 @@ export function setupAuth(app: Express) {
     try {
       console.log('Registration request body:', req.body);
 
-      // Validate required fields
+      const clientIp = getClientIp(req);
+
+      if (!checkRegistrationRateLimit(clientIp)) {
+        console.log('Rate limit exceeded for IP:', clientIp);
+        return res.status(429).json({ error: "Too many registration attempts. Please try again later." });
+      }
+
       if (!req.body.email || !req.body.password || !req.body.firstName || !req.body.lastName) {
         console.error('Missing required fields');
         return res.status(400).json({
@@ -167,15 +214,33 @@ export function setupAuth(app: Express) {
         }
       }
 
+      const verificationCode = generateVerificationCode();
+      const hashedCode = hashVerificationCode(verificationCode);
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
       const user = await storage.createUser({
         email: req.body.email,
         password: await hashPassword(req.body.password),
         firstName: req.body.firstName,
         lastName: req.body.lastName,
-        role: ['agent', 'client', 'vendor', 'lender'].includes(req.body.role) ? req.body.role : 'client'
+        role: ['agent', 'client', 'vendor', 'lender'].includes(req.body.role) ? req.body.role : 'client',
+        registrationIp: clientIp
       });
 
+      await storage.updateUser(user.id, {
+        emailVerified: false,
+        emailVerificationToken: hashedCode,
+        emailVerificationExpires: verificationExpires,
+      });
+
+      user.emailVerified = false;
+      user.emailVerificationToken = hashedCode;
+      user.emailVerificationExpires = verificationExpires;
+
+      recordRegistrationAttempt(clientIp);
+
       console.log('User created successfully:', { id: user.id, email: user.email });
+      console.log('Verification code for user', user.email, ':', verificationCode);
 
       if (referralCodeRecord && user.role !== 'lender') {
         try {
@@ -204,7 +269,7 @@ export function setupAuth(app: Express) {
           return next(err);
         }
         const { password, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
+        res.status(201).json({ ...userWithoutPassword, verificationCode });
       });
     } catch (error) {
       console.error('Registration error:', error);
@@ -213,6 +278,86 @@ export function setupAuth(app: Express) {
       } else {
         res.status(500).json({ error: 'Error during registration' });
       }
+    }
+  });
+
+  app.post("/api/verify-email", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const { code } = req.body;
+      if (!code || typeof code !== "string") {
+        return res.status(400).json({ error: "Verification code is required" });
+      }
+
+      const user = await storage.getUser(req.user.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (user.emailVerified) {
+        return res.status(400).json({ error: "Email is already verified" });
+      }
+
+      if (!user.emailVerificationToken || !user.emailVerificationExpires) {
+        return res.status(400).json({ error: "No verification code found. Please request a new one." });
+      }
+
+      if (new Date() > new Date(user.emailVerificationExpires)) {
+        return res.status(400).json({ error: "Verification code has expired. Please request a new one." });
+      }
+
+      const hashedInput = hashVerificationCode(code.trim());
+      if (hashedInput !== user.emailVerificationToken) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+
+      const updatedUser = await storage.updateUser(user.id, {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+      });
+
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Email verification error:", error);
+      res.status(500).json({ error: "Verification failed" });
+    }
+  });
+
+  app.post("/api/resend-verification", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (user.emailVerified) {
+        return res.status(400).json({ error: "Email is already verified" });
+      }
+
+      const verificationCode = generateVerificationCode();
+      const hashedCode = hashVerificationCode(verificationCode);
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      await storage.updateUser(user.id, {
+        emailVerificationToken: hashedCode,
+        emailVerificationExpires: verificationExpires,
+      });
+
+      console.log('New verification code for user', user.email, ':', verificationCode);
+
+      res.json({ message: "Verification code sent", verificationCode });
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ error: "Failed to resend verification code" });
     }
   });
 }
