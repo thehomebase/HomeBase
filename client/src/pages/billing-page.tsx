@@ -2,17 +2,74 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CreditCard, CheckCircle2, Clock, Gift, ExternalLink, Shield, Sparkles } from "lucide-react";
+import {
+  CreditCard, CheckCircle2, Clock, Gift, ExternalLink, Shield, Sparkles,
+  Check, Zap, Users, BarChart3, FileText, MessageSquare, Map, Home,
+  Phone, Mail, Star, ArrowRight, Crown, Building2, Briefcase
+} from "lucide-react";
 import type { ReferralCredit } from "@shared/schema";
+
+const agentFeatures = [
+  { icon: Briefcase, text: "Unlimited transactions" },
+  { icon: Users, text: "Unlimited client management" },
+  { icon: FileText, text: "TREC contract parsing & document tracking" },
+  { icon: Map, text: "Interactive property map with route planning" },
+  { icon: MessageSquare, text: "Encrypted private messaging" },
+  { icon: Phone, text: "SMS communications via Twilio" },
+  { icon: Mail, text: "Gmail integration & email tracking" },
+  { icon: BarChart3, text: "Communication metrics dashboard" },
+  { icon: Star, text: "Customizable dashboard with widgets" },
+  { icon: Home, text: "HomeBase Pros marketplace access" },
+  { icon: Users, text: "Drip campaigns & lead generation" },
+  { icon: Gift, text: "Affiliate referral program" },
+];
+
+const vendorFeatures = [
+  { icon: Building2, text: "Vendor portal with bid management" },
+  { icon: FileText, text: "Inspection bid system with PDF parsing" },
+  { icon: Users, text: "Contractor verification badges" },
+  { icon: Map, text: "HomeBase Pros marketplace listing" },
+  { icon: MessageSquare, text: "Encrypted private messaging" },
+  { icon: BarChart3, text: "Communication metrics dashboard" },
+  { icon: Star, text: "Vendor ratings & reviews" },
+  { icon: Zap, text: "Zip code lead generation" },
+  { icon: Phone, text: "Lead notifications via SMS & push" },
+  { icon: Gift, text: "Affiliate referral program" },
+];
+
+const highlights = [
+  {
+    icon: Shield,
+    title: "Bank-Level Security",
+    description: "AES-256 encryption for all messages. Your data is protected with enterprise-grade security."
+  },
+  {
+    icon: Zap,
+    title: "Real-Time Notifications",
+    description: "Instant SMS and push notifications for new leads, messages, and transaction updates."
+  },
+  {
+    icon: BarChart3,
+    title: "Powerful Analytics",
+    description: "Track communications, monitor your pipeline, and measure performance with detailed dashboards."
+  },
+  {
+    icon: Users,
+    title: "Team Collaboration",
+    description: "Connect with agents, lenders, vendors, and clients all in one centralized platform."
+  },
+];
 
 export default function BillingPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const searchParams = new URLSearchParams(window.location.search);
   const isSuccess = searchParams.get('success') === 'true';
   const isSetupSuccess = searchParams.get('setup_success') === 'true';
@@ -90,12 +147,22 @@ export default function BillingPage() {
   const currentSub = subscription?.subscription;
   const userRole = user?.role;
 
-  const relevantProduct = products?.products?.find(p => {
-    const meta = typeof p.metadata === 'string' ? JSON.parse(p.metadata) : p.metadata;
-    return meta?.role === userRole;
-  });
+  const safeParseMeta = (m: any) => {
+    if (!m) return {};
+    if (typeof m === 'object') return m;
+    try { return JSON.parse(m); } catch { return {}; }
+  };
 
-  const formatPrice = (amount: number) => `$${(amount / 100).toFixed(2)}`;
+  const allProducts = products?.products ?? [];
+  const agentProduct = allProducts.find(p => safeParseMeta(p.metadata)?.role === 'agent');
+  const vendorProduct = allProducts.find(p => safeParseMeta(p.metadata)?.role === 'vendor');
+
+  const formatPrice = (amount: number) => (amount / 100).toFixed(0);
+  const formatPriceCents = (amount: number) => (amount / 100).toFixed(2);
+
+  const isCurrentPlan = (product: any) => {
+    return safeParseMeta(product?.metadata)?.role === userRole && currentSub;
+  };
 
   if (userRole !== 'agent' && userRole !== 'vendor') {
     return (
@@ -112,200 +179,447 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Billing & Subscription</h1>
-        <p className="text-muted-foreground mt-1">Manage your plan and payment method</p>
-      </div>
-
-      {isSuccess && (
-        <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
-          <CheckCircle2 className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800 dark:text-green-200">
-            Subscription activated successfully! Welcome to HomeBase.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {isSetupSuccess && (
-        <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
-          <CheckCircle2 className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800 dark:text-green-200">
-            Payment method added successfully! You can now activate your referral credits.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {isCanceled && (
-        <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
-          <Clock className="h-4 w-4 text-yellow-600" />
-          <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-            Checkout was canceled. You can try again anytime.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Current Plan
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {subLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-4 w-32" />
-            </div>
-          ) : currentSub ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                  Active
-                </Badge>
-                <span className="font-medium capitalize">{currentSub.status}</span>
-              </div>
-              {currentSub.current_period_end && (
-                <p className="text-sm text-muted-foreground">
-                  Current period ends: {new Date(currentSub.current_period_end * 1000).toLocaleDateString()}
-                </p>
-              )}
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => portalMutation.mutate()}
-                  disabled={portalMutation.isPending}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  {portalMutation.isPending ? "Opening..." : "Manage Subscription"}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-muted-foreground">No active subscription</p>
-              {productsLoading ? (
-                <Skeleton className="h-32 w-full" />
-              ) : relevantProduct ? (
-                <div className="border rounded-lg p-4 space-y-3">
-                  <h3 className="font-semibold text-lg">{relevantProduct.name}</h3>
-                  <p className="text-sm text-muted-foreground">{relevantProduct.description}</p>
-                  {relevantProduct.prices?.map((price: any) => (
-                    <div key={price.id} className="flex items-center justify-between">
-                      <span className="text-2xl font-bold">
-                        {formatPrice(price.unit_amount)}
-                        <span className="text-sm font-normal text-muted-foreground">/month</span>
-                      </span>
-                      <Button
-                        onClick={() => checkoutMutation.mutate(price.id)}
-                        disabled={checkoutMutation.isPending}
-                      >
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        {checkoutMutation.isPending ? "Loading..." : "Subscribe"}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No plans are currently available. Check back soon.
-                </p>
-              )}
-            </div>
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
+      {(isSuccess || isSetupSuccess || isCanceled) && (
+        <div className="container mx-auto px-4 pt-4 max-w-5xl">
+          {isSuccess && (
+            <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800 dark:text-green-200">
+                Subscription activated successfully! Welcome to HomeBase.
+              </AlertDescription>
+            </Alert>
           )}
-        </CardContent>
-      </Card>
+          {isSetupSuccess && (
+            <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800 dark:text-green-200">
+                Payment method added successfully! You can now activate your referral credits.
+              </AlertDescription>
+            </Alert>
+          )}
+          {isCanceled && (
+            <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
+              <Clock className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+                Checkout was canceled. You can try again anytime.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
 
-      {pendingCredits.length > 0 && (
-        <Card className="border-amber-200 dark:border-amber-800">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-              <Gift className="h-5 w-5" />
-              Referral Credits Available
-            </CardTitle>
-            <CardDescription>
-              You have {pendingCredits.length} pending referral credit{pendingCredits.length > 1 ? 's' : ''}.
-              {!hasPaymentMethod
-                ? " Add a payment method to activate them."
-                : " Click below to activate your free month credit."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {!hasPaymentMethod ? (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    To prevent abuse, we require a payment method on file before activating free month credits.
-                    Your card won't be charged until after your free period ends.
-                  </p>
+      <div className={`container mx-auto px-4 ${isMobile ? "pt-6 pb-24" : "py-12"} max-w-5xl`}>
+        <div className="text-center mb-10">
+          <Badge variant="outline" className="mb-4 px-3 py-1 text-xs font-medium tracking-wider uppercase">
+            Pricing
+          </Badge>
+          <h1 className="text-4xl font-bold tracking-tight mb-3">
+            Plans that grow with your business
+          </h1>
+          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            Everything you need to manage transactions, nurture client relationships, and grow your real estate business.
+          </p>
+        </div>
+
+        {currentSub && (
+          <div className="mb-8">
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="p-6">
+                <div className={`flex ${isMobile ? "flex-col gap-4" : "items-center justify-between"}`}>
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Crown className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-lg">Active Subscription</h3>
+                        <Badge className={`border-0 ${
+                          currentSub.status === 'active' || currentSub.status === 'trialing'
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            : currentSub.status === 'past_due'
+                            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                        }`}>
+                          {currentSub.status === 'trialing' ? 'Trial' : currentSub.status?.charAt(0).toUpperCase() + currentSub.status?.slice(1).replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      {currentSub.current_period_end && (
+                        <p className="text-sm text-muted-foreground">
+                          Current period ends {new Date(currentSub.current_period_end * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                   <Button
+                    variant="outline"
+                    onClick={() => portalMutation.mutate()}
+                    disabled={portalMutation.isPending}
+                    className="gap-2"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    {portalMutation.isPending ? "Opening..." : "Manage Subscription"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        <div className={`grid gap-6 mb-16 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+          {subLoading || productsLoading ? (
+            <>
+              <Skeleton className="h-[500px] rounded-xl" />
+              <Skeleton className="h-[500px] rounded-xl" />
+            </>
+          ) : (
+            <>
+              <PlanCard
+                name="Agent Plan"
+                description="For real estate agents who want to streamline their business"
+                product={agentProduct}
+                features={agentFeatures}
+                isCurrent={userRole === 'agent' && !!currentSub}
+                isRelevant={userRole === 'agent'}
+                formatPrice={formatPrice}
+                formatPriceCents={formatPriceCents}
+                onSubscribe={(priceId) => checkoutMutation.mutate(priceId)}
+                isSubscribing={checkoutMutation.isPending}
+                accentColor="primary"
+                icon={Briefcase}
+                isMobile={isMobile}
+              />
+              <PlanCard
+                name="Vendor Plan"
+                description="For home service vendors and contractors"
+                product={vendorProduct}
+                features={vendorFeatures}
+                isCurrent={userRole === 'vendor' && !!currentSub}
+                isRelevant={userRole === 'vendor'}
+                formatPrice={formatPrice}
+                formatPriceCents={formatPriceCents}
+                onSubscribe={(priceId) => checkoutMutation.mutate(priceId)}
+                isSubscribing={checkoutMutation.isPending}
+                accentColor="primary"
+                icon={Building2}
+                isMobile={isMobile}
+              />
+            </>
+          )}
+        </div>
+
+        {pendingCredits.length > 0 && (
+          <div className="mb-12">
+            <Card className="border-amber-200 dark:border-amber-800 overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
+              <CardContent className="p-6">
+                <div className={`flex ${isMobile ? "flex-col gap-4" : "items-start justify-between"}`}>
+                  <div className="flex gap-4">
+                    <div className="h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center shrink-0">
+                      <Gift className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg mb-1">
+                        {pendingCredits.length} Referral Credit{pendingCredits.length > 1 ? 's' : ''} Available
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {!hasPaymentMethod
+                          ? "Add a payment method to activate your free month credits. Your card won't be charged until after your free period ends."
+                          : "You have credits ready to activate. Click the button to get your free month!"}
+                      </p>
+                    </div>
+                  </div>
+                  {!hasPaymentMethod ? (
+                    <Button
+                      onClick={() => setupMutation.mutate()}
+                      disabled={setupMutation.isPending}
+                      className="shrink-0 gap-2"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      {setupMutation.isPending ? "Loading..." : "Add Payment Method"}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => activateCreditsMutation.mutate()}
+                      disabled={activateCreditsMutation.isPending}
+                      className="shrink-0 gap-2 bg-amber-600 hover:bg-amber-700"
+                    >
+                      <Gift className="h-4 w-4" />
+                      {activateCreditsMutation.isPending ? "Activating..." : `Activate Credit${pendingCredits.length > 1 ? 's' : ''}`}
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {appliedCredits.length > 0 && (
+          <div className="mb-12">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Applied Credits</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {appliedCredits.length} referral credit{appliedCredits.length > 1 ? 's' : ''} applied to your account.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {!currentSub && !hasPaymentMethod && pendingCredits.length === 0 && (
+          <div className="mb-12">
+            <Card>
+              <CardContent className="p-6">
+                <div className={`flex ${isMobile ? "flex-col gap-4" : "items-center justify-between"}`}>
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                      <CreditCard className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Payment Method</h3>
+                      <p className="text-sm text-muted-foreground">Add a payment method to your account</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
                     onClick={() => setupMutation.mutate()}
                     disabled={setupMutation.isPending}
+                    className="gap-2"
                   >
-                    <CreditCard className="h-4 w-4 mr-2" />
+                    <CreditCard className="h-4 w-4" />
                     {setupMutation.isPending ? "Loading..." : "Add Payment Method"}
                   </Button>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Payment method is on file. Activate your credits to get your free month!
-                  </p>
-                  <Button
-                    onClick={() => activateCreditsMutation.mutate()}
-                    disabled={activateCreditsMutation.isPending}
-                    className="bg-amber-600 hover:bg-amber-700"
-                  >
-                    <Gift className="h-4 w-4 mr-2" />
-                    {activateCreditsMutation.isPending ? "Activating..." : `Activate ${pendingCredits.length} Credit${pendingCredits.length > 1 ? 's' : ''}`}
-                  </Button>
-                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        <div className="mb-16">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold tracking-tight mb-2">Why choose HomeBase?</h2>
+            <p className="text-muted-foreground">Built specifically for real estate professionals</p>
+          </div>
+          <div className={`grid gap-6 ${isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-4"}`}>
+            {highlights.map((item) => (
+              <Card key={item.title} className="border bg-card hover:shadow-md transition-shadow">
+                <CardContent className="p-6 text-center">
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <item.icon className="h-6 w-6 text-primary" />
+                  </div>
+                  <h3 className="font-semibold mb-2">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold tracking-tight mb-2">Compare plans</h2>
+            <p className="text-muted-foreground">See what's included in each plan</p>
+          </div>
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left p-4 font-semibold min-w-[200px]">Feature</th>
+                    <th className="text-center p-4 font-semibold min-w-[140px]">
+                      <div className="flex flex-col items-center gap-1">
+                        <span>Agent Plan</span>
+                        <span className="text-2xl font-bold">${agentProduct?.prices?.[0] ? formatPrice(agentProduct.prices[0].unit_amount) : '49'}<span className="text-sm font-normal text-muted-foreground">/mo</span></span>
+                      </div>
+                    </th>
+                    <th className="text-center p-4 font-semibold min-w-[140px]">
+                      <div className="flex flex-col items-center gap-1">
+                        <span>Vendor Plan</span>
+                        <span className="text-2xl font-bold">${vendorProduct?.prices?.[0] ? formatPrice(vendorProduct.prices[0].unit_amount) : '29'}<span className="text-sm font-normal text-muted-foreground">/mo</span></span>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonRows.map((row, i) => (
+                    <tr key={row.feature} className={i % 2 === 0 ? "bg-background" : "bg-muted/20"}>
+                      <td className="p-4 text-sm">{row.feature}</td>
+                      <td className="p-4 text-center">
+                        {row.agent ? (
+                          <Check className="h-5 w-5 text-green-500 mx-auto" />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="p-4 text-center">
+                        {row.vendor ? (
+                          <Check className="h-5 w-5 text-green-500 mx-auto" />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+
+        <div className="text-center py-12">
+          <div className="max-w-lg mx-auto">
+            <h2 className="text-2xl font-bold mb-3">Ready to get started?</h2>
+            <p className="text-muted-foreground mb-6">
+              Join thousands of real estate professionals who trust HomeBase to manage their business.
+            </p>
+            {!currentSub && (
+              <Button
+                size="lg"
+                className="gap-2 px-8"
+                onClick={() => {
+                  const product = userRole === 'agent' ? agentProduct : vendorProduct;
+                  if (product?.prices?.[0]) checkoutMutation.mutate(product.prices[0].id);
+                }}
+                disabled={checkoutMutation.isPending}
+              >
+                {checkoutMutation.isPending ? "Loading..." : "Get Started Today"}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const comparisonRows = [
+  { feature: "Transaction management", agent: true, vendor: false },
+  { feature: "Client management & CRM", agent: true, vendor: false },
+  { feature: "Contract parsing & document tracking", agent: true, vendor: false },
+  { feature: "Interactive property map", agent: true, vendor: false },
+  { feature: "Encrypted private messaging", agent: true, vendor: true },
+  { feature: "Communication metrics dashboard", agent: true, vendor: true },
+  { feature: "SMS communications", agent: true, vendor: false },
+  { feature: "Gmail integration", agent: true, vendor: false },
+  { feature: "Customizable dashboard", agent: true, vendor: true },
+  { feature: "Drip campaigns", agent: true, vendor: false },
+  { feature: "Lead generation", agent: true, vendor: true },
+  { feature: "Vendor portal & bid management", agent: false, vendor: true },
+  { feature: "Inspection bid system", agent: false, vendor: true },
+  { feature: "Contractor verification badges", agent: false, vendor: true },
+  { feature: "HomeBase Pros marketplace", agent: true, vendor: true },
+  { feature: "Vendor ratings & reviews", agent: false, vendor: true },
+  { feature: "Referral program", agent: true, vendor: true },
+  { feature: "Calendar & scheduling", agent: true, vendor: false },
+  { feature: "Mobile app (PWA)", agent: true, vendor: true },
+];
+
+function PlanCard({
+  name,
+  description,
+  product,
+  features,
+  isCurrent,
+  isRelevant,
+  formatPrice,
+  formatPriceCents,
+  onSubscribe,
+  isSubscribing,
+  accentColor,
+  icon: Icon,
+  isMobile,
+}: {
+  name: string;
+  description: string;
+  product: any;
+  features: { icon: any; text: string }[];
+  isCurrent: boolean;
+  isRelevant: boolean;
+  formatPrice: (n: number) => string;
+  formatPriceCents: (n: number) => string;
+  onSubscribe: (priceId: string) => void;
+  isSubscribing: boolean;
+  accentColor: string;
+  icon: any;
+  isMobile?: boolean;
+}) {
+  const price = product?.prices?.[0];
+  const priceAmount = price?.unit_amount;
+
+  return (
+    <Card className={`relative overflow-hidden transition-all hover:shadow-lg ${isRelevant ? "border-primary shadow-md ring-1 ring-primary/20" : "border"}`}>
+      {isRelevant && (
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-primary/60" />
+      )}
+      <CardContent className="p-0">
+        <div className={`p-6 ${isMobile ? "pb-4" : "p-8 pb-6"}`}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${isRelevant ? "bg-primary/10" : "bg-muted"}`}>
+              <Icon className={`h-5 w-5 ${isRelevant ? "text-primary" : "text-muted-foreground"}`} />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg">{name}</h3>
+              {isRelevant && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Your plan</Badge>
               )}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
 
-      {appliedCredits.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-              Applied Credits
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              You have {appliedCredits.length} applied referral credit{appliedCredits.length > 1 ? 's' : ''}.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+          <p className="text-sm text-muted-foreground mb-6">{description}</p>
 
-      {!currentSub && !hasPaymentMethod && pendingCredits.length === 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Payment Method
-            </CardTitle>
-            <CardDescription>
-              Add a payment method to your account
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              variant="outline"
-              onClick={() => setupMutation.mutate()}
-              disabled={setupMutation.isPending}
-            >
-              <CreditCard className="h-4 w-4 mr-2" />
-              {setupMutation.isPending ? "Loading..." : "Add Payment Method"}
+          <div className="mb-6">
+            {priceAmount ? (
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-bold tracking-tight">${formatPrice(priceAmount)}</span>
+                <span className="text-muted-foreground">/month</span>
+              </div>
+            ) : (
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-bold tracking-tight">—</span>
+              </div>
+            )}
+          </div>
+
+          {isCurrent ? (
+            <Button variant="outline" className="w-full gap-2" disabled>
+              <CheckCircle2 className="h-4 w-4" />
+              Current Plan
             </Button>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          ) : isRelevant && price ? (
+            <Button
+              className="w-full gap-2"
+              onClick={() => onSubscribe(price.id)}
+              disabled={isSubscribing}
+            >
+              <Sparkles className="h-4 w-4" />
+              {isSubscribing ? "Loading..." : `Get ${name}`}
+            </Button>
+          ) : (
+            <Button variant="outline" className="w-full" disabled>
+              {isRelevant ? "No price available" : "Not available for your role"}
+            </Button>
+          )}
+        </div>
+
+        <div className="border-t bg-muted/30 p-6 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">What's included</p>
+          {features.map((feature) => (
+            <div key={feature.text} className="flex items-start gap-3">
+              <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+              <span className="text-sm">{feature.text}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
