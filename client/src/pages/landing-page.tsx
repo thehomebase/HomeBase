@@ -15,13 +15,13 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <div className={`max-w-6xl mx-auto flex items-center justify-between ${isMobile ? "px-4 py-3" : "px-6 py-4"}`}>
-          <div className="flex items-center gap-2">
-            <img src="/homebaselogoicon_nobg.png" alt="HomeBase" className="h-8 w-8" />
-            <span className="font-bold text-xl tracking-tight">HomeBase</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <img src="/homebaselogoicon_nobg.png" alt="HomeBase" className="h-7 w-7" />
+            <span className="font-bold text-lg tracking-tight">HomeBase</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {!isMobile && (
               <nav className="flex items-center gap-6 mr-6">
                 <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
@@ -29,13 +29,13 @@ export default function LandingPage() {
                 <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
               </nav>
             )}
-            <Button variant="ghost" size="sm" onClick={() => setLocation("/auth")}>Log in</Button>
-            <Button size="sm" onClick={() => setLocation("/auth")}>Get Started</Button>
+            <Button variant="ghost" size="sm" className="px-2 text-xs" onClick={() => setLocation("/auth")}>Log in</Button>
+            <Button size="sm" className="px-3 text-xs whitespace-nowrap" onClick={() => setLocation("/auth")}>Get Started</Button>
           </div>
         </div>
       </nav>
 
-      <section className={`relative ${isMobile ? "pt-24 pb-12 px-4" : "pt-32 pb-20 px-6"}`}>
+      <section className={`relative ${isMobile ? "pt-28 pb-12 px-4" : "pt-32 pb-20 px-6"}`} style={isMobile ? { paddingTop: "calc(7rem + env(safe-area-inset-top, 0px))" } : undefined}>
         <div className="max-w-6xl mx-auto">
           <div className={`grid gap-8 items-center ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
             <div className={isMobile ? "text-center" : ""}>
