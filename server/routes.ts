@@ -4378,11 +4378,17 @@ export function registerRoutes(app: Express): Server {
 
   const FREE_ZIP_CODES_PER_AGENT = 3;
   const MAX_AGENTS_PER_ZIP = 5;
+  const FREE_ELIGIBLE_MIN_OPEN_SLOTS = 3;
   const ZIP_BASE_PRICE = 1000; // $10.00 in cents
   const ZIP_PRICE_INCREMENT = 500; // $5.00 in cents
 
   function calculateZipCodePrice(currentAgentCount: number): number {
     return ZIP_BASE_PRICE + (currentAgentCount * ZIP_PRICE_INCREMENT);
+  }
+
+  function isZipFreeEligible(agentCount: number): boolean {
+    const openSlots = MAX_AGENTS_PER_ZIP - agentCount;
+    return openSlots >= FREE_ELIGIBLE_MIN_OPEN_SLOTS;
   }
 
   app.get("/api/leads/zip-pricing/:zipCode", async (req, res) => {
@@ -4398,7 +4404,9 @@ export function registerRoutes(app: Express): Server {
       const agentCount = await storage.getAgentCountForZipCode(zipCode);
       const freeZipsUsed = await storage.countAgentFreeZipCodes(req.user.id);
       const alreadyClaimed = await storage.isZipCodeClaimed(req.user.id, zipCode);
-      const isFreeSlot = freeZipsUsed < FREE_ZIP_CODES_PER_AGENT;
+      const hasFreeSlots = freeZipsUsed < FREE_ZIP_CODES_PER_AGENT;
+      const zipEligibleForFree = isZipFreeEligible(agentCount);
+      const isFreeSlot = hasFreeSlots && zipEligibleForFree;
       const price = isFreeSlot ? 0 : calculateZipCodePrice(agentCount);
 
       res.json({
@@ -4410,6 +4418,8 @@ export function registerRoutes(app: Express): Server {
         alreadyClaimed,
         freeZipsUsed,
         freeZipsTotal: FREE_ZIP_CODES_PER_AGENT,
+        hasFreeSlots,
+        zipEligibleForFree,
         isFreeSlot,
         monthlyRate: price,
         monthlyRateDisplay: isFreeSlot ? "Free (included)" : `$${(price / 100).toFixed(2)}/mo`,
@@ -4446,7 +4456,9 @@ export function registerRoutes(app: Express): Server {
       }
 
       const freeZipsUsed = await storage.countAgentFreeZipCodes(req.user.id);
-      const isFreeSlot = freeZipsUsed < FREE_ZIP_CODES_PER_AGENT;
+      const hasFreeSlots = freeZipsUsed < FREE_ZIP_CODES_PER_AGENT;
+      const zipEligibleForFree = isZipFreeEligible(agentCount);
+      const isFreeSlot = hasFreeSlots && zipEligibleForFree;
       const monthlyRate = isFreeSlot ? 0 : calculateZipCodePrice(agentCount);
 
       const claimed = await storage.claimZipCode({

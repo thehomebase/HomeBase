@@ -73,6 +73,8 @@ interface ZipPricing {
   alreadyClaimed: boolean;
   freeZipsUsed: number;
   freeZipsTotal: number;
+  hasFreeSlots: boolean;
+  zipEligibleForFree: boolean;
   isFreeSlot: boolean;
   monthlyRate: number;
   monthlyRateDisplay: string;
@@ -415,10 +417,10 @@ export default function LeadGenerationPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-sm">Tiered Pricing</p>
-                    <p className="text-xs text-muted-foreground">After free slots</p>
+                    <p className="text-xs text-muted-foreground">Competitive zips</p>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">Starts at <span className="font-semibold text-foreground">$10/mo</span>, increases with competition</p>
+                <p className="text-sm text-muted-foreground">Free slots require 3+ open spots. Competitive zips start at <span className="font-semibold text-foreground">$10/mo</span></p>
               </CardContent>
             </Card>
           </div>
@@ -510,7 +512,12 @@ export default function LeadGenerationPage() {
                       {!pricing.isFreeSlot && !pricing.alreadyClaimed && !pricing.isFull && (
                         <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-800 dark:text-amber-300">
                           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                          <span>You've used all {pricing.freeZipsTotal} free slots. This zip code will cost {pricing.monthlyRateDisplay}. Price is based on competition level.</span>
+                          <span>
+                            {pricing.hasFreeSlots && !pricing.zipEligibleForFree
+                              ? `This zip code has too much competition for a free slot (needs 3+ open spots). You can claim it for ${pricing.monthlyRateDisplay}, or pick a less competitive zip to use your free slot.`
+                              : `You've used all ${pricing.freeZipsTotal} free slots. This zip will cost ${pricing.monthlyRateDisplay}. Price is based on competition level.`
+                            }
+                          </span>
                         </div>
                       )}
                     </div>
