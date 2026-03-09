@@ -265,129 +265,26 @@ function ZipMetricsDialog({
   );
 }
 
-function ZipMapView({
-  claimedZips,
-  onSelectZip,
-}: {
-  claimedZips: ZipCodeData[];
-  onSelectZip: (zip: string) => void;
-}) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<L.Map | null>(null);
-  const claimedLayerRef = useRef<L.LayerGroup | null>(null);
-  const searchLayerRef = useRef<L.LayerGroup | null>(null);
-  const [mapZipSearch, setMapZipSearch] = useState("");
-  const [mapReady, setMapReady] = useState(false);
+const BOUNDARY_MIN_ZOOM = 10;
+const TIGER_API_BASE = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/1/query";
 
-  const { data: allZipData } = useQuery<Array<{ zipCode: string; agentCount: number; isMine: boolean; spotsRemaining: number; isFull: boolean }>>({
-    queryKey: ["/api/leads/all-zip-data"],
+async function fetchZipBoundaries(bounds: L.LatLngBounds): Promise<any> {
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  const envelope = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
+  const params = new URLSearchParams({
+    geometry: envelope,
+    geometryType: "esriGeometryEnvelope",
+    spatialRel: "esriSpatialRelIntersects",
+    outFields: "ZCTA5,GEOID,BASENAME",
+    returnGeometry: "true",
+    f: "geojson",
+    outSR: "4326",
+    inSR: "4326",
   });
-
-  useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return;
-
-    const map = L.map(mapRef.current, {
-      center: [39.8283, -98.5795],
-      zoom: 4,
-      zoomControl: true,
-    });
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(map);
-
-    claimedLayerRef.current = L.layerGroup().addTo(map);
-    searchLayerRef.current = L.layerGroup().addTo(map);
-
-    mapInstanceRef.current = map;
-
-    setTimeout(() => {
-      map.invalidateSize();
-      setMapReady(true);
-    }, 200);
-
-    return () => {
-      map.remove();
-      mapInstanceRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!mapInstanceRef.current || !mapReady || !claimedLayerRef.current) return;
-
-    claimedLayerRef.current.clearLayers();
-
-    const allZips = new Set<string>();
-    claimedZips.forEach((zc) => allZips.add(zc.zipCode));
-    if (allZipData) {
-      allZipData.forEach((zd) => allZips.add(zd.zipCode));
-    }
-
-    const claimedSet = new Set(claimedZips.map(z => z.zipCode));
-
-    allZips.forEach((zip) => {
-      const isMine = claimedSet.has(zip);
-      const zipInfo = allZipData?.find(z => z.zipCode === zip);
-      addZipMarker(zip, claimedLayerRef.current!, isMine, onSelectZip, zipInfo);
-    });
-  }, [claimedZips, mapReady, allZipData, onSelectZip]);
-
-  const handleMapSearch = async () => {
-    const zip = mapZipSearch.trim();
-    if (!/^\d{5}$/.test(zip) || !mapInstanceRef.current) return;
-
-    searchLayerRef.current?.clearLayers();
-
-    const isMine = claimedZips.some(z => z.zipCode === zip);
-    const coords = await geocodeZipCode(zip);
-    if (coords) {
-      const color = isMine ? "#22c55e" : "#3b82f6";
-      const icon = L.divIcon({
-        html: `<div style="background:${color};color:white;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);border:2px solid white;cursor:pointer;">${zip}</div>`,
-        className: "",
-        iconSize: [60, 28],
-        iconAnchor: [30, 14],
-      });
-      const marker = L.marker(coords, { icon }).addTo(searchLayerRef.current!);
-      marker.on("click", () => onSelectZip(zip));
-      mapInstanceRef.current.setView(coords, 11);
-    }
-
-    onSelectZip(zip);
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex gap-2">
-        <Input
-          placeholder="Enter 5-digit ZIP code"
-          value={mapZipSearch}
-          onChange={(e) => setMapZipSearch(e.target.value.replace(/\D/g, "").slice(0, 5))}
-          onKeyDown={(e) => e.key === "Enter" && handleMapSearch()}
-          className="max-w-xs"
-        />
-        <Button onClick={handleMapSearch} variant="outline" className="gap-2">
-          <Search className="h-4 w-4" />
-          Search
-        </Button>
-      </div>
-      <div
-        ref={mapRef}
-        className="h-[400px] md:h-[500px] w-full rounded-lg border border-border overflow-hidden"
-      />
-      <div className="flex gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "#22c55e" }} /> Your ZIPs
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "#f59e0b" }} /> Other Active ZIPs
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "#3b82f6" }} /> Searched
-        </span>
-      </div>
-    </div>
-  );
+  const res = await fetch(`${TIGER_API_BASE}?${params}`);
+  if (!res.ok) throw new Error("Failed to fetch boundaries");
+  return res.json();
 }
 
 async function geocodeZipCode(zip: string): Promise<L.LatLngTuple | null> {
@@ -403,27 +300,363 @@ async function geocodeZipCode(zip: string): Promise<L.LatLngTuple | null> {
   return null;
 }
 
-function addZipMarker(
-  zip: string,
-  layer: L.LayerGroup,
-  isMine: boolean,
-  onSelect: (z: string) => void,
-  zipInfo?: { agentCount: number; spotsRemaining: number; isFull: boolean } | null
-) {
-  geocodeZipCode(zip).then((coords) => {
-    if (!coords) return;
-    const color = isMine ? "#22c55e" : "#f59e0b";
-    const maxAgents = zipInfo ? zipInfo.agentCount + zipInfo.spotsRemaining : 5;
-    const label = zipInfo ? `${zip} (${zipInfo.agentCount}/${maxAgents})` : zip;
-    const icon = L.divIcon({
-      html: `<div style="background:${color};color:white;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);border:2px solid white;cursor:pointer;">${label}</div>`,
-      className: "",
-      iconSize: [90, 28],
-      iconAnchor: [45, 14],
-    });
-    const marker = L.marker(coords, { icon }).addTo(layer);
-    marker.on("click", () => onSelect(zip));
+interface MapSelectedZip {
+  zipCode: string;
+  metrics?: ZipMetrics;
+  loading?: boolean;
+}
+
+function ZipMapView({
+  claimedZips,
+  onSelectZip,
+  onClaimZip,
+  claiming,
+}: {
+  claimedZips: ZipCodeData[];
+  onSelectZip: (zip: string) => void;
+  onClaimZip: (zip: string) => void;
+  claiming: boolean;
+}) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const boundaryLayerRef = useRef<L.LayerGroup | null>(null);
+  const labelLayerRef = useRef<L.LayerGroup | null>(null);
+  const highlightLayerRef = useRef<L.LayerGroup | null>(null);
+  const [mapZipSearch, setMapZipSearch] = useState("");
+  const [mapReady, setMapReady] = useState(false);
+  const [selectedZips, setSelectedZips] = useState<MapSelectedZip[]>([]);
+  const [zoomLevel, setZoomLevel] = useState(4);
+  const [loadingBoundaries, setLoadingBoundaries] = useState(false);
+  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadedBoundsRef = useRef<string>("");
+  const claimedSetRef = useRef<Set<string>>(new Set());
+
+  const { data: allZipData } = useQuery<Array<{ zipCode: string; agentCount: number; isMine: boolean; spotsRemaining: number; isFull: boolean }>>({
+    queryKey: ["/api/leads/all-zip-data"],
   });
+
+  useEffect(() => {
+    claimedSetRef.current = new Set(claimedZips.map(z => z.zipCode));
+  }, [claimedZips]);
+
+  useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+
+    const map = L.map(mapRef.current, {
+      center: [39.8283, -98.5795],
+      zoom: 4,
+      zoomControl: true,
+    });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+
+    boundaryLayerRef.current = L.layerGroup().addTo(map);
+    labelLayerRef.current = L.layerGroup().addTo(map);
+    highlightLayerRef.current = L.layerGroup().addTo(map);
+
+    mapInstanceRef.current = map;
+
+    const loadBoundaries = () => {
+      if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
+      fetchTimeoutRef.current = setTimeout(() => {
+        const z = map.getZoom();
+        setZoomLevel(z);
+        if (z >= BOUNDARY_MIN_ZOOM) {
+          const b = map.getBounds();
+          const key = `${b.toBBoxString()}_${z}`;
+          if (key !== loadedBoundsRef.current) {
+            loadedBoundsRef.current = key;
+            renderBoundaries(map, b);
+          }
+        } else {
+          boundaryLayerRef.current?.clearLayers();
+          labelLayerRef.current?.clearLayers();
+          loadedBoundsRef.current = "";
+        }
+      }, 300);
+    };
+
+    map.on("moveend", loadBoundaries);
+    map.on("zoomend", loadBoundaries);
+
+    setTimeout(() => {
+      map.invalidateSize();
+      setMapReady(true);
+    }, 200);
+
+    return () => {
+      if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
+      map.remove();
+      mapInstanceRef.current = null;
+    };
+  }, []);
+
+  const renderBoundaries = async (map: L.Map, bounds: L.LatLngBounds) => {
+    if (!boundaryLayerRef.current || !labelLayerRef.current) return;
+    setLoadingBoundaries(true);
+    try {
+      const geojson = await fetchZipBoundaries(bounds);
+      boundaryLayerRef.current.clearLayers();
+      labelLayerRef.current.clearLayers();
+
+      if (!geojson.features) return;
+
+      const activeZipSet = new Set(allZipData?.map(z => z.zipCode) || []);
+
+      geojson.features.forEach((feature: any) => {
+        const zipCode = feature.properties?.ZCTA5 || feature.properties?.GEOID || feature.properties?.BASENAME || "";
+        if (!zipCode) return;
+
+        const isMine = claimedSetRef.current.has(zipCode);
+        const isActive = activeZipSet.has(zipCode);
+
+        let fillColor = "rgba(59, 130, 246, 0.08)";
+        let borderColor = "rgba(59, 130, 246, 0.5)";
+        let fillOpacity = 0.08;
+        if (isMine) {
+          fillColor = "rgba(34, 197, 94, 0.15)";
+          borderColor = "rgba(34, 197, 94, 0.8)";
+          fillOpacity = 0.15;
+        } else if (isActive) {
+          fillColor = "rgba(245, 158, 11, 0.1)";
+          borderColor = "rgba(245, 158, 11, 0.6)";
+          fillOpacity = 0.1;
+        }
+
+        const layer = L.geoJSON(feature, {
+          style: {
+            color: borderColor,
+            weight: 2,
+            fillColor: fillColor,
+            fillOpacity: fillOpacity,
+            opacity: 0.7,
+          },
+          onEachFeature: (_feat, lyr) => {
+            lyr.on("click", () => handlePolygonClick(zipCode));
+            lyr.on("mouseover", (e: any) => {
+              e.target.setStyle({
+                weight: 3,
+                fillOpacity: fillOpacity + 0.15,
+                opacity: 1,
+              });
+            });
+            lyr.on("mouseout", (e: any) => {
+              e.target.setStyle({
+                weight: 2,
+                fillOpacity: fillOpacity,
+                opacity: 0.7,
+              });
+            });
+          },
+        }).addTo(boundaryLayerRef.current!);
+
+        const center = layer.getBounds().getCenter();
+        const labelIcon = L.divIcon({
+          html: `<div style="font-size:11px;font-weight:700;color:#1e3a5f;text-shadow:0 0 3px white,0 0 3px white,0 0 3px white,0 0 3px white;pointer-events:none;white-space:nowrap;">${zipCode}</div>`,
+          className: "",
+          iconSize: [50, 16],
+          iconAnchor: [25, 8],
+        });
+        L.marker(center, { icon: labelIcon, interactive: false }).addTo(labelLayerRef.current!);
+      });
+    } catch (err) {
+      console.error("Failed to load zip boundaries:", err);
+    } finally {
+      setLoadingBoundaries(false);
+    }
+  };
+
+  const handlePolygonClick = async (zipCode: string) => {
+    setSelectedZips((prev) => {
+      if (prev.some(z => z.zipCode === zipCode)) return prev;
+      return [...prev, { zipCode, loading: true }];
+    });
+
+    highlightLayerRef.current?.clearLayers();
+
+    try {
+      const res = await fetch(`/api/leads/zip-metrics/${zipCode}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const metrics: ZipMetrics = await res.json();
+      setSelectedZips((prev) =>
+        prev.map(z => z.zipCode === zipCode ? { zipCode, metrics, loading: false } : z)
+      );
+    } catch {
+      setSelectedZips((prev) =>
+        prev.map(z => z.zipCode === zipCode ? { zipCode, loading: false } : z)
+      );
+    }
+  };
+
+  const removeSelectedZip = (zipCode: string) => {
+    setSelectedZips((prev) => prev.filter(z => z.zipCode !== zipCode));
+  };
+
+  const handleMapSearch = async () => {
+    const zip = mapZipSearch.trim();
+    if (!/^\d{5}$/.test(zip) || !mapInstanceRef.current) return;
+
+    const coords = await geocodeZipCode(zip);
+    if (coords) {
+      mapInstanceRef.current.setView(coords, 13);
+    }
+    handlePolygonClick(zip);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2 items-center">
+        <Input
+          placeholder="Enter 5-digit ZIP code"
+          value={mapZipSearch}
+          onChange={(e) => setMapZipSearch(e.target.value.replace(/\D/g, "").slice(0, 5))}
+          onKeyDown={(e) => e.key === "Enter" && handleMapSearch()}
+          className="max-w-xs"
+        />
+        <Button onClick={handleMapSearch} variant="outline" className="gap-2">
+          <Search className="h-4 w-4" />
+          Search
+        </Button>
+        {loadingBoundaries && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" /> Loading boundaries...
+          </span>
+        )}
+      </div>
+
+      <div className="relative">
+        <div
+          ref={mapRef}
+          className="h-[450px] md:h-[550px] w-full rounded-lg border border-border overflow-hidden"
+        />
+        {zoomLevel < BOUNDARY_MIN_ZOOM && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-background/90 backdrop-blur-sm border rounded-lg px-4 py-2 text-xs text-muted-foreground shadow-md flex items-center gap-2 z-[1000]">
+            <Search className="h-3.5 w-3.5" />
+            Zoom in or search a ZIP code to see boundaries
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-4 text-xs text-muted-foreground flex-wrap">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-sm border-2" style={{ borderColor: "rgba(34,197,94,0.8)", background: "rgba(34,197,94,0.15)" }} /> Your ZIPs
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-sm border-2" style={{ borderColor: "rgba(245,158,11,0.6)", background: "rgba(245,158,11,0.1)" }} /> Other Active ZIPs
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-sm border-2" style={{ borderColor: "rgba(59,130,246,0.5)", background: "rgba(59,130,246,0.08)" }} /> Available
+        </span>
+      </div>
+
+      {selectedZips.length > 0 && (
+        <div className="border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="text-xs font-semibold uppercase">ZIP</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-center">Est. ROI 6 Months</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-center hidden sm:table-cell">Est. Cost/Lead</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-center">Est. Leads</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-center hidden sm:table-cell">Avg. Home Value</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-center">Available</TableHead>
+                <TableHead className="text-xs font-semibold uppercase text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {selectedZips.map((sz) => (
+                <TableRow key={sz.zipCode}>
+                  {sz.loading ? (
+                    <TableCell colSpan={7} className="text-center py-3">
+                      <span className="flex items-center gap-2 justify-center text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading {sz.zipCode}...
+                      </span>
+                    </TableCell>
+                  ) : sz.metrics ? (
+                    <>
+                      <TableCell>
+                        <button
+                          className="text-primary font-bold hover:underline text-sm"
+                          onClick={() => onSelectZip(sz.zipCode)}
+                        >
+                          {sz.zipCode}
+                        </button>
+                      </TableCell>
+                      <TableCell className="text-center font-semibold">
+                        {sz.metrics.roiSixMonth > 0 ? `${sz.metrics.roiSixMonth}x` : "N/A"}
+                      </TableCell>
+                      <TableCell className="text-center hidden sm:table-cell">
+                        {sz.metrics.monthlyRate > 0 && sz.metrics.estAdditionalLeads > 0
+                          ? formatCurrency(Math.round((sz.metrics.monthlyRate / 100) / Math.max(sz.metrics.estAdditionalLeads, 1)))
+                          : "N/A"}
+                      </TableCell>
+                      <TableCell className="text-center font-medium">
+                        {sz.metrics.estAdditionalLeads || 0}
+                      </TableCell>
+                      <TableCell className="text-center hidden sm:table-cell">
+                        {sz.metrics.avgHomeValue > 0 ? formatCompact(sz.metrics.avgHomeValue) : "N/A"}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {sz.metrics.isFull ? (
+                          <span className="text-red-500 text-sm">0%</span>
+                        ) : (
+                          <span className="text-sm">{Math.round((sz.metrics.spotsRemaining / sz.metrics.maxAgents) * 100)}%</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center gap-1 justify-end">
+                          {!sz.metrics.alreadyClaimed && !sz.metrics.isFull ? (
+                            <Button
+                              size="sm"
+                              variant="link"
+                              className="text-primary h-auto p-0 text-xs"
+                              onClick={() => onClaimZip(sz.zipCode)}
+                              disabled={claiming}
+                            >
+                              Select ZIP
+                            </Button>
+                          ) : sz.metrics.alreadyClaimed ? (
+                            <Badge variant="secondary" className="text-[10px]">Claimed</Badge>
+                          ) : (
+                            <Badge variant="destructive" className="text-[10px]">Full</Badge>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-muted-foreground"
+                            onClick={() => removeSelectedZip(sz.zipCode)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </>
+                  ) : (
+                    <>
+                      <TableCell className="font-bold text-sm">{sz.zipCode}</TableCell>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground text-sm">No data available</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0 text-muted-foreground"
+                          onClick={() => removeSelectedZip(sz.zipCode)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function LeadGenerationPage() {
@@ -1132,13 +1365,15 @@ export default function LeadGenerationPage() {
                 ZIP Code Map
               </CardTitle>
               <CardDescription>
-                Search for zip codes to view market data and claim new areas. Click a marker to see detailed metrics.
+                Zoom in or search a ZIP to see boundaries. Click any zip code area to view metrics and claim it.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ZipMapView
                 claimedZips={zipCodes}
                 onSelectZip={handleMapSelectZip}
+                onClaimZip={(zip) => claimZipMutation.mutate(zip)}
+                claiming={claimZipMutation.isPending}
               />
             </CardContent>
           </Card>
