@@ -155,7 +155,7 @@ function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={isSidebarOpen}>
-      <div className="flex min-h-screen bg-background w-full overflow-x-hidden">
+      <div className="flex min-h-screen bg-background w-full overflow-x-clip">
         {user && !isMobile && (
           <div className={`flex-none transition-all duration-200 ease-in-out ${
             isSidebarOpen ? 'w-[220px]' : 'w-[60px]'
@@ -530,7 +530,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             </Sidebar>
           </div>
         )}
-        <main className="flex-1 min-h-screen w-full overflow-x-hidden relative">
+        <main className="flex-1 min-h-screen w-full overflow-x-clip relative">
           {user && (
             <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
               <div className="flex items-center justify-between px-4 py-2">
