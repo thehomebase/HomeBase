@@ -13,6 +13,7 @@ import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, type EmailAttachment } from "./gmail-service";
 import { randomUUID } from "crypto";
+import { getEstimatedHomeValue } from "./zip-home-values";
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -5234,7 +5235,7 @@ export function registerRoutes(app: Express): Server {
         ? Math.round((estMonthlyLeads / agentCount) * 10) / 10
         : estMonthlyLeads;
 
-      const avgHomeValue = Number(txStats.avg_home_value) || 0;
+      const avgHomeValue = Number(txStats.avg_home_value) || getEstimatedHomeValue(zipCode);
       const avgCommission = avgHomeValue * 0.03;
       const estSixMonthLeads = Number(leadStats.six_month_leads) || 0;
       const estLeadsForAgent = agentCount > 0 ? Math.round((estSixMonthLeads / agentCount) * 10) / 10 : estSixMonthLeads;
