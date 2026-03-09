@@ -1064,7 +1064,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/communications/metrics", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (!["agent", "vendor", "lender"].includes(req.user.role)) return res.sendStatus(403);
+    if (!["agent", "broker", "vendor", "lender"].includes(req.user.role)) return res.sendStatus(403);
     try {
       const parsedContactId = req.query.contactId ? parseInt(req.query.contactId as string) : undefined;
       const contactId = parsedContactId && Number.isFinite(parsedContactId) ? parsedContactId : undefined;
@@ -5508,7 +5508,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/leads/response-metrics", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== 'agent') return res.status(403).json({ error: 'Forbidden' });
+    if (!req.isAuthenticated() || (req.user.role !== 'agent' && req.user.role !== 'broker')) return res.status(403).json({ error: 'Forbidden' });
     try {
       const metrics = await storage.getAgentResponseMetrics(req.user.id);
       res.json(metrics);

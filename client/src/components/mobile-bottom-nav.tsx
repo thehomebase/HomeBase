@@ -28,6 +28,8 @@ import {
   Check,
   Moon,
   Sun,
+  Briefcase,
+  DollarSign,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -74,6 +76,30 @@ function getAllNavItems(role: string | undefined): NavItem[] {
     ];
   }
 
+  if (role === "broker") {
+    return [
+      { icon: FileText, label: "Deals", href: "/transactions", id: "transactions" },
+      { icon: Users, label: "Clients", href: "/clients", id: "clients" },
+      { icon: MessageSquare, label: "Messages", href: "/messages", id: "messages" },
+      { icon: Briefcase, label: "Broker Portal", href: "/broker-portal", id: "broker-portal" },
+      { icon: DollarSign, label: "Commissions", href: "/commissions", id: "commissions" },
+      { icon: Search, label: "Search", href: "/property-search", id: "search" },
+      { icon: BarChart3, label: "Data", href: "/data", id: "data" },
+      { icon: Wrench, label: "Contractors", href: "/contractors", id: "contractors" },
+      { icon: Map, label: "Map", href: "/map", id: "map" },
+      { icon: Store, label: "HomeBase Pros", href: "/marketplace", id: "marketplace" },
+      { icon: HardHat, label: "My Team", href: "/my-team", id: "my-team" },
+      { icon: Home, label: "MyHome", href: "/my-home", id: "my-home" },
+      { icon: Star, label: "Find Agents", href: "/top-agents", id: "top-agents" },
+      { icon: Calendar, label: "Calendar", href: "/calendar", id: "calendar" },
+      { icon: Mail, label: "Mail", href: "/mail", id: "mail" },
+      { icon: Gift, label: "Referrals", href: "/referrals", id: "referrals" },
+      { icon: Bell, label: "Drip Campaigns", href: "/drip", id: "drip" },
+      { icon: MapPin, label: "Lead Gen", href: "/lead-gen", id: "lead-gen" },
+      { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
+    ];
+  }
+
   if (role === "client") {
     return [
       { icon: FileText, label: "Transaction", href: "/my-transaction", id: "my-transaction" },
@@ -115,6 +141,7 @@ function getDefaultSelectedIds(role: string | undefined): string[] {
   if (role === "vendor") return ["vendor-portal", "messages", "marketplace", "more"];
   if (role === "lender") return ["lender-portal", "messages", "search", "more"];
   if (role === "client") return ["my-transaction", "messages", "search", "more"];
+  if (role === "broker") return ["transactions", "broker-portal", "messages", "more"];
   return ["transactions", "clients", "messages", "more"];
 }
 
