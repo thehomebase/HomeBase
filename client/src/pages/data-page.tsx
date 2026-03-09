@@ -103,7 +103,7 @@ export default function DataPage() {
   // Query transactions data
   const { data: transactions = [], isLoading, error } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
-    enabled: !!user && user.role === "agent",
+    enabled: !!user && (user.role === "agent" || user.role === "broker"),
   });
 
   const currentYear = new Date().getFullYear();

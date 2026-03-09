@@ -134,7 +134,7 @@ export default function TransactionsPage() {
         return [];
       }
     },
-    enabled: !!user && user.role === "agent",
+    enabled: !!user && (user.role === "agent" || user.role === "broker"),
     staleTime: 5 * 60 * 1000,
     retry: false, // Don't retry on failure
   });
@@ -188,7 +188,7 @@ export default function TransactionsPage() {
         return [];
       }
     },
-    enabled: !!user && user.role === "agent",
+    enabled: !!user && (user.role === "agent" || user.role === "broker"),
     staleTime: 2 * 60 * 1000,
     retry: false,
   });
@@ -264,7 +264,7 @@ export default function TransactionsPage() {
   };
 
   const handleDeleteTransaction = (id: number) => {
-    if (user?.role === "agent") {
+    if (user?.role === "agent" || user?.role === "broker") {
       deleteTransactionMutation.mutate(id);
     }
   };
@@ -365,7 +365,7 @@ export default function TransactionsPage() {
                 </option>
               ))}
             </select>
-            {user?.role === "agent" && (
+            {(user?.role === "agent" || user?.role === "broker") && (
               <Dialog open={showNewTransactionDialog} onOpenChange={setShowNewTransactionDialog}>
                 <DialogTrigger asChild>
                   <Button className="whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 font-bold" size="sm">
@@ -482,7 +482,7 @@ export default function TransactionsPage() {
                           </FormItem>
                         )}
                       />
-                      {user?.role === "agent" && (
+                      {(user?.role === "agent" || user?.role === "broker") && (
                         <div className="space-y-4">
                           <FormField
                             control={form.control}
@@ -561,7 +561,7 @@ export default function TransactionsPage() {
           </div>
         </div>
         
-        {user?.role === "agent" && !alertsDismissed && totalAlerts > 0 && (
+        {(user?.role === "agent" || user?.role === "broker") && !alertsDismissed && totalAlerts > 0 && (
           <div className="w-full mt-4">
             <div className={cn(
               "rounded-lg border p-4",
@@ -665,7 +665,7 @@ export default function TransactionsPage() {
                   >
                     {transaction.streetName}
                   </CardTitle>
-                  {user?.role === "agent" && (
+                  {(user?.role === "agent" || user?.role === "broker") && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -702,7 +702,7 @@ export default function TransactionsPage() {
             {filteredTransactions.length === 0 && (
               <div className="col-span-full text-center py-12 text-muted-foreground">
                 No transactions found.{" "}
-                {user?.role === "agent" ? (
+                {(user?.role === "agent" || user?.role === "broker") ? (
                   <div className="mt-4">
                     <Button onClick={() => setShowNewTransactionDialog(true)}>
                       New Transaction

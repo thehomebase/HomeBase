@@ -55,6 +55,8 @@ Preferred communication style: Simple, everyday language.
     2. **Notifications**: Create/send notifications to all brokerage agents with priority levels (normal/info/urgent). Sent notifications list with read counts.
     3. **Sales Competitions**: Create competitions with metrics (calls/emails/texts/conversions/commissions/total_activity), date ranges, and prizes. Live leaderboard with crown/medal/award icons for top 3. Active/upcoming/completed sections.
   - Broker-to-agent linking via `users.brokerageId` — agents with matching `brokerageId` appear in the broker's portal.
+  - Brokers also have full agent capabilities (transactions, clients, contractors, map, mail, referrals, drip campaigns, lead gen) since real estate brokers often handle their own deals.
+  - All backend `role !== "agent"` checks also allow `"broker"` role, except notification reads (agent-only).
   - DB tables: `broker_notifications`, `broker_notification_reads`, `sales_competitions`.
   - APIs: `/api/broker/agents`, `/api/broker/metrics`, `/api/broker/agent/:id/metrics`, `/api/broker/notifications`, `/api/broker/competitions`, `/api/broker/competitions/:id/leaderboard`, `/api/notifications`, `/api/notifications/:id/read`.
   - Key file: `client/src/pages/broker-portal-page.tsx`.

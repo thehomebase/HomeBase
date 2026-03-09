@@ -1415,7 +1415,7 @@ export class DatabaseStorage implements IStorage {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
 
-    if (role === "agent") {
+    if (role === "agent" || role === "broker") {
       const txResult = await db.execute(sql`
         SELECT status, COUNT(*)::int as count, COALESCE(SUM(contract_price), 0)::bigint as total_value
         FROM transactions WHERE agent_id = ${userId}

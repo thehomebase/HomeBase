@@ -503,7 +503,7 @@ function ContractorDetail({
           <p className="text-muted-foreground mt-3">{contractor.description}</p>
         )}
         
-        {user?.role === "agent" && (
+        {(user?.role === "agent" || user?.role === "broker") && (
           <div className="mt-4">
             {recommendationData?.hasRecommended ? (
               <Button 
@@ -817,7 +817,7 @@ export default function ContractorsPage() {
           <h1 className="text-2xl font-bold">Trusted Contractors</h1>
           <p className="text-muted-foreground">Find and recommend trusted home service professionals</p>
         </div>
-        {user.role === "agent" && (
+        {(user.role === "agent" || user.role === "broker") && (
           <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-contractor">
             <Plus className="h-4 w-4 mr-2" />
             Add Contractor
@@ -922,7 +922,7 @@ export default function ContractorsPage() {
               ? "Start building your trusted contractor network by adding your first contractor."
               : "Try adjusting your search or filter criteria."}
           </p>
-          {user.role === "agent" && contractors.length === 0 && (
+          {(user.role === "agent" || user.role === "broker") && contractors.length === 0 && (
             <Button onClick={() => setShowAddDialog(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add Your First Contractor

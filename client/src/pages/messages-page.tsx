@@ -180,7 +180,7 @@ export default function MessagesPage() {
     enabled: !!user && newChatOpen,
   });
 
-  const canSeeMetrics = !!user && (user.role === "agent" || user.role === "vendor" || user.role === "lender");
+  const canSeeMetrics = !!user && (user.role === "agent" || user.role === "broker" || user.role === "vendor" || user.role === "lender");
 
   const metricsUrl = metricsContactId
     ? `/api/communications/metrics?contactId=${metricsContactId}`

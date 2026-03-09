@@ -993,7 +993,7 @@ export default function ClientsPage() {
 
   const { data: invitations = [] } = useQuery<ClientInvitation[]>({
     queryKey: ["/api/client-invitations"],
-    enabled: !!user && user.role === "agent",
+    enabled: !!user && (user.role === "agent" || user.role === "broker"),
   });
 
   const inviteClientMutation = useMutation({
@@ -1142,7 +1142,7 @@ export default function ClientsPage() {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
-            {user?.role === "agent" && (
+            {(user?.role === "agent" || user?.role === "broker") && (
               <>
                 <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
                   <DialogTrigger asChild>
@@ -1519,7 +1519,7 @@ export default function ClientsPage() {
 
       </div>
 
-      {user?.role === "agent" && invitations.length > 0 && (
+      {(user?.role === "agent" || user?.role === "broker") && invitations.length > 0 && (
         <Card className="w-full mb-4">
           <CardHeader className="py-3 px-4">
             <CardTitle className="text-sm font-medium flex items-center gap-2">

@@ -102,7 +102,7 @@ export default function TransactionPage() {
     },
   });
 
-  const isAgent = user?.role === 'agent';
+  const isAgent = user?.role === 'agent' || user?.role === 'broker';
   const [showInviteLender, setShowInviteLender] = useState(false);
   const [selectedLenderId, setSelectedLenderId] = useState<string>("");
 

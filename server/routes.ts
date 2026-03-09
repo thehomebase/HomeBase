@@ -351,7 +351,7 @@ export function registerRoutes(app: Express): Server {
       return res.sendStatus(401);
     }
 
-    if (req.user.role !== "agent") {
+    if (req.user.role !== "agent" && req.user.role !== "broker") {
       console.log('Role check failed, user role:', req.user.role);
       return res.sendStatus(403);
     }
@@ -402,7 +402,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/clients/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -435,7 +435,7 @@ export function registerRoutes(app: Express): Server {
   // Client Excel Import
   app.post("/api/clients/import", upload.single('file'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
     try {
       if (!req.file) {
@@ -573,7 +573,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/transactions/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -588,7 +588,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/transactions/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -622,7 +622,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/transactions", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -982,7 +982,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/contacts/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
     try {
@@ -1337,7 +1337,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/contractors", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -1358,7 +1358,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/contractors/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -1389,7 +1389,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/contractors/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -1451,7 +1451,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/contractors/:contractorId/reviews/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -1483,7 +1483,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/contractors/:id/recommend", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -1498,7 +1498,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/contractors/:id/recommend", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -1514,7 +1514,7 @@ export function registerRoutes(app: Express): Server {
 
   // Vendor Ratings
   app.post("/api/contractors/:id/ratings", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -1698,7 +1698,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/viewings", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -1722,7 +1722,7 @@ export function registerRoutes(app: Express): Server {
 
   app.patch("/api/viewings/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
     try {
       const viewing = await storage.getViewing(Number(req.params.id));
@@ -1750,7 +1750,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/viewings/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -1867,7 +1867,7 @@ export function registerRoutes(app: Express): Server {
 
   // Map data endpoints
   app.get("/api/map/transactions", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
     
@@ -1915,7 +1915,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/transactions/:id/geocode", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
     
@@ -1954,7 +1954,7 @@ export function registerRoutes(app: Express): Server {
 
   // Route planning endpoint using OSRM
   app.post("/api/route-plan", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
       return res.sendStatus(401);
     }
 
@@ -2252,7 +2252,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/saved-properties/showing-requests", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const properties = await storage.getShowingRequestedProperties(req.user.id);
       res.json(properties);
@@ -2533,7 +2533,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/communications/status", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const [agentPhone, gmailStatus] = await Promise.all([
         storage.getAgentPhoneNumber(req.user.id),
@@ -2554,7 +2554,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/phone-number", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const agentPhone = await storage.getAgentPhoneNumber(req.user.id);
       res.json({ phoneNumber: agentPhone });
@@ -2565,7 +2565,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/phone-number/search", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const existing = await storage.getAgentPhoneNumber(req.user.id);
       if (existing) {
@@ -2585,7 +2585,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/phone-number/purchase", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const existing = await storage.getAgentPhoneNumber(req.user.id);
       if (existing) {
@@ -2623,7 +2623,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/phone-number/release", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const existing = await storage.getAgentPhoneNumber(req.user.id);
       if (!existing) {
@@ -2645,7 +2645,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/gmail/auth-url", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const crypto = await import("crypto");
       const nonce = crypto.randomBytes(32).toString("hex");
@@ -2692,7 +2692,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/gmail/signature", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const result = await getSignature(req.user.id);
       res.json(result);
@@ -2703,7 +2703,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/gmail/disconnect", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       await disconnectGmail(req.user.id);
       res.json({ success: true });
@@ -2715,7 +2715,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/gmail/messages/:clientId", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const clientId = Number(req.params.clientId);
       const client = await storage.getClient(clientId);
@@ -2735,7 +2735,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/gmail/inbox", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const { pageToken, q, label, maxResults } = req.query;
       const parsedMax = maxResults ? Math.min(Number(maxResults), 50) : 25;
@@ -2754,7 +2754,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/gmail/message/:messageId", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const result = await getGmailMessageDetail(req.user.id, req.params.messageId);
       if (!result.message) {
@@ -2769,7 +2769,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/communications/:clientId", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const clientId = Number(req.params.clientId);
       const client = await storage.getClient(clientId);
@@ -2789,7 +2789,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/communications/sms", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const schema = z.object({
         clientId: z.number(),
@@ -2915,7 +2915,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/sms/limits", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const [dailyCount, uniqueRecipients] = await Promise.all([
         storage.getSmsSentCountToday(req.user.id),
@@ -2935,7 +2935,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/communications/email", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const schema = z.object({
         clientId: z.number(),
@@ -2982,7 +2982,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/communications/call", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const schema = z.object({
         clientId: z.number(),
@@ -3024,7 +3024,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/gmail/send", upload.array("attachments", 10), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const { to, cc, subject, body } = req.body;
       const sendSchema = z.object({
@@ -3085,7 +3085,7 @@ export function registerRoutes(app: Express): Server {
   // ============ Gmail Bulk Actions ============
   app.post("/api/gmail/batch-modify", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     const schema = z.object({
       messageIds: z.array(z.string()).min(1),
       addLabelIds: z.array(z.string()).optional(),
@@ -3100,7 +3100,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/gmail/trash", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     const schema = z.object({
       messageIds: z.array(z.string()).min(1),
     });
@@ -3113,7 +3113,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/gmail/labels", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     const result = await getGmailLabels(req.user.id);
     if (result.error) return res.status(400).json({ error: result.error });
     res.json(result.labels);
@@ -3122,14 +3122,14 @@ export function registerRoutes(app: Express): Server {
   // ============ Email Snippets ============
   app.get("/api/snippets", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     const snippets = await storage.getSnippetsByUser(req.user.id);
     res.json(snippets);
   });
 
   app.post("/api/snippets", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     const schema = z.object({
       title: z.string().min(1, "Title is required"),
       body: z.string().min(1, "Body is required"),
@@ -3142,7 +3142,7 @@ export function registerRoutes(app: Express): Server {
 
   app.patch("/api/snippets/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     const id = parseInt(req.params.id);
     const existing = await storage.getSnippet(id);
     if (!existing || existing.userId !== req.user.id) return res.sendStatus(404);
@@ -3158,7 +3158,7 @@ export function registerRoutes(app: Express): Server {
 
   app.delete("/api/snippets/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     const id = parseInt(req.params.id);
     const existing = await storage.getSnippet(id);
     if (!existing || existing.userId !== req.user.id) return res.sendStatus(404);
@@ -3184,7 +3184,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/email-tracking", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     const tracking = await storage.getEmailTrackingByUser(req.user.id);
     res.json(tracking);
   });
@@ -3214,7 +3214,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/alerts", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const { generateAgentAlerts } = await import("./timeline-service");
       const alerts = await generateAgentAlerts(req.user.id);
@@ -3259,7 +3259,7 @@ export function registerRoutes(app: Express): Server {
 
   // ============ Inspection Items ============
   app.post("/api/transactions/:id/parse-inspection", upload.single('file'), async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
@@ -3347,7 +3347,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/transactions/:id/inspection-items", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const transactionId = Number(req.params.id);
       const transaction = await storage.getTransaction(transactionId);
@@ -3396,7 +3396,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/inspection-items/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const id = Number(req.params.id);
       const allowedFields = ['category', 'description', 'severity', 'location', 'status', 'notes'];
@@ -3415,7 +3415,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/inspection-items/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       await storage.deleteInspectionItem(Number(req.params.id));
       res.sendStatus(200);
@@ -3427,7 +3427,7 @@ export function registerRoutes(app: Express): Server {
 
   // ============ Bid Requests ============
   app.post("/api/inspection-items/:id/send-bids", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const inspectionItemId = Number(req.params.id);
       const { contractorIds, transactionId } = req.body;
@@ -3638,7 +3638,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/bids/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const id = Number(req.params.id);
       const allowedFields = ['status'];
@@ -3673,7 +3673,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/referral/generate", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const existing = await storage.getReferralCodeByAgent(req.user.id);
       if (existing) {
@@ -3692,7 +3692,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/referral/my-code", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const referralCode = await storage.getReferralCodeByAgent(req.user.id);
       if (!referralCode) {
@@ -4273,7 +4273,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/drip/campaigns", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const parsed = insertDripCampaignSchema.safeParse({ ...req.body, agentId: req.user.id });
       if (!parsed.success) return res.status(400).json(parsed.error);
@@ -4300,7 +4300,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/drip/campaigns/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const existing = await storage.getDripCampaign(Number(req.params.id));
       if (!existing) return res.status(404).json({ error: 'Campaign not found' });
@@ -4314,7 +4314,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/drip/campaigns/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const existing = await storage.getDripCampaign(Number(req.params.id));
       if (!existing) return res.status(404).json({ error: 'Campaign not found' });
@@ -4328,7 +4328,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/drip/campaigns/:id/steps", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const campaignId = Number(req.params.id);
       const campaign = await storage.getDripCampaign(campaignId);
@@ -4345,7 +4345,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/drip/campaigns/:id/steps/:stepId", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const campaign = await storage.getDripCampaign(Number(req.params.id));
       if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
@@ -4359,7 +4359,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/drip/campaigns/:id/steps/:stepId", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const campaign = await storage.getDripCampaign(Number(req.params.id));
       if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
@@ -4373,7 +4373,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/drip/campaigns/:id/enroll", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const campaignId = Number(req.params.id);
       const campaign = await storage.getDripCampaign(campaignId);
@@ -4417,7 +4417,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/drip/enrollments/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const { status } = req.body;
       if (!status || !['active', 'paused', 'completed', 'canceled'].includes(status)) {
@@ -4446,7 +4446,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/drip/special-dates", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const parsed = insertClientSpecialDateSchema.safeParse({ ...req.body, agentId: req.user.id });
       if (!parsed.success) return res.status(400).json(parsed.error);
@@ -4459,7 +4459,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/drip/special-dates/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const existing = await storage.getClientSpecialDate(Number(req.params.id));
       if (!existing) return res.status(404).json({ error: 'Special date not found' });
@@ -4473,7 +4473,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/drip/special-dates/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent") return res.sendStatus(401);
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {
       const existing = await storage.getClientSpecialDate(Number(req.params.id));
       if (!existing) return res.status(404).json({ error: 'Special date not found' });
@@ -4596,7 +4596,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/leads/zip-pricing/:zipCode", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
     try {
       const zipCode = req.params.zipCode.trim();
@@ -4635,7 +4635,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/leads/zip-codes", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
     try {
       const { zipCode } = req.body;
@@ -4684,7 +4684,7 @@ export function registerRoutes(app: Express): Server {
 
   app.delete("/api/leads/zip-codes/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
     try {
       const id = Number(req.params.id);
@@ -4704,7 +4704,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/leads/zip-codes", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
     try {
       const zips = await storage.getAgentZipCodes(req.user.id);
@@ -4905,7 +4905,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/leads", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
     try {
       const leads = await storage.getLeadsByAgent(req.user.id);
@@ -4918,7 +4918,7 @@ export function registerRoutes(app: Express): Server {
 
   app.patch("/api/leads/:id/status", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
     try {
       const id = Number(req.params.id);
@@ -4970,7 +4970,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/leads/stats", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
     try {
       const leads = await storage.getLeadsByAgent(req.user.id);
@@ -5725,7 +5725,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/client-invitations", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent") return res.sendStatus(403);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
     try {
       const { email, firstName, lastName, clientRecordId } = req.body;

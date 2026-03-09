@@ -267,7 +267,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                         </SidebarMenuItem>
                       </>
                     )}
-                    {!isClient && !isVendor && !isLender && !isBroker && (
+                    {!isClient && !isVendor && !isLender && (
                       <>
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Dashboard">
@@ -293,7 +293,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
-                        {user?.role === "agent" && (
+                        {(user?.role === "agent" || user?.role === "broker") && (
                           <>
                             <SidebarMenuItem>
                               <SidebarMenuButton asChild tooltip="Data">
@@ -379,7 +379,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                    {user?.role === "agent" && (
+                    {(user?.role === "agent" || user?.role === "broker") && (
                       <>
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Mail">
@@ -593,6 +593,45 @@ function Router() {
           </Route>
           <Route path="/broker-portal">
             <ProtectedRoute path="/broker-portal" component={BrokerPortalPage} />
+          </Route>
+          <Route path="/transactions/:id/inspection">
+            <ProtectedRoute path="/transactions/:id/inspection" component={InspectionReviewPage} />
+          </Route>
+          <Route path="/transactions/:id/bids">
+            <ProtectedRoute path="/transactions/:id/bids" component={BidComparisonPage} />
+          </Route>
+          <Route path="/transactions/:id">
+            <ProtectedRoute path="/transactions/:id" component={TransactionPage} />
+          </Route>
+          <Route path="/transactions">
+            <ProtectedRoute path="/transactions" component={TransactionsPage} />
+          </Route>
+          <Route path="/clients">
+            <ProtectedRoute path="/clients" component={ClientsPage} />
+          </Route>
+          <Route path="/clients/:id">
+            <ProtectedRoute path="/clients/:id" component={ClientPage} />
+          </Route>
+          <Route path="/data">
+            <ProtectedRoute path="/data" component={DataPage} />
+          </Route>
+          <Route path="/contractors">
+            <ProtectedRoute path="/contractors" component={ContractorsPage} />
+          </Route>
+          <Route path="/map">
+            <ProtectedRoute path="/map" component={MapPage} />
+          </Route>
+          <Route path="/mail">
+            <ProtectedRoute path="/mail" component={MailPage} />
+          </Route>
+          <Route path="/referrals">
+            <ProtectedRoute path="/referrals" component={ReferralPage} />
+          </Route>
+          <Route path="/drip">
+            <ProtectedRoute path="/drip" component={DripCampaignsPage} />
+          </Route>
+          <Route path="/lead-gen">
+            <ProtectedRoute path="/lead-gen" component={LeadGenerationPage} />
           </Route>
           <Route path="/billing">
             <ProtectedRoute path="/billing" component={BillingPage} />

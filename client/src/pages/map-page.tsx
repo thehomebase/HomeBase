@@ -134,7 +134,7 @@ export default function MapPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  const isAgent = user?.role === "agent";
+  const isAgent = user?.role === "agent" || user?.role === "broker";
   
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
