@@ -7,10 +7,16 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton
 } from "./components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Switch, Route, Link } from "wouter";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
@@ -53,7 +59,9 @@ import {
   MapPin,
   Star,
   LayoutDashboard,
-  DollarSign
+  DollarSign,
+  Briefcase,
+  ChevronDown
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -173,16 +181,26 @@ function Layout({ children }: { children: React.ReactNode }) {
               <SidebarContent>
                 <SidebarGroup>
                   <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="Dashboard">
+                        <Link href="/dashboard" className="flex items-center gap-2">
+                          <LayoutDashboard className="h-4 w-4" />
+                          {isSidebarOpen && <span>Dashboard</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    {isBroker && (
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Broker Portal">
+                          <Link href="/broker-portal" className="flex items-center gap-2">
+                            <Briefcase className="h-4 w-4" />
+                            {isSidebarOpen && <span>Broker Portal</span>}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )}
                     {isVendor && (
                       <>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Dashboard">
-                            <Link href="/dashboard" className="flex items-center gap-2">
-                              <LayoutDashboard className="h-4 w-4" />
-                              {isSidebarOpen && <span>Dashboard</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Vendor Portal">
                             <Link href="/vendor" className="flex items-center gap-2">
@@ -218,277 +236,285 @@ function Layout({ children }: { children: React.ReactNode }) {
                       </>
                     )}
                     {isLender && (
-                      <>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Dashboard">
-                            <Link href="/dashboard" className="flex items-center gap-2">
-                              <LayoutDashboard className="h-4 w-4" />
-                              {isSidebarOpen && <span>Dashboard</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Loan Pipeline">
-                            <Link href="/lender-portal" className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              {isSidebarOpen && <span>Loan Pipeline</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      </>
-                    )}
-                    {isBroker && (
-                      <>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Dashboard">
-                            <Link href="/dashboard" className="flex items-center gap-2">
-                              <LayoutDashboard className="h-4 w-4" />
-                              {isSidebarOpen && <span>Dashboard</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Broker Portal">
-                            <Link href="/broker-portal" className="flex items-center gap-2">
-                              <BarChart3 className="h-4 w-4" />
-                              {isSidebarOpen && <span>Broker Portal</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      </>
-                    )}
-                    {isClient && (
-                      <>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Dashboard">
-                            <Link href="/dashboard" className="flex items-center gap-2">
-                              <LayoutDashboard className="h-4 w-4" />
-                              {isSidebarOpen && <span>Dashboard</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="My Transaction">
-                            <Link href="/my-transaction" className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              {isSidebarOpen && <span>My Transaction</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      </>
-                    )}
-                    {!isClient && !isVendor && !isLender && (
-                      <>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Dashboard">
-                            <Link href="/dashboard" className="flex items-center gap-2">
-                              <LayoutDashboard className="h-4 w-4" />
-                              {isSidebarOpen && <span>Dashboard</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Transactions">
-                            <Link href="/transactions" className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              {isSidebarOpen && <span>Transactions</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Commissions">
-                            <Link href="/commissions" className="flex items-center gap-2">
-                              <DollarSign className="h-4 w-4" />
-                              {isSidebarOpen && <span>Commissions</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Clients">
-                            <Link href="/clients" className="flex items-center gap-2">
-                              <Users className="h-4 w-4" />
-                              {isSidebarOpen && <span>Clients</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        {(user?.role === "agent" || user?.role === "broker") && (
-                          <>
-                            <SidebarMenuItem>
-                              <SidebarMenuButton asChild tooltip="Open Houses">
-                                <Link href="/open-houses" className="flex items-center gap-2">
-                                  <Home className="h-4 w-4" />
-                                  {isSidebarOpen && <span>Open Houses</span>}
-                                </Link>
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                              <SidebarMenuButton asChild tooltip="Data">
-                                <Link href="/data" className="flex items-center gap-2">
-                                  <BarChart3 className="h-4 w-4" />
-                                  {isSidebarOpen && <span>Data</span>}
-                                </Link>
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                            <SidebarMenuItem>
-                              <SidebarMenuButton asChild tooltip="Map">
-                                <Link href="/map" className="flex items-center gap-2">
-                                  <Map className="h-4 w-4" />
-                                  {isSidebarOpen && <span>Map</span>}
-                                </Link>
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                          </>
-                        )}
-                      </>
-                    )}
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="HomeBase Pros">
-                        <Link href="/marketplace" className="flex items-center gap-2">
-                          <Store className="h-4 w-4" />
-                          {isSidebarOpen && <span>HomeBase Pros</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="My Team">
-                        <Link href="/my-team" className="flex items-center gap-2">
-                          <HardHat className="h-4 w-4" />
-                          {isSidebarOpen && <span>My Team</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="MyHome">
-                        <Link href="/my-home" className="flex items-center gap-2">
-                          <Home className="h-4 w-4" />
-                          {isSidebarOpen && <span>MyHome</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="Find Agents">
-                        <Link href="/top-agents" className="flex items-center gap-2">
-                          <Star className="h-4 w-4" />
-                          {isSidebarOpen && <span>Find Agents</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="Property Search">
-                        <Link href="/property-search" className="flex items-center gap-2">
-                          <Search className="h-4 w-4" />
-                          {isSidebarOpen && <span>Property Search</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="Calendar">
-                        <Link href="/calendar" className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          {isSidebarOpen && <span>Calendar</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="Messages">
-                        <Link href="/messages" className="flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4" />
-                          {isSidebarOpen && <span>Messages</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    {(user?.role === "agent" || user?.role === "broker") && (
                       <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Reminders">
-                          <Link href="/reminders" className="flex items-center gap-2">
-                            <Bell className="h-4 w-4" />
-                            {isSidebarOpen && <span>Reminders</span>}
+                        <SidebarMenuButton asChild tooltip="Loan Pipeline">
+                          <Link href="/lender-portal" className="flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            {isSidebarOpen && <span>Loan Pipeline</span>}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     )}
-                    {(user?.role === "agent" || user?.role === "broker") && (
-                      <>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Mail">
-                            <Link href="/mail" className="flex items-center gap-2">
-                              <Mail className="h-4 w-4" />
-                              {isSidebarOpen && <span>Mail</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Referrals">
-                            <Link href="/referrals" className="flex items-center gap-2">
-                              <Gift className="h-4 w-4" />
-                              {isSidebarOpen && <span>Referrals</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Drip Campaigns">
-                            <Link href="/drip" className="flex items-center gap-2">
-                              <Bell className="h-4 w-4" />
-                              {isSidebarOpen && <span>Drip Campaigns</span>}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Lead Gen">
-                            <Link href="/lead-gen" className="flex items-center gap-2">
-                              <div className="relative">
-                                <MapPin className="h-4 w-4" />
-                                {newLeadCount > 0 && !isSidebarOpen && (
-                                  <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-0.5 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
-                                    {newLeadCount > 99 ? "99+" : newLeadCount}
-                                  </span>
-                                )}
-                              </div>
-                              {isSidebarOpen && (
-                                <span className="flex items-center gap-2">
-                                  Lead Gen
-                                  {newLeadCount > 0 && (
-                                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                                      {newLeadCount}
-                                    </span>
-                                  )}
-                                </span>
-                              )}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      </>
-                    )}
-                    {(user?.role === 'agent' || user?.role === 'vendor') && (
-                      <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Billing">
-                          <Link href="/billing" className="flex items-center gap-2">
-                            <CreditCard className="h-4 w-4" />
-                            {isSidebarOpen && <span>Billing</span>}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    )}
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip="Calculators">
-                        <Link href="/calculators" className="flex items-center gap-2">
-                          <Calculator className="h-4 w-4" />
-                          {isSidebarOpen && <span>Calculators</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
                     {isClient && (
                       <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Glossary">
-                          <Link href="/glossary" className="flex items-center gap-2">
-                            <Book className="h-4 w-4" />
-                            <span className="hidden md:inline">Glossary</span>
+                        <SidebarMenuButton asChild tooltip="My Transaction">
+                          <Link href="/my-transaction" className="flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            {isSidebarOpen && <span>My Transaction</span>}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     )}
                   </SidebarMenu>
                 </SidebarGroup>
+
+                {isAgentOrBroker && (
+                  <Collapsible defaultOpen className="group/deals">
+                    <SidebarGroup>
+                      <SidebarGroupLabel asChild>
+                        <CollapsibleTrigger className="flex w-full items-center justify-between">
+                          {isSidebarOpen ? "Deals & Clients" : ""}
+                          {isSidebarOpen && <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/deals:rotate-0 group-data-[state=closed]/deals:-rotate-90" />}
+                        </CollapsibleTrigger>
+                      </SidebarGroupLabel>
+                      <CollapsibleContent>
+                        <SidebarMenu>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Transactions">
+                              <Link href="/transactions" className="flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                {isSidebarOpen && <span>Transactions</span>}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Commissions">
+                              <Link href="/commissions" className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4" />
+                                {isSidebarOpen && <span>Commissions</span>}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Clients">
+                              <Link href="/clients" className="flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                {isSidebarOpen && <span>Clients</span>}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        </SidebarMenu>
+                      </CollapsibleContent>
+                    </SidebarGroup>
+                  </Collapsible>
+                )}
+
+                {isAgentOrBroker && (
+                  <Collapsible defaultOpen className="group/marketing">
+                    <SidebarGroup>
+                      <SidebarGroupLabel asChild>
+                        <CollapsibleTrigger className="flex w-full items-center justify-between">
+                          {isSidebarOpen ? "Marketing & Growth" : ""}
+                          {isSidebarOpen && <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/marketing:rotate-0 group-data-[state=closed]/marketing:-rotate-90" />}
+                        </CollapsibleTrigger>
+                      </SidebarGroupLabel>
+                      <CollapsibleContent>
+                        <SidebarMenu>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Open Houses">
+                              <Link href="/open-houses" className="flex items-center gap-2">
+                                <Home className="h-4 w-4" />
+                                {isSidebarOpen && <span>Open Houses</span>}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Lead Gen">
+                              <Link href="/lead-gen" className="flex items-center gap-2">
+                                <div className="relative">
+                                  <MapPin className="h-4 w-4" />
+                                  {newLeadCount > 0 && !isSidebarOpen && (
+                                    <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-0.5 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
+                                      {newLeadCount > 99 ? "99+" : newLeadCount}
+                                    </span>
+                                  )}
+                                </div>
+                                {isSidebarOpen && (
+                                  <span className="flex items-center gap-2">
+                                    Lead Gen
+                                    {newLeadCount > 0 && (
+                                      <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                                        {newLeadCount}
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Drip Campaigns">
+                              <Link href="/drip" className="flex items-center gap-2">
+                                <Bell className="h-4 w-4" />
+                                {isSidebarOpen && <span>Drip Campaigns</span>}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Referrals">
+                              <Link href="/referrals" className="flex items-center gap-2">
+                                <Gift className="h-4 w-4" />
+                                {isSidebarOpen && <span>Referrals</span>}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Data">
+                              <Link href="/data" className="flex items-center gap-2">
+                                <BarChart3 className="h-4 w-4" />
+                                {isSidebarOpen && <span>Data</span>}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        </SidebarMenu>
+                      </CollapsibleContent>
+                    </SidebarGroup>
+                  </Collapsible>
+                )}
+
+                <Collapsible defaultOpen className="group/comms">
+                  <SidebarGroup>
+                    <SidebarGroupLabel asChild>
+                      <CollapsibleTrigger className="flex w-full items-center justify-between">
+                        {isSidebarOpen ? "Communication" : ""}
+                        {isSidebarOpen && <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/comms:rotate-0 group-data-[state=closed]/comms:-rotate-90" />}
+                      </CollapsibleTrigger>
+                    </SidebarGroupLabel>
+                    <CollapsibleContent>
+                      <SidebarMenu>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Messages">
+                            <Link href="/messages" className="flex items-center gap-2">
+                              <MessageSquare className="h-4 w-4" />
+                              {isSidebarOpen && <span>Messages</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        {isAgentOrBroker && (
+                          <>
+                            <SidebarMenuItem>
+                              <SidebarMenuButton asChild tooltip="Mail">
+                                <Link href="/mail" className="flex items-center gap-2">
+                                  <Mail className="h-4 w-4" />
+                                  {isSidebarOpen && <span>Mail</span>}
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                              <SidebarMenuButton asChild tooltip="Reminders">
+                                <Link href="/reminders" className="flex items-center gap-2">
+                                  <Bell className="h-4 w-4" />
+                                  {isSidebarOpen && <span>Reminders</span>}
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          </>
+                        )}
+                      </SidebarMenu>
+                    </CollapsibleContent>
+                  </SidebarGroup>
+                </Collapsible>
+
+                <Collapsible defaultOpen className="group/tools">
+                  <SidebarGroup>
+                    <SidebarGroupLabel asChild>
+                      <CollapsibleTrigger className="flex w-full items-center justify-between">
+                        {isSidebarOpen ? "Tools & Services" : ""}
+                        {isSidebarOpen && <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/tools:rotate-0 group-data-[state=closed]/tools:-rotate-90" />}
+                      </CollapsibleTrigger>
+                    </SidebarGroupLabel>
+                    <CollapsibleContent>
+                      <SidebarMenu>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="HomeBase Pros">
+                            <Link href="/marketplace" className="flex items-center gap-2">
+                              <Store className="h-4 w-4" />
+                              {isSidebarOpen && <span>HomeBase Pros</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="My Team">
+                            <Link href="/my-team" className="flex items-center gap-2">
+                              <HardHat className="h-4 w-4" />
+                              {isSidebarOpen && <span>My Team</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Find Agents">
+                            <Link href="/top-agents" className="flex items-center gap-2">
+                              <Star className="h-4 w-4" />
+                              {isSidebarOpen && <span>Find Agents</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Property Search">
+                            <Link href="/property-search" className="flex items-center gap-2">
+                              <Search className="h-4 w-4" />
+                              {isSidebarOpen && <span>Property Search</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        {isAgentOrBroker && (
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Map">
+                              <Link href="/map" className="flex items-center gap-2">
+                                <Map className="h-4 w-4" />
+                                {isSidebarOpen && <span>Map</span>}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        )}
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Calendar">
+                            <Link href="/calendar" className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              {isSidebarOpen && <span>Calendar</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="MyHome">
+                            <Link href="/my-home" className="flex items-center gap-2">
+                              <Home className="h-4 w-4" />
+                              {isSidebarOpen && <span>MyHome</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Calculators">
+                            <Link href="/calculators" className="flex items-center gap-2">
+                              <Calculator className="h-4 w-4" />
+                              {isSidebarOpen && <span>Calculators</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        {isClient && (
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Glossary">
+                              <Link href="/glossary" className="flex items-center gap-2">
+                                <Book className="h-4 w-4" />
+                                {isSidebarOpen && <span>Glossary</span>}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        )}
+                        {(user?.role === 'agent' || user?.role === 'vendor') && (
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Billing">
+                              <Link href="/billing" className="flex items-center gap-2">
+                                <CreditCard className="h-4 w-4" />
+                                {isSidebarOpen && <span>Billing</span>}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        )}
+                      </SidebarMenu>
+                    </CollapsibleContent>
+                  </SidebarGroup>
+                </Collapsible>
               </SidebarContent>
               <SidebarFooter>
                 <div className="p-2">
