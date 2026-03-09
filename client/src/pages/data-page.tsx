@@ -30,6 +30,7 @@ import {
   Building2,
   Clock,
   CheckCircle2,
+  TrendingUp,
   Loader2,
 } from "lucide-react";
 
