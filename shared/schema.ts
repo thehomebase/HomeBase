@@ -49,6 +49,7 @@ export const clients = pgTable("clients", {
   status: text("status").notNull(), 
   notes: text("notes"),
   labels: text("labels").array().default([]),
+  source: text("source"),
   agentId: integer("agent_id").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -592,10 +593,14 @@ export const leads = pgTable("leads", {
   message: text("message"),
   budget: text("budget"),
   timeframe: text("timeframe"),
-  status: text("status", { enum: ['new', 'assigned', 'accepted', 'rejected', 'converted'] }).notNull().default('new'),
+  source: text("source"),
+  status: text("status", { enum: ['new', 'assigned', 'accepted', 'rejected', 'converted', 'expired'] }).notNull().default('new'),
   assignedAgentId: integer("assigned_agent_id"),
   assignedAt: timestamp("assigned_at"),
   respondedAt: timestamp("responded_at"),
+  contactedAt: timestamp("contacted_at"),
+  connectedAt: timestamp("connected_at"),
+  exclusiveUntil: timestamp("exclusive_until"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -51,6 +51,21 @@ const STATUS_COLORS: Record<string, string> = {
   accepted: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
   rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
   converted: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  expired: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  lead_gen: "Lead Gen",
+  open_house: "Open House",
+  referral: "Referral",
+  website: "Website",
+  zillow: "Zillow",
+  realtor_com: "Realtor.com",
+  social_media: "Social Media",
+  cold_call: "Cold Call",
+  sign_call: "Sign Call",
+  sphere: "Sphere of Influence",
+  unknown: "Unknown",
 };
 
 function formatResponseTime(ms: number): string {
@@ -468,13 +483,45 @@ function ZipMapView({
     }
   };
 
-  const handlePolygonClick = async (zipCode: string) => {
-    setSelectedZips((prev) => {
-      if (prev.some(z => z.zipCode === zipCode)) return prev;
-      return [...prev, { zipCode, loading: true }];
-    });
+  const highlightPolygon = async (zipCode: string) => {
+    if (!highlightLayerRef.current || !mapInstanceRef.current) return;
+    try {
+      const coords = await geocodeZipCode(zipCode);
+      if (!coords) return;
 
-    highlightLayerRef.current?.clearLayers();
+      const smallBounds = L.latLngBounds(
+        [coords[0] - 0.05, coords[1] - 0.05],
+        [coords[0] + 0.05, coords[1] + 0.05]
+      );
+      const geojson = await fetchZipBoundaries(smallBounds);
+      if (!geojson.features) return;
+
+      const feature = geojson.features.find((f: any) => {
+        const z = f.properties?.ZCTA5 || f.properties?.GEOID || f.properties?.BASENAME || "";
+        return z === zipCode;
+      });
+      if (!feature) return;
+
+      L.geoJSON(feature, {
+        style: {
+          color: "#2563eb",
+          weight: 3,
+          fillColor: "#3b82f6",
+          fillOpacity: 0.25,
+          opacity: 1,
+        },
+        interactive: false,
+      }).addTo(highlightLayerRef.current);
+    } catch {}
+  };
+
+  const handlePolygonClick = async (zipCode: string) => {
+    const alreadySelected = selectedZips.some(z => z.zipCode === zipCode);
+    if (alreadySelected) return;
+
+    setSelectedZips((prev) => [...prev, { zipCode, loading: true }]);
+
+    highlightPolygon(zipCode);
 
     try {
       const res = await fetch(`/api/leads/zip-metrics/${zipCode}`, { credentials: "include" });
@@ -491,7 +538,13 @@ function ZipMapView({
   };
 
   const removeSelectedZip = (zipCode: string) => {
-    setSelectedZips((prev) => prev.filter(z => z.zipCode !== zipCode));
+    setSelectedZips((prev) => {
+      const newList = prev.filter(z => z.zipCode !== zipCode);
+      if (newList.length === 0) {
+        highlightLayerRef.current?.clearLayers();
+      }
+      return newList;
+    });
   };
 
   const handleMapSearch = async () => {
@@ -671,6 +724,8 @@ export default function LeadGenerationPage() {
   const [pushSupported, setPushSupported] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushUnsupportedMsg, setPushUnsupportedMsg] = useState<string | null>(null);
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [contactPromptLeadId, setContactPromptLeadId] = useState<number | null>(null);
 
   useEffect(() => {
     const checkPush = async () => {
@@ -788,11 +843,32 @@ export default function LeadGenerationPage() {
     queryKey: ["/api/leads/response-metrics"],
   });
 
+  const contactMutation = useMutation({
+    mutationFn: async ({ id, connected }: { id: number; connected: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/leads/${id}/contact`, { connected });
+      return await res.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/stats"] });
+      setContactPromptLeadId(null);
+      toast({ title: variables.connected ? "Connection logged" : "Contact attempt logged" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const totalLeads = stats?.total ?? 0;
   const newLeads = stats?.new ?? 0;
   const acceptedLeads = stats?.accepted ?? 0;
   const convertedLeads = stats?.converted ?? 0;
   const acceptanceRate = totalLeads > 0 ? Math.round((acceptedLeads / totalLeads) * 100) : 0;
+  const connectionRate = (stats as any)?.connectionRate ?? 0;
+
+  const filteredLeads = (leads || []).filter(l =>
+    sourceFilter === "all" ? true : (l.source || "unknown") === sourceFilter
+  );
 
   const zipCodes = zipData?.zipCodes ?? [];
   const freeZipsUsed = zipData?.freeZipsUsed ?? 0;
@@ -908,6 +984,19 @@ export default function LeadGenerationPage() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="pt-4 sm:pt-6">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-cyan-500/10 rounded-lg">
+                <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Connection Rate</p>
+                <p className="text-xl sm:text-2xl font-bold">{connectionRate}%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {responseMetrics && responseMetrics.totalResponded > 0 && (
@@ -960,6 +1049,19 @@ export default function LeadGenerationPage() {
           ) : leads && leads.length > 0 ? (
             <Card>
               <CardContent className="pt-6 overflow-x-auto">
+                <div className="flex items-center gap-2 mb-4 flex-wrap">
+                  <span className="text-sm text-muted-foreground">Filter by source:</span>
+                  <select
+                    className="text-sm border rounded px-2 py-1 bg-background"
+                    value={sourceFilter}
+                    onChange={(e) => setSourceFilter(e.target.value)}
+                  >
+                    <option value="all">All Sources</option>
+                    {Array.from(new Set(leads.map(l => l.source || 'unknown'))).map(src => (
+                      <option key={src} value={src}>{SOURCE_LABELS[src] || src}</option>
+                    ))}
+                  </select>
+                </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -967,15 +1069,15 @@ export default function LeadGenerationPage() {
                       <TableHead>Contact</TableHead>
                       <TableHead>Zip</TableHead>
                       <TableHead>Type</TableHead>
+                      <TableHead className="hidden sm:table-cell">Source</TableHead>
                       <TableHead className="hidden sm:table-cell">Budget</TableHead>
-                      <TableHead className="hidden sm:table-cell">Timeframe</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="hidden md:table-cell">Message</TableHead>
+                      <TableHead className="hidden md:table-cell">Timer</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {leads.map(lead => (
+                    {filteredLeads.map(lead => (
                       <TableRow key={lead.id}>
                         <TableCell className="font-medium">
                           {lead.firstName} {lead.lastName}
@@ -996,13 +1098,22 @@ export default function LeadGenerationPage() {
                         <TableCell>
                           <Badge variant="outline">{TYPE_LABELS[lead.type] ?? lead.type}</Badge>
                         </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <Badge variant="secondary" className="text-xs">{SOURCE_LABELS[lead.source || 'unknown'] || lead.source || 'Unknown'}</Badge>
+                        </TableCell>
                         <TableCell className="text-sm hidden sm:table-cell">{lead.budget || "—"}</TableCell>
-                        <TableCell className="text-sm hidden sm:table-cell">{lead.timeframe || "—"}</TableCell>
                         <TableCell>
                           <Badge className={STATUS_COLORS[lead.status] ?? ""}>{lead.status}</Badge>
                         </TableCell>
-                        <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground hidden md:table-cell">
-                          {lead.message || "—"}
+                        <TableCell className="hidden md:table-cell">
+                          {lead.exclusiveUntil && new Date(lead.exclusiveUntil) > new Date() ? (
+                            <span className="text-xs text-amber-600 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              Exclusive {Math.ceil((new Date(lead.exclusiveUntil).getTime() - Date.now()) / 60000)}m
+                            </span>
+                          ) : lead.exclusiveUntil ? (
+                            <span className="text-xs text-red-500">Expired</span>
+                          ) : null}
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
@@ -1012,7 +1123,10 @@ export default function LeadGenerationPage() {
                                   size="sm"
                                   variant="ghost"
                                   className="text-green-600"
-                                  onClick={() => updateLeadStatusMutation.mutate({ id: lead.id, status: "accepted" })}
+                                  onClick={() => {
+                                    updateLeadStatusMutation.mutate({ id: lead.id, status: "accepted" });
+                                    setContactPromptLeadId(lead.id);
+                                  }}
                                   disabled={updateLeadStatusMutation.isPending}
                                 >
                                   <CheckCircle className="h-4 w-4" />
@@ -1027,6 +1141,16 @@ export default function LeadGenerationPage() {
                                   <XCircle className="h-4 w-4" />
                                 </Button>
                               </>
+                            )}
+                            {lead.status === "accepted" && !lead.contactedAt && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs"
+                                onClick={() => setContactPromptLeadId(lead.id)}
+                              >
+                                Log Contact
+                              </Button>
                             )}
                           </div>
                         </TableCell>
@@ -1387,6 +1511,32 @@ export default function LeadGenerationPage() {
         onClaim={(zip) => claimZipMutation.mutate(zip)}
         claiming={claimZipMutation.isPending}
       />
+
+      <Dialog open={contactPromptLeadId !== null} onOpenChange={(open) => !open && setContactPromptLeadId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Log Contact Attempt</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground mb-4">Were you able to connect with this lead?</p>
+          <div className="flex gap-3">
+            <Button
+              className="flex-1"
+              variant="outline"
+              onClick={() => contactPromptLeadId && contactMutation.mutate({ id: contactPromptLeadId, connected: false })}
+              disabled={contactMutation.isPending}
+            >
+              No Connection
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => contactPromptLeadId && contactMutation.mutate({ id: contactPromptLeadId, connected: true })}
+              disabled={contactMutation.isPending}
+            >
+              Yes, Connected
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

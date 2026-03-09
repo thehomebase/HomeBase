@@ -4896,6 +4896,7 @@ export function registerRoutes(app: Express): Server {
         message: z.string().optional().nullable(),
         budget: z.string().optional().nullable(),
         timeframe: z.string().optional().nullable(),
+        source: z.string().optional().nullable(),
       });
 
       const parsed = schema.safeParse(req.body);
@@ -4912,6 +4913,7 @@ export function registerRoutes(app: Express): Server {
         message: data.message || null,
         budget: data.budget || null,
         timeframe: data.timeframe || null,
+        source: data.source || 'website',
         status,
         assignedAgentId,
       });
@@ -5086,6 +5088,7 @@ export function registerRoutes(app: Express): Server {
             status: 'active',
             notes: lead.message || null,
             labels: ['lead'],
+            source: lead.source || 'lead_gen',
             agentId: req.user.id,
           });
         } catch (clientError) {
@@ -5115,10 +5118,82 @@ export function registerRoutes(app: Express): Server {
         ? Math.round(((accepted + converted) / (accepted + converted + rejected)) * 100)
         : 0;
 
-      res.json({ total, new: newCount, accepted, converted, rejected, acceptanceRate });
+      const contacted = leads.filter(l => l.contactedAt).length;
+      const connected = leads.filter(l => l.connectedAt).length;
+      const connectionRate = contacted > 0 ? Math.round((connected / contacted) * 100) : 0;
+
+      const sourceCounts: Record<string, number> = {};
+      leads.forEach(l => {
+        const src = l.source || 'unknown';
+        sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+      });
+
+      res.json({ total, new: newCount, accepted, converted, rejected, acceptanceRate, contacted, connected, connectionRate, sourceCounts });
     } catch (error) {
       console.error('Error fetching lead stats:', error);
       res.status(500).json({ error: 'Failed to fetch lead stats' });
+    }
+  });
+
+  app.patch("/api/leads/:id/contact", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+
+    try {
+      const id = Number(req.params.id);
+      const { connected } = req.body;
+      const lead = await storage.getLead(id);
+      if (!lead) return res.status(404).json({ error: 'Lead not found' });
+      if (lead.assignedAgentId !== req.user.id) return res.status(403).json({ error: 'Not your lead' });
+
+      const now = new Date();
+      await db.execute(sql`
+        UPDATE leads SET contacted_at = ${now}${connected ? sql`, connected_at = ${now}` : sql``} WHERE id = ${id}
+      `);
+
+      const updated = await storage.getLead(id);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating lead contact status:', error);
+      res.status(500).json({ error: 'Failed to update contact status' });
+    }
+  });
+
+  app.post("/api/leads/:id/rotate", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+
+    try {
+      const id = Number(req.params.id);
+      const lead = await storage.getLead(id);
+      if (!lead) return res.status(404).json({ error: 'Lead not found' });
+      if (lead.assignedAgentId !== req.user.id && req.user.role !== "broker") {
+        return res.status(403).json({ error: 'Not authorized to rotate this lead' });
+      }
+
+      if (lead.exclusiveUntil && new Date() < new Date(lead.exclusiveUntil)) {
+        return res.status(400).json({ error: 'Lead is still in exclusive period', exclusiveUntil: lead.exclusiveUntil });
+      }
+
+      const agentsInZip = await db.execute(sql`
+        SELECT agent_id FROM lead_zip_codes WHERE zip_code = ${lead.zipCode} AND agent_id != ${lead.assignedAgentId || 0} ORDER BY RANDOM() LIMIT 1
+      `);
+
+      if (!agentsInZip.rows[0]) {
+        return res.status(400).json({ error: 'No other agents available in this zip code' });
+      }
+
+      const nextAgentId = Number(agentsInZip.rows[0].agent_id);
+      const newExclusive = new Date(Date.now() + 15 * 60 * 1000);
+      await db.execute(sql`
+        UPDATE leads SET assigned_agent_id = ${nextAgentId}, assigned_at = NOW(), exclusive_until = ${newExclusive}, status = 'assigned' WHERE id = ${id}
+      `);
+
+      const updated = await storage.getLead(id);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error rotating lead:', error);
+      res.status(500).json({ error: 'Failed to rotate lead' });
     }
   });
 

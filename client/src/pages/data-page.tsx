@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
-import { type Transaction, type Client } from "@shared/schema";
+import { type Transaction, type Client, type Lead } from "@shared/schema";
 import { Link } from "wouter";
 import {
   BarChart,
@@ -44,6 +44,22 @@ interface CommissionSummary {
   ytd_pending: number;
   monthly: { month: number; year: number; total: number; deals: number }[];
 }
+
+const SOURCE_LABELS: Record<string, string> = {
+  lead_gen: "Lead Gen",
+  open_house: "Open House",
+  referral: "Referral",
+  website: "Website",
+  zillow: "Zillow",
+  realtor_com: "Realtor.com",
+  social_media: "Social Media",
+  cold_call: "Cold Call",
+  sign_call: "Sign Call",
+  sphere: "Sphere of Influence",
+  unknown: "Unknown",
+};
+
+const SOURCE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#f97316", "#ec4899", "#14b8a6", "#6366f1"];
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-US", {
@@ -142,6 +158,11 @@ export default function DataPage() {
 
   const { data: commissionSummary, isLoading: commLoading } = useQuery<CommissionSummary>({
     queryKey: ["/api/commissions/summary"],
+    enabled: !!user && (user.role === "agent" || user.role === "broker"),
+  });
+
+  const { data: leadStats } = useQuery<{ total: number; sourceCounts: Record<string, number>; connectionRate: number; acceptanceRate: number }>({
+    queryKey: ["/api/leads/stats"],
     enabled: !!user && (user.role === "agent" || user.role === "broker"),
   });
 
@@ -808,6 +829,62 @@ export default function DataPage() {
           </div>
         </Card>
       </div>
+
+      {leadStats && leadStats.total > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Target className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Lead Sources</span>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={Object.entries(leadStats.sourceCounts || {}).map(([name, value]) => ({
+                    name: SOURCE_LABELS[name] || name,
+                    value,
+                  }))}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {Object.keys(leadStats.sourceCounts || {}).map((_, i) => (
+                    <Cell key={i} fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <RechartsTooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Lead Performance</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-6">
+              <div className="p-3 rounded-lg bg-muted/30 text-center">
+                <p className="text-2xl font-bold">{leadStats.total}</p>
+                <p className="text-xs text-muted-foreground">Total Leads</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/30 text-center">
+                <p className="text-2xl font-bold">{leadStats.acceptanceRate}%</p>
+                <p className="text-xs text-muted-foreground">Acceptance Rate</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/30 text-center">
+                <p className="text-2xl font-bold">{leadStats.connectionRate}%</p>
+                <p className="text-xs text-muted-foreground">Connection Rate</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/30 text-center">
+                <p className="text-2xl font-bold">{Object.keys(leadStats.sourceCounts || {}).length}</p>
+                <p className="text-xs text-muted-foreground">Active Sources</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
     </main>
   );
 }

@@ -1983,6 +1983,7 @@ export class DatabaseStorage implements IStorage {
         status: String(client.status),
         notes: client.notes ? String(client.notes) : null,
         labels: Array.isArray(client.labels) ? client.labels : [],
+        source: (client as any).source ? String((client as any).source) : null,
         agentId: Number(client.agentId),
         createdAt: client.createdAt,
         updatedAt: client.updatedAt
@@ -2521,6 +2522,7 @@ export class DatabaseStorage implements IStorage {
         status: String(client.status),
         notes: client.notes ? String(client.notes) : null,
         labels: Array.isArray(client.labels) ? client.labels : [],
+        source: (client as any).source ? String((client as any).source) : null,
         agentId: Number(client.agentId),
         createdAt: client.createdAt,
         updatedAt: client.updatedAt
@@ -4497,10 +4499,14 @@ export class DatabaseStorage implements IStorage {
       message: row.message ? String(row.message) : null,
       budget: row.budget ? String(row.budget) : null,
       timeframe: row.timeframe ? String(row.timeframe) : null,
+      source: row.source ? String(row.source) : null,
       status: String(row.status) as any,
       assignedAgentId: row.assigned_agent_id ? Number(row.assigned_agent_id) : null,
       assignedAt: row.assigned_at ? new Date(row.assigned_at) : null,
       respondedAt: row.responded_at ? new Date(row.responded_at) : null,
+      contactedAt: row.contacted_at ? new Date(row.contacted_at) : null,
+      connectedAt: row.connected_at ? new Date(row.connected_at) : null,
+      exclusiveUntil: row.exclusive_until ? new Date(row.exclusive_until) : null,
       createdAt: row.created_at ? new Date(row.created_at) : null,
     };
   }
@@ -4579,9 +4585,10 @@ export class DatabaseStorage implements IStorage {
 
   async createLead(data: InsertLead): Promise<Lead> {
     const assignedAt = data.assignedAgentId ? new Date() : null;
+    const exclusiveUntil = data.exclusiveUntil || (data.assignedAgentId ? new Date(Date.now() + 15 * 60 * 1000) : null);
     const result = await db.execute(sql`
-      INSERT INTO leads (zip_code, first_name, last_name, email, phone, type, message, budget, timeframe, status, assigned_agent_id, assigned_at)
-      VALUES (${data.zipCode}, ${data.firstName}, ${data.lastName}, ${data.email}, ${data.phone || null}, ${data.type}, ${data.message || null}, ${data.budget || null}, ${data.timeframe || null}, ${data.status || 'new'}, ${data.assignedAgentId || null}, ${assignedAt})
+      INSERT INTO leads (zip_code, first_name, last_name, email, phone, type, message, budget, timeframe, source, status, assigned_agent_id, assigned_at, exclusive_until)
+      VALUES (${data.zipCode}, ${data.firstName}, ${data.lastName}, ${data.email}, ${data.phone || null}, ${data.type}, ${data.message || null}, ${data.budget || null}, ${data.timeframe || null}, ${data.source || null}, ${data.status || 'new'}, ${data.assignedAgentId || null}, ${assignedAt}, ${exclusiveUntil})
       RETURNING *
     `);
     if (!result.rows[0]) throw new Error('Failed to create lead');
