@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { OnboardingTutorial, useOnboardingTutorial, TutorialStartButton } from "@/components/onboarding-tutorial";
 import CalculatorsPage from "@/pages/calculators-page";
 import GlossaryPage from "./pages/glossary-page";
 import MessagesPage from "./pages/messages-page";
@@ -139,6 +140,8 @@ function Layout({ children }: { children: React.ReactNode }) {
   const isLender = user?.role === 'lender';
   const isBroker = user?.role === 'broker';
   const { newLeadCount } = useLeadAlerts();
+  const isAgentOrBroker = user?.role === 'agent' || user?.role === 'broker';
+  const tutorial = useOnboardingTutorial(user?.id, user?.role);
 
   // Update sidebar state when mobile status changes
   React.useEffect(() => {
@@ -515,6 +518,9 @@ function Layout({ children }: { children: React.ReactNode }) {
                       )}
                       {isSidebarOpen && <span className="ml-2">Compact View</span>}
                     </Button>
+                    {isAgentOrBroker && (
+                      <TutorialStartButton onClick={tutorial.startTutorial} />
+                    )}
                     <BiometricSetupButton compact={!isSidebarOpen} />
                     <Button
                       variant="outline"
@@ -538,6 +544,14 @@ function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </main>
         {isMobile && <MobileBottomNav />}
+        {isAgentOrBroker && (
+          <OnboardingTutorial
+            isActive={tutorial.isActive}
+            currentStep={tutorial.currentStep}
+            setCurrentStep={tutorial.setCurrentStep}
+            onClose={tutorial.closeTutorial}
+          />
+        )}
       </div>
     </SidebarProvider>
   );

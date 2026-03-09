@@ -31,7 +31,7 @@ Preferred communication style: Simple, everyday language.
 ### Key Features
 - **Transaction & Document Management**: Contract upload with data extraction, document signing link tracking, transaction timeline with risk alerts, client portal for progress visibility, and transaction templates.
 - **Client Management**: Client invitation system, automated feedback requests upon transaction closure, and smart reminders for anniversaries and birthdays with multi-channel delivery.
-- **Vendor & Contractor Ecosystem**: Inspection bid system with PDF parsing, vendor portal for bid management, contractor verification badges, and a "HomeBase Pros" marketplace.
+- **Vendor & Contractor Ecosystem**: Inspection bid system with PDF parsing, vendor portal for bid management, contractor verification badges, "HomeBase Pros" marketplace, and multi-category vendor ratings (quality, communication, timeliness, value) with performance stats.
 - **Communication Tools**: Encrypted private messaging (AES-256-GCM, server-side encryption/decryption) with real-time polling, SMS via Twilio, email integration via Google OAuth, and communication metrics dashboard. Call logging functionality is also available.
 - **Post-Close Engagement**: "MyHome" hub for homeowners to track properties and maintenance.
 - **Growth & Lead Generation**: Affiliate referral system, drip campaigns, zip code-based lead generation with tiered pricing, and public lead submission forms. Open House Manager for digital sign-ins and lead capture.
@@ -43,6 +43,7 @@ Preferred communication style: Simple, everyday language.
 - **Customizable Dashboard**: Role-aware, widget-based layout for agents, vendors, lenders, and clients, with user preferences stored.
 - **Commission Tracker**: Per-transaction commission tracking with rates, splits, and summary dashboards.
 - **Public Landing Page**: Marketing page for unauthenticated users highlighting features, roles, and pricing.
+- **Onboarding Tutorial**: Interactive guided tour for new agents/brokers, auto-triggered on first login. 18-step walkthrough covering all key features with page navigation, progress tracking, and per-user completion state in localStorage. Restartable from sidebar "Tutorial" button.
 
 ## External Dependencies
 
