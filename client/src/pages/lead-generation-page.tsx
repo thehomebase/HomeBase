@@ -518,39 +518,34 @@ function ZipMapView({
   };
 
   const handlePolygonClick = async (zipCode: string) => {
+    const alreadySelected = selectedZips.some(z => z.zipCode === zipCode);
+    if (alreadySelected) {
+      removeSelectedZip(zipCode);
+      return;
+    }
+
+    setSelectedZips([{ zipCode, loading: true }]);
+
+    highlightLayerRef.current?.clearLayers();
+    highlightPolygon(zipCode);
+
     if (onPolygonClick) {
       onPolygonClick(zipCode);
     }
-
-    const alreadySelected = selectedZips.some(z => z.zipCode === zipCode);
-    if (alreadySelected) return;
-
-    setSelectedZips((prev) => [...prev, { zipCode, loading: true }]);
-
-    highlightPolygon(zipCode);
 
     try {
       const res = await fetch(`/api/leads/zip-metrics/${zipCode}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       const metrics: ZipMetrics = await res.json();
-      setSelectedZips((prev) =>
-        prev.map(z => z.zipCode === zipCode ? { zipCode, metrics, loading: false } : z)
-      );
+      setSelectedZips([{ zipCode, metrics, loading: false }]);
     } catch {
-      setSelectedZips((prev) =>
-        prev.map(z => z.zipCode === zipCode ? { zipCode, loading: false } : z)
-      );
+      setSelectedZips([{ zipCode, loading: false }]);
     }
   };
 
   const removeSelectedZip = (zipCode: string) => {
-    setSelectedZips((prev) => {
-      const newList = prev.filter(z => z.zipCode !== zipCode);
-      if (newList.length === 0) {
-        highlightLayerRef.current?.clearLayers();
-      }
-      return newList;
-    });
+    highlightLayerRef.current?.clearLayers();
+    setSelectedZips([]);
   };
 
   const handleMapSearch = async () => {
