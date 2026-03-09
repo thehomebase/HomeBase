@@ -13,6 +13,7 @@ import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, type EmailAttachment } from "./gmail-service";
 import { randomUUID } from "crypto";
+import { notify } from "./notification-helper";
 import { getEstimatedHomeValue } from "./zip-home-values";
 import {
   generateRegistrationOptions,
@@ -642,6 +643,22 @@ export function registerRoutes(app: Express): Server {
 
       const transaction = await storage.updateTransaction(id, data);
 
+      if (data.status && oldTransaction && oldTransaction.status !== data.status) {
+        const address = [transaction.streetName, transaction.city].filter(Boolean).join(', ') || 'a property';
+        const statusLabel = data.status.replace(/_/g, ' ');
+        if (transaction.clientId) {
+          try {
+            const client = await storage.getClient(transaction.clientId);
+            if (client?.userId) {
+              notify(client.userId, 'transaction_update', 'Transaction Updated', `${address} moved to ${statusLabel}`, transaction.id, 'transaction').catch(() => {});
+            }
+          } catch (e) {}
+        }
+        if (transaction.agentId !== req.user.id) {
+          notify(transaction.agentId, 'transaction_update', 'Transaction Updated', `${address} moved to ${statusLabel}`, transaction.id, 'transaction').catch(() => {});
+        }
+      }
+
       if (oldTransaction && oldTransaction.status !== "closed" && data.status === "closed" && transaction.clientId) {
         try {
           const existing = await storage.getFeedbackRequestByTransaction(transaction.id, transaction.clientId);
@@ -1033,6 +1050,16 @@ export function registerRoutes(app: Express): Server {
         recipientId: parsed.data.recipientId,
         content: parsed.data.content,
       });
+
+      const senderName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.username;
+      notify(
+        parsed.data.recipientId,
+        'message_new',
+        'New Message',
+        `${senderName} sent you a message`,
+        req.user.id,
+        'message'
+      ).catch(() => {});
 
       res.status(201).json(message);
     } catch (error) {
@@ -3776,6 +3803,27 @@ export function registerRoutes(app: Express): Server {
       }
       const bid = await storage.createBid(parsed.data);
       await storage.updateBidRequest(parsed.data.bidRequestId, { status: 'bid_submitted' });
+
+      try {
+        const brResult = await db.execute(sql`
+          SELECT transaction_id FROM bid_requests WHERE id = ${parsed.data.bidRequestId}
+        `);
+        if (brResult.rows[0]) {
+          const transaction = await storage.getTransaction(Number(brResult.rows[0].transaction_id));
+          if (transaction) {
+            const vendorName = contractor.companyName || contractor.name || 'A vendor';
+            notify(
+              transaction.agentId,
+              'bid_received',
+              'New Bid Received',
+              `${vendorName} submitted a bid for inspection repairs`,
+              transaction.id,
+              'bid'
+            ).catch(() => {});
+          }
+        }
+      } catch (e) {}
+
       res.status(201).json(bid);
     } catch (error) {
       console.error('Error creating bid:', error);
@@ -4964,6 +5012,14 @@ export function registerRoutes(app: Express): Server {
               subs,
               async (subId) => storage.deletePushSubscription(subId)
             );
+            notify(
+              assignedAgentId,
+              'lead_new',
+              'New Lead',
+              `${data.firstName} ${data.lastName} in ${data.zipCode} (${data.type})`,
+              lead.id,
+              'lead'
+            ).catch(() => {});
           }
         } catch (notifErr) {
           console.error('Error sending lead notification:', notifErr);
@@ -6292,7 +6348,7 @@ export function registerRoutes(app: Express): Server {
       if (notification.rows.length === 0) return res.status(404).json({ error: "Notification not found" });
       const brokerId = (notification.rows[0] as any).broker_id;
       if (req.user.brokerageId !== brokerId) return res.sendStatus(403);
-      const read = await storage.markNotificationRead(notificationId, req.user.id);
+      const read = await storage.markBrokerNotificationRead(notificationId, req.user.id);
       res.json(read);
     } catch (error) {
       console.error("Error marking notification as read:", error);
@@ -6885,6 +6941,53 @@ export function registerRoutes(app: Express): Server {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete reminder" });
+    }
+  });
+
+  app.get("/api/notifications/list", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const limit = Math.min(Number(req.query.limit) || 50, 100);
+      const offset = Number(req.query.offset) || 0;
+      const notifications = await storage.getNotificationsByUser(req.user.id, limit, offset);
+      res.json(notifications);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const count = await storage.getUnreadNotificationCount(req.user.id);
+      res.json({ count });
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+      res.status(500).json({ error: 'Failed to fetch unread count' });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const updated = await storage.markNotificationRead(Number(req.params.id), req.user.id);
+      if (!updated) return res.status(404).json({ error: 'Notification not found' });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking notification read:', error);
+      res.status(500).json({ error: 'Failed to mark notification read' });
+    }
+  });
+
+  app.patch("/api/notifications/read-all", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      await storage.markAllNotificationsRead(req.user.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking all notifications read:', error);
+      res.status(500).json({ error: 'Failed to mark all notifications read' });
     }
   });
 

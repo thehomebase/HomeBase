@@ -96,6 +96,7 @@ import OpenHouseSignInPage from "@/pages/open-house-sign-in-page";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { BiometricSetupButton } from "@/components/biometric-setup";
 import { useLeadAlerts } from "@/hooks/use-lead-alerts";
+import { NotificationBell } from "@/components/notification-bell";
 
 function LeadAlertBanner() {
   const { newLeadCount, isAgent } = useLeadAlerts();
@@ -538,7 +539,17 @@ function Layout({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <main className="flex-1 min-h-screen w-full overflow-x-hidden relative">
-          {user && <LeadAlertBanner />}
+          {user && (
+            <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+              <div className="flex items-center justify-between px-4 py-2">
+                {isMobile && <Logo isCompact={false} />}
+                <div className={isMobile ? '' : 'ml-auto'}>
+                  <NotificationBell />
+                </div>
+              </div>
+              <LeadAlertBanner />
+            </div>
+          )}
           <div className={`w-full ${isMobile && user ? 'pb-20' : ''}`}>
             {children}
           </div>

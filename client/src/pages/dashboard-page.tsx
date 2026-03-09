@@ -426,38 +426,63 @@ function DeadlinesWidget({ deadlines }: { deadlines: any[] }) {
   );
 }
 
-function RecentActivityWidget({ activities }: { activities: any[] }) {
-  const typeIcons: Record<string, any> = {
-    transaction: Briefcase,
-    lead: Target,
-    message: MessageSquare,
+function RecentActivityWidget() {
+  const { data: notifications = [] } = useQuery<any[]>({
+    queryKey: ['/api/notifications/list', { limit: 15 }],
+    refetchInterval: 30000,
+  });
+
+  const typeIcons: Record<string, { icon: any; color: string }> = {
+    lead_new: { icon: Target, color: 'text-emerald-500' },
+    message_new: { icon: MessageSquare, color: 'text-blue-500' },
+    document_updated: { icon: FileText, color: 'text-amber-500' },
+    bid_received: { icon: Briefcase, color: 'text-purple-500' },
+    transaction_update: { icon: ArrowRight, color: 'text-primary' },
+    client_invited: { icon: UserPlus, color: 'text-teal-500' },
+    reminder: { icon: Clock, color: 'text-orange-500' },
+    general: { icon: Zap, color: 'text-muted-foreground' },
   };
+
+  function timeAgo(dateStr: string) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days}d ago`;
+    return new Date(dateStr).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
   return (
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-3">
         <Zap className="h-4 w-4 text-primary" />
         <h3 className="font-semibold text-sm">Recent Activity</h3>
       </div>
-      {activities.length === 0 ? (
+      {notifications.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-3">No recent activity</p>
       ) : (
-        <div className="space-y-2">
-          {activities.map((a, i) => {
-            const Icon = typeIcons[a.type] || Briefcase;
+        <div className="space-y-1">
+          {notifications.slice(0, 10).map((n: any) => {
+            const config = typeIcons[n.type] || typeIcons.general;
+            const Icon = config.icon;
             return (
-              <div key={i} className="flex items-center gap-3 p-2">
-                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
+              <div key={n.id} className={`flex items-center gap-3 p-2 rounded-md ${!n.read ? 'bg-primary/5' : ''}`}>
+                <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${!n.read ? 'bg-primary/10' : 'bg-muted'}`}>
+                  <Icon className={`h-4 w-4 ${!n.read ? config.color : 'text-muted-foreground'}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{a.title}</p>
+                  <p className={`text-sm truncate ${!n.read ? 'font-semibold' : 'font-medium'}`}>{n.title}</p>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px] px-1 py-0">{a.detail}</Badge>
-                    <span className="text-[10px] text-muted-foreground">
-                      {new Date(a.time).toLocaleDateString([], { month: "short", day: "numeric" })}
+                    <span className="text-xs text-muted-foreground truncate">{n.message}</span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {timeAgo(n.createdAt)}
                     </span>
                   </div>
                 </div>
+                {!n.read && <span className="h-2 w-2 rounded-full bg-primary shrink-0" />}
               </div>
             );
           })}
@@ -821,7 +846,7 @@ export default function DashboardPage() {
               <DeadlinesWidget deadlines={dashData.upcomingDeadlines || []} />
             )}
             {isWidgetVisible("recent") && (
-              <RecentActivityWidget activities={dashData.recentActivity || []} />
+              <RecentActivityWidget />
             )}
           </div>
 

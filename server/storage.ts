@@ -402,7 +402,7 @@ export interface IStorage {
   createBrokerNotification(data: InsertBrokerNotification): Promise<BrokerNotification>;
   getBrokerNotifications(brokerId: number): Promise<(BrokerNotification & { readCount: number })[]>;
   getAgentNotifications(agentId: number): Promise<BrokerNotification[]>;
-  markNotificationRead(notificationId: number, agentId: number): Promise<BrokerNotificationRead>;
+  markBrokerNotificationRead(notificationId: number, agentId: number): Promise<BrokerNotificationRead>;
   createSalesCompetition(data: InsertSalesCompetition): Promise<SalesCompetition>;
   getSalesCompetitions(brokerId: number): Promise<SalesCompetition[]>;
   getCompetitionLeaderboard(competitionId: number, metric: string, brokerageId: number): Promise<any[]>;
@@ -437,6 +437,12 @@ export interface IStorage {
   deleteClientReminder(id: number): Promise<void>;
   getDueReminders(): Promise<any[]>;
   markReminderSent(id: number): Promise<void>;
+
+  createNotification(data: any): Promise<any>;
+  getNotificationsByUser(userId: number, limit?: number, offset?: number): Promise<any[]>;
+  getUnreadNotificationCount(userId: number): Promise<number>;
+  markNotificationRead(id: number, userId?: number): Promise<boolean>;
+  markAllNotificationsRead(userId: number): Promise<void>;
 
 }
 
@@ -5441,7 +5447,7 @@ export class DatabaseStorage implements IStorage {
     return result.rows as BrokerNotification[];
   }
 
-  async markNotificationRead(notificationId: number, agentId: number): Promise<BrokerNotificationRead> {
+  async markBrokerNotificationRead(notificationId: number, agentId: number): Promise<BrokerNotificationRead> {
     const existing = await db.execute(sql`
       SELECT * FROM broker_notification_reads WHERE notification_id = ${notificationId} AND agent_id = ${agentId}
     `);
@@ -5882,6 +5888,67 @@ export class DatabaseStorage implements IStorage {
   async markReminderSent(id: number): Promise<void> {
     await db.execute(sql`
       UPDATE client_reminders SET last_sent_at = NOW() WHERE id = ${id}
+    `);
+  }
+
+  async createNotification(data: any): Promise<any> {
+    const result = await db.execute(sql`
+      INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
+      VALUES (${data.userId}, ${data.type}, ${data.title}, ${data.message}, ${data.relatedId || null}, ${data.relatedType || null})
+      RETURNING *
+    `);
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      userId: row.user_id,
+      type: row.type,
+      title: row.title,
+      message: row.message,
+      relatedId: row.related_id,
+      relatedType: row.related_type,
+      read: row.read,
+      createdAt: row.created_at,
+    };
+  }
+
+  async getNotificationsByUser(userId: number, limit = 50, offset = 0): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT * FROM notifications
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+    return result.rows.map(row => ({
+      id: row.id,
+      userId: row.user_id,
+      type: row.type,
+      title: row.title,
+      message: row.message,
+      relatedId: row.related_id,
+      relatedType: row.related_type,
+      read: row.read,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async getUnreadNotificationCount(userId: number): Promise<number> {
+    const result = await db.execute(sql`
+      SELECT COUNT(*) as count FROM notifications
+      WHERE user_id = ${userId} AND read = false
+    `);
+    return Number(result.rows[0].count);
+  }
+
+  async markNotificationRead(id: number, userId?: number): Promise<boolean> {
+    const result = userId
+      ? await db.execute(sql`UPDATE notifications SET read = true WHERE id = ${id} AND user_id = ${userId} RETURNING id`)
+      : await db.execute(sql`UPDATE notifications SET read = true WHERE id = ${id} RETURNING id`);
+    return result.rows.length > 0;
+  }
+
+  async markAllNotificationsRead(userId: number): Promise<void> {
+    await db.execute(sql`
+      UPDATE notifications SET read = true WHERE user_id = ${userId} AND read = false
     `);
   }
 

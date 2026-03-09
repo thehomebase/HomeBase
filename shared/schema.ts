@@ -1111,3 +1111,28 @@ export const insertClientReminderSchema = createInsertSchema(clientReminders).om
 
 export type ClientReminder = typeof clientReminders.$inferSelect;
 export type InsertClientReminder = z.infer<typeof insertClientReminderSchema>;
+
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  type: text("type", {
+    enum: ["lead_new", "message_new", "document_updated", "bid_received", "transaction_update", "client_invited", "reminder", "general"]
+  }).notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  relatedId: integer("related_id"),
+  relatedType: text("related_type", {
+    enum: ["transaction", "lead", "message", "bid", "client", "document"]
+  }),
+  read: boolean("read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  read: true,
+  createdAt: true,
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;

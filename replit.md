@@ -40,7 +40,7 @@ Preferred communication style: Simple, everyday language.
     - **Lender Portal**: Kanban board for loan pipelines, checklist synchronization, RESPA compliance.
     - **Broker Portal**: Comprehensive management for brokerage, including agent oversight, notifications, sales competitions with leaderboards, and lead routing.
 - **Billing**: Stripe integration for subscriptions and payment management with a dedicated portal.
-- **Notifications**: Real-time SMS and Web Push notifications for new leads, with iOS PWA guidance.
+- **Notifications**: Real-time SMS and Web Push notifications for new leads, with iOS PWA guidance. WebSocket-based in-app notification system (`/ws`) with notification bell, unread count, toast alerts, and activity feed on dashboard. Triggers: new leads, private messages, bids, transaction status changes. Server: `server/websocket.ts`, `server/notification-helper.ts`. Frontend: `use-websocket.ts`, `use-notifications.ts`, `notification-bell.tsx`.
 - **Customizable Dashboard**: Role-aware, widget-based layout for agents, vendors, lenders, and clients, with user preferences stored.
 - **Commission Tracker**: Per-transaction commission tracking with rates, splits, and summary dashboards.
 - **Public Landing Page**: Marketing page for unauthenticated users highlighting features, roles, and pricing.

@@ -7,6 +7,7 @@ import WebSocket from 'ws';
 import { WebhookHandlers } from "./webhookHandlers";
 import { startDripScheduler } from "./drip-scheduler";
 import { startReminderScheduler } from "./reminder-scheduler";
+import { setupWebSocket } from "./websocket";
 
 // Add startup message to verify nodemon restarts
 log(`Server starting... [${new Date().toISOString()}]`);
@@ -90,18 +91,17 @@ async function startServer(server: HttpServer): Promise<void> {
           reject(err);
         });
         
-      // Enhanced WebSocket handling for HMR
+      setupWebSocket(serverInstance);
+
       serverInstance.on('upgrade', (request, socket, head) => {
         const url = new URL(request.url!, `http://${request.headers.host}`);
         
-        // Allow Vite HMR paths (updated to match Vite 5.4.x format)
-        if (url.pathname.startsWith('/__vite_hmr') || 
+        if (url.pathname === '/ws' ||
+            url.pathname.startsWith('/__vite_hmr') || 
             url.pathname.startsWith('/@vite/client') || 
             url.pathname.startsWith('/hmr')) {
-          // Let HMR connections pass through
-          log(`HMR WebSocket connection: ${url.pathname}`);
+          // Let app WS and HMR connections pass through
         } else {
-          // Only destroy sockets that aren't for HMR
           socket.destroy();
         }
       });
