@@ -401,7 +401,8 @@ export default function DataPage() {
                   dataKey="month"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  interval={0}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                 />
                 <YAxis
                   yAxisId="left"
@@ -574,7 +575,8 @@ export default function DataPage() {
                   dataKey="month"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  interval={0}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                 />
                 <YAxis
                   tickFormatter={formatCurrency}
@@ -702,7 +704,8 @@ export default function DataPage() {
                   dataKey="month"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  interval={0}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                 />
                 <YAxis
                   axisLine={false}

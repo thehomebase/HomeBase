@@ -5122,6 +5122,113 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/leads/zip-metrics/:zipCode", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const zipCode = req.params.zipCode.trim();
+      if (!/^\d{5}$/.test(zipCode)) return res.status(400).json({ error: "Invalid zip code" });
+
+      const agentCount = await storage.getAgentCountForZipCode(zipCode);
+      const freeZipsUsed = await storage.countAgentFreeZipCodes(req.user.id);
+      const alreadyClaimed = await storage.isZipCodeClaimed(req.user.id, zipCode);
+
+      const txResult = await db.execute(sql`
+        SELECT
+          COALESCE(AVG(contract_price), 0)::int as avg_home_value,
+          COUNT(*)::int as total_transactions,
+          COUNT(*) FILTER (WHERE closing_date >= NOW() - INTERVAL '6 months')::int as recent_transactions
+        FROM transactions
+        WHERE zip_code = ${zipCode} AND contract_price IS NOT NULL AND contract_price > 0
+      `);
+      const txStats = txResult.rows[0] || { avg_home_value: 0, total_transactions: 0, recent_transactions: 0 };
+
+      const leadResult = await db.execute(sql`
+        SELECT
+          COUNT(*)::int as total_leads,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int as monthly_leads,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '6 months')::int as six_month_leads
+        FROM leads
+        WHERE zip_code = ${zipCode}
+      `);
+      const leadStats = leadResult.rows[0] || { total_leads: 0, monthly_leads: 0, six_month_leads: 0 };
+
+      const shareOfVoice = agentCount > 0 ? Math.round((1 / (agentCount + (alreadyClaimed ? 0 : 1))) * 100) : 100;
+      const estMonthlyLeads = Number(leadStats.monthly_leads) || 0;
+      const estConnectionsPerAgent = agentCount > 0
+        ? Math.round((estMonthlyLeads / agentCount) * 10) / 10
+        : estMonthlyLeads;
+
+      const avgHomeValue = Number(txStats.avg_home_value) || 0;
+      const avgCommission = avgHomeValue * 0.03;
+      const estSixMonthLeads = Number(leadStats.six_month_leads) || 0;
+      const estLeadsForAgent = agentCount > 0 ? Math.round((estSixMonthLeads / agentCount) * 10) / 10 : estSixMonthLeads;
+      const conversionRate = 0.05;
+      const estRevenue = estLeadsForAgent * conversionRate * avgCommission;
+
+      const hasFreeSlots = freeZipsUsed < FREE_ZIP_CODES_PER_AGENT;
+      const zipEligibleForFree = isZipFreeEligible(agentCount);
+      const isFreeSlot = hasFreeSlots && zipEligibleForFree;
+      const monthlyRate = isFreeSlot ? 0 : calculateZipCodePrice(agentCount);
+      const sixMonthCost = monthlyRate * 6;
+      const roi = sixMonthCost > 0 ? Math.round((estRevenue / (sixMonthCost / 100)) * 100) / 100 : 0;
+
+      res.json({
+        zipCode,
+        avgHomeValue,
+        currentAgents: agentCount,
+        maxAgents: MAX_AGENTS_PER_ZIP,
+        spotsRemaining: MAX_AGENTS_PER_ZIP - agentCount,
+        isFull: agentCount >= MAX_AGENTS_PER_ZIP,
+        alreadyClaimed,
+        shareOfVoice,
+        estMonthlyLeads,
+        estConnections: estConnectionsPerAgent,
+        estAdditionalLeads: Math.round(estConnectionsPerAgent * 1.2 * 10) / 10,
+        roiSixMonth: roi,
+        totalLeads: Number(leadStats.total_leads),
+        sixMonthLeads: estSixMonthLeads,
+        monthlyRate,
+        monthlyRateDisplay: isFreeSlot ? "Free" : `$${(monthlyRate / 100).toFixed(0)}`,
+        isFreeSlot,
+        hasFreeSlots,
+        freeZipsUsed,
+        freeZipsTotal: FREE_ZIP_CODES_PER_AGENT,
+      });
+    } catch (error) {
+      console.error("Error fetching zip metrics:", error);
+      res.status(500).json({ error: "Failed to fetch zip metrics" });
+    }
+  });
+
+  app.get("/api/leads/all-zip-data", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const result = await db.execute(sql`
+        SELECT zip_code, COUNT(*)::int as agent_count
+        FROM lead_zip_codes
+        WHERE is_active = true
+        GROUP BY zip_code
+        ORDER BY zip_code
+      `);
+      const myZips = await storage.getAgentZipCodes(req.user.id);
+      const myZipSet = new Set(myZips.map(z => z.zipCode));
+
+      const zipData = (result.rows as any[]).map(row => ({
+        zipCode: row.zip_code,
+        agentCount: Number(row.agent_count),
+        isMine: myZipSet.has(row.zip_code),
+        spotsRemaining: MAX_AGENTS_PER_ZIP - Number(row.agent_count),
+        isFull: Number(row.agent_count) >= MAX_AGENTS_PER_ZIP,
+      }));
+      res.json(zipData);
+    } catch (error) {
+      console.error("Error fetching all zip data:", error);
+      res.status(500).json({ error: "Failed to fetch zip data" });
+    }
+  });
+
   // ===== Public Lead Page Route =====
 
   app.get("/api/leads/available-zip-codes", async (req, res) => {

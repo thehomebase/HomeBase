@@ -34,7 +34,7 @@ Preferred communication style: Simple, everyday language.
 - **Vendor & Contractor Ecosystem**: Inspection bid system with PDF parsing, vendor portal for bid management, contractor verification badges, "HomeBase Pros" marketplace, and multi-category vendor ratings (quality, communication, timeliness, value) with performance stats.
 - **Communication Tools**: Encrypted private messaging (AES-256-GCM, server-side encryption/decryption) with real-time polling, SMS via Twilio, email integration via Google OAuth, and communication metrics dashboard. Call logging functionality is also available.
 - **Post-Close Engagement**: "MyHome" hub for homeowners to track properties and maintenance.
-- **Growth & Lead Generation**: Affiliate referral system, drip campaigns, zip code-based lead generation with tiered pricing, and public lead submission forms. Open House Manager for digital sign-ins and lead capture.
+- **Growth & Lead Generation**: Affiliate referral system, drip campaigns, zip code-based lead generation with tiered pricing, Zillow-style interactive map for browsing/claiming ZIPs with market metrics (avg home value, share of voice, est. leads, ROI), enhanced Active ZIPs table with competition data, and public lead submission forms. Open House Manager for digital sign-ins and lead capture. API endpoints: `GET /api/leads/zip-metrics/:zipCode` (enriched metrics), `GET /api/leads/all-zip-data` (map visualization data).
 - **Specialized Portals**:
     - **Lender Portal**: Kanban board for loan pipelines, checklist synchronization, RESPA compliance.
     - **Broker Portal**: Comprehensive management for brokerage, including agent oversight, notifications, sales competitions with leaderboards, and lead routing.

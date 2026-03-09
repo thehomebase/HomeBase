@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Plus,
   Trash2,
@@ -32,6 +33,12 @@ import {
   Bell,
   BellOff,
   Clock,
+  Map,
+  BarChart3,
+  Eye,
+  Target,
+  X,
+  Loader2,
 } from "lucide-react";
 import type { Lead } from "@shared/schema";
 import { isPushSupported, subscribeToPush, unsubscribeFromPush, isCurrentlySubscribed, getPushPermissionState, getPushUnsupportedReason, isIOS } from "@/lib/push-notifications";
@@ -59,6 +66,12 @@ const TYPE_LABELS: Record<string, string> = {
   seller: "Seller",
   both: "Buyer & Seller",
 };
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+
+const formatCompact = (value: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 0 }).format(value);
 
 interface ZipCodeData {
   id: number;
@@ -95,12 +108,372 @@ interface ZipPricing {
   monthlyRateDisplay: string;
 }
 
+interface ZipMetrics {
+  zipCode: string;
+  avgHomeValue: number;
+  currentAgents: number;
+  maxAgents: number;
+  spotsRemaining: number;
+  isFull: boolean;
+  alreadyClaimed: boolean;
+  shareOfVoice: number;
+  estMonthlyLeads: number;
+  estConnections: number;
+  estAdditionalLeads: number;
+  roiSixMonth: number;
+  totalLeads: number;
+  sixMonthLeads: number;
+  monthlyRate: number;
+  monthlyRateDisplay: string;
+  isFreeSlot: boolean;
+  hasFreeSlots: boolean;
+  freeZipsUsed: number;
+  freeZipsTotal: number;
+}
+
+function ZipMetricsDialog({
+  zipCode,
+  open,
+  onClose,
+  onClaim,
+  claiming,
+}: {
+  zipCode: string;
+  open: boolean;
+  onClose: () => void;
+  onClaim: (zip: string) => void;
+  claiming: boolean;
+}) {
+  const { data: metrics, isLoading } = useQuery<ZipMetrics>({
+    queryKey: ["/api/leads/zip-metrics", zipCode],
+    queryFn: async () => {
+      const res = await fetch(`/api/leads/zip-metrics/${zipCode}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: open && /^\d{5}$/.test(zipCode),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : metrics ? (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-2xl">
+                <MapPin className="h-5 w-5" />
+                {metrics.zipCode}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>{metrics.avgHomeValue > 0 ? `${formatCompact(metrics.avgHomeValue)} Avg Home Value` : "No home value data"}</span>
+              <span>{metrics.spotsRemaining > 0 ? `${Math.round((metrics.spotsRemaining / metrics.maxAgents) * 100)}% Available` : "Full"}</span>
+            </div>
+
+            <div className="space-y-4 mt-2">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Share of Voice</span>
+                  <span className="text-sm font-bold">{metrics.shareOfVoice}%</span>
+                </div>
+                <Progress value={metrics.shareOfVoice} className="h-2" />
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estimated Outcome</p>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-xl font-bold">{metrics.estConnections}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">Connections</p>
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold">{metrics.estAdditionalLeads}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">Est. Leads</p>
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold">{metrics.roiSixMonth > 0 ? `${metrics.roiSixMonth}x` : "—"}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">ROI 6 Mo</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Competition</p>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm">{metrics.currentAgents} of {metrics.maxAgents} agents</span>
+                  <Badge variant={metrics.isFull ? "destructive" : "outline"} className="text-[10px]">
+                    {metrics.isFull ? "Full" : `${metrics.spotsRemaining} spots left`}
+                  </Badge>
+                </div>
+                <Progress value={(metrics.currentAgents / metrics.maxAgents) * 100} className="h-2" />
+                <div className="flex gap-1 mt-3">
+                  {Array.from({ length: metrics.maxAgents }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`flex-1 h-6 rounded-sm ${
+                        i < metrics.currentAgents
+                          ? "bg-foreground/70"
+                          : "bg-muted"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div>
+                  <p className="text-xs text-muted-foreground">Monthly Cost</p>
+                  <p className="text-2xl font-bold">
+                    {metrics.isFreeSlot ? (
+                      <span className="text-green-600">Free</span>
+                    ) : (
+                      metrics.monthlyRateDisplay + "/mo"
+                    )}
+                  </p>
+                  {metrics.isFreeSlot && (
+                    <p className="text-[10px] text-muted-foreground">
+                      Free slot ({metrics.freeZipsUsed + 1} of {metrics.freeZipsTotal})
+                    </p>
+                  )}
+                </div>
+                {!metrics.alreadyClaimed && !metrics.isFull ? (
+                  <Button onClick={() => onClaim(metrics.zipCode)} disabled={claiming} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Claim ZIP
+                  </Button>
+                ) : metrics.alreadyClaimed ? (
+                  <Badge variant="secondary" className="text-sm py-1.5 px-3">Already Claimed</Badge>
+                ) : (
+                  <Badge variant="destructive" className="text-sm py-1.5 px-3">
+                    <Lock className="h-3 w-3 mr-1" /> Full
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">No data available</div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ZipMapView({
+  claimedZips,
+  onSelectZip,
+}: {
+  claimedZips: ZipCodeData[];
+  onSelectZip: (zip: string) => void;
+}) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<Map<string, any>>(new Map());
+  const claimedLayerRef = useRef<any>(null);
+  const searchLayerRef = useRef<any>(null);
+  const [mapZipSearch, setMapZipSearch] = useState("");
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const leafletRef = useRef<any>(null);
+
+  const { data: allZipData } = useQuery<Array<{ zipCode: string; agentCount: number; isMine: boolean; spotsRemaining: number; isFull: boolean }>>({
+    queryKey: ["/api/leads/all-zip-data"],
+  });
+
+  useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+
+    const loadMap = async () => {
+      const L = (await import("leaflet")).default;
+      await import("leaflet/dist/leaflet.css");
+      leafletRef.current = L;
+
+      const map = L.map(mapRef.current!, {
+        center: [39.8283, -98.5795],
+        zoom: 4,
+        zoomControl: true,
+      });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+
+      claimedLayerRef.current = L.layerGroup().addTo(map);
+      searchLayerRef.current = L.layerGroup().addTo(map);
+
+      mapInstanceRef.current = map;
+      setMapLoaded(true);
+    };
+
+    loadMap();
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded || !leafletRef.current) return;
+    if (!claimedLayerRef.current) return;
+
+    const L = leafletRef.current;
+    claimedLayerRef.current.clearLayers();
+    markersRef.current.clear();
+
+    const allZips = new Set<string>();
+    claimedZips.forEach((zc) => allZips.add(zc.zipCode));
+
+    if (allZipData) {
+      allZipData.forEach((zd) => allZips.add(zd.zipCode));
+    }
+
+    const claimedSet = new Set(claimedZips.map(z => z.zipCode));
+
+    allZips.forEach((zip) => {
+      const isMine = claimedSet.has(zip);
+      const zipInfo = allZipData?.find(z => z.zipCode === zip);
+      addMarkerToLayer(zip, L, claimedLayerRef.current, isMine, onSelectZip, zipInfo);
+    });
+  }, [claimedZips, mapLoaded, allZipData, onSelectZip]);
+
+  const handleMapSearch = async () => {
+    const zip = mapZipSearch.trim();
+    if (!/^\d{5}$/.test(zip)) return;
+    if (!mapInstanceRef.current || !leafletRef.current) return;
+
+    const L = leafletRef.current;
+    searchLayerRef.current?.clearLayers();
+
+    const isMine = claimedZips.some(z => z.zipCode === zip);
+    if (!markersRef.current.has(zip)) {
+      await geocodeAndAddMarker(zip, L, searchLayerRef.current, isMine, onSelectZip);
+    }
+
+    const existing = markersRef.current.get(zip);
+    if (existing) {
+      mapInstanceRef.current.setView(existing.getLatLng(), 11);
+    } else {
+      await geocodeAndPan(zip, mapInstanceRef.current);
+    }
+
+    onSelectZip(zip);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <Input
+          placeholder="Enter 5-digit ZIP code"
+          value={mapZipSearch}
+          onChange={(e) => setMapZipSearch(e.target.value.replace(/\D/g, "").slice(0, 5))}
+          onKeyDown={(e) => e.key === "Enter" && handleMapSearch()}
+          className="max-w-xs"
+        />
+        <Button onClick={handleMapSearch} variant="outline" className="gap-2">
+          <Search className="h-4 w-4" />
+          Search
+        </Button>
+      </div>
+      <div
+        ref={mapRef}
+        className="h-[400px] md:h-[500px] w-full rounded-lg border border-border overflow-hidden"
+      />
+      <div className="flex gap-4 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "#22c55e" }} /> Your ZIPs
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "#f59e0b" }} /> Other Active ZIPs
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "#3b82f6" }} /> Searched
+        </span>
+      </div>
+    </div>
+  );
+}
+
+async function geocodeAndPan(zip: string, map: any) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=US&format=json&limit=1`
+    );
+    const data = await res.json();
+    if (data.length > 0) {
+      map.setView([parseFloat(data[0].lat), parseFloat(data[0].lon)], 11);
+    }
+  } catch {}
+}
+
+async function geocodeAndAddMarker(
+  zip: string,
+  L: any,
+  layer: any,
+  isMine: boolean,
+  onSelect: (z: string) => void
+) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=US&format=json&limit=1`
+    );
+    const data = await res.json();
+    if (data.length > 0) {
+      const { lat, lon } = data[0];
+      const color = isMine ? "#22c55e" : "#3b82f6";
+      const icon = L.divIcon({
+        html: `<div style="background:${color};color:white;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);border:2px solid white;cursor:pointer;">${zip}</div>`,
+        className: "",
+        iconSize: [60, 28],
+        iconAnchor: [30, 14],
+      });
+      const marker = L.marker([parseFloat(lat), parseFloat(lon)], { icon }).addTo(layer);
+      marker.on("click", () => onSelect(zip));
+    }
+  } catch {}
+}
+
+function addMarkerToLayer(
+  zip: string,
+  L: any,
+  layer: any,
+  isMine: boolean,
+  onSelect: (z: string) => void,
+  zipInfo?: { agentCount: number; spotsRemaining: number; isFull: boolean } | null
+) {
+  fetch(`https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=US&format=json&limit=1`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.length > 0) {
+        const { lat, lon } = data[0];
+        const color = isMine ? "#22c55e" : "#f59e0b";
+        const label = zipInfo ? `${zip} (${zipInfo.agentCount}/${zipInfo.agentCount + zipInfo.spotsRemaining})` : zip;
+        const icon = L.divIcon({
+          html: `<div style="background:${color};color:white;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);border:2px solid white;cursor:pointer;">${label}</div>`,
+          className: "",
+          iconSize: [90, 28],
+          iconAnchor: [45, 14],
+        });
+        const marker = L.marker([parseFloat(lat), parseFloat(lon)], { icon }).addTo(layer);
+        marker.on("click", () => onSelect(zip));
+      }
+    })
+    .catch(() => {});
+}
+
 export default function LeadGenerationPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("leads");
   const [newZipCode, setNewZipCode] = useState("");
   const [previewZip, setPreviewZip] = useState("");
+  const [metricsZip, setMetricsZip] = useState("");
+  const [metricsOpen, setMetricsOpen] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
@@ -178,8 +551,10 @@ export default function LeadGenerationPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads/zip-codes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leads/zip-pricing"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/zip-metrics"] });
       setNewZipCode("");
       setPreviewZip("");
+      setMetricsOpen(false);
       toast({ title: "Zip code claimed successfully" });
     },
     onError: (error: Error) => {
@@ -229,6 +604,7 @@ export default function LeadGenerationPage() {
   const zipCodes = zipData?.zipCodes ?? [];
   const freeZipsUsed = zipData?.freeZipsUsed ?? 0;
   const freeZipsTotal = zipData?.freeZipsTotal ?? 3;
+  const totalMonthlyBudget = zipCodes.reduce((sum, zc) => sum + zc.monthlyRate, 0);
 
   const handleZipInput = (value: string) => {
     const cleaned = value.replace(/\D/g, "").slice(0, 5);
@@ -250,6 +626,11 @@ export default function LeadGenerationPage() {
     claimZipMutation.mutate(trimmed);
   };
 
+  const handleMapSelectZip = useCallback((zip: string) => {
+    setMetricsZip(zip);
+    setMetricsOpen(true);
+  }, []);
+
   const competitionLevel = (count: number, max: number) => {
     const ratio = count / max;
     if (ratio === 0) return { label: "No competition", color: "text-green-600", bg: "bg-green-500" };
@@ -260,7 +641,7 @@ export default function LeadGenerationPage() {
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-6 overflow-x-hidden">
+    <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-6 overflow-x-hidden pb-24 md:pb-6">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold">Lead Generation</h1>
         <p className="text-muted-foreground mt-1 text-sm">
@@ -368,7 +749,14 @@ export default function LeadGenerationPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="leads">Incoming Leads</TabsTrigger>
-          <TabsTrigger value="zip-codes">Zip Code Coverage</TabsTrigger>
+          <TabsTrigger value="zip-codes" className="gap-1.5">
+            <BarChart3 className="h-3.5 w-3.5" />
+            My ZIPs
+          </TabsTrigger>
+          <TabsTrigger value="map" className="gap-1.5">
+            <Map className="h-3.5 w-3.5" />
+            ZIP Map
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="leads" className="space-y-4">
@@ -492,14 +880,16 @@ export default function LeadGenerationPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-blue-500/10 rounded-lg">
-                    <Users className="h-5 w-5 text-blue-500" />
+                    <DollarSign className="h-5 w-5 text-blue-500" />
                   </div>
                   <div>
-                    <p className="font-semibold text-sm">Max Per Zip Code</p>
-                    <p className="text-xs text-muted-foreground">Limited spots per area</p>
+                    <p className="font-semibold text-sm">Monthly Budget</p>
+                    <p className="text-xs text-muted-foreground">Total across all ZIPs</p>
                   </div>
                 </div>
-                <p className="text-2xl font-bold">{zipData?.maxAgentsPerZip ?? 5} agents</p>
+                <p className="text-2xl font-bold">
+                  {totalMonthlyBudget > 0 ? `$${(totalMonthlyBudget / 100).toFixed(2)}` : "Free"}
+                </p>
               </CardContent>
             </Card>
 
@@ -507,14 +897,14 @@ export default function LeadGenerationPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-amber-500/10 rounded-lg">
-                    <DollarSign className="h-5 w-5 text-amber-500" />
+                    <Users className="h-5 w-5 text-amber-500" />
                   </div>
                   <div>
-                    <p className="font-semibold text-sm">Tiered Pricing</p>
-                    <p className="text-xs text-muted-foreground">Competitive zips</p>
+                    <p className="font-semibold text-sm">Active ZIPs</p>
+                    <p className="text-xs text-muted-foreground">{zipData?.maxAgentsPerZip ?? 5} agents max per area</p>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">Free slots require 3+ open spots. Competitive zips start at <span className="font-semibold text-foreground">$10/mo</span></p>
+                <p className="text-2xl font-bold">{zipCodes.length}</p>
               </CardContent>
             </Card>
           </div>
@@ -558,21 +948,35 @@ export default function LeadGenerationPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Search className="h-5 w-5" />
-                Claim a Zip Code
+                Add New ZIP
               </CardTitle>
               <CardDescription>
-                Enter a zip code to check availability and pricing before claiming
+                Enter a zip code to check availability, metrics, and pricing
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2 max-w-md">
                 <Input
-                  placeholder="Enter 5-digit zip code"
+                  placeholder="Enter 5-digit ZIP"
                   value={newZipCode}
                   onChange={(e) => handleZipInput(e.target.value)}
                   maxLength={5}
                   onKeyDown={(e) => e.key === "Enter" && pricing && !pricing.isFull && !pricing.alreadyClaimed && handleClaimZip()}
                 />
+                {previewZip && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1 shrink-0"
+                    onClick={() => {
+                      setMetricsZip(previewZip);
+                      setMetricsOpen(true);
+                    }}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    View Metrics
+                  </Button>
+                )}
               </div>
 
               {previewZip && (
@@ -657,85 +1061,137 @@ export default function LeadGenerationPage() {
           </Card>
 
           {zipCodesLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {[1, 2, 3].map(i => <Skeleton key={i} className="h-28" />)}
-            </div>
+            <Skeleton className="h-48 w-full" />
           ) : zipCodes.length > 0 ? (
-            <>
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-                Your Claimed Zip Codes ({zipCodes.length})
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {zipCodes.map(zc => {
-                  const comp = competitionLevel(zc.currentAgents, zc.maxAgents);
-                  return (
-                    <Card key={zc.id} className="relative">
-                      <CardContent className="pt-6">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-lg">
-                              <MapPin className="h-5 w-5 text-primary" />
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Active ZIPs</CardTitle>
+                  {totalMonthlyBudget > 0 && (
+                    <span className="text-sm text-muted-foreground">
+                      Total Budget: <span className="font-semibold text-foreground">${(totalMonthlyBudget / 100).toFixed(2)}/mo</span>
+                    </span>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ZIP</TableHead>
+                      <TableHead className="text-center">Agents</TableHead>
+                      <TableHead className="text-center">Competition</TableHead>
+                      <TableHead className="text-center hidden sm:table-cell">Share of Voice</TableHead>
+                      <TableHead className="text-right">Monthly Cost</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {zipCodes.map(zc => {
+                      const comp = competitionLevel(zc.currentAgents, zc.maxAgents);
+                      const sov = zc.currentAgents > 0
+                        ? Math.round((1 / zc.currentAgents) * 100)
+                        : 100;
+                      return (
+                        <TableRow key={zc.id}>
+                          <TableCell>
+                            <button
+                              className="text-primary font-semibold hover:underline"
+                              onClick={() => handleMapSelectZip(zc.zipCode)}
+                            >
+                              {zc.zipCode}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-sm">{zc.currentAgents}/{zc.maxAgents}</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className={`text-[10px] ${comp.color}`}>
+                              {comp.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center hidden sm:table-cell">
+                            <div className="flex items-center gap-2 justify-center">
+                              <Progress value={sov} className="h-1.5 w-16" />
+                              <span className="text-xs font-medium">{sov}%</span>
                             </div>
-                            <div>
-                              <p className="text-xl font-bold">{zc.zipCode}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <Badge variant={zc.isActive ? "default" : "secondary"} className="text-[10px]">
-                                  {zc.isActive ? "Active" : "Inactive"}
-                                </Badge>
-                                {zc.isFreeSlot ? (
-                                  <Badge variant="outline" className="text-[10px] text-green-600 border-green-300">
-                                    Free
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-[10px]">
-                                    ${(zc.monthlyRate / 100).toFixed(0)}/mo
-                                  </Badge>
-                                )}
-                              </div>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {zc.isFreeSlot ? (
+                              <Badge variant="outline" className="text-green-600 border-green-300 text-[10px]">Free</Badge>
+                            ) : (
+                              <span>${(zc.monthlyRate / 100).toFixed(0)}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex gap-1 justify-end">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleMapSelectZip(zc.zipCode)}
+                                title="View metrics"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-red-500"
+                                onClick={() => unclaimZipMutation.mutate(zc.id)}
+                                disabled={unclaimZipMutation.isPending}
+                                title="Remove"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-red-500 shrink-0"
-                            onClick={() => unclaimZipMutation.mutate(zc.id)}
-                            disabled={unclaimZipMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className={`${comp.color} font-medium`}>
-                              <Users className="h-3 w-3 inline mr-1" />
-                              {zc.currentAgents}/{zc.maxAgents} agents
-                            </span>
-                            <span className="text-muted-foreground">{comp.label}</span>
-                          </div>
-                          <Progress
-                            value={(zc.currentAgents / zc.maxAgents) * 100}
-                            className="h-1.5"
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           ) : (
             <Card>
               <CardContent className="py-12 text-center">
                 <MapPin className="h-12 w-12 mx-auto mb-3 opacity-30" />
                 <p className="text-muted-foreground">
-                  No zip codes claimed yet. Enter a zip code above to check availability and pricing.
+                  No zip codes claimed yet. Enter a zip code above or use the ZIP Map tab to explore areas.
                 </p>
               </CardContent>
             </Card>
           )}
         </TabsContent>
+
+        <TabsContent value="map" className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Map className="h-5 w-5" />
+                ZIP Code Map
+              </CardTitle>
+              <CardDescription>
+                Search for zip codes to view market data and claim new areas. Click a marker to see detailed metrics.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ZipMapView
+                claimedZips={zipCodes}
+                onSelectZip={handleMapSelectZip}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      <ZipMetricsDialog
+        zipCode={metricsZip}
+        open={metricsOpen}
+        onClose={() => setMetricsOpen(false)}
+        onClaim={(zip) => claimZipMutation.mutate(zip)}
+        claiming={claimZipMutation.isPending}
+      />
     </div>
   );
 }
