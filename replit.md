@@ -63,6 +63,8 @@ Preferred communication style: Simple, everyday language.
   - Key file: `client/src/pages/broker-portal-page.tsx`.
 
 - **Automated Feedback Requests**: When a transaction status changes to "closed", the system automatically sends an SMS to the client with a unique link to submit a review. Agents can also manually send feedback requests for any transaction via `POST /api/feedback-requests/send`. The feedback form is a public page at `/feedback/:token` — no login required. Clients rate 1-5 stars, add title and comment, which creates an `agent_reviews` record. Agents can view all sent feedback requests and their status via `GET /api/feedback-requests`. Duplicate-checked per transaction+client pair. DB table: `feedback_requests`. Key files: `client/src/pages/feedback-page.tsx`, `server/routes.ts`, `server/storage.ts`.
+  - **Multi-channel delivery**: Feedback requests are delivered via all available channels: (1) SMS — uses agent's own provisioned number if available, otherwise platform Twilio number; (2) Email — sends styled HTML email via agent's connected Gmail if available; (3) In-app private message — sends encrypted message to client's user account if one exists (matched by email). Response includes `deliveredVia` array showing which channels succeeded.
+  - **Security**: PATCH /api/transactions/:id strips immutable fields (id, agentId) from body. Auto-trigger always uses req.user.id for attribution. DB has unique constraint on (transaction_id, client_id).
 
 ## External Dependencies
 

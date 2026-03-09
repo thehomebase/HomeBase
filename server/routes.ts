@@ -603,6 +603,8 @@ export function registerRoutes(app: Express): Server {
     try {
       const id = Number(req.params.id);
       const data = { ...req.body };
+      delete data.id;
+      delete data.agentId;
 
       const oldTransaction = await storage.getTransaction(id);
       if (!oldTransaction || oldTransaction.agentId !== req.user.id) {
@@ -637,7 +639,7 @@ export function registerRoutes(app: Express): Server {
               const token = randomUUID();
               await storage.createFeedbackRequest({
                 transactionId: transaction.id,
-                agentId: transaction.agentId,
+                agentId: req.user.id,
                 clientId: transaction.clientId,
                 token,
               });
@@ -645,12 +647,55 @@ export function registerRoutes(app: Express): Server {
               const agentName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'your agent';
               const address = [transaction.streetName, transaction.city].filter(Boolean).join(', ') || 'your property';
               const feedbackUrl = `${getAppBaseUrl(req)}/feedback/${token}`;
+              const deliveredVia: string[] = [];
 
               if (client.phone) {
-                const message = `Congratulations on closing on ${address}! ${agentName} would love to hear about your experience. Please leave a review here: ${feedbackUrl}`;
-                sendSMS(client.phone, message).catch(err => console.error("Failed to send feedback SMS:", err));
+                const agentPhone = await storage.getAgentPhoneNumber(req.user.id);
+                const smsMessage = `Congratulations on closing on ${address}! ${agentName} would love to hear about your experience. Please leave a review here: ${feedbackUrl}`;
+                const smsResult = agentPhone
+                  ? await sendSMSFromNumber(agentPhone.phoneNumber, client.phone, smsMessage)
+                  : await sendSMS(client.phone, smsMessage);
+                if (smsResult.success) deliveredVia.push('sms');
+                else console.error("Failed to send feedback SMS:", smsResult.error);
               }
-              console.log(`[Feedback] Created feedback request for transaction ${transaction.id}, client ${client.firstName} ${client.lastName}`);
+
+              if (client.email) {
+                try {
+                  const gmailStatus = await getGmailStatus(req.user.id);
+                  if (gmailStatus.connected) {
+                    const subject = `How was your experience? — ${address}`;
+                    const emailBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+                      <h2 style="color:#333;">Congratulations on your closing!</h2>
+                      <p>Hi ${client.firstName || 'there'},</p>
+                      <p>${agentName} would love to hear about your experience with the transaction at <strong>${address}</strong>.</p>
+                      <p style="margin:24px 0;"><a href="${feedbackUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">Leave a Review</a></p>
+                      <p style="color:#666;font-size:13px;">Or copy this link: ${feedbackUrl}</p>
+                    </div>`;
+                    const emailResult = await sendGmailEmail(req.user.id, client.email, subject, emailBody);
+                    if (emailResult.success) deliveredVia.push('email');
+                  }
+                } catch (emailErr) {
+                  console.error("Failed to send feedback email:", emailErr);
+                }
+              }
+
+              if (client.email) {
+                try {
+                  const clientUser = await storage.getUserByEmail(client.email);
+                  if (clientUser) {
+                    await storage.createPrivateMessage({
+                      senderId: req.user.id,
+                      recipientId: clientUser.id,
+                      content: `Congratulations on closing on ${address}! I'd love to hear about your experience. Please leave a review here: ${feedbackUrl}`,
+                    });
+                    deliveredVia.push('message');
+                  }
+                } catch (msgErr) {
+                  console.error("Failed to send feedback private message:", msgErr);
+                }
+              }
+
+              console.log(`[Feedback] Created feedback request for transaction ${transaction.id}, client ${client.firstName} ${client.lastName}, delivered via: ${deliveredVia.join(', ') || 'none (no contact info)'}`);
             }
           }
         } catch (feedbackErr) {
@@ -6139,14 +6184,59 @@ export function registerRoutes(app: Express): Server {
       const agentName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'your agent';
       const address = [transaction.streetName, transaction.city].filter(Boolean).join(', ') || 'your property';
       const feedbackUrl = `${getAppBaseUrl(req)}/feedback/${token}`;
+      const deliveredVia: string[] = [];
 
       if (client.phone) {
-        const message = `Hi ${client.firstName}! ${agentName} would love to hear about your experience with the transaction at ${address}. Please leave a review here: ${feedbackUrl}`;
-        const smsResult = await sendSMS(client.phone, message);
-        if (!smsResult.success) console.error("Failed to send feedback SMS:", smsResult.error);
+        const agentPhone = await storage.getAgentPhoneNumber(req.user.id);
+        const smsMessage = `Hi ${client.firstName}! ${agentName} would love to hear about your experience with the transaction at ${address}. Please leave a review here: ${feedbackUrl}`;
+        const smsResult = agentPhone
+          ? await sendSMSFromNumber(agentPhone.phoneNumber, client.phone, smsMessage)
+          : await sendSMS(client.phone, smsMessage);
+        if (smsResult.success) deliveredVia.push('sms');
+        else console.error("Failed to send feedback SMS:", smsResult.error);
       }
 
-      res.json(feedbackReq);
+      if (client.email) {
+        try {
+          const gmailStatus = await getGmailStatus(req.user.id);
+          if (gmailStatus.connected) {
+            const subject = `How was your experience? — ${address}`;
+            const emailBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+              <h2 style="color:#333;">We'd love your feedback!</h2>
+              <p>Hi ${client.firstName || 'there'},</p>
+              <p>${agentName} would love to hear about your experience with the transaction at <strong>${address}</strong>.</p>
+              <p style="margin:24px 0;"><a href="${feedbackUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">Leave a Review</a></p>
+              <p style="color:#666;font-size:13px;">Or copy this link: ${feedbackUrl}</p>
+            </div>`;
+            const emailResult = await sendGmailEmail(req.user.id, client.email, subject, emailBody);
+            if (emailResult.success) deliveredVia.push('email');
+          }
+        } catch (emailErr) {
+          console.error("Failed to send feedback email:", emailErr);
+        }
+      }
+
+      if (client.email) {
+        try {
+          const clientUser = await storage.getUserByEmail(client.email);
+          if (clientUser) {
+            await storage.createPrivateMessage({
+              senderId: req.user.id,
+              recipientId: clientUser.id,
+              content: `Hi ${client.firstName || 'there'}! I'd love to hear about your experience with the transaction at ${address}. Please leave a review here: ${feedbackUrl}`,
+            });
+            deliveredVia.push('message');
+          }
+        } catch (msgErr) {
+          console.error("Failed to send feedback private message:", msgErr);
+        }
+      }
+
+      if (deliveredVia.length === 0 && !client.phone && !client.email) {
+        return res.status(400).json({ error: "Client has no phone number or email address on file" });
+      }
+
+      res.json({ ...feedbackReq, deliveredVia });
     } catch (error) {
       console.error("Error sending feedback request:", error);
       res.status(500).json({ error: "Failed to send feedback request" });
