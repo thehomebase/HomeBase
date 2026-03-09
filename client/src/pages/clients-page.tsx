@@ -24,7 +24,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient, type ClientInvitation } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check, Upload, FileSpreadsheet, Info, AlertTriangle, MessageSquare, Send, UserPlus, Clock } from "lucide-react";
+import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check, Upload, FileSpreadsheet, Info, AlertTriangle, MessageSquare, Send, UserPlus, Clock, Heart, Link2, Unlink, Cake, CalendarHeart } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -205,17 +206,64 @@ const ClientDetailsPanel = ({
   isOpen,
   onClose,
   onUpdate,
-  onContact
+  onContact,
+  allClients
 }: {
   client: Client | null;
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (updatedClient: Client) => Promise<void>;
   onContact?: (client: Client) => void;
+  allClients?: Client[];
 }) => {
   const [editingClient, setEditingClient] = useState<Client | null>(client);
   const { toast } = useToast();
   const [newLabel, setNewLabel] = useState("");
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [linkSearchQuery, setLinkSearchQuery] = useState("");
+
+  const { data: linkedClient, refetch: refetchLinked } = useQuery<Client | null>({
+    queryKey: ['/api/clients', editingClient?.id, 'linked'],
+    queryFn: async () => {
+      if (!editingClient?.linkedClientId) return null;
+      const res = await fetch(`/api/clients/${editingClient.id}/linked`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!editingClient?.id && !!editingClient?.linkedClientId,
+  });
+
+  const linkMutation = useMutation({
+    mutationFn: async (linkedClientId: number) => {
+      const res = await apiRequest('POST', `/api/clients/${editingClient!.id}/link`, { linkedClientId });
+      return { result: await res.json(), linkedClientId };
+    },
+    onSuccess: ({ linkedClientId }) => {
+      toast({ title: "Success", description: "Clients linked successfully" });
+      setShowLinkDialog(false);
+      setEditingClient(prev => prev ? { ...prev, linkedClientId } : prev);
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      refetchLinked();
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to link clients", variant: "destructive" });
+    }
+  });
+
+  const unlinkMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('DELETE', `/api/clients/${editingClient!.id}/link`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Clients unlinked" });
+      setEditingClient(prev => prev ? { ...prev, linkedClientId: null } : prev);
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to unlink clients", variant: "destructive" });
+    }
+  });
 
   useEffect(() => {
     setEditingClient(client);
@@ -462,6 +510,130 @@ const ClientDetailsPanel = ({
               </div>
             </div>
           </div>
+
+          {/* Important Dates */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <CalendarHeart className="h-4 w-4" />
+              Important Dates
+            </h3>
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">
+                  <Cake className="h-3 w-3" />
+                  Birthday (MM-DD)
+                </Label>
+                <Input
+                  placeholder="03-15"
+                  value={editingClient.birthday || ''}
+                  onChange={(e) => handleUpdate('birthday' as keyof Client, e.target.value || null)}
+                  maxLength={5}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">
+                  <Heart className="h-3 w-3" />
+                  Anniversary (MM-DD)
+                </Label>
+                <Input
+                  placeholder="06-20"
+                  value={editingClient.anniversary || ''}
+                  onChange={(e) => handleUpdate('anniversary' as keyof Client, e.target.value || null)}
+                  maxLength={5}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Linked Client (Spouse/Partner) */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <Link2 className="h-4 w-4" />
+              Linked Client (Spouse/Partner)
+            </h3>
+            {linkedClient ? (
+              <div className="border rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium text-sm">
+                    {linkedClient.firstName} {linkedClient.lastName}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-destructive hover:text-destructive"
+                    onClick={() => unlinkMutation.mutate()}
+                    disabled={unlinkMutation.isPending}
+                  >
+                    <Unlink className="h-3 w-3 mr-1" />
+                    Unlink
+                  </Button>
+                </div>
+                {linkedClient.email && (
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Mail className="h-3 w-3" /> {linkedClient.email}
+                  </div>
+                )}
+                {linkedClient.phone && (
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Phone className="h-3 w-3" /> {linkedClient.phone}
+                  </div>
+                )}
+              </div>
+            ) : editingClient.linkedClientId ? (
+              <p className="text-sm text-muted-foreground">Loading linked client...</p>
+            ) : (
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => { setShowLinkDialog(true); setLinkSearchQuery(""); }}
+                >
+                  <Link2 className="h-3 w-3" />
+                  Link a Client
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Link Client Dialog */}
+          <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Link Client (Spouse/Partner)</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <Input
+                  placeholder="Search clients..."
+                  value={linkSearchQuery}
+                  onChange={(e) => setLinkSearchQuery(e.target.value)}
+                />
+                <div className="max-h-60 overflow-y-auto space-y-1">
+                  {(allClients || [])
+                    .filter(c =>
+                      c.id !== editingClient.id &&
+                      !c.linkedClientId &&
+                      (linkSearchQuery === '' ||
+                        `${c.firstName} ${c.lastName}`.toLowerCase().includes(linkSearchQuery.toLowerCase()))
+                    )
+                    .map(c => (
+                      <button
+                        key={c.id}
+                        className="w-full text-left px-3 py-2 rounded hover:bg-accent text-sm flex justify-between items-center"
+                        onClick={() => linkMutation.mutate(c.id)}
+                        disabled={linkMutation.isPending}
+                      >
+                        <span>{c.firstName} {c.lastName}</span>
+                        {c.phone && <span className="text-xs text-muted-foreground">{c.phone}</span>}
+                      </button>
+                    ))}
+                  {(allClients || []).filter(c => c.id !== editingClient.id && !c.linkedClientId).length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">No available clients to link</p>
+                  )}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </SheetContent>
     </Sheet>
@@ -729,6 +901,7 @@ const TableContent = ({
         onClose={() => setSelectedClient(null)}
         onUpdate={onUpdate}
         onContact={onContact ? (client) => { setSelectedClient(null); onContact(client); } : undefined}
+        allClients={clients}
       />
     </>
   );
@@ -1578,6 +1751,7 @@ export default function ClientsPage() {
         onClose={() => setSelectedClient(null)}
         onUpdate={handleClientUpdate}
         onContact={(client) => { setSelectedClient(null); setContactClient(client); }}
+        allClients={clients}
       />
       <ClientContactDialog
         client={contactClient}

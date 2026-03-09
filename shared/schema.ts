@@ -51,6 +51,9 @@ export const clients = pgTable("clients", {
   labels: text("labels").array().default([]),
   source: text("source"),
   agentId: integer("agent_id").notNull(),
+  linkedClientId: integer("linked_client_id"),
+  birthday: text("birthday"),
+  anniversary: text("anniversary"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

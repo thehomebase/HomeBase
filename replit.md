@@ -31,7 +31,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Features
 - **Transaction & Document Management**: Contract upload with data extraction, document signing link tracking, transaction timeline with risk alerts, client portal for progress visibility, and transaction templates.
-- **Client Management**: Client invitation system, automated feedback requests upon transaction closure, and smart reminders for anniversaries and birthdays with multi-channel delivery.
+- **Client Management**: Client invitation system, automated feedback requests upon transaction closure, smart reminders for anniversaries and birthdays with multi-channel delivery, and client linking (spouse/partner) with bidirectional linking and shared transaction/communication visibility. Birthday and anniversary fields on client records auto-sync from drip campaign special dates.
 - **Vendor & Contractor Ecosystem**: Inspection bid system with PDF parsing, vendor portal for bid management, contractor verification badges, "HomeBase Pros" marketplace, and multi-category vendor ratings (quality, communication, timeliness, value) with performance stats.
 - **Communication Tools**: Encrypted private messaging (AES-256-GCM, server-side encryption/decryption) with real-time polling, SMS via Twilio, email integration via Google OAuth, and communication metrics dashboard. Call logging functionality is also available.
 - **Post-Close Engagement**: "MyHome" hub for homeowners to track properties and maintenance.

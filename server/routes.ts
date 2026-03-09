@@ -434,7 +434,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: 'Not authorized to update this client' });
       }
 
-      const client = await storage.updateClient(clientId, req.body);
+      const { linkedClientId, agentId, id, ...safeBody } = req.body;
+      const client = await storage.updateClient(clientId, safeBody);
 
       console.log('Client updated successfully:', client);
       res.json(client);
@@ -445,6 +446,55 @@ export function registerRoutes(app: Express): Server {
         error: 'Failed to update client',
         details: errorMessage
       });
+    }
+  });
+
+  app.get("/api/clients/:id/linked", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const client = await storage.getClient(Number(req.params.id));
+      if (!client) return res.status(404).json({ error: 'Client not found' });
+      if (client.agentId !== req.user.id && req.user.role !== "broker") return res.sendStatus(403);
+      if (!client.linkedClientId) return res.json(null);
+      const linked = await storage.getClient(client.linkedClientId);
+      res.json(linked || null);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch linked client' });
+    }
+  });
+
+  app.post("/api/clients/:id/link", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const clientId = Number(req.params.id);
+      const { linkedClientId } = req.body;
+      if (!linkedClientId || clientId === linkedClientId) return res.status(400).json({ error: 'Invalid linked client' });
+      const client = await storage.getClient(clientId);
+      if (!client || client.agentId !== req.user.id) return res.sendStatus(403);
+      const target = await storage.getClient(linkedClientId);
+      if (!target || target.agentId !== req.user.id) return res.status(400).json({ error: 'Target client not found or not yours' });
+      if (client.linkedClientId) return res.status(400).json({ error: 'Client is already linked. Unlink first.' });
+      if (target.linkedClientId) return res.status(400).json({ error: 'Target client is already linked to someone else.' });
+      await storage.linkClients(clientId, linkedClientId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error linking clients:', error);
+      res.status(500).json({ error: 'Failed to link clients' });
+    }
+  });
+
+  app.delete("/api/clients/:id/link", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const client = await storage.getClient(Number(req.params.id));
+      if (!client || client.agentId !== req.user.id) return res.sendStatus(403);
+      await storage.unlinkClients(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error unlinking clients:', error);
+      res.status(500).json({ error: 'Failed to unlink clients' });
     }
   });
 
@@ -4666,6 +4716,12 @@ export function registerRoutes(app: Express): Server {
       const parsed = insertClientSpecialDateSchema.safeParse({ ...req.body, agentId: req.user.id });
       if (!parsed.success) return res.status(400).json(parsed.error);
       const date = await storage.createClientSpecialDate(parsed.data);
+      if ((date.dateType === 'birthday' || date.dateType === 'anniversary') && date.clientId) {
+        const targetClient = await storage.getClient(date.clientId);
+        if (targetClient && targetClient.agentId === req.user.id) {
+          await storage.updateClient(date.clientId, { [date.dateType]: date.dateValue } as any);
+        }
+      }
       res.status(201).json(date);
     } catch (error) {
       console.error('Error creating special date:', error);
@@ -4679,7 +4735,19 @@ export function registerRoutes(app: Express): Server {
       const existing = await storage.getClientSpecialDate(Number(req.params.id));
       if (!existing) return res.status(404).json({ error: 'Special date not found' });
       if (existing.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      if (existing.dateType !== req.body.dateType && (existing.dateType === 'birthday' || existing.dateType === 'anniversary') && existing.clientId) {
+        const client = await storage.getClient(existing.clientId);
+        if (client && client.agentId === req.user.id) {
+          await storage.updateClient(existing.clientId, { [existing.dateType]: null } as any);
+        }
+      }
       const date = await storage.updateClientSpecialDate(Number(req.params.id), req.body);
+      if ((date.dateType === 'birthday' || date.dateType === 'anniversary') && date.clientId) {
+        const client = await storage.getClient(date.clientId);
+        if (client && client.agentId === req.user.id) {
+          await storage.updateClient(date.clientId, { [date.dateType]: date.dateValue } as any);
+        }
+      }
       res.json(date);
     } catch (error) {
       console.error('Error updating special date:', error);
@@ -4693,6 +4761,12 @@ export function registerRoutes(app: Express): Server {
       const existing = await storage.getClientSpecialDate(Number(req.params.id));
       if (!existing) return res.status(404).json({ error: 'Special date not found' });
       if (existing.agentId !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      if ((existing.dateType === 'birthday' || existing.dateType === 'anniversary') && existing.clientId) {
+        const targetClient = await storage.getClient(existing.clientId);
+        if (targetClient && targetClient.agentId === req.user.id) {
+          await storage.updateClient(existing.clientId, { [existing.dateType]: null } as any);
+        }
+      }
       await storage.deleteClientSpecialDate(Number(req.params.id));
       res.sendStatus(200);
     } catch (error) {

@@ -104,6 +104,8 @@ export interface IStorage {
   createClient(insertClient: InsertClient): Promise<Client>;
   updateClient(id: number, data: Partial<Client>): Promise<Client>;
   deleteClient(clientId: number): Promise<void>;
+  linkClients(clientId: number, linkedClientId: number): Promise<void>;
+  unlinkClients(clientId: number): Promise<void>;
   createChecklist(checklist: InsertChecklist): Promise<Checklist>;
   getChecklist(transactionId: number, role: string): Promise<Checklist | undefined>;
   updateChecklist(id: number, items: ChecklistItem[]): Promise<Checklist>;
@@ -1870,8 +1872,10 @@ export class DatabaseStorage implements IStorage {
         SELECT 
           id, first_name as "firstName", last_name as "lastName",
           email, phone, mobile_phone as "mobilePhone", address, street, city,
-          zip_code as "zipCode", type, status, notes, labels,
-          agent_id as "agentId", created_at as "createdAt", updated_at as "updatedAt"
+          zip_code as "zipCode", type, status, notes, labels, source,
+          agent_id as "agentId", linked_client_id as "linkedClientId",
+          birthday, anniversary,
+          created_at as "createdAt", updated_at as "updatedAt"
         FROM clients WHERE id = ${id} LIMIT 1
       `);
       if (result.rows.length === 0) return undefined;
@@ -1891,7 +1895,11 @@ export class DatabaseStorage implements IStorage {
         status: String(row.status),
         notes: row.notes ? String(row.notes) : null,
         labels: Array.isArray(row.labels) ? row.labels : [],
+        source: row.source ? String(row.source) : null,
         agentId: Number(row.agentId),
+        linkedClientId: row.linkedClientId ? Number(row.linkedClientId) : null,
+        birthday: row.birthday ? String(row.birthday) : null,
+        anniversary: row.anniversary ? String(row.anniversary) : null,
         createdAt: new Date(row.createdAt as string),
         updatedAt: new Date(row.updatedAt as string),
       };
@@ -1918,7 +1926,11 @@ export class DatabaseStorage implements IStorage {
           status,
           notes,
           labels,
+          source,
           agent_id as "agentId",
+          linked_client_id as "linkedClientId",
+          birthday,
+          anniversary,
           created_at as "createdAt",
           updated_at as "updatedAt"
         FROM clients 
@@ -1940,7 +1952,11 @@ export class DatabaseStorage implements IStorage {
         status: String(row.status),
         notes: row.notes ? String(row.notes) : null,
         labels: Array.isArray(row.labels) ? row.labels : [],
+        source: row.source ? String(row.source) : null,
         agentId: Number(row.agentId),
+        linkedClientId: row.linkedClientId ? Number(row.linkedClientId) : null,
+        birthday: row.birthday ? String(row.birthday) : null,
+        anniversary: row.anniversary ? String(row.anniversary) : null,
         createdAt: new Date(row.createdAt),
         updatedAt: new Date(row.updatedAt)
       }));
@@ -1952,9 +1968,33 @@ export class DatabaseStorage implements IStorage {
 
   async deleteClient(clientId: number): Promise<void> {
     try {
+      await db.execute(sql`UPDATE clients SET linked_client_id = NULL WHERE linked_client_id = ${clientId}`);
       await db.delete(clients).where(sql`id = ${clientId}`);
     } catch (error) {
       console.error('Error in deleteClient:', error);
+      throw error;
+    }
+  }
+
+  async linkClients(clientId: number, linkedClientId: number): Promise<void> {
+    try {
+      await db.execute(sql`UPDATE clients SET linked_client_id = ${linkedClientId}, updated_at = CURRENT_TIMESTAMP WHERE id = ${clientId}`);
+      await db.execute(sql`UPDATE clients SET linked_client_id = ${clientId}, updated_at = CURRENT_TIMESTAMP WHERE id = ${linkedClientId}`);
+    } catch (error) {
+      console.error('Error in linkClients:', error);
+      throw error;
+    }
+  }
+
+  async unlinkClients(clientId: number): Promise<void> {
+    try {
+      const client = await this.getClient(clientId);
+      if (client?.linkedClientId) {
+        await db.execute(sql`UPDATE clients SET linked_client_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ${client.linkedClientId}`);
+      }
+      await db.execute(sql`UPDATE clients SET linked_client_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ${clientId}`);
+    } catch (error) {
+      console.error('Error in unlinkClients:', error);
       throw error;
     }
   }
@@ -1995,6 +2035,9 @@ export class DatabaseStorage implements IStorage {
         labels: Array.isArray(client.labels) ? client.labels : [],
         source: (client as any).source ? String((client as any).source) : null,
         agentId: Number(client.agentId),
+        linkedClientId: client.linkedClientId ? Number(client.linkedClientId) : null,
+        birthday: client.birthday ? String(client.birthday) : null,
+        anniversary: client.anniversary ? String(client.anniversary) : null,
         createdAt: client.createdAt,
         updatedAt: client.updatedAt
       };
@@ -2406,7 +2449,11 @@ export class DatabaseStorage implements IStorage {
           status,
           notes,
           labels,
+          source,
           agent_id as "agentId",
+          linked_client_id as "linkedClientId",
+          birthday,
+          anniversary,
           created_at as "createdAt",
           updated_at as "updatedAt"
       `);
@@ -2430,7 +2477,11 @@ export class DatabaseStorage implements IStorage {
         status: String(row.status),
         notes: row.notes,
         labels: Array.isArray(row.labels) ? row.labels : [],
+        source: row.source || null,
         agentId: Number(row.agentId),
+        linkedClientId: row.linkedClientId ? Number(row.linkedClientId) : null,
+        birthday: row.birthday || null,
+        anniversary: row.anniversary || null,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt
       };
@@ -2457,7 +2508,11 @@ export class DatabaseStorage implements IStorage {
           status,
           notes,
           labels,
+          source,
           agent_id as "agentId",
+          linked_client_id as "linkedClientId",
+          birthday,
+          anniversary,
           created_at as "createdAt",
           updated_at as "updatedAt"
         FROM clients 
@@ -2479,7 +2534,11 @@ export class DatabaseStorage implements IStorage {
         status: String(row.status),
         notes: row.notes ? String(row.notes) : null,
         labels: Array.isArray(row.labels) ? row.labels : [],
+        source: row.source ? String(row.source) : null,
         agentId: Number(row.agentId),
+        linkedClientId: row.linkedClientId ? Number(row.linkedClientId) : null,
+        birthday: row.birthday ? String(row.birthday) : null,
+        anniversary: row.anniversary ? String(row.anniversary) : null,
         createdAt: new Date(row.createdAt),
         updatedAt: new Date(row.updatedAt)
       }));
@@ -2491,6 +2550,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteClient(clientId: number): Promise<void> {
     try {
+      await db.execute(sql`UPDATE clients SET linked_client_id = NULL WHERE linked_client_id = ${clientId}`);
       await db.delete(clients).where(sql`id = ${clientId}`);
     } catch (error) {
       console.error('Error in deleteClient:', error);
@@ -2534,6 +2594,9 @@ export class DatabaseStorage implements IStorage {
         labels: Array.isArray(client.labels) ? client.labels : [],
         source: (client as any).source ? String((client as any).source) : null,
         agentId: Number(client.agentId),
+        linkedClientId: client.linkedClientId ? Number(client.linkedClientId) : null,
+        birthday: client.birthday ? String(client.birthday) : null,
+        anniversary: client.anniversary ? String(client.anniversary) : null,
         createdAt: client.createdAt,
         updatedAt: client.updatedAt
       };
