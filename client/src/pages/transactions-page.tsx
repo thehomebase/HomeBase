@@ -198,7 +198,7 @@ export default function TransactionsPage() {
     queryKey: ["/api/clients"],
     queryFn: async () => {
       try {
-        if (!user || user.role !== "agent") {
+        if (!user || (user.role !== "agent" && user.role !== "broker")) {
           return [];
         }
         const response = await apiRequest("GET", "/api/clients");
@@ -255,7 +255,7 @@ export default function TransactionsPage() {
     queryKey: ["/api/alerts"],
     queryFn: async () => {
       try {
-        if (!user || user.role !== "agent") return [];
+        if (!user || (user.role !== "agent" && user.role !== "broker")) return [];
         const response = await apiRequest("GET", "/api/alerts");
         return response.json();
       } catch {

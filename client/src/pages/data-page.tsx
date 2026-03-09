@@ -184,13 +184,13 @@ export default function DataPage() {
   const averageDealSize = totalTransactions > 0 ? totalVolume / totalTransactions : 0;
   const winRate = 65;
 
-  if (!user || user.role !== "agent") {
+  if (!user || (user.role !== "agent" && user.role !== "broker")) {
     return (
       <main className="container mx-auto px-4 py-8">
         <h2 className="text-2xl font-bold mb-8">Sales Data Analysis</h2>
         <Card className="p-6">
           <p className="text-center text-muted-foreground">
-            This page is only available to agents.
+            This page is only available to agents and brokers.
           </p>
         </Card>
       </main>
