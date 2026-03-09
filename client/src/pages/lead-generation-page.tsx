@@ -326,11 +326,13 @@ function ZipMapView({
   onSelectZip,
   onClaimZip,
   claiming,
+  onPolygonClick,
 }: {
   claimedZips: ZipCodeData[];
   onSelectZip: (zip: string) => void;
   onClaimZip: (zip: string) => void;
   claiming: boolean;
+  onPolygonClick?: (zip: string) => void;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -516,6 +518,10 @@ function ZipMapView({
   };
 
   const handlePolygonClick = async (zipCode: string) => {
+    if (onPolygonClick) {
+      onPolygonClick(zipCode);
+    }
+
     const alreadySelected = selectedZips.some(z => z.zipCode === zipCode);
     if (alreadySelected) return;
 
@@ -1498,6 +1504,10 @@ export default function LeadGenerationPage() {
                 onSelectZip={handleMapSelectZip}
                 onClaimZip={(zip) => claimZipMutation.mutate(zip)}
                 claiming={claimZipMutation.isPending}
+                onPolygonClick={(zip) => {
+                  setMetricsZip(zip);
+                  setMetricsOpen(true);
+                }}
               />
             </CardContent>
           </Card>
