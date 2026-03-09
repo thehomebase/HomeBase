@@ -701,6 +701,49 @@ export function registerRoutes(app: Express): Server {
         } catch (feedbackErr) {
           console.error("Error creating feedback request:", feedbackErr);
         }
+
+        if (transaction.contractPrice) {
+          try {
+            const existingComm = await storage.getCommissionEntryByTransaction(transaction.id, req.user.id);
+            if (!existingComm) {
+              await storage.createCommissionEntry({
+                transactionId: transaction.id,
+                agentId: req.user.id,
+                commissionRate: 3,
+                commissionAmount: Math.round(transaction.contractPrice * 0.03),
+                status: 'pending',
+              });
+              console.log(`[Commission] Auto-created commission entry for transaction ${transaction.id}`);
+            }
+          } catch (commErr) {
+            console.error("Error auto-creating commission entry:", commErr);
+          }
+        }
+
+        if (transaction.clientId && transaction.closingDate) {
+          try {
+            const client = await storage.getClient(transaction.clientId);
+            if (client) {
+              const closingDate = new Date(transaction.closingDate);
+              const nextAnniversary = new Date(closingDate);
+              nextAnniversary.setFullYear(nextAnniversary.getFullYear() + 1);
+              const address = [transaction.streetName, transaction.city].filter(Boolean).join(', ');
+              await storage.createClientReminder({
+                agentId: req.user.id,
+                clientId: transaction.clientId,
+                type: 'closing_anniversary',
+                title: `Closing Anniversary — ${address}`,
+                message: `Happy home anniversary! It's been a year since you closed on ${address}. Hope you're enjoying your home!`,
+                reminderDate: nextAnniversary.toISOString(),
+                recurring: true,
+                channels: ['sms', 'email', 'message'],
+              });
+              console.log(`[Reminder] Auto-created closing anniversary reminder for client ${client.firstName} ${client.lastName}`);
+            }
+          } catch (reminderErr) {
+            console.error("Error auto-creating anniversary reminder:", reminderErr);
+          }
+        }
       }
 
       res.json(transaction);
@@ -6276,6 +6319,355 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error reassigning lead:", error);
       res.status(500).json({ error: "Failed to reassign lead" });
+    }
+  });
+
+  // Transaction Templates
+  app.get("/api/transaction-templates", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const templates = await storage.getTransactionTemplatesByAgent(req.user.id);
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch templates" });
+    }
+  });
+
+  app.post("/api/transaction-templates", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const { name, type, checklistItems, documents, notes } = req.body;
+      if (!name) return res.status(400).json({ error: "Template name is required" });
+      const template = await storage.createTransactionTemplate({
+        agentId: req.user.id, name, type, checklistItems, documents, notes,
+      });
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create template" });
+    }
+  });
+
+  app.post("/api/transaction-templates/from-transaction/:id", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const txId = Number(req.params.id);
+      const transaction = await storage.getTransaction(txId);
+      if (!transaction || transaction.agentId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ error: "Template name is required" });
+
+      const buyerChecklist = await storage.getChecklist(txId, 'buyer');
+      const sellerChecklist = await storage.getChecklist(txId, 'seller');
+      const checklistItems = {
+        buyer: buyerChecklist?.items || [],
+        seller: sellerChecklist?.items || [],
+      };
+
+      const docsResult = await db.execute(sql`SELECT name, status, notes FROM documents WHERE transaction_id = ${txId}`);
+      const documents = docsResult.rows.map((d: any) => ({ name: d.name, notes: d.notes }));
+
+      const template = await storage.createTransactionTemplate({
+        agentId: req.user.id, name, type: transaction.type || 'buy', checklistItems, documents, notes: req.body.notes,
+      });
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create template from transaction" });
+    }
+  });
+
+  app.patch("/api/transaction-templates/:id", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const template = await storage.getTransactionTemplate(Number(req.params.id));
+      if (!template || template.agent_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      const updated = await storage.updateTransactionTemplate(Number(req.params.id), req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update template" });
+    }
+  });
+
+  app.delete("/api/transaction-templates/:id", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const template = await storage.getTransactionTemplate(Number(req.params.id));
+      if (!template || template.agent_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      await storage.deleteTransactionTemplate(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete template" });
+    }
+  });
+
+  app.post("/api/transactions/from-template/:templateId", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const template = await storage.getTransactionTemplate(Number(req.params.templateId));
+      if (!template || template.agent_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+
+      const { streetName, city, state, zipCode, clientId, accessCode } = req.body;
+      if (!streetName) return res.status(400).json({ error: "Street name is required" });
+
+      const transaction = await storage.createTransaction({
+        streetName, city, state, zipCode, accessCode, type: template.type || 'buy',
+        agentId: req.user.id, clientId: clientId || null, status: 'prospect',
+      });
+
+      if (template.checklist_items) {
+        const items = typeof template.checklist_items === 'string' ? JSON.parse(template.checklist_items) : template.checklist_items;
+        if (items.buyer && Array.isArray(items.buyer)) {
+          const resetItems = items.buyer.map((item: any) => ({ ...item, completed: false }));
+          await storage.createChecklist({ transactionId: transaction.id, role: 'buyer', items: resetItems });
+        }
+        if (items.seller && Array.isArray(items.seller)) {
+          const resetItems = items.seller.map((item: any) => ({ ...item, completed: false }));
+          await storage.createChecklist({ transactionId: transaction.id, role: 'seller', items: resetItems });
+        }
+      }
+
+      if (template.documents) {
+        const docs = typeof template.documents === 'string' ? JSON.parse(template.documents) : template.documents;
+        if (Array.isArray(docs)) {
+          for (const doc of docs) {
+            await db.execute(sql`
+              INSERT INTO documents (transaction_id, name, status, notes)
+              VALUES (${transaction.id}, ${doc.name}, 'not_applicable', ${doc.notes || null})
+            `);
+          }
+        }
+      }
+
+      res.json(transaction);
+    } catch (error) {
+      console.error("Error creating transaction from template:", error);
+      res.status(500).json({ error: "Failed to create transaction from template" });
+    }
+  });
+
+  // Commission Entries
+  app.get("/api/commissions", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const entries = await storage.getCommissionEntriesByAgent(req.user.id);
+      res.json(entries);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch commissions" });
+    }
+  });
+
+  app.get("/api/commissions/summary", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const summary = await storage.getCommissionSummary(req.user.id);
+      res.json(summary);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch commission summary" });
+    }
+  });
+
+  app.post("/api/commissions", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const { transactionId, commissionRate, commissionAmount, brokerageSplitPercent, referralFeePercent, expenses, notes } = req.body;
+      if (!transactionId) return res.status(400).json({ error: "Transaction ID is required" });
+
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction || transaction.agentId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+
+      const existing = await storage.getCommissionEntryByTransaction(transactionId, req.user.id);
+      if (existing) return res.status(400).json({ error: "Commission entry already exists for this transaction" });
+
+      const entry = await storage.createCommissionEntry({
+        transactionId, agentId: req.user.id, commissionRate, commissionAmount, brokerageSplitPercent, referralFeePercent, expenses, notes,
+      });
+      res.json(entry);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create commission entry" });
+    }
+  });
+
+  app.patch("/api/commissions/:id", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const entry = await storage.getCommissionEntry(Number(req.params.id));
+      if (!entry || entry.agent_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      const updated = await storage.updateCommissionEntry(Number(req.params.id), req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update commission entry" });
+    }
+  });
+
+  app.delete("/api/commissions/:id", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const entry = await storage.getCommissionEntry(Number(req.params.id));
+      if (!entry || entry.agent_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      await storage.deleteCommissionEntry(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete commission entry" });
+    }
+  });
+
+  // Open Houses
+  app.get("/api/open-houses", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const openHouses = await storage.getOpenHousesByAgent(req.user.id);
+      res.json(openHouses);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch open houses" });
+    }
+  });
+
+  app.post("/api/open-houses", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const { address, city, state, zipCode, date, startTime, endTime, notes, transactionId } = req.body;
+      if (!address || !date || !startTime || !endTime) return res.status(400).json({ error: "Address, date, start time, and end time are required" });
+
+      const slug = `${address.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${Date.now().toString(36)}`;
+
+      const openHouse = await storage.createOpenHouse({
+        agentId: req.user.id, transactionId, address, city, state, zipCode, date, startTime, endTime, notes, slug,
+      });
+      res.json(openHouse);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create open house" });
+    }
+  });
+
+  app.patch("/api/open-houses/:id", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const oh = await storage.getOpenHouse(Number(req.params.id));
+      if (!oh || oh.agent_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      const updated = await storage.updateOpenHouse(Number(req.params.id), req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update open house" });
+    }
+  });
+
+  app.delete("/api/open-houses/:id", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const oh = await storage.getOpenHouse(Number(req.params.id));
+      if (!oh || oh.agent_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      await storage.deleteOpenHouse(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete open house" });
+    }
+  });
+
+  app.get("/api/open-houses/:id/visitors", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const oh = await storage.getOpenHouse(Number(req.params.id));
+      if (!oh || oh.agent_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      const visitors = await storage.getOpenHouseVisitors(Number(req.params.id));
+      res.json(visitors);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch visitors" });
+    }
+  });
+
+  app.get("/api/open-house/:slug", async (req, res) => {
+    try {
+      const openHouse = await storage.getOpenHouseBySlug(req.params.slug);
+      if (!openHouse) return res.status(404).json({ error: "Open house not found" });
+      res.json({
+        id: openHouse.id, address: openHouse.address, city: openHouse.city, state: openHouse.state,
+        date: openHouse.date, startTime: openHouse.start_time, endTime: openHouse.end_time,
+        agentName: `${openHouse.agent_first_name || ''} ${openHouse.agent_last_name || ''}`.trim(),
+        status: openHouse.status,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch open house" });
+    }
+  });
+
+  app.post("/api/open-house/:slug/sign-in", async (req, res) => {
+    try {
+      const openHouse = await storage.getOpenHouseBySlug(req.params.slug);
+      if (!openHouse) return res.status(404).json({ error: "Open house not found" });
+
+      const { firstName, lastName, email, phone, interestedLevel, notes, preApproved, workingWithAgent } = req.body;
+      if (!firstName) return res.status(400).json({ error: "First name is required" });
+
+      const visitor = await storage.createOpenHouseVisitor({
+        openHouseId: openHouse.id, firstName, lastName, email, phone, interestedLevel, notes, preApproved, workingWithAgent,
+      });
+
+      if (email || phone) {
+        try {
+          await storage.createLead({
+            firstName, lastName: lastName || '', email: email || '', phone: phone || '',
+            zipCode: openHouse.zip_code || '', type: 'buyer', message: `Open house visitor at ${openHouse.address}`,
+            status: 'new', assignedAgentId: openHouse.agent_id,
+          });
+        } catch (leadErr) {
+          console.error("Failed to create lead from open house visitor:", leadErr);
+        }
+      }
+
+      res.json({ success: true, message: "Thank you for visiting!" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to sign in" });
+    }
+  });
+
+  // Client Reminders
+  app.get("/api/reminders", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const reminders = await storage.getClientRemindersByAgent(req.user.id);
+      res.json(reminders);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch reminders" });
+    }
+  });
+
+  app.post("/api/reminders", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const { clientId, type, title, message, reminderDate, recurring, channels } = req.body;
+      if (!clientId || !title || !reminderDate) return res.status(400).json({ error: "Client, title, and date are required" });
+      const client = await storage.getClient(clientId);
+      if (!client || client.agentId !== req.user.id) return res.status(403).json({ error: "Client not found or not authorized" });
+      const reminder = await storage.createClientReminder({
+        agentId: req.user.id, clientId, type, title, message, reminderDate, recurring, channels,
+      });
+      res.json(reminder);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create reminder" });
+    }
+  });
+
+  app.patch("/api/reminders/:id", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const reminder = await storage.getClientReminder(Number(req.params.id));
+      if (!reminder || reminder.agent_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      const updated = await storage.updateClientReminder(Number(req.params.id), req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update reminder" });
+    }
+  });
+
+  app.delete("/api/reminders/:id", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const reminder = await storage.getClientReminder(Number(req.params.id));
+      if (!reminder || reminder.agent_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      await storage.deleteClientReminder(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete reminder" });
     }
   });
 

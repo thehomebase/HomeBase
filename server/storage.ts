@@ -406,6 +406,37 @@ export interface IStorage {
   getSalesCompetitions(brokerId: number): Promise<SalesCompetition[]>;
   getCompetitionLeaderboard(competitionId: number, metric: string, brokerageId: number): Promise<any[]>;
 
+  createTransactionTemplate(data: any): Promise<any>;
+  getTransactionTemplatesByAgent(agentId: number): Promise<any[]>;
+  getTransactionTemplate(id: number): Promise<any>;
+  updateTransactionTemplate(id: number, data: any): Promise<any>;
+  deleteTransactionTemplate(id: number): Promise<void>;
+
+  createCommissionEntry(data: any): Promise<any>;
+  getCommissionEntriesByAgent(agentId: number): Promise<any[]>;
+  getCommissionEntry(id: number): Promise<any>;
+  getCommissionEntryByTransaction(transactionId: number, agentId: number): Promise<any>;
+  updateCommissionEntry(id: number, data: any): Promise<any>;
+  deleteCommissionEntry(id: number): Promise<void>;
+  getCommissionSummary(agentId: number): Promise<any>;
+
+  createOpenHouse(data: any): Promise<any>;
+  getOpenHousesByAgent(agentId: number): Promise<any[]>;
+  getOpenHouse(id: number): Promise<any>;
+  getOpenHouseBySlug(slug: string): Promise<any>;
+  updateOpenHouse(id: number, data: any): Promise<any>;
+  deleteOpenHouse(id: number): Promise<void>;
+  createOpenHouseVisitor(data: any): Promise<any>;
+  getOpenHouseVisitors(openHouseId: number): Promise<any[]>;
+
+  createClientReminder(data: any): Promise<any>;
+  getClientRemindersByAgent(agentId: number): Promise<any[]>;
+  getClientReminder(id: number): Promise<any>;
+  updateClientReminder(id: number, data: any): Promise<any>;
+  deleteClientReminder(id: number): Promise<void>;
+  getDueReminders(): Promise<any[]>;
+  markReminderSent(id: number): Promise<void>;
+
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -5559,6 +5590,288 @@ export class DatabaseStorage implements IStorage {
       LIMIT 1
     `);
     return result.rows[0] || null;
+  }
+
+  async createTransactionTemplate(data: any): Promise<any> {
+    const result = await db.execute(sql`
+      INSERT INTO transaction_templates (agent_id, name, type, checklist_items, documents, notes, is_default)
+      VALUES (${data.agentId}, ${data.name}, ${data.type || 'buy'}, ${JSON.stringify(data.checklistItems || null)}, ${JSON.stringify(data.documents || null)}, ${data.notes || null}, ${data.isDefault || false})
+      RETURNING *
+    `);
+    return result.rows[0];
+  }
+
+  async getTransactionTemplatesByAgent(agentId: number): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT * FROM transaction_templates WHERE agent_id = ${agentId} ORDER BY created_at DESC
+    `);
+    return result.rows as any[];
+  }
+
+  async getTransactionTemplate(id: number): Promise<any> {
+    const result = await db.execute(sql`
+      SELECT * FROM transaction_templates WHERE id = ${id} LIMIT 1
+    `);
+    return result.rows[0] || null;
+  }
+
+  async updateTransactionTemplate(id: number, data: any): Promise<any> {
+    const sets: string[] = [];
+    const values: any[] = [];
+    if (data.name !== undefined) { sets.push('name'); values.push(data.name); }
+    if (data.type !== undefined) { sets.push('type'); values.push(data.type); }
+    if (data.checklistItems !== undefined) { sets.push('checklist_items'); values.push(JSON.stringify(data.checklistItems)); }
+    if (data.documents !== undefined) { sets.push('documents'); values.push(JSON.stringify(data.documents)); }
+    if (data.notes !== undefined) { sets.push('notes'); values.push(data.notes); }
+    if (data.isDefault !== undefined) { sets.push('is_default'); values.push(data.isDefault); }
+
+    const result = await db.execute(sql`
+      UPDATE transaction_templates
+      SET name = COALESCE(${data.name}, name),
+          type = COALESCE(${data.type}, type),
+          checklist_items = COALESCE(${data.checklistItems ? JSON.stringify(data.checklistItems) : null}::json, checklist_items),
+          documents = COALESCE(${data.documents ? JSON.stringify(data.documents) : null}::json, documents),
+          notes = COALESCE(${data.notes}, notes),
+          is_default = COALESCE(${data.isDefault}, is_default)
+      WHERE id = ${id}
+      RETURNING *
+    `);
+    return result.rows[0];
+  }
+
+  async deleteTransactionTemplate(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM transaction_templates WHERE id = ${id}`);
+  }
+
+  async createCommissionEntry(data: any): Promise<any> {
+    const result = await db.execute(sql`
+      INSERT INTO commission_entries (transaction_id, agent_id, commission_rate, commission_amount, brokerage_split_percent, referral_fee_percent, expenses, notes, status, paid_date)
+      VALUES (${data.transactionId}, ${data.agentId}, ${data.commissionRate || null}, ${data.commissionAmount || null}, ${data.brokerageSplitPercent || null}, ${data.referralFeePercent || null}, ${data.expenses ? JSON.stringify(data.expenses) : null}, ${data.notes || null}, ${data.status || 'pending'}, ${data.paidDate || null})
+      RETURNING *
+    `);
+    return result.rows[0];
+  }
+
+  async getCommissionEntriesByAgent(agentId: number): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT ce.*, t.street_name, t.city, t.state, t.contract_price, t.status as transaction_status, t.closing_date,
+        c.first_name as client_first_name, c.last_name as client_last_name
+      FROM commission_entries ce
+      JOIN transactions t ON ce.transaction_id = t.id
+      LEFT JOIN clients c ON t.client_id = c.id
+      WHERE ce.agent_id = ${agentId}
+      ORDER BY ce.created_at DESC
+    `);
+    return result.rows as any[];
+  }
+
+  async getCommissionEntry(id: number): Promise<any> {
+    const result = await db.execute(sql`
+      SELECT * FROM commission_entries WHERE id = ${id} LIMIT 1
+    `);
+    return result.rows[0] || null;
+  }
+
+  async getCommissionEntryByTransaction(transactionId: number, agentId: number): Promise<any> {
+    const result = await db.execute(sql`
+      SELECT * FROM commission_entries WHERE transaction_id = ${transactionId} AND agent_id = ${agentId} LIMIT 1
+    `);
+    return result.rows[0] || null;
+  }
+
+  async updateCommissionEntry(id: number, data: any): Promise<any> {
+    const result = await db.execute(sql`
+      UPDATE commission_entries
+      SET commission_rate = COALESCE(${data.commissionRate}, commission_rate),
+          commission_amount = COALESCE(${data.commissionAmount}, commission_amount),
+          brokerage_split_percent = COALESCE(${data.brokerageSplitPercent}, brokerage_split_percent),
+          referral_fee_percent = COALESCE(${data.referralFeePercent}, referral_fee_percent),
+          expenses = COALESCE(${data.expenses ? JSON.stringify(data.expenses) : null}::json, expenses),
+          notes = COALESCE(${data.notes}, notes),
+          status = COALESCE(${data.status}, status),
+          paid_date = COALESCE(${data.paidDate}, paid_date)
+      WHERE id = ${id}
+      RETURNING *
+    `);
+    return result.rows[0];
+  }
+
+  async deleteCommissionEntry(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM commission_entries WHERE id = ${id}`);
+  }
+
+  async getCommissionSummary(agentId: number): Promise<any> {
+    const result = await db.execute(sql`
+      SELECT
+        COUNT(*)::int as total_deals,
+        COALESCE(SUM(CASE WHEN status = 'paid' THEN commission_amount ELSE 0 END), 0)::int as total_earned,
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN commission_amount ELSE 0 END), 0)::int as total_pending,
+        COALESCE(AVG(commission_amount) FILTER (WHERE commission_amount > 0), 0)::int as avg_per_deal,
+        COUNT(*) FILTER (WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW()))::int as ytd_deals,
+        COALESCE(SUM(CASE WHEN EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW()) AND status = 'paid' THEN commission_amount ELSE 0 END), 0)::int as ytd_earned,
+        COALESCE(SUM(CASE WHEN EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW()) AND status = 'pending' THEN commission_amount ELSE 0 END), 0)::int as ytd_pending
+      FROM commission_entries
+      WHERE agent_id = ${agentId}
+    `);
+    const monthlyResult = await db.execute(sql`
+      SELECT
+        EXTRACT(MONTH FROM created_at)::int as month,
+        EXTRACT(YEAR FROM created_at)::int as year,
+        COALESCE(SUM(commission_amount), 0)::int as total,
+        COUNT(*)::int as deals
+      FROM commission_entries
+      WHERE agent_id = ${agentId} AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW())
+      GROUP BY EXTRACT(YEAR FROM created_at), EXTRACT(MONTH FROM created_at)
+      ORDER BY year, month
+    `);
+    return { ...result.rows[0], monthly: monthlyResult.rows };
+  }
+
+  async createOpenHouse(data: any): Promise<any> {
+    const result = await db.execute(sql`
+      INSERT INTO open_houses (agent_id, transaction_id, address, city, state, zip_code, date, start_time, end_time, notes, status, slug)
+      VALUES (${data.agentId}, ${data.transactionId || null}, ${data.address}, ${data.city || null}, ${data.state || null}, ${data.zipCode || null}, ${data.date}, ${data.startTime}, ${data.endTime}, ${data.notes || null}, ${data.status || 'scheduled'}, ${data.slug})
+      RETURNING *
+    `);
+    return result.rows[0];
+  }
+
+  async getOpenHousesByAgent(agentId: number): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT oh.*, COUNT(ohv.id)::int as visitor_count
+      FROM open_houses oh
+      LEFT JOIN open_house_visitors ohv ON oh.id = ohv.open_house_id
+      WHERE oh.agent_id = ${agentId}
+      GROUP BY oh.id
+      ORDER BY oh.date DESC
+    `);
+    return result.rows as any[];
+  }
+
+  async getOpenHouse(id: number): Promise<any> {
+    const result = await db.execute(sql`
+      SELECT * FROM open_houses WHERE id = ${id} LIMIT 1
+    `);
+    return result.rows[0] || null;
+  }
+
+  async getOpenHouseBySlug(slug: string): Promise<any> {
+    const result = await db.execute(sql`
+      SELECT oh.*, u.first_name as agent_first_name, u.last_name as agent_last_name
+      FROM open_houses oh
+      JOIN users u ON oh.agent_id = u.id
+      WHERE oh.slug = ${slug}
+      LIMIT 1
+    `);
+    return result.rows[0] || null;
+  }
+
+  async updateOpenHouse(id: number, data: any): Promise<any> {
+    const result = await db.execute(sql`
+      UPDATE open_houses
+      SET address = COALESCE(${data.address}, address),
+          city = COALESCE(${data.city}, city),
+          state = COALESCE(${data.state}, state),
+          zip_code = COALESCE(${data.zipCode}, zip_code),
+          date = COALESCE(${data.date}, date),
+          start_time = COALESCE(${data.startTime}, start_time),
+          end_time = COALESCE(${data.endTime}, end_time),
+          notes = COALESCE(${data.notes}, notes),
+          status = COALESCE(${data.status}, status),
+          transaction_id = COALESCE(${data.transactionId}, transaction_id)
+      WHERE id = ${id}
+      RETURNING *
+    `);
+    return result.rows[0];
+  }
+
+  async deleteOpenHouse(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM open_house_visitors WHERE open_house_id = ${id}`);
+    await db.execute(sql`DELETE FROM open_houses WHERE id = ${id}`);
+  }
+
+  async createOpenHouseVisitor(data: any): Promise<any> {
+    const result = await db.execute(sql`
+      INSERT INTO open_house_visitors (open_house_id, first_name, last_name, email, phone, interested_level, notes, pre_approved, working_with_agent)
+      VALUES (${data.openHouseId}, ${data.firstName}, ${data.lastName || null}, ${data.email || null}, ${data.phone || null}, ${data.interestedLevel || null}, ${data.notes || null}, ${data.preApproved || false}, ${data.workingWithAgent || false})
+      RETURNING *
+    `);
+    return result.rows[0];
+  }
+
+  async getOpenHouseVisitors(openHouseId: number): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT * FROM open_house_visitors WHERE open_house_id = ${openHouseId} ORDER BY created_at DESC
+    `);
+    return result.rows as any[];
+  }
+
+  async createClientReminder(data: any): Promise<any> {
+    const result = await db.execute(sql`
+      INSERT INTO client_reminders (agent_id, client_id, type, title, message, reminder_date, recurring, channels, is_active)
+      VALUES (${data.agentId}, ${data.clientId}, ${data.type || 'custom'}, ${data.title}, ${data.message || null}, ${data.reminderDate}, ${data.recurring || false}, ${data.channels ? JSON.stringify(data.channels) : '["sms","email","message"]'}, ${data.isActive !== false})
+      RETURNING *
+    `);
+    return result.rows[0];
+  }
+
+  async getClientRemindersByAgent(agentId: number): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT cr.*, c.first_name as client_first_name, c.last_name as client_last_name, c.email as client_email, c.phone as client_phone
+      FROM client_reminders cr
+      JOIN clients c ON cr.client_id = c.id
+      WHERE cr.agent_id = ${agentId}
+      ORDER BY cr.reminder_date ASC
+    `);
+    return result.rows as any[];
+  }
+
+  async getClientReminder(id: number): Promise<any> {
+    const result = await db.execute(sql`
+      SELECT * FROM client_reminders WHERE id = ${id} LIMIT 1
+    `);
+    return result.rows[0] || null;
+  }
+
+  async updateClientReminder(id: number, data: any): Promise<any> {
+    const result = await db.execute(sql`
+      UPDATE client_reminders
+      SET title = COALESCE(${data.title}, title),
+          message = COALESCE(${data.message}, message),
+          reminder_date = COALESCE(${data.reminderDate}, reminder_date),
+          recurring = COALESCE(${data.recurring}, recurring),
+          channels = COALESCE(${data.channels ? JSON.stringify(data.channels) : null}::json, channels),
+          is_active = COALESCE(${data.isActive}, is_active),
+          type = COALESCE(${data.type}, type)
+      WHERE id = ${id}
+      RETURNING *
+    `);
+    return result.rows[0];
+  }
+
+  async deleteClientReminder(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM client_reminders WHERE id = ${id}`);
+  }
+
+  async getDueReminders(): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT cr.*, c.first_name as client_first_name, c.last_name as client_last_name, c.email as client_email, c.phone as client_phone,
+        u.first_name as agent_first_name, u.last_name as agent_last_name
+      FROM client_reminders cr
+      JOIN clients c ON cr.client_id = c.id
+      JOIN users u ON cr.agent_id = u.id
+      WHERE cr.is_active = true
+        AND cr.reminder_date <= NOW()
+        AND (cr.last_sent_at IS NULL OR cr.last_sent_at < cr.reminder_date)
+      ORDER BY cr.reminder_date ASC
+    `);
+    return result.rows as any[];
+  }
+
+  async markReminderSent(id: number): Promise<void> {
+    await db.execute(sql`
+      UPDATE client_reminders SET last_sent_at = NOW() WHERE id = ${id}
+    `);
   }
 
 }

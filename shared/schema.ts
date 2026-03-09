@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, boolean, json, date, time, doublePrecision, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, integer, boolean, json, date, time, doublePrecision, real, uniqueIndex } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from "zod";
 
@@ -992,3 +992,117 @@ export type InsertBrokerNotification = z.infer<typeof insertBrokerNotificationSc
 export type BrokerNotificationRead = typeof brokerNotificationReads.$inferSelect;
 export type SalesCompetition = typeof salesCompetitions.$inferSelect;
 export type InsertSalesCompetition = z.infer<typeof insertSalesCompetitionSchema>;
+
+export const transactionTemplates = pgTable("transaction_templates", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  name: text("name").notNull(),
+  type: text("type").notNull().default("buy"),
+  checklistItems: json("checklist_items"),
+  documents: json("documents"),
+  notes: text("notes"),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTransactionTemplateSchema = createInsertSchema(transactionTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type TransactionTemplate = typeof transactionTemplates.$inferSelect;
+export type InsertTransactionTemplate = z.infer<typeof insertTransactionTemplateSchema>;
+
+export const commissionEntries = pgTable("commission_entries", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  commissionRate: real("commission_rate"),
+  commissionAmount: integer("commission_amount"),
+  brokerageSplitPercent: real("brokerage_split_percent"),
+  referralFeePercent: real("referral_fee_percent"),
+  expenses: json("expenses"),
+  notes: text("notes"),
+  status: text("status", { enum: ["pending", "paid"] }).notNull().default("pending"),
+  paidDate: timestamp("paid_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCommissionEntrySchema = createInsertSchema(commissionEntries).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type CommissionEntry = typeof commissionEntries.$inferSelect;
+export type InsertCommissionEntry = z.infer<typeof insertCommissionEntrySchema>;
+
+export const openHouses = pgTable("open_houses", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  transactionId: integer("transaction_id"),
+  address: text("address").notNull(),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  date: timestamp("date").notNull(),
+  startTime: text("start_time").notNull(),
+  endTime: text("end_time").notNull(),
+  notes: text("notes"),
+  status: text("status", { enum: ["scheduled", "active", "completed"] }).notNull().default("scheduled"),
+  slug: text("slug").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertOpenHouseSchema = createInsertSchema(openHouses).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type OpenHouse = typeof openHouses.$inferSelect;
+export type InsertOpenHouse = z.infer<typeof insertOpenHouseSchema>;
+
+export const openHouseVisitors = pgTable("open_house_visitors", {
+  id: serial("id").primaryKey(),
+  openHouseId: integer("open_house_id").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name"),
+  email: text("email"),
+  phone: text("phone"),
+  interestedLevel: integer("interested_level"),
+  notes: text("notes"),
+  preApproved: boolean("pre_approved").default(false),
+  workingWithAgent: boolean("working_with_agent").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertOpenHouseVisitorSchema = createInsertSchema(openHouseVisitors).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type OpenHouseVisitor = typeof openHouseVisitors.$inferSelect;
+export type InsertOpenHouseVisitor = z.infer<typeof insertOpenHouseVisitorSchema>;
+
+export const clientReminders = pgTable("client_reminders", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  clientId: integer("client_id").notNull(),
+  type: text("type", { enum: ["closing_anniversary", "birthday", "custom"] }).notNull().default("custom"),
+  title: text("title").notNull(),
+  message: text("message"),
+  reminderDate: timestamp("reminder_date").notNull(),
+  recurring: boolean("recurring").default(false),
+  channels: json("channels"),
+  lastSentAt: timestamp("last_sent_at"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClientReminderSchema = createInsertSchema(clientReminders).omit({
+  id: true,
+  lastSentAt: true,
+  createdAt: true,
+});
+
+export type ClientReminder = typeof clientReminders.$inferSelect;
+export type InsertClientReminder = z.infer<typeof insertClientReminderSchema>;

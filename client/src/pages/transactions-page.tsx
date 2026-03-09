@@ -38,7 +38,11 @@ import {
   AlertCircle,
   ChevronRight,
   X,
+  FileText,
+  Loader2,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { TransactionTemplate } from "@shared/schema";
 import { NavTabs } from "@/components/ui/nav-tabs";
 import { KanbanBoard } from "@/components/kanban-board";
 import { useState, useEffect } from "react";
@@ -93,6 +97,76 @@ const createTransactionSchema = z.object({
   secondaryClientId: z.number().nullable(),
 });
 
+function SaveTransactionAsTemplate({
+  transactions,
+  newTemplateName,
+  setNewTemplateName,
+}: {
+  transactions: Transaction[];
+  newTemplateName: string;
+  setNewTemplateName: (v: string) => void;
+}) {
+  const { toast } = useToast();
+  const [selectedTxId, setSelectedTxId] = useState<number | null>(null);
+
+  const saveAsTemplateMutation = useMutation({
+    mutationFn: async ({ transactionId, name }: { transactionId: number; name: string }) => {
+      const response = await apiRequest("POST", `/api/transaction-templates/from-transaction/${transactionId}`, { name });
+      if (!response.ok) throw new Error("Failed to save template");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-templates"] });
+      toast({ title: "Success", description: "Transaction saved as template" });
+      setNewTemplateName("");
+      setSelectedTxId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save template", variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="space-y-2">
+      <select
+        className="w-full h-9 px-3 rounded-md border text-sm bg-background"
+        value={selectedTxId || ""}
+        onChange={(e) => setSelectedTxId(e.target.value ? Number(e.target.value) : null)}
+      >
+        <option value="">Select a transaction...</option>
+        {transactions.map((tx) => (
+          <option key={tx.id} value={tx.id}>
+            {tx.streetName} — {tx.city}, {tx.state}
+          </option>
+        ))}
+      </select>
+      <div className="flex gap-2">
+        <Input
+          placeholder="Template name"
+          value={newTemplateName}
+          onChange={(e) => setNewTemplateName(e.target.value)}
+          className="flex-1"
+        />
+        <Button
+          size="sm"
+          disabled={!selectedTxId || !newTemplateName.trim() || saveAsTemplateMutation.isPending}
+          onClick={() => {
+            if (selectedTxId && newTemplateName.trim()) {
+              saveAsTemplateMutation.mutate({ transactionId: selectedTxId, name: newTemplateName.trim() });
+            }
+          }}
+        >
+          {saveAsTemplateMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            "Save"
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function TransactionsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
@@ -110,7 +184,9 @@ export default function TransactionsPage() {
   );
   const [endDate, setEndDate] = useState<string>("");
   const [showNewTransactionDialog, setShowNewTransactionDialog] = useState(false);
-
+  const [showTemplatesDialog, setShowTemplatesDialog] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
 
   // Handle initial authentication check
   useEffect(() => {
@@ -191,6 +267,62 @@ export default function TransactionsPage() {
     enabled: !!user && (user.role === "agent" || user.role === "broker"),
     staleTime: 2 * 60 * 1000,
     retry: false,
+  });
+
+  const { data: templates = [], isLoading: templatesLoading } = useQuery<TransactionTemplate[]>({
+    queryKey: ["/api/transaction-templates"],
+    queryFn: async () => {
+      try {
+        if (!user || (user.role !== "agent" && user.role !== "broker")) return [];
+        const response = await apiRequest("GET", "/api/transaction-templates");
+        return response.json();
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!user && (user.role === "agent" || user.role === "broker"),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/transaction-templates/${id}`);
+      if (!response.ok) throw new Error("Failed to delete template");
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-templates"] });
+      toast({ title: "Success", description: "Template deleted" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete template", variant: "destructive" });
+    },
+  });
+
+  const createFromTemplateMutation = useMutation({
+    mutationFn: async ({ templateId, data }: { templateId: number; data: z.infer<typeof createTransactionSchema> }) => {
+      const response = await apiRequest("POST", `/api/transactions/from-template/${templateId}`, {
+        streetName: data.streetName,
+        city: data.city,
+        state: data.state,
+        zipCode: data.zipCode,
+        clientId: data.clientId || null,
+        accessCode: data.accessCode,
+      });
+      if (!response.ok) throw new Error("Failed to create transaction from template");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      toast({ title: "Success", description: "Transaction created from template" });
+      form.reset();
+      setShowNewTransactionDialog(false);
+      setSelectedTemplateId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create transaction from template", variant: "destructive" });
+    },
   });
 
   const [alertsDismissed, setAlertsDismissed] = useState(false);
@@ -366,7 +498,20 @@ export default function TransactionsPage() {
               ))}
             </select>
             {(user?.role === "agent" || user?.role === "broker") && (
-              <Dialog open={showNewTransactionDialog} onOpenChange={setShowNewTransactionDialog}>
+              <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="whitespace-nowrap"
+                onClick={() => setShowTemplatesDialog(true)}
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                Templates
+              </Button>
+              <Dialog open={showNewTransactionDialog} onOpenChange={(open) => {
+                setShowNewTransactionDialog(open);
+                if (!open) setSelectedTemplateId(null);
+              }}>
                 <DialogTrigger asChild>
                   <Button className="whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 font-bold" size="sm">
                     <Plus className="h-4 w-4 mr-1" />
@@ -377,11 +522,41 @@ export default function TransactionsPage() {
                   <DialogHeader>
                     <DialogTitle>Create New Transaction</DialogTitle>
                   </DialogHeader>
+                  {templates.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">From Template</label>
+                      <select
+                        className="w-full h-9 px-3 rounded-md border text-base bg-background"
+                        value={selectedTemplateId || ""}
+                        onChange={(e) => {
+                          const id = e.target.value ? Number(e.target.value) : null;
+                          setSelectedTemplateId(id);
+                          if (id) {
+                            const tmpl = templates.find(t => t.id === id);
+                            if (tmpl) {
+                              form.setValue("type", tmpl.type as "buy" | "sell");
+                            }
+                          }
+                        }}
+                      >
+                        <option value="">Start from scratch</option>
+                        {templates.map((tmpl) => (
+                          <option key={tmpl.id} value={tmpl.id}>
+                            {tmpl.name} ({tmpl.type})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <Form {...form}>
                     <form
-                      onSubmit={form.handleSubmit((data) =>
-                        createTransactionMutation.mutate(data),
-                      )}
+                      onSubmit={form.handleSubmit((data) => {
+                        if (selectedTemplateId) {
+                          createFromTemplateMutation.mutate({ templateId: selectedTemplateId, data });
+                        } else {
+                          createTransactionMutation.mutate(data);
+                        }
+                      })}
                       className="space-y-4"
                     >
                       <FormField
@@ -549,14 +724,18 @@ export default function TransactionsPage() {
                       <Button
                         type="submit"
                         className="w-full bg-primary text-white hover:bg-primary/90"
-                        disabled={createTransactionMutation.isPending}
+                        disabled={createTransactionMutation.isPending || createFromTemplateMutation.isPending}
                       >
-                        Create Transaction
+                        {(createTransactionMutation.isPending || createFromTemplateMutation.isPending) && (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        )}
+                        {selectedTemplateId ? "Create from Template" : "Create Transaction"}
                       </Button>
                     </form>
                   </Form>
                 </DialogContent>
               </Dialog>
+              </>
             )}
           </div>
         </div>
@@ -745,6 +924,65 @@ export default function TransactionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showTemplatesDialog} onOpenChange={setShowTemplatesDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Transaction Templates
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {templatesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                No templates saved yet. Save a transaction as a template from the transaction detail page.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {templates.map((tmpl) => (
+                  <div
+                    key={tmpl.id}
+                    className="flex items-center justify-between rounded-md border px-3 py-2.5 hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium text-sm truncate">{tmpl.name}</span>
+                      <Badge variant={tmpl.type === "sell" ? "destructive" : "default"} className="shrink-0 text-[10px] px-1.5 py-0">
+                        {tmpl.type}
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                      disabled={deleteTemplateMutation.isPending}
+                      onClick={() => deleteTemplateMutation.mutate(tmpl.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-medium mb-2">Save Transaction as Template</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Select a transaction and give it a name to save as a reusable template.
+              </p>
+              <SaveTransactionAsTemplate
+                transactions={transactions}
+                newTemplateName={newTemplateName}
+                setNewTemplateName={setNewTemplateName}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

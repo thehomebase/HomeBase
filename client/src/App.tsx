@@ -52,7 +52,8 @@ import {
   Bell,
   MapPin,
   Star,
-  LayoutDashboard
+  LayoutDashboard,
+  DollarSign
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -87,6 +88,10 @@ import LandingPage from "@/pages/landing-page";
 import FeedbackPage from "@/pages/feedback-page";
 import VerifyEmailPage from "@/pages/verify-email-page";
 import BrokerPortalPage from "@/pages/broker-portal-page";
+import CommissionsPage from "@/pages/commissions-page";
+import RemindersPage from "@/pages/reminders-page";
+import OpenHousesPage from "@/pages/open-houses-page";
+import OpenHouseSignInPage from "@/pages/open-house-sign-in-page";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { BiometricSetupButton } from "@/components/biometric-setup";
 import { useLeadAlerts } from "@/hooks/use-lead-alerts";
@@ -287,6 +292,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                           </SidebarMenuButton>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Commissions">
+                            <Link href="/commissions" className="flex items-center gap-2">
+                              <DollarSign className="h-4 w-4" />
+                              {isSidebarOpen && <span>Commissions</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Clients">
                             <Link href="/clients" className="flex items-center gap-2">
                               <Users className="h-4 w-4" />
@@ -296,6 +309,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                         </SidebarMenuItem>
                         {(user?.role === "agent" || user?.role === "broker") && (
                           <>
+                            <SidebarMenuItem>
+                              <SidebarMenuButton asChild tooltip="Open Houses">
+                                <Link href="/open-houses" className="flex items-center gap-2">
+                                  <Home className="h-4 w-4" />
+                                  {isSidebarOpen && <span>Open Houses</span>}
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
                             <SidebarMenuItem>
                               <SidebarMenuButton asChild tooltip="Data">
                                 <Link href="/data" className="flex items-center gap-2">
@@ -380,6 +401,16 @@ function Layout({ children }: { children: React.ReactNode }) {
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
+                    {(user?.role === "agent" || user?.role === "broker") && (
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Reminders">
+                          <Link href="/reminders" className="flex items-center gap-2">
+                            <Bell className="h-4 w-4" />
+                            {isSidebarOpen && <span>Reminders</span>}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )}
                     {(user?.role === "agent" || user?.role === "broker") && (
                       <>
                         <SidebarMenuItem>
@@ -525,6 +556,7 @@ function Router() {
       <Route path="/agents/:agentId/reviews" component={AgentReviewsPage} />
       <Route path="/top-agents" component={TopAgentsPage} />
       <Route path="/feedback/:token" component={FeedbackPage} />
+      <Route path="/open-house/:slug" component={OpenHouseSignInPage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/messages" component={MessagesPage} />
@@ -596,6 +628,12 @@ function Router() {
           <Route path="/broker-portal">
             <ProtectedRoute path="/broker-portal" component={BrokerPortalPage} />
           </Route>
+          <Route path="/commissions">
+            <ProtectedRoute path="/commissions" component={CommissionsPage} />
+          </Route>
+          <Route path="/open-houses">
+            <ProtectedRoute path="/open-houses" component={OpenHousesPage} />
+          </Route>
           <Route path="/transactions/:id/inspection">
             <ProtectedRoute path="/transactions/:id/inspection" component={InspectionReviewPage} />
           </Route>
@@ -634,6 +672,9 @@ function Router() {
           </Route>
           <Route path="/lead-gen">
             <ProtectedRoute path="/lead-gen" component={LeadGenerationPage} />
+          </Route>
+          <Route path="/reminders">
+            <ProtectedRoute path="/reminders" component={RemindersPage} />
           </Route>
           <Route path="/billing">
             <ProtectedRoute path="/billing" component={BillingPage} />
@@ -647,6 +688,12 @@ function Router() {
           <Route path="/dashboard">
             <ProtectedRoute path="/dashboard" component={DashboardPage} />
           </Route>
+          <Route path="/commissions">
+            <ProtectedRoute path="/commissions" component={CommissionsPage} />
+          </Route>
+          <Route path="/open-houses">
+            <ProtectedRoute path="/open-houses" component={OpenHousesPage} />
+          </Route>
           <Route path="/transactions/:id/inspection">
             <ProtectedRoute path="/transactions/:id/inspection" component={InspectionReviewPage} />
           </Route>
@@ -685,6 +732,9 @@ function Router() {
           </Route>
           <Route path="/lead-gen">
             <ProtectedRoute path="/lead-gen" component={LeadGenerationPage} />
+          </Route>
+          <Route path="/reminders">
+            <ProtectedRoute path="/reminders" component={RemindersPage} />
           </Route>
           <Route path="/billing">
             <ProtectedRoute path="/billing" component={BillingPage} />
