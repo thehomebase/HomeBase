@@ -84,15 +84,8 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     category: "tools",
   },
   {
-    title: "Contractors & Vendors",
-    description: "Build your trusted vendor team. Add contractors, rate their performance across quality, communication, timeliness, and value. Send inspection repair items out for bids and compare responses side by side.",
-    icon: Wrench,
-    route: "/contractors",
-    category: "tools",
-  },
-  {
-    title: "HomeBase Pros Marketplace",
-    description: "Discover verified service providers in your area. Browse by category, read performance reviews from other agents, and add top vendors to your team with one click.",
+    title: "HomeBase Pros",
+    description: "Find and manage trusted home service professionals. Browse by category, add pros, rate their performance, read reviews from other agents, and add top vendors to your team with one click. Switch between card and table views for easy sorting.",
     icon: Store,
     route: "/marketplace",
     category: "tools",
