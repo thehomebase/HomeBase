@@ -3,6 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -271,13 +273,11 @@ function ZipMapView({
   onSelectZip: (zip: string) => void;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markersRef = useRef<Map<string, any>>(new Map());
-  const claimedLayerRef = useRef<any>(null);
-  const searchLayerRef = useRef<any>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const claimedLayerRef = useRef<L.LayerGroup | null>(null);
+  const searchLayerRef = useRef<L.LayerGroup | null>(null);
   const [mapZipSearch, setMapZipSearch] = useState("");
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const leafletRef = useRef<any>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   const { data: allZipData } = useQuery<Array<{ zipCode: string; agentCount: number; isMine: boolean; spotsRemaining: number; isFull: boolean }>>({
     queryKey: ["/api/leads/all-zip-data"],
@@ -286,49 +286,39 @@ function ZipMapView({
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
-    const loadMap = async () => {
-      const L = (await import("leaflet")).default;
-      await import("leaflet/dist/leaflet.css");
-      leafletRef.current = L;
+    const map = L.map(mapRef.current, {
+      center: [39.8283, -98.5795],
+      zoom: 4,
+      zoomControl: true,
+    });
 
-      const map = L.map(mapRef.current!, {
-        center: [39.8283, -98.5795],
-        zoom: 4,
-        zoomControl: true,
-      });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; OpenStreetMap contributors',
-      }).addTo(map);
+    claimedLayerRef.current = L.layerGroup().addTo(map);
+    searchLayerRef.current = L.layerGroup().addTo(map);
 
-      claimedLayerRef.current = L.layerGroup().addTo(map);
-      searchLayerRef.current = L.layerGroup().addTo(map);
+    mapInstanceRef.current = map;
 
-      mapInstanceRef.current = map;
-      setMapLoaded(true);
-    };
-
-    loadMap();
+    setTimeout(() => {
+      map.invalidateSize();
+      setMapReady(true);
+    }, 200);
 
     return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
+      map.remove();
+      mapInstanceRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    if (!mapInstanceRef.current || !mapLoaded || !leafletRef.current) return;
-    if (!claimedLayerRef.current) return;
+    if (!mapInstanceRef.current || !mapReady || !claimedLayerRef.current) return;
 
-    const L = leafletRef.current;
     claimedLayerRef.current.clearLayers();
-    markersRef.current.clear();
 
     const allZips = new Set<string>();
     claimedZips.forEach((zc) => allZips.add(zc.zipCode));
-
     if (allZipData) {
       allZipData.forEach((zd) => allZips.add(zd.zipCode));
     }
@@ -338,28 +328,29 @@ function ZipMapView({
     allZips.forEach((zip) => {
       const isMine = claimedSet.has(zip);
       const zipInfo = allZipData?.find(z => z.zipCode === zip);
-      addMarkerToLayer(zip, L, claimedLayerRef.current, isMine, onSelectZip, zipInfo);
+      addZipMarker(zip, claimedLayerRef.current!, isMine, onSelectZip, zipInfo);
     });
-  }, [claimedZips, mapLoaded, allZipData, onSelectZip]);
+  }, [claimedZips, mapReady, allZipData, onSelectZip]);
 
   const handleMapSearch = async () => {
     const zip = mapZipSearch.trim();
-    if (!/^\d{5}$/.test(zip)) return;
-    if (!mapInstanceRef.current || !leafletRef.current) return;
+    if (!/^\d{5}$/.test(zip) || !mapInstanceRef.current) return;
 
-    const L = leafletRef.current;
     searchLayerRef.current?.clearLayers();
 
     const isMine = claimedZips.some(z => z.zipCode === zip);
-    if (!markersRef.current.has(zip)) {
-      await geocodeAndAddMarker(zip, L, searchLayerRef.current, isMine, onSelectZip);
-    }
-
-    const existing = markersRef.current.get(zip);
-    if (existing) {
-      mapInstanceRef.current.setView(existing.getLatLng(), 11);
-    } else {
-      await geocodeAndPan(zip, mapInstanceRef.current);
+    const coords = await geocodeZipCode(zip);
+    if (coords) {
+      const color = isMine ? "#22c55e" : "#3b82f6";
+      const icon = L.divIcon({
+        html: `<div style="background:${color};color:white;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);border:2px solid white;cursor:pointer;">${zip}</div>`,
+        className: "",
+        iconSize: [60, 28],
+        iconAnchor: [30, 14],
+      });
+      const marker = L.marker(coords, { icon }).addTo(searchLayerRef.current!);
+      marker.on("click", () => onSelectZip(zip));
+      mapInstanceRef.current.setView(coords, 11);
     }
 
     onSelectZip(zip);
@@ -399,71 +390,40 @@ function ZipMapView({
   );
 }
 
-async function geocodeAndPan(zip: string, map: any) {
+async function geocodeZipCode(zip: string): Promise<L.LatLngTuple | null> {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=US&format=json&limit=1`
     );
     const data = await res.json();
     if (data.length > 0) {
-      map.setView([parseFloat(data[0].lat), parseFloat(data[0].lon)], 11);
+      return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
     }
   } catch {}
+  return null;
 }
 
-async function geocodeAndAddMarker(
+function addZipMarker(
   zip: string,
-  L: any,
-  layer: any,
-  isMine: boolean,
-  onSelect: (z: string) => void
-) {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=US&format=json&limit=1`
-    );
-    const data = await res.json();
-    if (data.length > 0) {
-      const { lat, lon } = data[0];
-      const color = isMine ? "#22c55e" : "#3b82f6";
-      const icon = L.divIcon({
-        html: `<div style="background:${color};color:white;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);border:2px solid white;cursor:pointer;">${zip}</div>`,
-        className: "",
-        iconSize: [60, 28],
-        iconAnchor: [30, 14],
-      });
-      const marker = L.marker([parseFloat(lat), parseFloat(lon)], { icon }).addTo(layer);
-      marker.on("click", () => onSelect(zip));
-    }
-  } catch {}
-}
-
-function addMarkerToLayer(
-  zip: string,
-  L: any,
-  layer: any,
+  layer: L.LayerGroup,
   isMine: boolean,
   onSelect: (z: string) => void,
   zipInfo?: { agentCount: number; spotsRemaining: number; isFull: boolean } | null
 ) {
-  fetch(`https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=US&format=json&limit=1`)
-    .then(res => res.json())
-    .then(data => {
-      if (data.length > 0) {
-        const { lat, lon } = data[0];
-        const color = isMine ? "#22c55e" : "#f59e0b";
-        const label = zipInfo ? `${zip} (${zipInfo.agentCount}/${zipInfo.agentCount + zipInfo.spotsRemaining})` : zip;
-        const icon = L.divIcon({
-          html: `<div style="background:${color};color:white;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);border:2px solid white;cursor:pointer;">${label}</div>`,
-          className: "",
-          iconSize: [90, 28],
-          iconAnchor: [45, 14],
-        });
-        const marker = L.marker([parseFloat(lat), parseFloat(lon)], { icon }).addTo(layer);
-        marker.on("click", () => onSelect(zip));
-      }
-    })
-    .catch(() => {});
+  geocodeZipCode(zip).then((coords) => {
+    if (!coords) return;
+    const color = isMine ? "#22c55e" : "#f59e0b";
+    const maxAgents = zipInfo ? zipInfo.agentCount + zipInfo.spotsRemaining : 5;
+    const label = zipInfo ? `${zip} (${zipInfo.agentCount}/${maxAgents})` : zip;
+    const icon = L.divIcon({
+      html: `<div style="background:${color};color:white;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);border:2px solid white;cursor:pointer;">${label}</div>`,
+      className: "",
+      iconSize: [90, 28],
+      iconAnchor: [45, 14],
+    });
+    const marker = L.marker(coords, { icon }).addTo(layer);
+    marker.on("click", () => onSelect(zip));
+  });
 }
 
 export default function LeadGenerationPage() {
