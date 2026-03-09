@@ -35,7 +35,7 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      <section className={`relative ${isMobile ? "pt-28 pb-12 px-4" : "pt-32 pb-20 px-6"}`} style={isMobile ? { paddingTop: "calc(7rem + env(safe-area-inset-top, 0px))" } : undefined}>
+      <section className={`relative ${isMobile ? "pt-20 pb-12 px-4" : "pt-32 pb-20 px-6"}`} style={isMobile ? { paddingTop: "calc(5rem + env(safe-area-inset-top, 0px))" } : undefined}>
         <div className="max-w-6xl mx-auto">
           <div className={`grid gap-8 items-center ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
             <div className={isMobile ? "text-center" : ""}>
