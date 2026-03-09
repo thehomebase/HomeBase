@@ -53,6 +53,9 @@ import {
   type LenderChecklist, type InsertLenderChecklist,
   type LenderChecklistMapping, type InsertLenderChecklistMapping,
   type ClientInvitation, type InsertClientInvitation,
+  type BrokerNotification, type InsertBrokerNotification,
+  type BrokerNotificationRead,
+  type SalesCompetition, type InsertSalesCompetition,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
@@ -385,6 +388,17 @@ export interface IStorage {
   getClientInvitationsByEmail(email: string): Promise<ClientInvitation[]>;
   updateClientInvitationStatus(id: number, status: string, clientRecordId?: number): Promise<ClientInvitation>;
 
+  getBrokerageAgents(brokerageId: number): Promise<User[]>;
+  getBrokerMetrics(brokerageId: number): Promise<any>;
+  getAgentMetrics(agentId: number): Promise<any>;
+  createBrokerNotification(data: InsertBrokerNotification): Promise<BrokerNotification>;
+  getBrokerNotifications(brokerId: number): Promise<(BrokerNotification & { readCount: number })[]>;
+  getAgentNotifications(agentId: number): Promise<BrokerNotification[]>;
+  markNotificationRead(notificationId: number, agentId: number): Promise<BrokerNotificationRead>;
+  createSalesCompetition(data: InsertSalesCompetition): Promise<SalesCompetition>;
+  getSalesCompetitions(brokerId: number): Promise<SalesCompetition[]>;
+  getCompetitionLeaderboard(competitionId: number, metric: string, brokerageId: number): Promise<any[]>;
+
 }
 
 const MemoryStoreSession = MemoryStore(session);
@@ -473,6 +487,7 @@ export class DatabaseStorage implements IStorage {
         emailVerificationToken: user.emailVerificationToken ?? null,
         emailVerificationExpires: user.emailVerificationExpires ?? null,
         registrationIp: user.registrationIp ?? null,
+        brokerageId: user.brokerageId ? Number(user.brokerageId) : null,
       };
     } catch (error) {
       console.error('Error in getUser:', error);
@@ -506,6 +521,7 @@ export class DatabaseStorage implements IStorage {
         emailVerificationToken: user.emailVerificationToken ?? null,
         emailVerificationExpires: user.emailVerificationExpires ?? null,
         registrationIp: user.registrationIp ?? null,
+        brokerageId: user.brokerageId ? Number(user.brokerageId) : null,
       };
     } catch (error) {
       console.error('Error in getUserByEmail:', error);
@@ -559,6 +575,7 @@ export class DatabaseStorage implements IStorage {
         emailVerificationToken: user.emailVerificationToken ?? null,
         emailVerificationExpires: user.emailVerificationExpires ?? null,
         registrationIp: user.registrationIp ?? null,
+        brokerageId: user.brokerageId ? Number(user.brokerageId) : null,
       };
     } catch (error) {
       console.error('Error in createUser:', error);
@@ -2652,6 +2669,7 @@ export class DatabaseStorage implements IStorage {
         emailVerificationToken: user.email_verification_token ?? null,
         emailVerificationExpires: user.email_verification_expires ?? null,
         registrationIp: user.registration_ip ?? null,
+        brokerageId: user.brokerage_id ? Number(user.brokerage_id) : null,
       };
     } catch (error) {
       console.error('Error in updateUser:', error);
@@ -5192,6 +5210,257 @@ export class DatabaseStorage implements IStorage {
     }
     const result = await db.execute(sql`SELECT * FROM client_invitations WHERE id = ${id}`);
     return result.rows[0] as ClientInvitation;
+  }
+
+  async getBrokerageAgents(brokerageId: number): Promise<User[]> {
+    const result = await db.execute(sql`SELECT * FROM users WHERE brokerage_id = ${brokerageId} AND role = 'agent'`);
+    return result.rows as User[];
+  }
+
+  async getBrokerMetrics(brokerageId: number): Promise<any> {
+    const agentsResult = await db.execute(sql`SELECT id FROM users WHERE brokerage_id = ${brokerageId} AND role = 'agent'`);
+    const agentIds = (agentsResult.rows as any[]).map(r => r.id);
+
+    if (agentIds.length === 0) {
+      return {
+        totalAgents: 0,
+        activeDeals: 0,
+        pipelineValue: 0,
+        totalClients: 0,
+        conversionRate: 0,
+        dealsTrend: 0,
+        pipelineTrend: 0,
+        clientsTrend: 0,
+        conversionTrend: 0,
+        dailyActivity: [],
+      };
+    }
+
+    const activeStatuses = ['prospect', 'listing_prep', 'live_listing', 'under_contract'];
+    const txResult = await db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(contract_price), 0) as pipeline FROM transactions WHERE agent_id = ANY(${agentIds}) AND status = ANY(${activeStatuses})`);
+    const totalTxResult = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE agent_id = ANY(${agentIds})`);
+    const clientResult = await db.execute(sql`SELECT COUNT(*) as count FROM clients WHERE agent_id = ANY(${agentIds})`);
+    const closedResult = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE agent_id = ANY(${agentIds}) AND status = 'closed'`);
+
+    const totalTx = Number((totalTxResult.rows[0] as any).count) || 0;
+    const closedTx = Number((closedResult.rows[0] as any).count) || 0;
+    const conversionRate = totalTx > 0 ? Math.round((closedTx / totalTx) * 100) : 0;
+
+    const prevMonthTx = await db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(contract_price), 0) as pipeline FROM transactions WHERE agent_id = ANY(${agentIds}) AND status = ANY(${activeStatuses}) AND updated_at < NOW() - INTERVAL '30 days'`);
+    const prevClients = await db.execute(sql`SELECT COUNT(*) as count FROM clients WHERE agent_id = ANY(${agentIds}) AND created_at < NOW() - INTERVAL '30 days'`);
+    const prevActiveDeals = Number((prevMonthTx.rows[0] as any).count) || 0;
+    const currentActiveDeals = Number((txResult.rows[0] as any).count) || 0;
+    const currentPipeline = Number((txResult.rows[0] as any).pipeline) || 0;
+    const prevPipeline = Number((prevMonthTx.rows[0] as any).pipeline) || 0;
+    const currentClients = Number((clientResult.rows[0] as any).count) || 0;
+    const prevClientsCount = Number((prevClients.rows[0] as any).count) || 0;
+
+    const dealsTrend = prevActiveDeals > 0 ? Math.round(((currentActiveDeals - prevActiveDeals) / prevActiveDeals) * 100) : 0;
+    const pipelineTrend = prevPipeline > 0 ? Math.round(((currentPipeline - prevPipeline) / prevPipeline) * 100) : 0;
+    const clientsTrend = prevClientsCount > 0 ? Math.round(((currentClients - prevClientsCount) / prevClientsCount) * 100) : 0;
+
+    const dailyResult = await db.execute(sql`
+      SELECT 
+        to_char(created_at, 'Dy') as day,
+        type,
+        COUNT(*) as count
+      FROM communications 
+      WHERE agent_id = ANY(${agentIds})
+        AND created_at >= NOW() - INTERVAL '7 days'
+      GROUP BY to_char(created_at, 'Dy'), type
+      ORDER BY MIN(created_at)
+    `);
+
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const dailyMap: Record<string, any> = {};
+    for (const d of dayNames) {
+      dailyMap[d] = { day: d, calls: 0, emails: 0, texts: 0 };
+    }
+    for (const row of dailyResult.rows as any[]) {
+      const d = row.day?.trim();
+      if (dailyMap[d]) {
+        if (row.type === 'call') dailyMap[d].calls = Number(row.count);
+        if (row.type === 'email') dailyMap[d].emails = Number(row.count);
+        if (row.type === 'sms') dailyMap[d].texts = Number(row.count);
+      }
+    }
+
+    return {
+      totalAgents: agentIds.length,
+      activeDeals: currentActiveDeals,
+      pipelineValue: currentPipeline,
+      totalClients: currentClients,
+      conversionRate,
+      dealsTrend,
+      pipelineTrend,
+      clientsTrend,
+      conversionTrend: 0,
+      dailyActivity: Object.values(dailyMap),
+    };
+  }
+
+  async getAgentMetrics(agentId: number): Promise<any> {
+    const txResult = await db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(contract_price), 0) as pipeline FROM transactions WHERE agent_id = ${agentId}`);
+    const clientResult = await db.execute(sql`SELECT COUNT(*) as count FROM clients WHERE agent_id = ${agentId}`);
+    const callsResult = await db.execute(sql`SELECT COUNT(*) as count FROM communications WHERE agent_id = ${agentId} AND type = 'call'`);
+    const emailsResult = await db.execute(sql`SELECT COUNT(*) as count FROM communications WHERE agent_id = ${agentId} AND type = 'email'`);
+    const textsResult = await db.execute(sql`SELECT COUNT(*) as count FROM communications WHERE agent_id = ${agentId} AND type = 'sms'`);
+    const closedResult = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE agent_id = ${agentId} AND status = 'closed'`);
+    const totalTx = Number((txResult.rows[0] as any).count) || 0;
+    const closedTx = Number((closedResult.rows[0] as any).count) || 0;
+
+    return {
+      totalTransactions: totalTx,
+      pipelineValue: Number((txResult.rows[0] as any).pipeline) || 0,
+      totalClients: Number((clientResult.rows[0] as any).count) || 0,
+      calls: Number((callsResult.rows[0] as any).count) || 0,
+      emails: Number((emailsResult.rows[0] as any).count) || 0,
+      texts: Number((textsResult.rows[0] as any).count) || 0,
+      closedDeals: closedTx,
+      conversionRate: totalTx > 0 ? Math.round((closedTx / totalTx) * 100) : 0,
+      totalActivity: Number((callsResult.rows[0] as any).count) + Number((emailsResult.rows[0] as any).count) + Number((textsResult.rows[0] as any).count),
+      commissions: Number((txResult.rows[0] as any).pipeline) * 0.03,
+    };
+  }
+
+  async createBrokerNotification(data: InsertBrokerNotification): Promise<BrokerNotification> {
+    const result = await db.execute(sql`
+      INSERT INTO broker_notifications (broker_id, title, message, priority)
+      VALUES (${data.brokerId}, ${data.title}, ${data.message}, ${data.priority || 'normal'})
+      RETURNING *
+    `);
+    return result.rows[0] as BrokerNotification;
+  }
+
+  async getBrokerNotifications(brokerId: number): Promise<(BrokerNotification & { readCount: number })[]> {
+    const result = await db.execute(sql`
+      SELECT bn.*, COALESCE(reads.read_count, 0) as read_count
+      FROM broker_notifications bn
+      LEFT JOIN (
+        SELECT notification_id, COUNT(*) as read_count
+        FROM broker_notification_reads
+        GROUP BY notification_id
+      ) reads ON reads.notification_id = bn.id
+      WHERE bn.broker_id = ${brokerId}
+      ORDER BY bn.created_at DESC
+    `);
+    return (result.rows as any[]).map(r => ({
+      ...r,
+      readCount: Number(r.read_count) || 0,
+    }));
+  }
+
+  async getAgentNotifications(agentId: number): Promise<BrokerNotification[]> {
+    const userResult = await db.execute(sql`SELECT brokerage_id FROM users WHERE id = ${agentId}`);
+    const user = userResult.rows[0] as any;
+    if (!user?.brokerage_id) return [];
+
+    const brokerResult = await db.execute(sql`SELECT id FROM users WHERE id = ${user.brokerage_id} AND role = 'broker'`);
+    if (brokerResult.rows.length === 0) {
+      const result = await db.execute(sql`
+        SELECT bn.* FROM broker_notifications bn
+        JOIN users u ON u.brokerage_id = (SELECT brokerage_id FROM users WHERE id = ${agentId})
+        WHERE bn.broker_id = u.id AND u.role = 'broker'
+        AND bn.id NOT IN (SELECT notification_id FROM broker_notification_reads WHERE agent_id = ${agentId})
+        ORDER BY bn.created_at DESC
+      `);
+      return result.rows as BrokerNotification[];
+    }
+
+    const brokerId = (brokerResult.rows[0] as any).id;
+    const result = await db.execute(sql`
+      SELECT * FROM broker_notifications
+      WHERE broker_id IN (SELECT id FROM users WHERE role = 'broker' AND id = ${user.brokerage_id})
+      AND id NOT IN (SELECT notification_id FROM broker_notification_reads WHERE agent_id = ${agentId})
+      ORDER BY created_at DESC
+    `);
+
+    if (result.rows.length === 0) {
+      const allResult = await db.execute(sql`
+        SELECT bn.* FROM broker_notifications bn
+        WHERE bn.broker_id IN (
+          SELECT u2.id FROM users u2 
+          WHERE u2.role = 'broker' 
+          AND u2.id = (SELECT brokerage_id FROM users WHERE id = ${agentId})
+        )
+        AND bn.id NOT IN (SELECT notification_id FROM broker_notification_reads WHERE agent_id = ${agentId})
+        ORDER BY bn.created_at DESC
+      `);
+      return allResult.rows as BrokerNotification[];
+    }
+
+    return result.rows as BrokerNotification[];
+  }
+
+  async markNotificationRead(notificationId: number, agentId: number): Promise<BrokerNotificationRead> {
+    const existing = await db.execute(sql`
+      SELECT * FROM broker_notification_reads WHERE notification_id = ${notificationId} AND agent_id = ${agentId}
+    `);
+    if (existing.rows.length > 0) {
+      return existing.rows[0] as BrokerNotificationRead;
+    }
+    const result = await db.execute(sql`
+      INSERT INTO broker_notification_reads (notification_id, agent_id)
+      VALUES (${notificationId}, ${agentId})
+      RETURNING *
+    `);
+    return result.rows[0] as BrokerNotificationRead;
+  }
+
+  async createSalesCompetition(data: InsertSalesCompetition): Promise<SalesCompetition> {
+    const result = await db.execute(sql`
+      INSERT INTO sales_competitions (broker_id, name, description, start_date, end_date, metric, prize, status)
+      VALUES (${data.brokerId}, ${data.name}, ${data.description || null}, ${data.startDate}, ${data.endDate}, ${data.metric}, ${data.prize || null}, ${data.status || 'upcoming'})
+      RETURNING *
+    `);
+    return result.rows[0] as SalesCompetition;
+  }
+
+  async getSalesCompetitions(brokerId: number): Promise<SalesCompetition[]> {
+    const result = await db.execute(sql`
+      SELECT * FROM sales_competitions WHERE broker_id = ${brokerId} ORDER BY created_at DESC
+    `);
+    return result.rows as SalesCompetition[];
+  }
+
+  async getCompetitionLeaderboard(competitionId: number, metric: string, brokerageId: number): Promise<any[]> {
+    const compResult = await db.execute(sql`SELECT start_date, end_date FROM sales_competitions WHERE id = ${competitionId}`);
+    if (compResult.rows.length === 0) return [];
+    const { start_date: startDate, end_date: endDate } = compResult.rows[0] as any;
+
+    const agentsResult = await db.execute(sql`SELECT id, first_name, last_name, email FROM users WHERE brokerage_id = ${brokerageId} AND role = 'agent'`);
+    const agents = agentsResult.rows as any[];
+
+    const leaderboard = [];
+    for (const agent of agents) {
+      let score = 0;
+      if (metric === 'calls' || metric === 'emails' || metric === 'texts' || metric === 'total_activity') {
+        const typeFilter = metric === 'calls' ? 'call' : metric === 'emails' ? 'email' : metric === 'texts' ? 'sms' : null;
+        if (typeFilter) {
+          const r = await db.execute(sql`SELECT COUNT(*) as count FROM communications WHERE agent_id = ${agent.id} AND type = ${typeFilter} AND created_at >= ${startDate} AND created_at <= ${endDate}`);
+          score = Number((r.rows[0] as any).count) || 0;
+        } else {
+          const r = await db.execute(sql`SELECT COUNT(*) as count FROM communications WHERE agent_id = ${agent.id} AND created_at >= ${startDate} AND created_at <= ${endDate}`);
+          score = Number((r.rows[0] as any).count) || 0;
+        }
+      } else if (metric === 'conversions') {
+        const r = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE agent_id = ${agent.id} AND status = 'closed' AND updated_at >= ${startDate} AND updated_at <= ${endDate}`);
+        score = Number((r.rows[0] as any).count) || 0;
+      } else if (metric === 'commissions') {
+        const r = await db.execute(sql`SELECT COALESCE(SUM(contract_price), 0) as total FROM transactions WHERE agent_id = ${agent.id} AND status = 'closed' AND updated_at >= ${startDate} AND updated_at <= ${endDate}`);
+        score = Math.round(Number((r.rows[0] as any).total) * 0.03) || 0;
+      }
+      leaderboard.push({
+        agentId: agent.id,
+        firstName: agent.first_name,
+        lastName: agent.last_name,
+        email: agent.email,
+        score,
+      });
+    }
+
+    leaderboard.sort((a, b) => b.score - a.score);
+    return leaderboard.map((entry, index) => ({ ...entry, rank: index + 1 }));
   }
 
 }

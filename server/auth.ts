@@ -223,7 +223,7 @@ export function setupAuth(app: Express) {
         password: await hashPassword(req.body.password),
         firstName: req.body.firstName,
         lastName: req.body.lastName,
-        role: ['agent', 'client', 'vendor', 'lender'].includes(req.body.role) ? req.body.role : 'client',
+        role: ['agent', 'client', 'vendor', 'lender', 'broker'].includes(req.body.role) ? req.body.role : 'client',
         registrationIp: clientIp
       });
 

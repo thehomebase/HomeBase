@@ -31,6 +31,7 @@ export const users = pgTable("users", {
   emailVerificationToken: text("email_verification_token"),
   emailVerificationExpires: timestamp("email_verification_expires"),
   registrationIp: text("registration_ip"),
+  brokerageId: integer("brokerage_id"),
 });
 
 export const clients = pgTable("clients", {
@@ -924,3 +925,48 @@ export const insertClientInvitationSchema = createInsertSchema(clientInvitations
 
 export type ClientInvitation = typeof clientInvitations.$inferSelect;
 export type InsertClientInvitation = z.infer<typeof insertClientInvitationSchema>;
+
+export const brokerNotifications = pgTable("broker_notifications", {
+  id: serial("id").primaryKey(),
+  brokerId: integer("broker_id").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  priority: text("priority").notNull().default("normal"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const brokerNotificationReads = pgTable("broker_notification_reads", {
+  id: serial("id").primaryKey(),
+  notificationId: integer("notification_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  readAt: timestamp("read_at").notNull().defaultNow(),
+});
+
+export const salesCompetitions = pgTable("sales_competitions", {
+  id: serial("id").primaryKey(),
+  brokerId: integer("broker_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  metric: text("metric").notNull(),
+  prize: text("prize"),
+  status: text("status").notNull().default("upcoming"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertBrokerNotificationSchema = createInsertSchema(brokerNotifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSalesCompetitionSchema = createInsertSchema(salesCompetitions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type BrokerNotification = typeof brokerNotifications.$inferSelect;
+export type InsertBrokerNotification = z.infer<typeof insertBrokerNotificationSchema>;
+export type BrokerNotificationRead = typeof brokerNotificationReads.$inferSelect;
+export type SalesCompetition = typeof salesCompetitions.$inferSelect;
+export type InsertSalesCompetition = z.infer<typeof insertSalesCompetitionSchema>;

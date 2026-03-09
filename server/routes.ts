@@ -5845,6 +5845,167 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/broker/agents", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const agents = await storage.getBrokerageAgents(req.user.id);
+      const enriched = await Promise.all(agents.map(async ({ password, ...a }) => {
+        const metrics = await storage.getAgentMetrics(a.id);
+        return { ...a, transactions: metrics.totalTransactions, clients: metrics.totalClients, pipelineValue: metrics.pipelineValue, communications: metrics.totalActivity };
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching broker agents:", error);
+      res.status(500).json({ error: "Failed to fetch agents" });
+    }
+  });
+
+  app.get("/api/broker/metrics", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const metrics = await storage.getBrokerMetrics(req.user.id);
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching broker metrics:", error);
+      res.status(500).json({ error: "Failed to fetch metrics" });
+    }
+  });
+
+  app.get("/api/broker/agent/:id/metrics", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const agentId = Number(req.params.id);
+      const agent = await storage.getUser(agentId);
+      if (!agent || agent.brokerageId !== req.user.id) {
+        return res.status(404).json({ error: "Agent not found in your brokerage" });
+      }
+      const metrics = await storage.getAgentMetrics(agentId);
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching agent metrics:", error);
+      res.status(500).json({ error: "Failed to fetch agent metrics" });
+    }
+  });
+
+  app.post("/api/broker/notifications", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const { title, message, priority } = req.body;
+      if (!title || !message) {
+        return res.status(400).json({ error: "Title and message are required" });
+      }
+      const notification = await storage.createBrokerNotification({
+        brokerId: req.user.id,
+        title,
+        message,
+        priority: priority || "normal",
+      });
+      res.status(201).json(notification);
+    } catch (error) {
+      console.error("Error creating broker notification:", error);
+      res.status(500).json({ error: "Failed to create notification" });
+    }
+  });
+
+  app.get("/api/broker/notifications", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const notifications = await storage.getBrokerNotifications(req.user.id);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching broker notifications:", error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get("/api/notifications", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const notifications = await storage.getAgentNotifications(req.user.id);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching agent notifications:", error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  app.post("/api/notifications/:id/read", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent") return res.sendStatus(403);
+    try {
+      const notificationId = Number(req.params.id);
+      const notification = await db.execute(sql`SELECT broker_id FROM broker_notifications WHERE id = ${notificationId}`);
+      if (notification.rows.length === 0) return res.status(404).json({ error: "Notification not found" });
+      const brokerId = (notification.rows[0] as any).broker_id;
+      if (req.user.brokerageId !== brokerId) return res.sendStatus(403);
+      const read = await storage.markNotificationRead(notificationId, req.user.id);
+      res.json(read);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
+
+  app.post("/api/broker/competitions", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const { name, description, startDate, endDate, metric, prize, status } = req.body;
+      if (!name || !startDate || !endDate || !metric) {
+        return res.status(400).json({ error: "Name, start date, end date, and metric are required" });
+      }
+      const competition = await storage.createSalesCompetition({
+        brokerId: req.user.id,
+        name,
+        description: description || null,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        metric,
+        prize: prize || null,
+        status: status || "upcoming",
+      });
+      res.status(201).json(competition);
+    } catch (error) {
+      console.error("Error creating competition:", error);
+      res.status(500).json({ error: "Failed to create competition" });
+    }
+  });
+
+  app.get("/api/broker/competitions", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const competitions = await storage.getSalesCompetitions(req.user.id);
+      res.json(competitions);
+    } catch (error) {
+      console.error("Error fetching competitions:", error);
+      res.status(500).json({ error: "Failed to fetch competitions" });
+    }
+  });
+
+  app.get("/api/broker/competitions/:id/leaderboard", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const competitionId = Number(req.params.id);
+      const competitions = await storage.getSalesCompetitions(req.user.id);
+      const competition = competitions.find(c => c.id === competitionId);
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+      const leaderboard = await storage.getCompetitionLeaderboard(competitionId, competition.metric, req.user.id);
+      res.json(leaderboard);
+    } catch (error) {
+      console.error("Error fetching leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
   // Simple ping endpoint for health checks
   app.get("/ping", (req, res) => {
     res.json({ 

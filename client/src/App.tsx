@@ -85,6 +85,7 @@ import VendorRatingsPage from "@/pages/vendor-ratings-page";
 import BiometricSettingsPage from "@/pages/biometric-settings-page";
 import LandingPage from "@/pages/landing-page";
 import VerifyEmailPage from "@/pages/verify-email-page";
+import BrokerPortalPage from "@/pages/broker-portal-page";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { BiometricSetupButton } from "@/components/biometric-setup";
 import { useLeadAlerts } from "@/hooks/use-lead-alerts";
@@ -130,6 +131,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   const isClient = user?.role === 'client';
   const isVendor = user?.role === 'vendor';
   const isLender = user?.role === 'lender';
+  const isBroker = user?.role === 'broker';
   const { newLeadCount } = useLeadAlerts();
 
   // Update sidebar state when mobile status changes
@@ -225,6 +227,26 @@ function Layout({ children }: { children: React.ReactNode }) {
                         </SidebarMenuItem>
                       </>
                     )}
+                    {isBroker && (
+                      <>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Dashboard">
+                            <Link href="/dashboard" className="flex items-center gap-2">
+                              <LayoutDashboard className="h-4 w-4" />
+                              {isSidebarOpen && <span>Dashboard</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Broker Portal">
+                            <Link href="/broker-portal" className="flex items-center gap-2">
+                              <BarChart3 className="h-4 w-4" />
+                              {isSidebarOpen && <span>Broker Portal</span>}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      </>
+                    )}
                     {isClient && (
                       <>
                         <SidebarMenuItem>
@@ -245,7 +267,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                         </SidebarMenuItem>
                       </>
                     )}
-                    {!isClient && !isVendor && !isLender && (
+                    {!isClient && !isVendor && !isLender && !isBroker && (
                       <>
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Dashboard">
@@ -556,6 +578,21 @@ function Router() {
           </Route>
           <Route path="/lender-transaction/:id">
             <ProtectedRoute path="/lender-transaction/:id" component={LenderTransactionPage} />
+          </Route>
+          <Route path="/billing">
+            <ProtectedRoute path="/billing" component={BillingPage} />
+          </Route>
+          <Route path="/">
+            <ProtectedRoute path="/" component={DashboardPage} />
+          </Route>
+        </>
+      ) : user?.role === "broker" ? (
+        <>
+          <Route path="/dashboard">
+            <ProtectedRoute path="/dashboard" component={DashboardPage} />
+          </Route>
+          <Route path="/broker-portal">
+            <ProtectedRoute path="/broker-portal" component={BrokerPortalPage} />
           </Route>
           <Route path="/billing">
             <ProtectedRoute path="/billing" component={BillingPage} />

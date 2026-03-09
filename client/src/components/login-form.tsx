@@ -215,13 +215,14 @@ export function LoginForm({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="agent">Agent</SelectItem>
+                  <SelectItem value="broker">Broker</SelectItem>
                   <SelectItem value="client">Client</SelectItem>
                   <SelectItem value="vendor">Vendor</SelectItem>
                   <SelectItem value="lender">Lender</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {selectedRole !== "lender" && (
+            {selectedRole !== "lender" && selectedRole !== "broker" && (
               <div className="space-y-2">
                 <Label htmlFor="reg-referralCode">Referral Code (optional)</Label>
                 <Input

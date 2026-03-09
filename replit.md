@@ -50,6 +50,14 @@ Preferred communication style: Simple, everyday language.
 - **Subscription Page**: Redesigned billing page with hero, plan cards with feature lists, active subscription banner with dynamic status badges, referral credits section, feature highlights grid, comparison table, and CTA. Safe metadata parsing. Key file: `client/src/pages/billing-page.tsx`.
 - **Registration Security**: IP-based rate limiting (max 3 registrations per IP per hour, in-memory tracking). Email verification with 6-digit codes (SHA-256 hashed, 24h expiry). Server-side middleware blocks unverified users from all API routes except auth/verification endpoints. Key files: `server/auth.ts`, `client/src/pages/verify-email-page.tsx`, `client/src/lib/protected-route.tsx`.
 - **Client Invitation System**: Agents invite clients by email from the Clients page. Creates invitation with unique token (7-day expiry). Clients see pending invitations banner on dashboard with accept/decline. Accepting links user's account to agent (sets `agentId` and `clientRecordId`). Ownership validation on `clientRecordId`. DB table: `client_invitations`. Key files: `server/routes.ts`, `server/storage.ts`, `client/src/pages/clients-page.tsx`, `client/src/pages/dashboard-page.tsx`.
+- **Broker Portal**: Full brokerage management portal for the `broker` role. Three tabs:
+    1. **Overview Dashboard**: Metric cards (Total Agents, Active Deals, Pipeline Value, Total Clients, Conversion Rate) with trend indicators, activity chart (stacked Recharts bar chart showing calls/emails/texts by day), sortable agent performance table with deal counts, clients, and pipeline values.
+    2. **Notifications**: Create/send notifications to all brokerage agents with priority levels (normal/info/urgent). Sent notifications list with read counts.
+    3. **Sales Competitions**: Create competitions with metrics (calls/emails/texts/conversions/commissions/total_activity), date ranges, and prizes. Live leaderboard with crown/medal/award icons for top 3. Active/upcoming/completed sections.
+  - Broker-to-agent linking via `users.brokerageId` — agents with matching `brokerageId` appear in the broker's portal.
+  - DB tables: `broker_notifications`, `broker_notification_reads`, `sales_competitions`.
+  - APIs: `/api/broker/agents`, `/api/broker/metrics`, `/api/broker/agent/:id/metrics`, `/api/broker/notifications`, `/api/broker/competitions`, `/api/broker/competitions/:id/leaderboard`, `/api/notifications`, `/api/notifications/:id/read`.
+  - Key file: `client/src/pages/broker-portal-page.tsx`.
 
 ## External Dependencies
 
