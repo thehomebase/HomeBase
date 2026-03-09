@@ -5413,7 +5413,7 @@ export function registerRoutes(app: Express): Server {
         ? Math.round((estMonthlyLeads / agentCount) * 10) / 10
         : estMonthlyLeads;
 
-      const avgHomeValue = getEstimatedHomeValue(zipCode);
+      const avgHomeValue = await getEstimatedHomeValue(zipCode);
       const avgCommission = avgHomeValue * 0.03;
       const estSixMonthLeads = Number(leadStats.six_month_leads) || 0;
       const estLeadsForAgent = agentCount > 0 ? Math.round((estSixMonthLeads / agentCount) * 10) / 10 : estSixMonthLeads;

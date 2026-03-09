@@ -1249,7 +1249,7 @@ export default function ClientsPage() {
   });
 
   return (
-    <main className="flex-1 min-w-0 px-4 overflow-x-hidden">
+    <div className="flex-1 min-w-0 px-4 sm:px-8 overflow-x-hidden">
       <div className="w-full flex flex-wrap bg-background relative px-2 py-8">
         <div className="flex flex-col sm:flex-row w-full sm:items-center justify-between gap-2 mb-2">
           <h2 className="text-2xl font-bold dark:text-white">Client Management</h2>
@@ -1782,6 +1782,6 @@ export default function ClientsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </div>
   );
 }

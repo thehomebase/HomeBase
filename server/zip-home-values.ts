@@ -105,7 +105,61 @@ const ZIP_PREFIX_HOME_VALUES: Record<string, number> = {
 
 const NATIONAL_MEDIAN = 350000;
 
-export function getEstimatedHomeValue(zipCode: string): number {
+const censusCache: Map<string, { value: number | null; timestamp: number }> = new Map();
+const CACHE_TTL = 24 * 60 * 60 * 1000;
+const NEGATIVE_CACHE_TTL = 5 * 60 * 1000;
+
+async function fetchCensusHomeValue(zipCode: string): Promise<number | null> {
+  const cached = censusCache.get(zipCode);
+  if (cached) {
+    const ttl = cached.value !== null ? CACHE_TTL : NEGATIVE_CACHE_TTL;
+    if (Date.now() - cached.timestamp < ttl) {
+      return cached.value;
+    }
+  }
+
+  try {
+    const url = `https://api.census.gov/data/2022/acs/acs5?get=B25077_001E&for=zip%20code%20tabulation%20area:${zipCode}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      censusCache.set(zipCode, { value: null, timestamp: Date.now() });
+      return null;
+    }
+    const data = await response.json();
+    if (!Array.isArray(data) || data.length < 2) {
+      censusCache.set(zipCode, { value: null, timestamp: Date.now() });
+      return null;
+    }
+
+    const value = parseInt(data[1][0], 10);
+    if (isNaN(value) || value <= 0) {
+      censusCache.set(zipCode, { value: null, timestamp: Date.now() });
+      return null;
+    }
+
+    censusCache.set(zipCode, { value, timestamp: Date.now() });
+    return value;
+  } catch {
+    censusCache.set(zipCode, { value: null, timestamp: Date.now() });
+    return null;
+  }
+}
+
+function getStaticEstimate(zipCode: string): number {
   const prefix = zipCode.substring(0, 3);
   return ZIP_PREFIX_HOME_VALUES[prefix] || NATIONAL_MEDIAN;
+}
+
+export async function getEstimatedHomeValue(zipCode: string): Promise<number> {
+  const censusValue = await fetchCensusHomeValue(zipCode);
+  if (censusValue !== null) return censusValue;
+  return getStaticEstimate(zipCode);
 }

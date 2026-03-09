@@ -584,6 +584,7 @@ function ZipMapView({
         <div
           ref={mapRef}
           className="h-[450px] md:h-[550px] w-full rounded-lg border border-border overflow-hidden"
+          style={{ isolation: "isolate" }}
         />
         {zoomLevel < BOUNDARY_MIN_ZOOM && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-background/90 backdrop-blur-sm border rounded-lg px-4 py-2 text-xs text-muted-foreground shadow-md flex items-center gap-2 z-[1000]">

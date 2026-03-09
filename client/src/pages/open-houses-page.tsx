@@ -174,6 +174,7 @@ export default function OpenHousesPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingHouse, setEditingHouse] = useState<any | null>(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
 
   const { data: openHouses, isLoading } = useQuery<any[]>({
     queryKey: ["/api/open-houses"],
@@ -195,12 +196,17 @@ export default function OpenHousesPage() {
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
       await apiRequest("PATCH", `/api/open-houses/${id}`, data);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/open-houses"] });
       setEditingHouse(null);
-      toast({ title: "Open house updated!" });
+      setUpdatingStatusId(null);
+      const newStatus = variables.data?.status;
+      toast({ title: newStatus === "active" ? "Open house started!" : newStatus === "completed" ? "Open house completed!" : "Open house updated!" });
     },
-    onError: () => toast({ title: "Error", description: "Failed to update", variant: "destructive" }),
+    onError: () => {
+      setUpdatingStatusId(null);
+      toast({ title: "Error", description: "Failed to update", variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -320,9 +326,14 @@ export default function OpenHousesPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => updateMutation.mutate({ id: oh.id, data: { status: nextStatus[oh.status] } })}
+                        disabled={updatingStatusId === oh.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUpdatingStatusId(oh.id);
+                          updateMutation.mutate({ id: oh.id, data: { status: nextStatus[oh.status] } });
+                        }}
                       >
-                        {nextStatus[oh.status] === "active" ? "Start" : "Complete"}
+                        {updatingStatusId === oh.id ? "Updating..." : nextStatus[oh.status] === "active" ? "Start" : "Complete"}
                       </Button>
                     )}
                     <Dialog open={editingHouse?.id === oh.id} onOpenChange={(open) => !open && setEditingHouse(null)}>

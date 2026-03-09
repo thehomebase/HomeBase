@@ -556,7 +556,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             </Sidebar>
           </div>
         )}
-        <main className="flex-1 min-h-screen w-full overflow-x-clip relative">
+        <main className="flex-1 min-h-screen min-w-0 overflow-x-clip relative">
           {user && (
             <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
               <div className="flex items-center justify-between px-4 py-2">
