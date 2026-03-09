@@ -393,6 +393,11 @@ export interface IStorage {
   getAgentMetrics(agentId: number): Promise<any>;
   getBrokerageLeads(brokerageId: number): Promise<any[]>;
   reassignLead(leadId: number, newAgentId: number): Promise<any>;
+  createFeedbackRequest(data: any): Promise<any>;
+  getFeedbackRequestByToken(token: string): Promise<any>;
+  getFeedbackRequestsByAgent(agentId: number): Promise<any[]>;
+  completeFeedbackRequest(id: number, reviewId: number): Promise<any>;
+  getFeedbackRequestByTransaction(transactionId: number, clientId: number): Promise<any>;
   createBrokerNotification(data: InsertBrokerNotification): Promise<BrokerNotification>;
   getBrokerNotifications(brokerId: number): Promise<(BrokerNotification & { readCount: number })[]>;
   getAgentNotifications(agentId: number): Promise<BrokerNotification[]>;
@@ -5497,6 +5502,63 @@ export class DatabaseStorage implements IStorage {
       RETURNING *
     `);
     return result.rows[0];
+  }
+
+  async createFeedbackRequest(data: any): Promise<any> {
+    const result = await db.execute(sql`
+      INSERT INTO feedback_requests (transaction_id, agent_id, client_id, token, status)
+      VALUES (${data.transactionId}, ${data.agentId}, ${data.clientId}, ${data.token}, 'pending')
+      RETURNING *
+    `);
+    return result.rows[0];
+  }
+
+  async getFeedbackRequestByToken(token: string): Promise<any> {
+    const result = await db.execute(sql`
+      SELECT fr.*,
+        t.street_name, t.city, t.state, t.zip_code, t.type as transaction_type,
+        u.first_name as agent_first_name, u.last_name as agent_last_name,
+        c.first_name as client_first_name, c.last_name as client_last_name
+      FROM feedback_requests fr
+      JOIN transactions t ON fr.transaction_id = t.id
+      JOIN users u ON fr.agent_id = u.id
+      JOIN clients c ON fr.client_id = c.id
+      WHERE fr.token = ${token}
+    `);
+    return result.rows[0] || null;
+  }
+
+  async getFeedbackRequestsByAgent(agentId: number): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT fr.*,
+        t.street_name, t.city, t.state, t.zip_code,
+        c.first_name as client_first_name, c.last_name as client_last_name, c.email as client_email
+      FROM feedback_requests fr
+      JOIN transactions t ON fr.transaction_id = t.id
+      JOIN clients c ON fr.client_id = c.id
+      WHERE fr.agent_id = ${agentId}
+      ORDER BY fr.sent_at DESC
+    `);
+    return result.rows as any[];
+  }
+
+  async completeFeedbackRequest(id: number, reviewId: number): Promise<any> {
+    const result = await db.execute(sql`
+      UPDATE feedback_requests
+      SET status = 'completed', completed_at = NOW(), review_id = ${reviewId}
+      WHERE id = ${id}
+      RETURNING *
+    `);
+    return result.rows[0];
+  }
+
+  async getFeedbackRequestByTransaction(transactionId: number, clientId: number): Promise<any> {
+    const result = await db.execute(sql`
+      SELECT * FROM feedback_requests
+      WHERE transaction_id = ${transactionId} AND client_id = ${clientId}
+      LIMIT 1
+    `);
+    return result.rows[0] || null;
   }
 
 }

@@ -965,6 +965,28 @@ export const insertSalesCompetitionSchema = createInsertSchema(salesCompetitions
   createdAt: true,
 });
 
+export const feedbackRequests = pgTable("feedback_requests", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  clientId: integer("client_id").notNull(),
+  token: text("token").notNull().unique(),
+  status: text("status", { enum: ['pending', 'completed', 'expired'] }).notNull().default('pending'),
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  reviewId: integer("review_id"),
+});
+
+export const insertFeedbackRequestSchema = createInsertSchema(feedbackRequests).omit({
+  id: true,
+  sentAt: true,
+  completedAt: true,
+  reviewId: true,
+});
+
+export type FeedbackRequest = typeof feedbackRequests.$inferSelect;
+export type InsertFeedbackRequest = z.infer<typeof insertFeedbackRequestSchema>;
+
 export type BrokerNotification = typeof brokerNotifications.$inferSelect;
 export type InsertBrokerNotification = z.infer<typeof insertBrokerNotificationSchema>;
 export type BrokerNotificationRead = typeof brokerNotificationReads.$inferSelect;

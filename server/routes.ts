@@ -130,6 +130,14 @@ export function registerRoutes(app: Express): Server {
   });
 
   const rpName = "Home-Base";
+  const getAppBaseUrl = (req: any): string => {
+    if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+    if (process.env.REPL_SLUG && process.env.REPL_OWNER) return `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+    const host = req.get("host") || "localhost:5000";
+    const protocol = host.includes("localhost") ? "http" : "https";
+    return `${protocol}://${host}`;
+  };
+
   const getWebAuthnConfig = (req: any) => {
     const host = req.get("host") || "localhost:5000";
     const rpID = host.split(":")[0];
@@ -596,6 +604,11 @@ export function registerRoutes(app: Express): Server {
       const id = Number(req.params.id);
       const data = { ...req.body };
 
+      const oldTransaction = await storage.getTransaction(id);
+      if (!oldTransaction || oldTransaction.agentId !== req.user.id) {
+        return res.status(403).json({ error: "Not authorized to update this transaction" });
+      }
+
       // Handle date fields specifically
       const dateFields = ['closingDate', 'contractExecutionDate', 'optionPeriodExpiration'];
       dateFields.forEach(field => {
@@ -614,6 +627,37 @@ export function registerRoutes(app: Express): Server {
       });
 
       const transaction = await storage.updateTransaction(id, data);
+
+      if (oldTransaction && oldTransaction.status !== "closed" && data.status === "closed" && transaction.clientId) {
+        try {
+          const existing = await storage.getFeedbackRequestByTransaction(transaction.id, transaction.clientId);
+          if (!existing) {
+            const client = await storage.getClient(transaction.clientId);
+            if (client) {
+              const token = randomUUID();
+              await storage.createFeedbackRequest({
+                transactionId: transaction.id,
+                agentId: transaction.agentId,
+                clientId: transaction.clientId,
+                token,
+              });
+
+              const agentName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'your agent';
+              const address = [transaction.streetName, transaction.city].filter(Boolean).join(', ') || 'your property';
+              const feedbackUrl = `${getAppBaseUrl(req)}/feedback/${token}`;
+
+              if (client.phone) {
+                const message = `Congratulations on closing on ${address}! ${agentName} would love to hear about your experience. Please leave a review here: ${feedbackUrl}`;
+                sendSMS(client.phone, message).catch(err => console.error("Failed to send feedback SMS:", err));
+              }
+              console.log(`[Feedback] Created feedback request for transaction ${transaction.id}, client ${client.firstName} ${client.lastName}`);
+            }
+          }
+        } catch (feedbackErr) {
+          console.error("Error creating feedback request:", feedbackErr);
+        }
+      }
+
       res.json(transaction);
     } catch (error) {
       console.error('Error updating transaction:', error);
@@ -6003,6 +6047,109 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error fetching leaderboard:", error);
       res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
+  app.get("/api/feedback/:token", async (req, res) => {
+    try {
+      const feedbackRequest = await storage.getFeedbackRequestByToken(req.params.token);
+      if (!feedbackRequest) return res.status(404).json({ error: "Feedback request not found" });
+      if (feedbackRequest.status === 'completed') return res.status(400).json({ error: "Feedback already submitted", completed: true });
+      res.json(feedbackRequest);
+    } catch (error) {
+      console.error("Error fetching feedback request:", error);
+      res.status(500).json({ error: "Failed to fetch feedback request" });
+    }
+  });
+
+  app.post("/api/feedback/:token/submit", async (req, res) => {
+    try {
+      const feedbackRequest = await storage.getFeedbackRequestByToken(req.params.token);
+      if (!feedbackRequest) return res.status(404).json({ error: "Feedback request not found" });
+      if (feedbackRequest.status === 'completed') return res.status(400).json({ error: "Feedback already submitted" });
+
+      const { rating, title, comment } = req.body;
+      if (typeof rating !== 'number' || !Number.isInteger(rating) || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "Rating must be an integer between 1 and 5" });
+      }
+      if (!comment || typeof comment !== 'string' || !comment.trim()) {
+        return res.status(400).json({ error: "Comment is required" });
+      }
+      if (comment.length > 2000) return res.status(400).json({ error: "Comment must be 2000 characters or less" });
+      if (title && (typeof title !== 'string' || title.length > 100)) {
+        return res.status(400).json({ error: "Title must be 100 characters or less" });
+      }
+
+      const reviewResult = await db.execute(sql`
+        INSERT INTO agent_reviews (agent_id, reviewer_id, rating, title, comment, transaction_id, is_public)
+        VALUES (${feedbackRequest.agent_id}, ${feedbackRequest.client_id}, ${rating}, ${title || null}, ${comment}, ${feedbackRequest.transaction_id}, true)
+        RETURNING *
+      `);
+      const review = reviewResult.rows[0] as any;
+
+      await storage.completeFeedbackRequest(feedbackRequest.id, review.id);
+
+      res.json({ success: true, message: "Thank you for your feedback!" });
+    } catch (error) {
+      console.error("Error submitting feedback:", error);
+      res.status(500).json({ error: "Failed to submit feedback" });
+    }
+  });
+
+  app.get("/api/feedback-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const requests = await storage.getFeedbackRequestsByAgent(req.user.id);
+      res.json(requests);
+    } catch (error) {
+      console.error("Error fetching feedback requests:", error);
+      res.status(500).json({ error: "Failed to fetch feedback requests" });
+    }
+  });
+
+  app.post("/api/feedback-requests/send", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const { transactionId, clientId } = req.body;
+      if (!transactionId || !clientId) return res.status(400).json({ error: "Transaction ID and Client ID are required" });
+
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) return res.status(404).json({ error: "Transaction not found" });
+      if (transaction.agentId !== req.user.id) return res.status(403).json({ error: "Not authorized for this transaction" });
+      if (transaction.clientId !== clientId && transaction.secondaryClientId !== clientId) {
+        return res.status(400).json({ error: "Client is not part of this transaction" });
+      }
+
+      const existing = await storage.getFeedbackRequestByTransaction(transactionId, clientId);
+      if (existing) return res.status(400).json({ error: "Feedback request already sent for this transaction" });
+
+      const client = await storage.getClient(clientId);
+      if (!client) return res.status(404).json({ error: "Client not found" });
+
+      const token = randomUUID();
+      const feedbackReq = await storage.createFeedbackRequest({
+        transactionId,
+        agentId: req.user.id,
+        clientId,
+        token,
+      });
+
+      const agentName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'your agent';
+      const address = [transaction.streetName, transaction.city].filter(Boolean).join(', ') || 'your property';
+      const feedbackUrl = `${getAppBaseUrl(req)}/feedback/${token}`;
+
+      if (client.phone) {
+        const message = `Hi ${client.firstName}! ${agentName} would love to hear about your experience with the transaction at ${address}. Please leave a review here: ${feedbackUrl}`;
+        const smsResult = await sendSMS(client.phone, message);
+        if (!smsResult.success) console.error("Failed to send feedback SMS:", smsResult.error);
+      }
+
+      res.json(feedbackReq);
+    } catch (error) {
+      console.error("Error sending feedback request:", error);
+      res.status(500).json({ error: "Failed to send feedback request" });
     }
   });
 

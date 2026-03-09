@@ -84,6 +84,7 @@ import FindContractorPage from "@/pages/find-contractor-page";
 import VendorRatingsPage from "@/pages/vendor-ratings-page";
 import BiometricSettingsPage from "@/pages/biometric-settings-page";
 import LandingPage from "@/pages/landing-page";
+import FeedbackPage from "@/pages/feedback-page";
 import VerifyEmailPage from "@/pages/verify-email-page";
 import BrokerPortalPage from "@/pages/broker-portal-page";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
@@ -523,6 +524,7 @@ function Router() {
       <Route path="/find-contractor" component={FindContractorPage} />
       <Route path="/agents/:agentId/reviews" component={AgentReviewsPage} />
       <Route path="/top-agents" component={TopAgentsPage} />
+      <Route path="/feedback/:token" component={FeedbackPage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/messages" component={MessagesPage} />

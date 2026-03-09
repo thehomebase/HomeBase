@@ -62,6 +62,8 @@ Preferred communication style: Simple, everyday language.
   - APIs: `/api/broker/agents`, `/api/broker/metrics`, `/api/broker/agent/:id/metrics`, `/api/broker/notifications`, `/api/broker/competitions`, `/api/broker/competitions/:id/leaderboard`, `/api/broker/leads`, `/api/broker/leads/:id/reassign`, `/api/notifications`, `/api/notifications/:id/read`.
   - Key file: `client/src/pages/broker-portal-page.tsx`.
 
+- **Automated Feedback Requests**: When a transaction status changes to "closed", the system automatically sends an SMS to the client with a unique link to submit a review. Agents can also manually send feedback requests for any transaction via `POST /api/feedback-requests/send`. The feedback form is a public page at `/feedback/:token` — no login required. Clients rate 1-5 stars, add title and comment, which creates an `agent_reviews` record. Agents can view all sent feedback requests and their status via `GET /api/feedback-requests`. Duplicate-checked per transaction+client pair. DB table: `feedback_requests`. Key files: `client/src/pages/feedback-page.tsx`, `server/routes.ts`, `server/storage.ts`.
+
 ## External Dependencies
 
 - **Neon PostgreSQL**: Serverless database solution.
