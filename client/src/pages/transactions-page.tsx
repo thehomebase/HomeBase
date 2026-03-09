@@ -174,9 +174,7 @@ export default function TransactionsPage() {
   const [view, setView] = useState<"list" | "board" | "table">("board");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">(
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light",
+    localStorage.getItem('theme') === 'dark' ? "dark" : "light",
   );
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [startDate, setStartDate] = useState<string>(
@@ -392,6 +390,7 @@ export default function TransactionsPage() {
   const toggleTheme = () => {
     const newTheme = theme === "light" ? "dark" : "light";
     setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
     document.documentElement.classList.toggle("dark");
   };
 

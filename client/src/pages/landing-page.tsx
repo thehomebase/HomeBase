@@ -18,7 +18,7 @@ export default function LandingPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <div className={`max-w-6xl mx-auto flex items-center justify-between ${isMobile ? "px-4 py-3" : "px-6 py-4"}`}>
           <div className="flex items-center gap-2 shrink-0">
-            <img src="/homebaselogoicon_nobg.png" alt="HomeBase" className="h-7 w-7" />
+            <img src="/homebaselogoicon_nobg.png" alt="HomeBase" className="h-7 w-7 dark:invert" />
             <span className="font-bold text-lg tracking-tight">HomeBase</span>
           </div>
           <div className="flex items-center gap-2">
@@ -267,7 +267,7 @@ export default function LandingPage() {
       <footer className={`border-t ${isMobile ? "py-8 px-4" : "py-12 px-6"}`}>
         <div className={`max-w-6xl mx-auto flex ${isMobile ? "flex-col gap-6" : "items-center justify-between"}`}>
           <div className="flex items-center gap-2">
-            <img src="/homebaselogoicon_nobg.png" alt="HomeBase" className="h-6 w-6" />
+            <img src="/homebaselogoicon_nobg.png" alt="HomeBase" className="h-6 w-6 dark:invert" />
             <span className="font-bold text-lg">HomeBase</span>
           </div>
           <div className="flex items-center gap-6">
