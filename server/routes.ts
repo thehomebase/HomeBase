@@ -402,7 +402,13 @@ export function registerRoutes(app: Express): Server {
   app.delete("/api/clients/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      await storage.deleteClient(Number(req.params.id));
+      const clientId = Number(req.params.id);
+      const client = await storage.getClient(clientId);
+      if (!client) return res.status(404).json({ error: 'Client not found' });
+      if (client.agentId !== req.user.id && req.user.role !== "broker") {
+        return res.status(403).json({ error: 'Not authorized to delete this client' });
+      }
+      await storage.deleteClient(clientId);
       res.sendStatus(200);
     } catch (error) {
       console.error('Error deleting client:', error);
@@ -416,16 +422,16 @@ export function registerRoutes(app: Express): Server {
     }
 
     try {
-      // Validate client ID
       const clientId = Number(req.params.id);
       if (isNaN(clientId)) {
         return res.status(400).json({ error: 'Invalid client ID' });
       }
 
-      console.log('Processing client update request:', {
-        clientId,
-        updateData: req.body
-      });
+      const existing = await storage.getClient(clientId);
+      if (!existing) return res.status(404).json({ error: 'Client not found' });
+      if (existing.agentId !== req.user.id && req.user.role !== "broker") {
+        return res.status(403).json({ error: 'Not authorized to update this client' });
+      }
 
       const client = await storage.updateClient(clientId, req.body);
 
@@ -588,6 +594,11 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const id = Number(req.params.id);
+      const transaction = await storage.getTransaction(id);
+      if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
+      if (transaction.agentId !== req.user.id && req.user.role !== "broker") {
+        return res.status(403).json({ error: 'Not authorized to delete this transaction' });
+      }
       await storage.deleteTransaction(id);
       res.sendStatus(200);
     } catch (error) {
@@ -608,7 +619,7 @@ export function registerRoutes(app: Express): Server {
       delete data.agentId;
 
       const oldTransaction = await storage.getTransaction(id);
-      if (!oldTransaction || oldTransaction.agentId !== req.user.id) {
+      if (!oldTransaction || (oldTransaction.agentId !== req.user.id && req.user.role !== "broker")) {
         return res.status(403).json({ error: "Not authorized to update this transaction" });
       }
 
@@ -880,23 +891,26 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/messages/recipients", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      // Get all transactions for the user
       const transactions = await storage.getTransactionsByUser(req.user.id);
+      const transactionIds = transactions.map(t => t.id);
 
-      // Get all unique contacts from these transactions
-      const contacts = await Promise.all(
-        transactions.map(t => storage.getContactsByTransaction(t.id))
-      );
+      if (transactionIds.length === 0) {
+        return res.json([]);
+      }
 
-      // Flatten and remove duplicates
-      const uniqueContacts = Array.from(new Set(
-        contacts.flat().map(c => ({
-          id: c.id,
-          name: `${c.firstName} ${c.lastName}`,
-          role: c.role,
-          email: c.email
-        }))
-      ));
+      const result = await db.execute(sql`
+        SELECT DISTINCT ON (email) id, first_name, last_name, role, email, phone
+        FROM contacts
+        WHERE transaction_id = ANY(${transactionIds})
+        ORDER BY email, id
+      `);
+
+      const uniqueContacts = result.rows.map(c => ({
+        id: c.id,
+        name: `${c.first_name} ${c.last_name}`,
+        role: c.role,
+        email: c.email
+      }));
 
       res.json(uniqueContacts);
     } catch (error) {
@@ -1167,6 +1181,16 @@ export function registerRoutes(app: Express): Server {
   app.patch("/api/documents/:transactionId/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
+      const transactionId = Number(req.params.transactionId);
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
+      if (transaction.agentId !== req.user.id && req.user.role !== "broker") {
+        return res.status(403).json({ error: 'Not authorized to modify documents for this transaction' });
+      }
+      const existing = await storage.getDocument(req.params.id);
+      if (!existing || existing.transactionId !== transactionId) {
+        return res.status(404).json({ error: 'Document not found in this transaction' });
+      }
       const document = await storage.updateDocument(req.params.id, req.body);
       res.json(document);
     } catch (error) {
@@ -1178,6 +1202,16 @@ export function registerRoutes(app: Express): Server {
   app.delete("/api/documents/:transactionId/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
+      const transactionId = Number(req.params.transactionId);
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
+      if (transaction.agentId !== req.user.id && req.user.role !== "broker") {
+        return res.status(403).json({ error: 'Not authorized to delete documents for this transaction' });
+      }
+      const existing = await storage.getDocument(req.params.id);
+      if (!existing || existing.transactionId !== transactionId) {
+        return res.status(404).json({ error: 'Document not found in this transaction' });
+      }
       await storage.deleteDocument(req.params.id);
       res.sendStatus(200);
     } catch (error) {

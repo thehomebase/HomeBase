@@ -63,7 +63,8 @@ import {
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
 import session from 'express-session';
-import MemoryStore from 'memorystore';
+import connectPgSimple from 'connect-pg-simple';
+import { pool } from './db';
 
 // Define ChecklistItem type to match the frontend
 interface ChecklistItem {
@@ -439,7 +440,7 @@ export interface IStorage {
 
 }
 
-const MemoryStoreSession = MemoryStore(session);
+const PgStore = connectPgSimple(session);
 
 export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
@@ -447,8 +448,11 @@ export class DatabaseStorage implements IStorage {
   private SELLER_CHECKLIST_ITEMS: ChecklistItem[];
 
   constructor() {
-    this.sessionStore = new MemoryStoreSession({
-      checkPeriod: 86400000 // prune expired entries every 24h
+    this.sessionStore = new PgStore({
+      pool: pool,
+      tableName: 'session',
+      createTableIfMissing: true,
+      pruneSessionInterval: 60 * 15,
     });
 
     // Initialize checklist items

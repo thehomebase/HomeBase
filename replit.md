@@ -21,7 +21,8 @@ Preferred communication style: Simple, everyday language.
 - **API Design**: RESTful for CRUD operations
 - **Authentication**: Passport.js (local strategy, session-based)
 - **Password Security**: scrypt hashing
-- **Security**: IP-based rate limiting for registration, email verification with SHA-256 hashed codes, server-side middleware for unverified users.
+- **Security**: IP-based rate limiting for registration, email verification with SHA-256 hashed codes, server-side middleware for unverified users, ownership checks on client/transaction/document CRUD routes.
+- **Session Storage**: PostgreSQL-backed sessions via `connect-pg-simple` (persistent across restarts).
 
 ### Data Storage
 - **Database**: PostgreSQL (Neon serverless)
