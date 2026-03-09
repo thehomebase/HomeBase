@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { type Contractor, type ContractorReview } from "@shared/schema";
+import { type Contractor, type ContractorReview, type VendorRating } from "@shared/schema";
+import { RateVendorDialog, PerformanceStatsDisplay } from "@/pages/vendor-ratings-page";
 
 type ContractorWithRating = Contractor & {
   averageRating?: number | null;
@@ -398,12 +399,21 @@ function ContractorDetail({
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [reviewForm, setReviewForm] = useState({ reviewerName: "", rating: 5, comment: "" });
+  const [showRateDialog, setShowRateDialog] = useState(false);
 
-  const { data: reviews = [], isLoading: loadingReviews } = useQuery<ContractorReview[]>({
+  const { data: reviews = [] } = useQuery<ContractorReview[]>({
     queryKey: ["/api/contractors", contractor.id, "reviews"],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/contractors/${contractor.id}/reviews`);
+      return res.json();
+    }
+  });
+
+  const { data: vendorRatings = [] } = useQuery<VendorRating[]>({
+    queryKey: ["/api/contractors", contractor.id, "ratings"],
+    queryFn: async () => {
+      const res = await fetch(`/api/contractors/${contractor.id}/ratings`, { credentials: "include" });
+      if (!res.ok) return [];
       return res.json();
     }
   });
@@ -437,27 +447,6 @@ function ContractorDetail({
       toast({ title: "Recommendation removed" });
     }
   });
-
-  const addReviewMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", `/api/contractors/${contractor.id}/reviews`, data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contractors", contractor.id, "reviews"] });
-      setReviewForm({ reviewerName: "", rating: 5, comment: "" });
-      toast({ title: "Review added successfully" });
-    },
-    onError: () => {
-      toast({ title: "Failed to add review", variant: "destructive" });
-    }
-  });
-
-  const handleAddReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewForm.reviewerName) return;
-    addReviewMutation.mutate(reviewForm);
-  };
 
   const categoryLabel = CATEGORIES.find(c => c.value === contractor.category)?.label || contractor.category;
 
@@ -591,14 +580,54 @@ function ContractorDetail({
       )}
 
       <div>
-        <h3 className="text-lg font-semibold mb-4">Client Reviews ({reviews.length})</h3>
-        
-        {loadingReviews ? (
-          <p className="text-muted-foreground">Loading reviews...</p>
-        ) : reviews.length === 0 ? (
-          <p className="text-muted-foreground">No reviews yet. Be the first to add one!</p>
-        ) : (
-          <div className="space-y-4 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Performance & Reviews</h3>
+          {(user?.role === "agent" || user?.role === "broker") && (
+            <Button size="sm" onClick={() => setShowRateDialog(true)}>
+              <Star className="h-4 w-4 mr-1" />
+              Rate Vendor
+            </Button>
+          )}
+        </div>
+
+        <PerformanceStatsDisplay contractorId={contractor.id} />
+
+        {vendorRatings.length > 0 && (
+          <div className="space-y-3 mt-4">
+            <h4 className="font-medium text-sm text-muted-foreground">Agent Reviews ({vendorRatings.length})</h4>
+            {vendorRatings.map((rating) => (
+              <Card key={rating.id}>
+                <CardContent className="pt-4">
+                  <div className="flex justify-between items-start mb-1">
+                    {rating.title && <span className="font-medium text-sm">{rating.title}</span>}
+                    <div className="flex items-center gap-1">
+                      <StarRating rating={rating.overallRating} readonly />
+                      {rating.wouldRecommend && (
+                        <Badge variant="outline" className="ml-2 text-xs text-green-600 border-green-200 bg-green-50">
+                          <ThumbsUp className="h-3 w-3 mr-0.5" /> Recommends
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{rating.comment}</p>
+                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-2">
+                    {rating.qualityRating && <span>Quality: {rating.qualityRating}/5</span>}
+                    {rating.communicationRating && <span>Communication: {rating.communicationRating}/5</span>}
+                    {rating.timelinessRating && <span>Timeliness: {rating.timelinessRating}/5</span>}
+                    {rating.valueRating && <span>Value: {rating.valueRating}/5</span>}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {rating.createdAt ? new Date(rating.createdAt).toLocaleDateString() : ''}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {reviews.length > 0 && (
+          <div className="space-y-3 mt-4">
+            <h4 className="font-medium text-sm text-muted-foreground">Client Reviews ({reviews.length})</h4>
             {reviews.map((review) => (
               <Card key={review.id}>
                 <CardContent className="pt-4">
@@ -616,44 +645,16 @@ function ContractorDetail({
           </div>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Add a Review</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAddReview} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="reviewerName">Name *</Label>
-                <Input
-                  id="reviewerName"
-                  value={reviewForm.reviewerName}
-                  onChange={(e) => setReviewForm({ ...reviewForm, reviewerName: e.target.value })}
-                  placeholder="Your name or client name"
-                  required
-                  data-testid="input-review-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Rating</Label>
-                <StarRating rating={reviewForm.rating} onChange={(r) => setReviewForm({ ...reviewForm, rating: r })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="comment">Comment</Label>
-                <Textarea
-                  id="comment"
-                  value={reviewForm.comment}
-                  onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
-                  placeholder="Share your experience..."
-                  data-testid="input-review-comment"
-                />
-              </div>
-              <Button type="submit" disabled={!reviewForm.reviewerName || addReviewMutation.isPending} data-testid="button-submit-review">
-                {addReviewMutation.isPending ? "Submitting..." : "Submit Review"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        {vendorRatings.length === 0 && reviews.length === 0 && (
+          <p className="text-muted-foreground text-sm mt-4">No reviews yet.</p>
+        )}
       </div>
+
+      <RateVendorDialog
+        contractorId={contractor.id}
+        open={showRateDialog}
+        onOpenChange={setShowRateDialog}
+      />
 
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Close</Button>

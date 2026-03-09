@@ -19,6 +19,9 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { RateVendorDialog } from "@/pages/vendor-ratings-page";
+import { Star } from "lucide-react";
 
 const severityColors: Record<string, string> = {
   minor: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -45,7 +48,9 @@ export default function BidComparisonPage() {
   const params = useParams<{ id: string }>();
   const transactionId = Number(params.id);
   const { toast } = useToast();
+  const { user } = useAuth();
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const [ratingContractorId, setRatingContractorId] = useState<number | null>(null);
 
   const { data: inspectionItems, isLoading: itemsLoading } = useQuery<InspectionItem[]>({
     queryKey: [`/api/transactions/${transactionId}/inspection-items`],
@@ -314,6 +319,18 @@ export default function BidComparisonPage() {
                                   </Button>
                                 </div>
                               )}
+
+                              {bid.status === "accepted" && (user?.role === "agent" || user?.role === "broker") && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full mt-2"
+                                  onClick={() => setRatingContractorId(bid.contractorId)}
+                                >
+                                  <Star className="h-3.5 w-3.5 mr-1" />
+                                  Rate Vendor
+                                </Button>
+                              )}
                             </div>
                           );
                         })}
@@ -343,6 +360,14 @@ export default function BidComparisonPage() {
             );
           })}
         </div>
+      )}
+
+      {ratingContractorId && (
+        <RateVendorDialog
+          contractorId={ratingContractorId}
+          open={!!ratingContractorId}
+          onOpenChange={(open) => { if (!open) setRatingContractorId(null); }}
+        />
       )}
     </div>
   );

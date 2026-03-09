@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { type Contractor, type ContractorReview } from "@shared/schema";
+import { PerformanceStatsDisplay, RateVendorDialog } from "@/pages/vendor-ratings-page";
 import {
   Search, Star, Phone, Mail, Globe, MapPin, UserPlus, CheckCircle2,
   Wrench, Zap, Thermometer, Home, Paintbrush, Trees, Sparkles, Hammer,
@@ -96,6 +97,7 @@ export default function MarketplacePage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedContractor, setSelectedContractor] = useState<ContractorWithDetails | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [ratingContractorId, setRatingContractorId] = useState<number | null>(null);
 
   const { data: categories, isLoading: categoriesLoading } = useQuery<MarketplaceCategory[]>({
     queryKey: ["/api/marketplace/categories"],
@@ -350,14 +352,24 @@ export default function MarketplacePage() {
               </DialogHeader>
 
               <div className="space-y-4 mt-4">
-                <div className="flex items-center gap-2">
-                  <StarRating rating={selectedContractor.averageRating ?? selectedContractor.agentRating ?? 0} />
-                  {(selectedContractor.recommendationCount ?? 0) > 0 && (
-                    <span className="text-sm text-muted-foreground">
-                      {selectedContractor.recommendationCount} recommendation{selectedContractor.recommendationCount !== 1 ? "s" : ""}
-                    </span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <StarRating rating={selectedContractor.averageRating ?? selectedContractor.agentRating ?? 0} />
+                    {(selectedContractor.recommendationCount ?? 0) > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        {selectedContractor.recommendationCount} recommendation{selectedContractor.recommendationCount !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </div>
+                  {(user?.role === "agent" || user?.role === "broker") && (
+                    <Button size="sm" variant="outline" onClick={() => setRatingContractorId(selectedContractor.id)}>
+                      <Star className="h-3.5 w-3.5 mr-1" />
+                      Rate
+                    </Button>
                   )}
                 </div>
+
+                <PerformanceStatsDisplay contractorId={selectedContractor.id} />
 
                 {selectedContractor.description && (
                   <p className="text-sm text-muted-foreground">{selectedContractor.description}</p>
@@ -442,6 +454,14 @@ export default function MarketplacePage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {ratingContractorId && (
+        <RateVendorDialog
+          contractorId={ratingContractorId}
+          open={!!ratingContractorId}
+          onOpenChange={(open) => { if (!open) setRatingContractorId(null); }}
+        />
+      )}
     </div>
   );
 }
