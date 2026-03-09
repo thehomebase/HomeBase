@@ -16,7 +16,7 @@ import {
   Wrench, Zap, Thermometer, Home, Paintbrush, Trees, Sparkles, Hammer,
   Bug, Waves, Square, DoorOpen, Key, TreePine, Droplets, SprayCan,
   Layers, Shield, Camera, Sofa, Truck, MoreHorizontal, Construction,
-  ClipboardList, Map, Settings, X
+  ClipboardList, Map, Settings, X, Users, Heart
 } from "lucide-react";
 
 type MarketplaceCategory = {
@@ -30,6 +30,8 @@ type ContractorWithDetails = Contractor & {
   recommendationCount?: number;
   averageRating?: number | null;
   reviewCount?: number;
+  teamCount?: number;
+  trustedByCount?: number;
 };
 
 type MarketplaceResponse = {
@@ -277,6 +279,21 @@ export default function MarketplacePage() {
                     )}
                   </div>
 
+                  <div className="flex flex-wrap gap-1.5">
+                    {(contractor.trustedByCount ?? 0) > 0 && (
+                      <Badge variant="secondary" className="gap-1 text-xs font-normal py-0.5">
+                        <Shield className="h-3 w-3 text-blue-500" />
+                        Trusted by {contractor.trustedByCount} agent{contractor.trustedByCount === 1 ? '' : 's'}
+                      </Badge>
+                    )}
+                    {(contractor.teamCount ?? 0) > 0 && (
+                      <Badge variant="secondary" className="gap-1 text-xs font-normal py-0.5">
+                        <Users className="h-3 w-3 text-purple-500" />
+                        On {contractor.teamCount} team{contractor.teamCount === 1 ? '' : 's'}
+                      </Badge>
+                    )}
+                  </div>
+
                   {contractor.city && (
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <MapPin className="h-3.5 w-3.5 shrink-0" />
@@ -370,6 +387,23 @@ export default function MarketplacePage() {
                 </div>
 
                 <PerformanceStatsDisplay contractorId={selectedContractor.id} />
+
+                {((selectedContractor.trustedByCount ?? 0) > 0 || (selectedContractor.teamCount ?? 0) > 0) && (
+                  <div className="flex flex-wrap gap-2">
+                    {(selectedContractor.trustedByCount ?? 0) > 0 && (
+                      <Badge variant="secondary" className="gap-1.5 text-sm font-normal py-1 px-3">
+                        <Shield className="h-3.5 w-3.5 text-blue-500" />
+                        Trusted by {selectedContractor.trustedByCount} agent{selectedContractor.trustedByCount === 1 ? '' : 's'}
+                      </Badge>
+                    )}
+                    {(selectedContractor.teamCount ?? 0) > 0 && (
+                      <Badge variant="secondary" className="gap-1.5 text-sm font-normal py-1 px-3">
+                        <Users className="h-3.5 w-3.5 text-purple-500" />
+                        On {selectedContractor.teamCount} team{selectedContractor.teamCount === 1 ? '' : 's'}
+                      </Badge>
+                    )}
+                  </div>
+                )}
 
                 {selectedContractor.description && (
                   <p className="text-sm text-muted-foreground">{selectedContractor.description}</p>

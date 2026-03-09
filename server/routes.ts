@@ -4037,7 +4037,17 @@ export function registerRoutes(app: Express): Server {
         storage.getMarketplaceContractorCount({ category, search }),
       ]);
 
-      res.json({ contractors, total, limit, offset });
+      const enriched = await Promise.all(
+        contractors.map(async (c) => {
+          const [teamCount, trustedByCount] = await Promise.all([
+            storage.getContractorTeamCount(c.id),
+            storage.getContractorTrustedByAgentCount(c.id),
+          ]);
+          return { ...c, teamCount, trustedByCount };
+        })
+      );
+
+      res.json({ contractors: enriched, total, limit, offset });
     } catch (error) {
       console.error('Error fetching marketplace contractors:', error);
       res.status(500).json({ error: 'Failed to fetch contractors' });
@@ -4053,10 +4063,14 @@ export function registerRoutes(app: Express): Server {
       const contractor = await storage.getContractor(id);
       if (!contractor) return res.status(404).json({ error: 'Contractor not found' });
 
-      const reviews = await storage.getContractorReviews(id);
-      const recommendationCount = await storage.getContractorRecommendationCount(id);
+      const [reviews, recommendationCount, teamCount, trustedByCount] = await Promise.all([
+        storage.getContractorReviews(id),
+        storage.getContractorRecommendationCount(id),
+        storage.getContractorTeamCount(id),
+        storage.getContractorTrustedByAgentCount(id),
+      ]);
 
-      res.json({ ...contractor, reviews, recommendationCount });
+      res.json({ ...contractor, reviews, recommendationCount, teamCount, trustedByCount });
     } catch (error) {
       console.error('Error fetching marketplace contractor:', error);
       res.status(500).json({ error: 'Failed to fetch contractor' });

@@ -337,6 +337,8 @@ export interface IStorage {
   getVendorRatingsByAgent(agentId: number): Promise<VendorRating[]>;
   deleteVendorRating(id: number): Promise<void>;
   getVendorPerformanceStats(contractorId: number): Promise<{ avgOverall: number; avgQuality: number; avgCommunication: number; avgTimeliness: number; avgValue: number; totalRatings: number; recommendRate: number }>;
+  getContractorTeamCount(contractorId: number): Promise<number>;
+  getContractorTrustedByAgentCount(contractorId: number): Promise<number>;
 
   createWebAuthnCredential(credential: { id: string; userId: number; publicKey: string; counter: number; deviceType?: string; backedUp?: boolean; transports?: string }): Promise<WebAuthnCredential>;
   getWebAuthnCredentialsByUser(userId: number): Promise<WebAuthnCredential[]>;
@@ -4876,6 +4878,20 @@ export class DatabaseStorage implements IStorage {
       totalRatings: row ? Number(row.total_ratings) : 0,
       recommendRate: row ? Number(Number(row.recommend_rate).toFixed(1)) : 0,
     };
+  }
+
+  async getContractorTeamCount(contractorId: number): Promise<number> {
+    const result = await db.execute(sql`
+      SELECT COUNT(DISTINCT user_id) as count FROM home_team_members WHERE contractor_id = ${contractorId}
+    `);
+    return Number((result.rows[0] as any)?.count || 0);
+  }
+
+  async getContractorTrustedByAgentCount(contractorId: number): Promise<number> {
+    const result = await db.execute(sql`
+      SELECT COUNT(DISTINCT agent_id) as count FROM vendor_ratings WHERE contractor_id = ${contractorId} AND would_recommend = true
+    `);
+    return Number((result.rows[0] as any)?.count || 0);
   }
 
   async createWebAuthnCredential(credential: { id: string; userId: number; publicKey: string; counter: number; deviceType?: string; backedUp?: boolean; transports?: string }): Promise<WebAuthnCredential> {
