@@ -391,6 +391,8 @@ export interface IStorage {
   getBrokerageAgents(brokerageId: number): Promise<User[]>;
   getBrokerMetrics(brokerageId: number): Promise<any>;
   getAgentMetrics(agentId: number): Promise<any>;
+  getBrokerageLeads(brokerageId: number): Promise<any[]>;
+  reassignLead(leadId: number, newAgentId: number): Promise<any>;
   createBrokerNotification(data: InsertBrokerNotification): Promise<BrokerNotification>;
   getBrokerNotifications(brokerId: number): Promise<(BrokerNotification & { readCount: number })[]>;
   getAgentNotifications(agentId: number): Promise<BrokerNotification[]>;
@@ -5461,6 +5463,40 @@ export class DatabaseStorage implements IStorage {
 
     leaderboard.sort((a, b) => b.score - a.score);
     return leaderboard.map((entry, index) => ({ ...entry, rank: index + 1 }));
+  }
+
+  async getBrokerageLeads(brokerageId: number): Promise<any[]> {
+    const agentsResult = await db.execute(sql`SELECT id FROM users WHERE brokerage_id = ${brokerageId} AND role = 'agent'`);
+    const agentIds = (agentsResult.rows as any[]).map(r => r.id);
+    agentIds.push(brokerageId);
+
+    if (agentIds.length === 0) return [];
+
+    const result = await db.execute(sql`
+      SELECT l.*, 
+        u.first_name as agent_first_name, 
+        u.last_name as agent_last_name
+      FROM leads l
+      LEFT JOIN users u ON l.assigned_agent_id = u.id
+      WHERE l.assigned_agent_id = ANY(${agentIds})
+         OR (l.assigned_agent_id IS NULL AND l.zip_code IN (
+           SELECT zip_code FROM lead_zip_codes WHERE agent_id = ANY(${agentIds})
+         ))
+      ORDER BY l.created_at DESC
+    `);
+    return result.rows as any[];
+  }
+
+  async reassignLead(leadId: number, newAgentId: number): Promise<any> {
+    const result = await db.execute(sql`
+      UPDATE leads 
+      SET assigned_agent_id = ${newAgentId}, 
+          assigned_at = NOW(),
+          status = 'assigned'
+      WHERE id = ${leadId}
+      RETURNING *
+    `);
+    return result.rows[0];
   }
 
 }

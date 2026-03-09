@@ -54,11 +54,12 @@ Preferred communication style: Simple, everyday language.
     1. **Overview Dashboard**: Metric cards (Total Agents, Active Deals, Pipeline Value, Total Clients, Conversion Rate) with trend indicators, activity chart (stacked Recharts bar chart showing calls/emails/texts by day), sortable agent performance table with deal counts, clients, and pipeline values.
     2. **Notifications**: Create/send notifications to all brokerage agents with priority levels (normal/info/urgent). Sent notifications list with read counts.
     3. **Sales Competitions**: Create competitions with metrics (calls/emails/texts/conversions/commissions/total_activity), date ranges, and prizes. Live leaderboard with crown/medal/award icons for top 3. Active/upcoming/completed sections.
+    4. **Lead Routing**: View all leads across brokerage agents with status filter cards (All/New/Assigned/Accepted/Converted/Rejected). Reassign leads to any agent in the brokerage via inline agent selector. APIs: `GET /api/broker/leads`, `POST /api/broker/leads/:id/reassign`.
   - Broker-to-agent linking via `users.brokerageId` — agents with matching `brokerageId` appear in the broker's portal.
   - Brokers also have full agent capabilities (transactions, clients, contractors, map, mail, referrals, drip campaigns, lead gen) since real estate brokers often handle their own deals.
   - All backend `role !== "agent"` checks also allow `"broker"` role, except notification reads (agent-only).
   - DB tables: `broker_notifications`, `broker_notification_reads`, `sales_competitions`.
-  - APIs: `/api/broker/agents`, `/api/broker/metrics`, `/api/broker/agent/:id/metrics`, `/api/broker/notifications`, `/api/broker/competitions`, `/api/broker/competitions/:id/leaderboard`, `/api/notifications`, `/api/notifications/:id/read`.
+  - APIs: `/api/broker/agents`, `/api/broker/metrics`, `/api/broker/agent/:id/metrics`, `/api/broker/notifications`, `/api/broker/competitions`, `/api/broker/competitions/:id/leaderboard`, `/api/broker/leads`, `/api/broker/leads/:id/reassign`, `/api/notifications`, `/api/notifications/:id/read`.
   - Key file: `client/src/pages/broker-portal-page.tsx`.
 
 ## External Dependencies

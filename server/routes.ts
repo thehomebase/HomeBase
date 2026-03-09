@@ -6006,6 +6006,42 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/broker/leads", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const leads = await storage.getBrokerageLeads(req.user.id);
+      res.json(leads);
+    } catch (error) {
+      console.error("Error fetching broker leads:", error);
+      res.status(500).json({ error: "Failed to fetch leads" });
+    }
+  });
+
+  app.post("/api/broker/leads/:id/reassign", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const leadId = Number(req.params.id);
+      const { agentId } = req.body;
+      if (!agentId) return res.status(400).json({ error: "Agent ID is required" });
+
+      const agents = await storage.getBrokerageAgents(req.user.id);
+      const agentIds = agents.map(a => a.id);
+      agentIds.push(req.user.id);
+      if (!agentIds.includes(agentId)) {
+        return res.status(403).json({ error: "Agent is not in your brokerage" });
+      }
+
+      const lead = await storage.reassignLead(leadId, agentId);
+      if (!lead) return res.status(404).json({ error: "Lead not found" });
+      res.json(lead);
+    } catch (error) {
+      console.error("Error reassigning lead:", error);
+      res.status(500).json({ error: "Failed to reassign lead" });
+    }
+  });
+
   // Simple ping endpoint for health checks
   app.get("/ping", (req, res) => {
     res.json({ 

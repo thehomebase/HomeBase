@@ -20,7 +20,7 @@ import {
   Bell, Trophy, Send, Plus, ArrowUpRight, ArrowDownRight, Minus,
   Phone, Mail, MessageSquare, Calendar, Award, Crown, Medal,
   ChevronUp, ChevronDown, ChevronsUpDown, CheckCircle2, Clock,
-  AlertTriangle, Info
+  AlertTriangle, Info, MapPin, ArrowRight, UserCheck, RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { BrokerNotification, SalesCompetition } from "@shared/schema";
@@ -675,6 +675,205 @@ function CompetitionCard({ competition, metricLabels }: { competition: SalesComp
   );
 }
 
+function LeadRoutingTab() {
+  const { toast } = useToast();
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [reassigningId, setReassigningId] = useState<number | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<string>("");
+
+  const { data: leads = [], isLoading: leadsLoading } = useQuery<any[]>({
+    queryKey: ["/api/broker/leads"],
+  });
+
+  const { data: agents = [] } = useQuery<any[]>({
+    queryKey: ["/api/broker/agents"],
+  });
+
+  const reassignMutation = useMutation({
+    mutationFn: async ({ leadId, agentId }: { leadId: number; agentId: number }) => {
+      const res = await apiRequest("POST", `/api/broker/leads/${leadId}/reassign`, { agentId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/broker/leads"] });
+      setReassigningId(null);
+      setSelectedAgent("");
+      toast({ title: "Lead reassigned successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to reassign lead", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const filteredLeads = statusFilter === "all" ? leads : leads.filter(l => l.status === statusFilter);
+
+  const statusCounts = {
+    all: leads.length,
+    new: leads.filter(l => l.status === "new").length,
+    assigned: leads.filter(l => l.status === "assigned").length,
+    accepted: leads.filter(l => l.status === "accepted").length,
+    converted: leads.filter(l => l.status === "converted").length,
+    rejected: leads.filter(l => l.status === "rejected").length,
+  };
+
+  const statusBadgeColors: Record<string, string> = {
+    new: "bg-blue-100 text-blue-700 border-blue-200",
+    assigned: "bg-amber-100 text-amber-700 border-amber-200",
+    accepted: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    converted: "bg-purple-100 text-purple-700 border-purple-200",
+    rejected: "bg-red-100 text-red-700 border-red-200",
+  };
+
+  if (leadsLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {Object.entries(statusCounts).map(([status, count]) => (
+          <Card
+            key={status}
+            className={`p-3 cursor-pointer transition-all ${statusFilter === status ? "ring-2 ring-primary" : "hover:shadow-md"}`}
+            onClick={() => setStatusFilter(status)}
+          >
+            <p className="text-xs font-medium text-muted-foreground capitalize">{status === "all" ? "All Leads" : status}</p>
+            <p className="text-2xl font-bold">{count}</p>
+          </Card>
+        ))}
+      </div>
+
+      {filteredLeads.length === 0 ? (
+        <Card className="p-12 text-center">
+          <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No leads found</h3>
+          <p className="text-muted-foreground">
+            {statusFilter === "all"
+              ? "No leads have been generated for your brokerage agents yet."
+              : `No leads with "${statusFilter}" status.`}
+          </p>
+        </Card>
+      ) : (
+        <Card>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Lead</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Zip</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Budget</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Assigned To</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLeads.map((lead: any) => (
+                  <TableRow key={lead.id}>
+                    <TableCell>
+                      <div className="font-medium">{lead.first_name} {lead.last_name}</div>
+                      {lead.message && (
+                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">{lead.message}</p>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{lead.email}</div>
+                      {lead.phone && <div className="text-xs text-muted-foreground">{lead.phone}</div>}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-mono">{lead.zip_code}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="capitalize text-sm">{lead.type}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">{lead.budget || "—"}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`text-[10px] border ${statusBadgeColors[lead.status] || ""}`}>
+                        {lead.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {lead.agent_first_name ? (
+                        <div className="flex items-center gap-1.5">
+                          <UserCheck className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-sm">{lead.agent_first_name} {lead.agent_last_name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground italic">Unassigned</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground">
+                        {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {reassigningId === lead.id ? (
+                        <div className="flex items-center gap-2 justify-end">
+                          <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                            <SelectTrigger className="w-[160px] h-8 text-xs">
+                              <SelectValue placeholder="Select agent" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {agents.map((agent: any) => (
+                                <SelectItem key={agent.id} value={String(agent.id)}>
+                                  {agent.firstName} {agent.lastName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            className="h-8"
+                            disabled={!selectedAgent || reassignMutation.isPending}
+                            onClick={() => reassignMutation.mutate({ leadId: lead.id, agentId: Number(selectedAgent) })}
+                          >
+                            {reassignMutation.isPending ? <RefreshCw className="h-3 w-3 animate-spin" /> : <ArrowRight className="h-3 w-3" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8"
+                            onClick={() => { setReassigningId(null); setSelectedAgent(""); }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs"
+                          onClick={() => setReassigningId(lead.id)}
+                        >
+                          <ArrowRight className="h-3 w-3 mr-1" />
+                          Route
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 export default function BrokerPortalPage() {
   const { user } = useAuth();
 
@@ -686,10 +885,14 @@ export default function BrokerPortalPage() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className="grid w-full max-w-lg grid-cols-4">
           <TabsTrigger value="overview" className="gap-2">
             <Briefcase className="h-4 w-4" />
             <span className="hidden sm:inline">Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="leads" className="gap-2">
+            <MapPin className="h-4 w-4" />
+            <span className="hidden sm:inline">Lead Routing</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="h-4 w-4" />
@@ -703,6 +906,10 @@ export default function BrokerPortalPage() {
 
         <TabsContent value="overview">
           <OverviewTab />
+        </TabsContent>
+
+        <TabsContent value="leads">
+          <LeadRoutingTab />
         </TabsContent>
 
         <TabsContent value="notifications">
