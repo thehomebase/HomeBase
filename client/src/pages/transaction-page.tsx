@@ -248,11 +248,16 @@ export default function TransactionPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold">
-            {transaction.streetName}
+            {transaction.streetName || (transaction.type === 'buy' ? 'Buyer Transaction' : `Transaction #${transaction.id}`)}
           </h1>
-          <p className="text-muted-foreground">
-            {transaction.city}, {transaction.state} {transaction.zipCode}
-          </p>
+          {(transaction.city || transaction.state || transaction.zipCode) && (
+            <p className="text-muted-foreground">
+              {[transaction.city, transaction.state].filter(Boolean).join(', ')} {transaction.zipCode || ''}
+            </p>
+          )}
+          {!transaction.streetName && transaction.type === 'buy' && (
+            <p className="text-sm text-muted-foreground italic">Property address will be added when a home is found</p>
+          )}
           <p className="text-sm text-muted-foreground">Transaction ID: {transaction.id}</p>
         </div>
       </div>

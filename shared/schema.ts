@@ -60,10 +60,10 @@ export const clients = pgTable("clients", {
 
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
-  streetName: text("street_name").notNull(),
-  city: text("city").notNull(),
-  state: text("state").notNull(),
-  zipCode: text("zip_code").notNull(),
+  streetName: text("street_name"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
   accessCode: text("access_code").notNull(),
   status: text("status").notNull(),
   type: text("type").notNull().default('buy'), 

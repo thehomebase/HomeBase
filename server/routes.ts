@@ -677,6 +677,20 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: "Not authorized to update this transaction" });
       }
 
+      const VALID_BUYER_STATUSES = ['prospect', 'active_buyer', 'under_contract', 'closing', 'closed'];
+      const VALID_SELLER_STATUSES = ['prospect', 'active_listing_prep', 'live_listing', 'under_contract', 'closed'];
+      if (data.status) {
+        const txType = data.type || oldTransaction.type || 'buy';
+        const validStatuses = txType === 'buy' ? VALID_BUYER_STATUSES : VALID_SELLER_STATUSES;
+        if (!validStatuses.includes(data.status)) {
+          return res.status(400).json({ error: `Invalid status '${data.status}' for ${txType} transaction` });
+        }
+      }
+
+      if (data.type === 'sell' && !data.streetName && !oldTransaction.streetName) {
+        return res.status(400).json({ error: "Street name is required for seller transactions" });
+      }
+
       // Handle date fields specifically
       const dateFields = ['closingDate', 'contractExecutionDate', 'optionPeriodExpiration'];
       dateFields.forEach(field => {
@@ -848,7 +862,10 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json(parsed.error);
       }
 
-      // Create transaction with the new schema fields
+      if (parsed.data.type === 'sell' && (!parsed.data.streetName || !parsed.data.streetName.trim())) {
+        return res.status(400).json({ error: "Street name is required for seller transactions" });
+      }
+
       const transaction = await storage.createTransaction({
         ...parsed.data,
         agentId: req.user.id,
@@ -1379,7 +1396,7 @@ export function registerRoutes(app: Express): Server {
 
       // Add transaction events
       transactions.forEach(transaction => {
-        const address = `${transaction.streetName}, ${transaction.city}, ${transaction.state} ${transaction.zipCode}`;
+        const address = [transaction.streetName, transaction.city, transaction.state, transaction.zipCode].filter(Boolean).join(', ') || 'TBD';
 
         if (transaction.closingDate) {
           calendar.createEvent({
@@ -2174,7 +2191,10 @@ export function registerRoutes(app: Express): Server {
         return res.sendStatus(403);
       }
       
-      const address = `${transaction.streetName}, ${transaction.city}, ${transaction.state} ${transaction.zipCode}`;
+      const address = [transaction.streetName, transaction.city, transaction.state, transaction.zipCode].filter(Boolean).join(', ');
+      if (!address) {
+        return res.status(400).json({ error: 'Property address required for geocoding' });
+      }
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
         {
@@ -6901,11 +6921,15 @@ export function registerRoutes(app: Express): Server {
       const template = await storage.getTransactionTemplate(Number(req.params.templateId));
       if (!template || template.agent_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
 
-      const { streetName, city, state, zipCode, clientId, accessCode } = req.body;
-      if (!streetName) return res.status(400).json({ error: "Street name is required" });
+      const { streetName, city, state, zipCode, clientId, accessCode, type } = req.body;
+      const effectiveType = type || template.type || 'buy';
+      if (effectiveType === 'sell' && (!streetName || !streetName.trim())) {
+        return res.status(400).json({ error: "Street name is required for seller transactions" });
+      }
 
       const transaction = await storage.createTransaction({
-        streetName, city, state, zipCode, accessCode, type: template.type || 'buy',
+        streetName: streetName || null, city: city || null, state: state || null, zipCode: zipCode || null,
+        accessCode, type: effectiveType,
         agentId: req.user.id, clientId: clientId || null, status: 'prospect',
       });
 

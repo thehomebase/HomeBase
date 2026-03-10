@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DndContext,
@@ -19,14 +19,15 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Trash2, Home, User } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Transaction {
   id: number;
-  streetName: string;
-  city: string;
-  state: string;
-  zipCode: string;
+  streetName: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
   status: string;
   type: 'buy' | 'sell';
   contractPrice: number | null;
@@ -40,7 +41,15 @@ interface Client {
   lastName: string;
 }
 
-const statusColumns = [
+const buyerColumns = [
+  { id: "prospect", title: "Prospect" },
+  { id: "active_buyer", title: "Active Buyer" },
+  { id: "under_contract", title: "Under Contract" },
+  { id: "closing", title: "Closing" },
+  { id: "closed", title: "Closed" },
+];
+
+const sellerColumns = [
   { id: "prospect", title: "Prospect" },
   { id: "active_listing_prep", title: "Active Listing Prep" },
   { id: "live_listing", title: "Live Listing" },
@@ -57,6 +66,17 @@ const formatPrice = (price: number | null) => {
     maximumFractionDigits: 0,
   }).format(price);
 };
+
+function getCardTitle(transaction: Transaction, clients: Client[]): string {
+  if (transaction.streetName && transaction.streetName.trim()) {
+    return transaction.streetName;
+  }
+  const client = clients.find((c) => c.id === transaction.clientId);
+  if (client) {
+    return `${client.firstName} ${client.lastName}`;
+  }
+  return 'Untitled Transaction';
+}
 
 function DraggableCard({ 
   transaction, 
@@ -78,6 +98,8 @@ function DraggableCard({
   } : undefined;
 
   const client = clients.find((c) => c.id === transaction.clientId);
+  const hasAddress = transaction.streetName && transaction.streetName.trim();
+  const cardTitle = getCardTitle(transaction, clients);
 
   return (
     <Card
@@ -105,8 +127,13 @@ function DraggableCard({
           onClick();
         }}
       >
-        <div className="font-medium text-sm truncate pr-8">
-          {transaction.streetName}
+        <div className="font-medium text-sm truncate pr-8 flex items-center gap-1">
+          {hasAddress ? (
+            <Home className="h-3 w-3 shrink-0 text-muted-foreground" />
+          ) : (
+            <User className="h-3 w-3 shrink-0 text-muted-foreground" />
+          )}
+          {cardTitle}
         </div>
         <div className="text-xs space-y-1.5">
           <div className="flex justify-between items-center">
@@ -115,11 +142,18 @@ function DraggableCard({
             </span>
             <span>{formatPrice(transaction.contractPrice)}</span>
           </div>
-          <div className="text-muted-foreground">
-            Client: {client 
-              ? `${client.firstName} ${client.lastName}` 
-              : 'Not set'}
-          </div>
+          {hasAddress && (
+            <div className="text-muted-foreground">
+              Client: {client 
+                ? `${client.firstName} ${client.lastName}` 
+                : 'Not set'}
+            </div>
+          )}
+          {!hasAddress && (
+            <div className="text-muted-foreground italic text-[11px]">
+              No property yet
+            </div>
+          )}
         </div>
       </div>
     </Card>
@@ -128,6 +162,7 @@ function DraggableCard({
 
 function KanbanColumn({ 
   status, 
+  droppableId,
   title, 
   transactions,
   onDelete,
@@ -135,6 +170,7 @@ function KanbanColumn({
   clients
 }: { 
   status: string; 
+  droppableId: string;
   title: string; 
   transactions: Transaction[];
   onDelete: (id: number) => void;
@@ -142,7 +178,7 @@ function KanbanColumn({
   clients: Client[];
 }) {
   const { setNodeRef } = useDroppable({
-    id: status,
+    id: droppableId,
   });
 
   return (
@@ -182,6 +218,7 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
   const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<number | null>(null);
   const [localTransactions, setLocalTransactions] = useState<Transaction[]>(transactions);
+  const [viewFilter, setViewFilter] = useState<'all' | 'buyer' | 'seller'>('all');
 
   const { data: clientsData = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -235,9 +272,18 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
     if (!over) return;
 
     const draggedId = Number(active.id);
-    const newStatus = over.id.toString();
+    const droppableId = over.id.toString();
+    const newStatus = droppableId.replace(/^(buyer|seller)_/, '');
 
-    if (newStatus === active.id.toString()) return;
+    const draggedTransaction = localTransactions.find(t => t.id === draggedId);
+    if (!draggedTransaction) return;
+
+    const validBuyerStatuses = buyerColumns.map(c => c.id);
+    const validSellerStatuses = sellerColumns.map(c => c.id);
+    const validStatuses = draggedTransaction.type === 'buy' ? validBuyerStatuses : validSellerStatuses;
+
+    if (!validStatuses.includes(newStatus)) return;
+    if (draggedTransaction.status === newStatus) return;
 
     const updatedTransactions = localTransactions.map(t => 
       t.id === draggedId 
@@ -249,12 +295,37 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
     updateTransactionStatusMutation.mutate({ id: draggedId, status: newStatus });
   };
 
-  // Update local transactions when props change
   useEffect(() => {
     setLocalTransactions(transactions);
   }, [transactions]);
 
   const activeTransaction = activeId ? localTransactions.find(t => t.id === activeId) : null;
+
+  const buyerStatusSet = new Set(buyerColumns.map(c => c.id));
+  const sellerStatusSet = new Set(sellerColumns.map(c => c.id));
+  const buyerTransactions = localTransactions
+    .filter(t => t.type === 'buy')
+    .map(t => buyerStatusSet.has(t.status) ? t : { ...t, status: 'prospect' });
+  const sellerTransactions = localTransactions
+    .filter(t => t.type === 'sell')
+    .map(t => sellerStatusSet.has(t.status) ? t : { ...t, status: 'prospect' });
+
+  const renderColumns = (columns: typeof buyerColumns, filteredTransactions: Transaction[], prefix: string) => (
+    <div className={`${isMobile ? 'flex flex-col w-full' : 'grid grid-cols-5 w-full'} gap-4 pb-4`}>
+      {columns.map((column) => (
+        <KanbanColumn 
+          key={`${prefix}_${column.id}`} 
+          status={column.id}
+          droppableId={`${prefix}_${column.id}`}
+          title={column.title} 
+          transactions={filteredTransactions.filter((t) => t.status === column.id)}
+          onDelete={onDeleteTransaction}
+          onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
+          clients={clientsData}
+        />
+      ))}
+    </div>
+  );
 
   return (
     <DndContext
@@ -264,29 +335,69 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
       onDragEnd={handleDragEnd}
     >
       <div className="w-full min-w-0">
-        <div className={`${isMobile ? 'flex flex-col w-full' : 'grid grid-cols-5 w-full'} gap-4 pb-4`}>
-          {statusColumns.map((column) => (
-            <KanbanColumn 
-              key={column.id} 
-              status={column.id} 
-              title={column.title} 
-              transactions={localTransactions.filter((t) => t.status === column.id)}
-              onDelete={onDeleteTransaction}
-              onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
-              clients={clientsData}
-            />
-          ))}
+        <div className="flex items-center gap-4 mb-4">
+          <Tabs value={viewFilter} onValueChange={(v) => setViewFilter(v as 'all' | 'buyer' | 'seller')}>
+            <TabsList>
+              <TabsTrigger value="all">
+                All ({localTransactions.length})
+              </TabsTrigger>
+              <TabsTrigger value="buyer">
+                Buyers ({buyerTransactions.length})
+              </TabsTrigger>
+              <TabsTrigger value="seller">
+                Sellers ({sellerTransactions.length})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
+
+        {(viewFilter === 'all' || viewFilter === 'buyer') && buyerTransactions.length > 0 && (
+          <div className="mb-6">
+            {viewFilter === 'all' && (
+              <h3 className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Buyer Pipeline</h3>
+            )}
+            {renderColumns(buyerColumns, buyerTransactions, 'buyer')}
+          </div>
+        )}
+
+        {(viewFilter === 'all' || viewFilter === 'seller') && sellerTransactions.length > 0 && (
+          <div className="mb-6">
+            {viewFilter === 'all' && (
+              <h3 className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Seller Pipeline</h3>
+            )}
+            {renderColumns(sellerColumns, sellerTransactions, 'seller')}
+          </div>
+        )}
+
+        {viewFilter === 'buyer' && buyerTransactions.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            No buyer transactions yet
+          </div>
+        )}
+        {viewFilter === 'seller' && sellerTransactions.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            No seller transactions yet
+          </div>
+        )}
+        {viewFilter === 'all' && localTransactions.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            No transactions yet
+          </div>
+        )}
       </div>
 
       <DragOverlay>
-        {activeId && activeTransaction && activeTransaction.client ? (
+        {activeId && activeTransaction ? (
           <Card className="p-3 w-[180px] shadow-lg cursor-grabbing dark:bg-neutral-600 dark:border-neutral-500">
             <div className="font-medium text-sm truncate">
-              {activeTransaction.streetName}
+              {getCardTitle(activeTransaction, clientsData)}
             </div>
             <div className="text-sm text-primary">
-              {activeTransaction.client.firstName} {activeTransaction.client.lastName}
+              {activeTransaction.client
+                ? `${activeTransaction.client.firstName} ${activeTransaction.client.lastName}`
+                : activeTransaction.streetName && activeTransaction.streetName.trim()
+                  ? 'No client'
+                  : ''}
             </div>
             <div className="text-xs text-muted-foreground">
               {activeTransaction.type === "buy" ? "Purchase" : "Sale"}

@@ -61,13 +61,12 @@ import { TransactionTable } from "@/components/transaction-table";
 import { Transaction as SchemaTransaction } from "@shared/schema";
 import { Client } from "@shared/schema";
 
-// Update the Transaction interface to include all required fields
 interface Transaction extends Omit<SchemaTransaction, "updatedAt"> {
   id: number;
-  streetName: string;
-  city: string;
-  state: string;
-  zipCode: string;
+  streetName: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
   status: string;
   type: "buy" | "sell";
   participants: any[];
@@ -87,14 +86,29 @@ interface Transaction extends Omit<SchemaTransaction, "updatedAt"> {
 }
 
 const createTransactionSchema = z.object({
-  streetName: z.string().min(1, "Street name is required"),
-  city: z.string().min(1, "City is required"),
-  state: z.string().min(2, "State is required"),
-  zipCode: z.string().min(5, "ZIP code is required"),
+  streetName: z.string().optional().default(""),
+  city: z.string().optional().default(""),
+  state: z.string().optional().default(""),
+  zipCode: z.string().optional().default(""),
   accessCode: z.string().min(6, "Access code must be at least 6 characters"),
   type: z.enum(["buy", "sell"]),
   clientId: z.number().nullable(),
   secondaryClientId: z.number().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.type === "sell") {
+    if (!data.streetName || data.streetName.trim().length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Street name is required for listings", path: ["streetName"] });
+    }
+    if (!data.city || data.city.trim().length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "City is required for listings", path: ["city"] });
+    }
+    if (!data.state || data.state.trim().length < 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "State is required for listings", path: ["state"] });
+    }
+    if (!data.zipCode || data.zipCode.trim().length < 5) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "ZIP code is required for listings", path: ["zipCode"] });
+    }
+  }
 });
 
 function SaveTransactionAsTemplate({
@@ -136,7 +150,7 @@ function SaveTransactionAsTemplate({
         <option value="">Select a transaction...</option>
         {transactions.map((tx) => (
           <option key={tx.id} value={tx.id}>
-            {tx.streetName} — {tx.city}, {tx.state}
+            {tx.streetName ? `${tx.streetName} — ${tx.city}, ${tx.state}` : `Transaction #${tx.id}`}
           </option>
         ))}
       </select>
@@ -300,11 +314,12 @@ export default function TransactionsPage() {
 
   const createFromTemplateMutation = useMutation({
     mutationFn: async ({ templateId, data }: { templateId: number; data: z.infer<typeof createTransactionSchema> }) => {
+      const isBuyer = data.type === "buy";
       const response = await apiRequest("POST", `/api/transactions/from-template/${templateId}`, {
-        streetName: data.streetName,
-        city: data.city,
-        state: data.state,
-        zipCode: data.zipCode,
+        streetName: data.streetName?.trim() || (isBuyer ? null : data.streetName),
+        city: data.city?.trim() || (isBuyer ? null : data.city),
+        state: data.state?.trim() || (isBuyer ? null : data.state),
+        zipCode: data.zipCode?.trim() || (isBuyer ? null : data.zipCode),
         clientId: data.clientId || null,
         accessCode: data.accessCode,
       });
@@ -332,8 +347,13 @@ export default function TransactionsPage() {
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: z.infer<typeof createTransactionSchema>) => {
+      const isBuyer = data.type === "buy";
       const response = await apiRequest("POST", "/api/transactions", {
         ...data,
+        streetName: data.streetName?.trim() || (isBuyer ? null : data.streetName),
+        city: data.city?.trim() || (isBuyer ? null : data.city),
+        state: data.state?.trim() || (isBuyer ? null : data.state),
+        zipCode: data.zipCode?.trim() || (isBuyer ? null : data.zipCode),
         agentId: user?.id,
         status: "prospect",
         participants: [],
@@ -560,83 +580,6 @@ export default function TransactionsPage() {
                     >
                       <FormField
                         control={form.control}
-                        name="streetName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Street Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="Enter street name" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="city"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>City</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="Enter city" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="state"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>State</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="Enter state"
-                                maxLength={2}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="zipCode"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>ZIP Code</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="Enter ZIP code"
-                                maxLength={5}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="accessCode"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Passkey</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                type="text"
-                                placeholder="Enter passkey (min. 6 characters)"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
                         name="type"
                         render={({ field }) => (
                           <FormItem>
@@ -663,10 +606,16 @@ export default function TransactionsPage() {
                             name="clientId"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Primary Client</FormLabel>
+                                <FormLabel>
+                                  {form.watch("type") === "buy" ? "Buyer Client" : "Primary Client"}
+                                  {form.watch("type") === "buy" && <span className="text-destructive ml-1">*</span>}
+                                </FormLabel>
                                 <FormControl>
                                   <select
-                                    className="w-full h-9 px-3 rounded-md border text-base bg-background"
+                                    className={cn(
+                                      "w-full h-9 px-3 rounded-md border text-base bg-background",
+                                      form.watch("type") === "buy" && "ring-2 ring-primary/20 border-primary/50"
+                                    )}
                                     value={field.value || ""}
                                     onChange={(e) =>
                                       field.onChange(
@@ -676,7 +625,9 @@ export default function TransactionsPage() {
                                       )
                                     }
                                   >
-                                    <option value="">Select primary client</option>
+                                    <option value="">
+                                      {form.watch("type") === "buy" ? "Select buyer client" : "Select primary client"}
+                                    </option>
                                     {clients.map((client: Client) => (
                                       <option key={client.id} value={client.id}>
                                         {client.firstName} {client.lastName}
@@ -720,6 +671,106 @@ export default function TransactionsPage() {
                           />
                         </div>
                       )}
+                      {form.watch("type") === "buy" && (
+                        <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-3 py-2">
+                          <p className="text-xs text-blue-700 dark:text-blue-300">
+                            You can add the property address later once your buyer finds a home.
+                          </p>
+                        </div>
+                      )}
+                      <FormField
+                        control={form.control}
+                        name="streetName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              Street Name
+                              {form.watch("type") === "sell" && <span className="text-destructive ml-1">*</span>}
+                              {form.watch("type") === "buy" && <span className="text-muted-foreground ml-1 text-xs font-normal">(optional)</span>}
+                            </FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Enter street name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="city"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              City
+                              {form.watch("type") === "sell" && <span className="text-destructive ml-1">*</span>}
+                              {form.watch("type") === "buy" && <span className="text-muted-foreground ml-1 text-xs font-normal">(optional)</span>}
+                            </FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Enter city" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="state"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              State
+                              {form.watch("type") === "sell" && <span className="text-destructive ml-1">*</span>}
+                              {form.watch("type") === "buy" && <span className="text-muted-foreground ml-1 text-xs font-normal">(optional)</span>}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Enter state"
+                                maxLength={2}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="zipCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              ZIP Code
+                              {form.watch("type") === "sell" && <span className="text-destructive ml-1">*</span>}
+                              {form.watch("type") === "buy" && <span className="text-muted-foreground ml-1 text-xs font-normal">(optional)</span>}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Enter ZIP code"
+                                maxLength={5}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="accessCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Passkey</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="text"
+                                placeholder="Enter passkey (min. 6 characters)"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       <Button
                         type="submit"
                         className="w-full bg-primary text-white hover:bg-primary/90"
@@ -792,7 +843,7 @@ export default function TransactionsPage() {
                     onClick={() => setLocation(`/transactions/${txAlert.transactionId}`)}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{txAlert.streetName}</p>
+                      <p className="font-medium text-sm truncate">{txAlert.streetName || `Transaction #${txAlert.transactionId}`}</p>
                       <p className="text-muted-foreground text-xs truncate">
                         {txAlert.alerts.length} alert{txAlert.alerts.length !== 1 ? "s" : ""}:
                         {" "}{txAlert.alerts.map(a => a.message).join("; ")}
@@ -841,7 +892,7 @@ export default function TransactionsPage() {
                       setLocation(`/transactions/${transaction.id}`)
                     }
                   >
-                    {transaction.streetName}
+                    {transaction.streetName || (transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : `Transaction #${transaction.id}`)}
                   </CardTitle>
                   {(user?.role === "agent" || user?.role === "broker") && (
                     <Button
