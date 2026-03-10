@@ -32,6 +32,8 @@ import {
   DollarSign,
   ScanLine,
   Phone,
+  Zap,
+  Key,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -100,6 +102,8 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
       { icon: ScanLine, label: "Scanner", href: "/scanner", id: "scanner" },
       { icon: Phone, label: "Phone & SMS", href: "/phone", id: "phone" },
+      { icon: Zap, label: "Zapier", href: "/integrations/zapier", id: "zapier" },
+      { icon: Key, label: "API Keys", href: "/api-keys", id: "api-keys" },
     ];
   }
 
@@ -138,6 +142,8 @@ function getAllNavItems(role: string | undefined): NavItem[] {
     { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
     { icon: ScanLine, label: "Scanner", href: "/scanner", id: "scanner" },
     { icon: Phone, label: "Phone & SMS", href: "/phone", id: "phone" },
+    { icon: Zap, label: "Zapier", href: "/integrations/zapier", id: "zapier" },
+    { icon: Key, label: "API Keys", href: "/api-keys", id: "api-keys" },
   ];
 }
 
