@@ -143,7 +143,7 @@ export const contractors = pgTable("contractors", {
   yelpUrl: text("yelp_url"),
   bbbUrl: text("bbb_url"),
   vendorUserId: integer("vendor_user_id"),
-  agentId: integer("agent_id").notNull(),
+  agentId: integer("agent_id"),
   agentRating: integer("agent_rating"),
   agentNotes: text("agent_notes"),
   latitude: doublePrecision("latitude"),
@@ -486,6 +486,23 @@ export const homeTeamMembers = pgTable("home_team_members", {
   notes: text("notes"),
   addedAt: timestamp("added_at").defaultNow(),
 });
+
+export const vendorTeamRequests = pgTable("vendor_team_requests", {
+  id: serial("id").primaryKey(),
+  vendorContractorId: integer("vendor_contractor_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  category: text("category").notNull(),
+  message: text("message"),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertVendorTeamRequestSchema = createInsertSchema(vendorTeamRequests).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertVendorTeamRequest = z.infer<typeof insertVendorTeamRequestSchema>;
+export type VendorTeamRequest = typeof vendorTeamRequests.$inferSelect;
 
 export const homeownerHomes = pgTable("homeowner_homes", {
   id: serial("id").primaryKey(),

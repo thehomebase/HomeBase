@@ -42,17 +42,21 @@ import {
   Trash2,
   Plus,
   Users,
+  Search,
+  Send,
+  UserPlus,
 } from "lucide-react";
 import { SiGoogle, SiYelp } from "react-icons/si";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { VendorLead, VendorZipCode } from "@shared/schema";
+import type { VendorLead, VendorZipCode, VendorTeamRequest } from "@shared/schema";
 
-function DashboardTab({ profile, bidRequests, bids }: {
+function DashboardTab({ profile, bidRequests, bids, onSwitchToProfile }: {
   profile: Contractor | null;
   bidRequests: BidRequest[];
   bids: Bid[];
+  onSwitchToProfile?: () => void;
 }) {
   const pendingRequests = bidRequests.filter(br => br.status === 'pending' || br.status === 'viewed');
   const activeBids = bids.filter(b => b.status === 'submitted');
@@ -105,12 +109,18 @@ function DashboardTab({ profile, bidRequests, bids }: {
       {!profile && (
         <Card className="border-dashed">
           <CardContent className="pt-6">
-            <div className="text-center space-y-2">
+            <div className="text-center space-y-3">
               <UserCircle className="h-12 w-12 mx-auto text-muted-foreground" />
-              <h3 className="font-semibold">No Profile Found</h3>
+              <h3 className="font-semibold">Create Your Profile to Get Started</h3>
               <p className="text-sm text-muted-foreground">
-                An agent needs to add you as a contractor and link your vendor account to start receiving bid requests.
+                Set up your vendor profile to start receiving bid requests and connecting with agents.
               </p>
+              {onSwitchToProfile && (
+                <Button onClick={onSwitchToProfile} className="mt-2">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Create Profile
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -449,23 +459,34 @@ function ProfileTab({ profile }: { profile: Contractor | null }) {
     },
   });
 
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await apiRequest("POST", "/api/vendor/profile", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Profile created successfully!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/profile"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to create profile", variant: "destructive" });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateMutation.mutate(formData);
+    if (profile) {
+      updateMutation.mutate(formData);
+    } else {
+      createMutation.mutate(formData);
+    }
   };
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  if (!profile) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <UserCircle className="h-12 w-12 mx-auto mb-4" />
-        <p>No vendor profile found. An agent needs to link your account to a contractor profile.</p>
-      </div>
-    );
-  }
+  const isSubmitting = updateMutation.isPending || createMutation.isPending;
 
   const categories = [
     'home_inspector', 'roofer', 'plumber', 'electrician', 'hvac', 'painter',
@@ -475,7 +496,10 @@ function ProfileTab({ profile }: { profile: Contractor | null }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold">Business Profile</h2>
+      <h2 className="text-xl font-semibold">{profile ? 'Business Profile' : 'Create Your Business Profile'}</h2>
+      {!profile && (
+        <p className="text-muted-foreground">Fill out the form below to create your vendor profile and start receiving bid requests.</p>
+      )}
       <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -611,10 +635,185 @@ function ProfileTab({ profile }: { profile: Contractor | null }) {
           </div>
         </div>
 
-        <Button type="submit" disabled={updateMutation.isPending}>
-          {updateMutation.isPending ? "Saving..." : "Save Profile"}
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Saving..." : profile ? "Save Profile" : "Create Profile"}
         </Button>
       </form>
+    </div>
+  );
+}
+
+type AgentOpportunity = {
+  id: number;
+  username: string;
+  fullName: string;
+  teamSize: number;
+};
+
+type TeamRequestWithAgent = VendorTeamRequest & { agentName?: string };
+
+function FindAgentsTab({ profile }: { profile: Contractor | null }) {
+  const { toast } = useToast();
+  const [requestMessage, setRequestMessage] = useState<Record<number, string>>({});
+  const [sendingTo, setSendingTo] = useState<number | null>(null);
+
+  const { data: agents = [], isLoading: agentsLoading } = useQuery<AgentOpportunity[]>({
+    queryKey: ["/api/vendor/agent-opportunities"],
+    enabled: !!profile,
+  });
+
+  const { data: sentRequests = [], isLoading: requestsLoading } = useQuery<TeamRequestWithAgent[]>({
+    queryKey: ["/api/vendor/team-requests"],
+    enabled: !!profile,
+  });
+
+  const sendRequestMutation = useMutation({
+    mutationFn: async (data: { agentId: number; message?: string }) => {
+      const res = await apiRequest("POST", "/api/vendor/team-requests", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Request sent successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/team-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor/agent-opportunities"] });
+      setSendingTo(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to send request", variant: "destructive" });
+    },
+  });
+
+  if (!profile) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <Search className="h-12 w-12 mx-auto mb-4" />
+        <p>Create your profile first to browse agent opportunities.</p>
+      </div>
+    );
+  }
+
+  const requestedAgentIds = new Set(sentRequests.map(r => r.agentId));
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending': return <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+      case 'accepted': return <Badge className="bg-green-100 text-green-800"><CheckCircle2 className="h-3 w-3 mr-1" />Accepted</Badge>;
+      case 'declined': return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Declined</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold">Find Agents</h2>
+        <p className="text-sm text-muted-foreground">
+          Agents below don't have a <span className="font-medium">{profile.category.replace(/_/g, ' ')}</span> vendor on their team yet. Send a request to join!
+        </p>
+      </div>
+
+      {sentRequests.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Send className="h-4 w-4" /> Your Sent Requests ({sentRequests.length})
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {sentRequests.map((req) => (
+              <Card key={req.id}>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <p className="font-medium">{(req as any).agentName || `Agent #${req.agentId}`}</p>
+                      <p className="text-xs text-muted-foreground">{req.category.replace(/_/g, ' ')}</p>
+                      {req.message && <p className="text-xs text-muted-foreground italic">"{req.message}"</p>}
+                    </div>
+                    {getStatusBadge(req.status)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Sent: {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : 'N/A'}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <h3 className="font-semibold flex items-center gap-2">
+          <Users className="h-4 w-4" /> Available Agents
+        </h3>
+        {agentsLoading || requestsLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+          </div>
+        ) : agents.length === 0 ? (
+          <Card>
+            <CardContent className="pt-8 pb-8 text-center text-muted-foreground">
+              <Users className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p>No agents currently looking for a {profile.category.replace(/_/g, ' ')} vendor.</p>
+              <p className="text-xs mt-1">Check back later or update your category in your profile.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {agents.filter(a => !requestedAgentIds.has(a.id)).map((agent) => (
+              <Card key={agent.id}>
+                <CardContent className="pt-4 pb-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium">{agent.fullName}</p>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Users className="h-3 w-3" /> {agent.teamSize} team member{agent.teamSize !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <UserCircle className="h-8 w-8 text-muted-foreground" />
+                  </div>
+
+                  {sendingTo === agent.id ? (
+                    <div className="space-y-2">
+                      <Textarea
+                        placeholder="Add an optional message..."
+                        value={requestMessage[agent.id] || ""}
+                        onChange={(e) => setRequestMessage(prev => ({ ...prev, [agent.id]: e.target.value }))}
+                        rows={2}
+                        className="text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          disabled={sendRequestMutation.isPending}
+                          onClick={() => sendRequestMutation.mutate({
+                            agentId: agent.id,
+                            message: requestMessage[agent.id] || undefined,
+                          })}
+                        >
+                          {sendRequestMutation.isPending ? "Sending..." : "Send Request"}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setSendingTo(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setSendingTo(agent.id)}
+                    >
+                      <UserPlus className="h-4 w-4 mr-1" /> Request to Join
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1165,6 +1364,10 @@ export default function VendorPortal() {
             <MapPin className="h-4 w-4" />
             <span className="hidden sm:inline">Zip Codes</span>
           </TabsTrigger>
+          <TabsTrigger value="find-agents" className="flex items-center gap-1">
+            <Search className="h-4 w-4" />
+            <span className="hidden sm:inline">Find Agents</span>
+          </TabsTrigger>
           <TabsTrigger value="requests" className="flex items-center gap-1">
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Requests</span>
@@ -1184,13 +1387,16 @@ export default function VendorPortal() {
         </TabsList>
 
         <TabsContent value="dashboard">
-          <DashboardTab profile={profile ?? null} bidRequests={bidRequests} bids={bids} />
+          <DashboardTab profile={profile ?? null} bidRequests={bidRequests} bids={bids} onSwitchToProfile={() => setActiveTab("profile")} />
         </TabsContent>
         <TabsContent value="leads">
           <LeadsTab />
         </TabsContent>
         <TabsContent value="zip-codes">
           <ZipCodesTab />
+        </TabsContent>
+        <TabsContent value="find-agents">
+          <FindAgentsTab profile={profile ?? null} />
         </TabsContent>
         <TabsContent value="requests">
           <BidRequestsTab bidRequests={bidRequests} profile={profile ?? null} />

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { type Contractor, type ContractorReview, type VendorRating } from "@shared/schema";
+import { type Contractor, type ContractorReview, type VendorRating, type VendorTeamRequest } from "@shared/schema";
 import { PerformanceStatsDisplay, RateVendorDialog } from "@/pages/vendor-ratings-page";
 import {
   Search, Star, Phone, Mail, Globe, MapPin, UserPlus, CheckCircle2,
@@ -28,7 +28,7 @@ import {
   Bug, Waves, Square, DoorOpen, Key, TreePine, Droplets, SprayCan,
   Layers, Shield, Camera, Sofa, Truck, MoreHorizontal, Construction,
   ClipboardList, Map, Settings, Users, Plus, Pencil, Trash2,
-  ExternalLink, Building2, Award, ThumbsUp, LayoutGrid, List
+  ExternalLink, Building2, Award, ThumbsUp, LayoutGrid, List, Check, X, Bell
 } from "lucide-react";
 import { SiYelp, SiGoogle } from "react-icons/si";
 
@@ -653,6 +653,48 @@ export default function MarketplacePage() {
     }
   });
 
+  type TeamRequestWithContractor = VendorTeamRequest & { contractor?: Contractor };
+
+  const { data: teamRequests = [] } = useQuery<TeamRequestWithContractor[]>({
+    queryKey: ["/api/agent/team-requests"],
+    queryFn: async () => {
+      const res = await fetch("/api/agent/team-requests", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: user?.role === "agent" || user?.role === "broker",
+  });
+
+  const pendingTeamRequests = teamRequests.filter((r) => r.status === "pending");
+
+  const acceptRequestMutation = useMutation({
+    mutationFn: async (requestId: number) => {
+      await apiRequest("PATCH", `/api/agent/team-requests/${requestId}`, { status: "accepted" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agent/team-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-team"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/marketplace/contractors"] });
+      toast({ title: "Request accepted", description: "Vendor has been added to your team." });
+    },
+    onError: () => {
+      toast({ title: "Failed to accept request", variant: "destructive" });
+    },
+  });
+
+  const declineRequestMutation = useMutation({
+    mutationFn: async (requestId: number) => {
+      await apiRequest("PATCH", `/api/agent/team-requests/${requestId}`, { status: "declined" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agent/team-requests"] });
+      toast({ title: "Request declined" });
+    },
+    onError: () => {
+      toast({ title: "Failed to decline request", variant: "destructive" });
+    },
+  });
+
   const handleProximitySearch = () => {
     if (zipSearch.length !== 5) {
       toast({ title: "Please enter a valid 5-digit zip code", variant: "destructive" });
@@ -729,6 +771,59 @@ export default function MarketplacePage() {
           )}
         </div>
       </div>
+
+      {(user?.role === "agent" || user?.role === "broker") && pendingTeamRequests.length > 0 && (
+        <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Bell className="h-5 w-5 text-blue-600" />
+              Vendor Team Requests ({pendingTeamRequests.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pendingTeamRequests.map((request) => {
+              const categoryLabel = CATEGORIES.find(c => c.value === request.category)?.label || request.category;
+              return (
+                <div key={request.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-background rounded-lg border">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">
+                        {(request as any).vendorName || `Vendor #${request.vendorContractorId}`}
+                      </span>
+                      <Badge variant="secondary">{categoryLabel}</Badge>
+                    </div>
+                    {request.message && (
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{request.message}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {request.createdAt ? new Date(request.createdAt).toLocaleDateString() : ""}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      onClick={() => acceptRequestMutation.mutate(request.id)}
+                      disabled={acceptRequestMutation.isPending || declineRequestMutation.isPending}
+                    >
+                      <Check className="h-4 w-4 mr-1" />
+                      Accept
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => declineRequestMutation.mutate(request.id)}
+                      disabled={acceptRequestMutation.isPending || declineRequestMutation.isPending}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1 max-w-md">

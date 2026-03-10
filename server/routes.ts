@@ -1617,11 +1617,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: 'Contractor not found' });
       }
       if (contractor.agentId !== req.user.id) {
-        return res.status(403).json({ error: 'Not authorized to edit this contractor' });
+        return res.status(403).json({ error: 'Not authorized to edit this contractor. Vendor-created profiles should be edited via the vendor portal.' });
       }
       
       const allowedFields = ['name', 'category', 'phone', 'email', 'website', 'address', 
-        'city', 'state', 'zipCode', 'description', 'googleMapsUrl', 'yelpUrl', 'bbbUrl', 'vendorUserId', 'agentRating', 'agentNotes'];
+        'city', 'state', 'zipCode', 'description', 'googleMapsUrl', 'yelpUrl', 'bbbUrl', 'agentRating', 'agentNotes'];
       const sanitizedData: Record<string, any> = {};
       for (const field of allowedFields) {
         if (req.body[field] !== undefined) {
@@ -3838,6 +3838,133 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error updating vendor profile:', error);
       res.status(500).json({ error: 'Failed to update vendor profile' });
+    }
+  });
+
+  // ============ Vendor Self-Registration ============
+  app.post("/api/vendor/profile", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") return res.sendStatus(401);
+    try {
+      const existing = await storage.getContractorByVendorUserId(req.user.id);
+      if (existing) {
+        return res.status(409).json({ error: 'Vendor profile already exists' });
+      }
+      const { name, category, phone, email, website, address, city, state, zipCode, description, googleMapsUrl, yelpUrl, bbbUrl } = req.body;
+      if (!name || !category) {
+        return res.status(400).json({ error: 'Name and category are required' });
+      }
+      const contractor = await storage.createVendorProfile({
+        name, category, phone, email, website, address, city, state, zipCode, description, googleMapsUrl, yelpUrl, bbbUrl,
+        vendorUserId: req.user.id
+      });
+      res.status(201).json(contractor);
+    } catch (error) {
+      console.error('Error creating vendor profile:', error);
+      res.status(500).json({ error: 'Failed to create vendor profile' });
+    }
+  });
+
+  // ============ Vendor Team Requests ============
+  app.get("/api/vendor/agent-opportunities", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") return res.sendStatus(401);
+    try {
+      const profile = await storage.getContractorByVendorUserId(req.user.id);
+      if (!profile) return res.status(404).json({ error: 'Create your profile first' });
+      const category = (req.query.category as string) || profile.category;
+      const agents = await storage.getAgentsWithoutCategoryVendor(category);
+      const filteredAgents = agents.filter(a => a.id !== req.user!.id);
+      res.json(filteredAgents);
+    } catch (error) {
+      console.error('Error fetching agent opportunities:', error);
+      res.status(500).json({ error: 'Failed to fetch agent opportunities' });
+    }
+  });
+
+  app.post("/api/vendor/team-requests", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") return res.sendStatus(401);
+    try {
+      const profile = await storage.getContractorByVendorUserId(req.user.id);
+      if (!profile) return res.status(404).json({ error: 'Create your profile first' });
+      const { agentId, message } = req.body;
+      if (!agentId) return res.status(400).json({ error: 'Agent ID is required' });
+      const targetAgent = await storage.getUser(Number(agentId));
+      if (!targetAgent || (targetAgent.role !== 'agent' && targetAgent.role !== 'broker')) {
+        return res.status(400).json({ error: 'Target must be an agent or broker' });
+      }
+      const existingRequests = await storage.getTeamRequestsByVendor(profile.id);
+      const hasPending = existingRequests.some(r => r.agentId === Number(agentId) && r.status === 'pending');
+      if (hasPending) {
+        return res.status(409).json({ error: 'You already have a pending request to this agent' });
+      }
+      const request = await storage.createVendorTeamRequest({
+        vendorContractorId: profile.id,
+        agentId: Number(agentId),
+        category: profile.category,
+        message: message || null
+      });
+      res.status(201).json(request);
+    } catch (error) {
+      console.error('Error creating team request:', error);
+      res.status(500).json({ error: 'Failed to create team request' });
+    }
+  });
+
+  app.get("/api/vendor/team-requests", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "vendor") return res.sendStatus(401);
+    try {
+      const profile = await storage.getContractorByVendorUserId(req.user.id);
+      if (!profile) return res.json([]);
+      const requests = await storage.getTeamRequestsByVendor(profile.id);
+      res.json(requests);
+    } catch (error) {
+      console.error('Error fetching vendor team requests:', error);
+      res.status(500).json({ error: 'Failed to fetch team requests' });
+    }
+  });
+
+  app.get("/api/agent/team-requests", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const requests = await storage.getTeamRequestsByAgent(req.user.id);
+      res.json(requests);
+    } catch (error) {
+      console.error('Error fetching agent team requests:', error);
+      res.status(500).json({ error: 'Failed to fetch team requests' });
+    }
+  });
+
+  app.patch("/api/agent/team-requests/:id", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const { status } = req.body;
+      if (!status || !['accepted', 'declined'].includes(status)) {
+        return res.status(400).json({ error: 'Status must be accepted or declined' });
+      }
+      const requests = await storage.getTeamRequestsByAgent(req.user.id);
+      const request = requests.find(r => r.id === Number(req.params.id));
+      if (!request) {
+        return res.status(404).json({ error: 'Request not found or not yours' });
+      }
+      if (request.status !== 'pending') {
+        return res.status(400).json({ error: 'Request already processed' });
+      }
+      const updated = await storage.updateTeamRequestStatus(Number(req.params.id), status);
+      if (status === 'accepted') {
+        const existingTeam = await storage.getHomeTeamByUser(req.user.id);
+        const alreadyOnTeam = existingTeam.some(m => m.contractorId === updated.vendorContractorId);
+        if (!alreadyOnTeam) {
+          await storage.addHomeTeamMember({
+            userId: req.user.id,
+            contractorId: updated.vendorContractorId,
+            category: updated.category,
+            notes: 'Added via vendor team request'
+          });
+        }
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating team request:', error);
+      res.status(500).json({ error: 'Failed to update team request' });
     }
   });
 

@@ -61,7 +61,8 @@ import {
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest,
   scannedDocuments, type ScannedDocument, type InsertScannedDocument,
   apiKeys, type ApiKey, type InsertApiKey,
-  webhooks, type Webhook, type InsertWebhook
+  webhooks, type Webhook, type InsertWebhook,
+  vendorTeamRequests, type VendorTeamRequest, type InsertVendorTeamRequest
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
@@ -239,6 +240,14 @@ export interface IStorage {
 
   // Contractor by vendor user
   getContractorByVendorUserId(vendorUserId: number): Promise<Contractor | undefined>;
+  createVendorProfile(data: any): Promise<Contractor>;
+
+  // Vendor team request operations
+  createVendorTeamRequest(data: any): Promise<VendorTeamRequest>;
+  getTeamRequestsByVendor(vendorContractorId: number): Promise<VendorTeamRequest[]>;
+  getTeamRequestsByAgent(agentId: number): Promise<(VendorTeamRequest & { vendorName?: string; vendorCategory?: string })[]>;
+  updateTeamRequestStatus(id: number, status: string): Promise<VendorTeamRequest>;
+  getAgentsWithoutCategoryVendor(category: string): Promise<{ id: number; username: string; fullName: string; teamSize: number }[]>;
 
   // Home Team operations
   addHomeTeamMember(data: InsertHomeTeamMember): Promise<HomeTeamMember>;
@@ -4129,6 +4138,89 @@ export class DatabaseStorage implements IStorage {
       console.error('Error in getContractorByVendorUserId:', error);
       return undefined;
     }
+  }
+
+  async createVendorProfile(data: { name: string; category: string; phone?: string; email?: string; website?: string; address?: string; city?: string; state?: string; zipCode?: string; description?: string; googleMapsUrl?: string; yelpUrl?: string; bbbUrl?: string; vendorUserId: number }): Promise<Contractor> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO contractors (name, category, phone, email, website, address, city, state, zip_code, description, google_maps_url, yelp_url, bbb_url, vendor_user_id)
+        VALUES (${data.name}, ${data.category}, ${data.phone || null}, ${data.email || null}, ${data.website || null}, ${data.address || null}, ${data.city || null}, ${data.state || null}, ${data.zipCode || null}, ${data.description || null}, ${data.googleMapsUrl || null}, ${data.yelpUrl || null}, ${data.bbbUrl || null}, ${data.vendorUserId})
+        RETURNING *
+      `);
+      return this.mapContractorRow(result.rows[0]);
+    } catch (error) {
+      console.error('Error in createVendorProfile:', error);
+      throw error;
+    }
+  }
+
+  async createVendorTeamRequest(data: { vendorContractorId: number; agentId: number; category: string; message?: string }): Promise<VendorTeamRequest> {
+    const result = await db.execute(sql`
+      INSERT INTO vendor_team_requests (vendor_contractor_id, agent_id, category, message)
+      VALUES (${data.vendorContractorId}, ${data.agentId}, ${data.category}, ${data.message || null})
+      RETURNING *
+    `);
+    const row = result.rows[0] as any;
+    return { id: row.id, vendorContractorId: row.vendor_contractor_id, agentId: row.agent_id, category: row.category, message: row.message, status: row.status, createdAt: row.created_at };
+  }
+
+  async getTeamRequestsByVendor(vendorContractorId: number): Promise<VendorTeamRequest[]> {
+    const result = await db.execute(sql`
+      SELECT vtr.*, u.username as agent_username, u.full_name as agent_full_name
+      FROM vendor_team_requests vtr
+      LEFT JOIN users u ON u.id = vtr.agent_id
+      WHERE vtr.vendor_contractor_id = ${vendorContractorId}
+      ORDER BY vtr.created_at DESC
+    `);
+    return (result.rows as any[]).map(row => ({
+      id: row.id, vendorContractorId: row.vendor_contractor_id, agentId: row.agent_id,
+      category: row.category, message: row.message, status: row.status, createdAt: row.created_at,
+      agentName: row.agent_full_name || row.agent_username
+    }));
+  }
+
+  async getTeamRequestsByAgent(agentId: number): Promise<(VendorTeamRequest & { vendorName?: string; vendorCategory?: string })[]> {
+    const result = await db.execute(sql`
+      SELECT vtr.*, c.name as vendor_name, c.category as vendor_category
+      FROM vendor_team_requests vtr
+      LEFT JOIN contractors c ON c.id = vtr.vendor_contractor_id
+      WHERE vtr.agent_id = ${agentId} AND vtr.status = 'pending'
+      ORDER BY vtr.created_at DESC
+    `);
+    return (result.rows as any[]).map(row => ({
+      id: row.id, vendorContractorId: row.vendor_contractor_id, agentId: row.agent_id,
+      category: row.category, message: row.message, status: row.status, createdAt: row.created_at,
+      vendorName: row.vendor_name, vendorCategory: row.vendor_category
+    }));
+  }
+
+  async updateTeamRequestStatus(id: number, status: string): Promise<VendorTeamRequest> {
+    const result = await db.execute(sql`
+      UPDATE vendor_team_requests SET status = ${status} WHERE id = ${id} RETURNING *
+    `);
+    const row = result.rows[0] as any;
+    if (!row) throw new Error('Team request not found');
+    return { id: row.id, vendorContractorId: row.vendor_contractor_id, agentId: row.agent_id, category: row.category, message: row.message, status: row.status, createdAt: row.created_at };
+  }
+
+  async getAgentsWithoutCategoryVendor(category: string): Promise<{ id: number; username: string; fullName: string; teamSize: number }[]> {
+    const result = await db.execute(sql`
+      SELECT u.id, u.username, u.full_name,
+        (SELECT COUNT(*)::int FROM home_team_members WHERE user_id = u.id) as team_size
+      FROM users u
+      WHERE u.role IN ('agent', 'broker')
+        AND NOT EXISTS (
+          SELECT 1 FROM home_team_members htm
+          WHERE htm.user_id = u.id AND htm.category = ${category}
+        )
+      ORDER BY u.full_name, u.username
+    `);
+    return (result.rows as any[]).map(row => ({
+      id: row.id,
+      username: row.username,
+      fullName: row.full_name || row.username,
+      teamSize: row.team_size || 0
+    }));
   }
 
   async addHomeTeamMember(data: InsertHomeTeamMember): Promise<HomeTeamMember> {
