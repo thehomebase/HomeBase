@@ -39,6 +39,7 @@ Preferred communication style: Simple, everyday language.
 - **Specialized Portals**:
     - **Lender Portal**: Kanban board for loan pipelines, checklist synchronization, RESPA compliance.
     - **Broker Portal**: Comprehensive management for brokerage, including agent oversight, notifications, sales competitions with leaderboards, and lead routing.
+- **Zapier Integration**: API key authentication system (SHA-256 hashed keys, `hb_` prefix), webhook triggers (new_lead, transaction_created, client_created, etc.), public REST API (`/api/v1/`) for leads, transactions, clients, documents. Webhook service with HMAC-SHA256 signatures. API Keys management page (`/api-keys`) for generating keys and registering webhooks. Public showcase page at `/integrations/zapier`. Files: `server/api-key-auth.ts`, `server/webhook-service.ts`.
 - **Billing**: Stripe integration for subscriptions and payment management with a dedicated portal.
 - **Notifications**: Real-time SMS and Web Push notifications for new leads, with iOS PWA guidance. WebSocket-based in-app notification system (`/ws`) with notification bell, unread count, toast alerts, and activity feed on dashboard. Triggers: new leads, private messages, bids, transaction status changes. Server: `server/websocket.ts`, `server/notification-helper.ts`. Frontend: `use-websocket.ts`, `use-notifications.ts`, `notification-bell.tsx`.
 - **Customizable Dashboard**: Role-aware, widget-based layout for agents, vendors, lenders, and clients, with user preferences stored.

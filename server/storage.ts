@@ -59,7 +59,9 @@ import {
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
   type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest,
-  scannedDocuments, type ScannedDocument, type InsertScannedDocument
+  scannedDocuments, type ScannedDocument, type InsertScannedDocument,
+  apiKeys, type ApiKey, type InsertApiKey,
+  webhooks, type Webhook, type InsertWebhook
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
@@ -453,6 +455,17 @@ export interface IStorage {
   getScannedDocuments(userId: number, transactionId?: number, clientId?: number): Promise<ScannedDocument[]>;
   getScannedDocument(id: number): Promise<ScannedDocument | undefined>;
   deleteScannedDocument(id: number): Promise<void>;
+
+  createApiKey(data: InsertApiKey): Promise<ApiKey>;
+  getApiKeys(userId: number): Promise<ApiKey[]>;
+  getApiKeyByHash(keyHash: string): Promise<ApiKey | undefined>;
+  deleteApiKey(id: number, userId: number): Promise<void>;
+  updateApiKeyLastUsed(id: number): Promise<void>;
+
+  createWebhook(data: InsertWebhook): Promise<Webhook>;
+  getWebhooks(userId: number): Promise<Webhook[]>;
+  getWebhooksByEvent(event: string): Promise<Webhook[]>;
+  deleteWebhook(id: number, userId: number): Promise<void>;
 }
 
 const PgStore = connectPgSimple(session);
@@ -6066,6 +6079,45 @@ export class DatabaseStorage implements IStorage {
 
   async deleteScannedDocument(id: number): Promise<void> {
     await db.delete(scannedDocuments).where(eq(scannedDocuments.id, id));
+  }
+
+  async createApiKey(data: InsertApiKey): Promise<ApiKey> {
+    const [result] = await db.insert(apiKeys).values(data).returning();
+    return result;
+  }
+
+  async getApiKeys(userId: number): Promise<ApiKey[]> {
+    return await db.select().from(apiKeys).where(and(eq(apiKeys.userId, userId), eq(apiKeys.isActive, true)));
+  }
+
+  async getApiKeyByHash(keyHash: string): Promise<ApiKey | undefined> {
+    const [result] = await db.select().from(apiKeys).where(and(eq(apiKeys.keyHash, keyHash), eq(apiKeys.isActive, true)));
+    return result;
+  }
+
+  async deleteApiKey(id: number, userId: number): Promise<void> {
+    await db.update(apiKeys).set({ isActive: false }).where(and(eq(apiKeys.id, id), eq(apiKeys.userId, userId)));
+  }
+
+  async updateApiKeyLastUsed(id: number): Promise<void> {
+    await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, id));
+  }
+
+  async createWebhook(data: InsertWebhook): Promise<Webhook> {
+    const [result] = await db.insert(webhooks).values(data).returning();
+    return result;
+  }
+
+  async getWebhooks(userId: number): Promise<Webhook[]> {
+    return await db.select().from(webhooks).where(and(eq(webhooks.userId, userId), eq(webhooks.isActive, true)));
+  }
+
+  async getWebhooksByEvent(event: string): Promise<Webhook[]> {
+    return await db.select().from(webhooks).where(and(eq(webhooks.event, event), eq(webhooks.isActive, true)));
+  }
+
+  async deleteWebhook(id: number, userId: number): Promise<void> {
+    await db.update(webhooks).set({ isActive: false }).where(and(eq(webhooks.id, id), eq(webhooks.userId, userId)));
   }
 
 }

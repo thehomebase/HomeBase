@@ -25,6 +25,8 @@ import type {
   AuthenticatorTransportFuture,
 } from "@simplewebauthn/server";
 import { notifyAgentOfNewLead, notifyVendorOfNewLead } from "./notification-service";
+import { apiKeyAuth as apiKeyAuthMiddleware, generateApiKey, hashApiKey } from "./api-key-auth";
+import { fireWebhook } from "./webhook-service";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -390,6 +392,7 @@ export function registerRoutes(app: Express): Server {
         throw new Error('Failed to create client record');
       }
 
+      fireWebhook("client_created", client);
       res.status(201).json(client);
     } catch (error) {
       console.error('Error creating client:', error);
@@ -854,6 +857,7 @@ export function registerRoutes(app: Express): Server {
       });
 
       console.log('Created transaction:', transaction);
+      fireWebhook("transaction_created", transaction);
       res.status(201).json(transaction);
     } catch (error) {
       console.error('Error creating transaction:', error);
@@ -5090,6 +5094,8 @@ export function registerRoutes(app: Express): Server {
         assignedAgentId,
       });
 
+      fireWebhook("new_lead", lead);
+
       if (assignedAgentId) {
         try {
           const agent = await storage.getUser(assignedAgentId);
@@ -7185,6 +7191,223 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error emailing scanned document:", error);
       res.status(500).json({ error: "Failed to email document" });
+    }
+  });
+
+  // ============ API KEY MANAGEMENT ============
+
+  app.post("/api/api-keys", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { name, permissions } = req.body;
+      if (!name) return res.status(400).json({ error: "Key name is required" });
+
+      const rawKey = generateApiKey();
+      const keyHash = hashApiKey(rawKey);
+      const prefix = rawKey.substring(0, 10);
+
+      const apiKey = await storage.createApiKey({
+        userId: req.user.id,
+        name,
+        keyHash,
+        prefix,
+        permissions: permissions || ["read", "write"],
+        isActive: true,
+      });
+
+      res.json({ ...apiKey, key: rawKey });
+    } catch (error) {
+      console.error("Error creating API key:", error);
+      res.status(500).json({ error: "Failed to create API key" });
+    }
+  });
+
+  app.get("/api/api-keys", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const keys = await storage.getApiKeys(req.user.id);
+      const safeKeys = keys.map(({ keyHash, ...rest }) => rest);
+      res.json(safeKeys);
+    } catch (error) {
+      console.error("Error fetching API keys:", error);
+      res.status(500).json({ error: "Failed to fetch API keys" });
+    }
+  });
+
+  app.delete("/api/api-keys/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      await storage.deleteApiKey(parseInt(req.params.id), req.user.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting API key:", error);
+      res.status(500).json({ error: "Failed to delete API key" });
+    }
+  });
+
+  // ============ WEBHOOK MANAGEMENT ============
+
+  app.post("/api/webhooks", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { url, event } = req.body;
+      if (!url || !event) return res.status(400).json({ error: "URL and event are required" });
+
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== "https:") return res.status(400).json({ error: "Webhook URL must use HTTPS" });
+        if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1" || parsed.hostname === "0.0.0.0") {
+          return res.status(400).json({ error: "Webhook URL cannot target localhost" });
+        }
+      } catch {
+        return res.status(400).json({ error: "Invalid webhook URL" });
+      }
+
+      const validEvents = ["new_lead", "lead_updated", "transaction_created", "transaction_updated", "transaction_closed", "client_created", "client_updated", "document_uploaded", "message_received"];
+      if (!validEvents.includes(event)) return res.status(400).json({ error: "Invalid event type" });
+
+      const secret = randomUUID();
+      const webhook = await storage.createWebhook({
+        userId: req.user.id,
+        url,
+        event,
+        secret,
+        isActive: true,
+      });
+
+      res.json(webhook);
+    } catch (error) {
+      console.error("Error creating webhook:", error);
+      res.status(500).json({ error: "Failed to create webhook" });
+    }
+  });
+
+  app.get("/api/webhooks", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const webhooksList = await storage.getWebhooks(req.user.id);
+      res.json(webhooksList);
+    } catch (error) {
+      console.error("Error fetching webhooks:", error);
+      res.status(500).json({ error: "Failed to fetch webhooks" });
+    }
+  });
+
+  app.delete("/api/webhooks/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      await storage.deleteWebhook(parseInt(req.params.id), req.user.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting webhook:", error);
+      res.status(500).json({ error: "Failed to delete webhook" });
+    }
+  });
+
+  // ============ PUBLIC API (API-KEY AUTHENTICATED) ============
+
+  app.get("/api/v1/leads", apiKeyAuthMiddleware, async (req, res) => {
+    try {
+      const userId = (req as any).apiKeyUserId;
+      const leads = await db.execute(sql`SELECT * FROM leads WHERE agent_id = ${userId} ORDER BY created_at DESC LIMIT 100`);
+      res.json(leads.rows);
+    } catch (error) {
+      console.error("API v1 error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/v1/leads", apiKeyAuthMiddleware, async (req, res) => {
+    try {
+      const userId = (req as any).apiKeyUserId;
+      const { firstName, lastName, email, phone, source, zipCode, notes } = req.body;
+      if (!firstName || !lastName) return res.status(400).json({ error: "firstName and lastName are required" });
+
+      const result = await db.execute(sql`
+        INSERT INTO leads (first_name, last_name, email, phone, source, zip_code, notes, agent_id, status, created_at)
+        VALUES (${firstName}, ${lastName}, ${email || null}, ${phone || null}, ${source || 'api'}, ${zipCode || null}, ${notes || null}, ${userId}, 'new', NOW())
+        RETURNING *
+      `);
+      fireWebhook("new_lead", result.rows[0]);
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("API v1 error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/v1/transactions", apiKeyAuthMiddleware, async (req, res) => {
+    try {
+      const userId = (req as any).apiKeyUserId;
+      const transactions = await storage.getTransactionsByUser(userId);
+      res.json(transactions);
+    } catch (error) {
+      console.error("API v1 error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/v1/transactions", apiKeyAuthMiddleware, async (req, res) => {
+    try {
+      const agentId = (req as any).apiKeyUserId;
+      const data = req.body;
+      const transaction = await storage.createTransaction({ ...data, agentId, status: data.status || 'prospect', participants: data.participants || [] });
+      fireWebhook("transaction_created", transaction);
+      res.status(201).json(transaction);
+    } catch (error) {
+      console.error("API v1 error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/v1/clients", apiKeyAuthMiddleware, async (req, res) => {
+    try {
+      const agentId = (req as any).apiKeyUserId;
+      const clientsList = await storage.getClientsByAgent(agentId);
+      res.json(clientsList);
+    } catch (error) {
+      console.error("API v1 error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/v1/clients", apiKeyAuthMiddleware, async (req, res) => {
+    try {
+      const agentId = (req as any).apiKeyUserId;
+      const data = req.body;
+      const client = await storage.createClient({ ...data, agentId });
+      fireWebhook("client_created", client);
+      res.status(201).json(client);
+    } catch (error) {
+      console.error("API v1 error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/v1/clients/:id", apiKeyAuthMiddleware, async (req, res) => {
+    try {
+      const agentId = (req as any).apiKeyUserId;
+      const clientId = parseInt(req.params.id);
+      const existing = await storage.getClient(clientId);
+      if (!existing || existing.agentId !== agentId) return res.status(404).json({ error: "Client not found" });
+
+      const updated = await storage.updateClient(clientId, req.body);
+      fireWebhook("client_updated", updated);
+      res.json(updated);
+    } catch (error) {
+      console.error("API v1 error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/v1/documents", apiKeyAuthMiddleware, async (req, res) => {
+    try {
+      const userId = (req as any).apiKeyUserId;
+      const docs = await storage.getAllDocumentsByUser(userId);
+      res.json(docs);
+    } catch (error) {
+      console.error("API v1 error:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 

@@ -61,7 +61,9 @@ import {
   Briefcase,
   ChevronDown,
   Phone,
-  ScanLine
+  ScanLine,
+  Zap,
+  Key
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -98,6 +100,8 @@ import BiometricSettingsPage from "@/pages/biometric-settings-page";
 import LandingPage from "@/pages/landing-page";
 import FeedbackPage from "@/pages/feedback-page";
 import VerifyEmailPage from "@/pages/verify-email-page";
+import ZapierPage from "@/pages/zapier-page";
+import ApiKeysPage from "@/pages/api-keys-page";
 import BrokerPortalPage from "@/pages/broker-portal-page";
 import CommissionsPage from "@/pages/commissions-page";
 import RemindersPage from "@/pages/reminders-page";
@@ -500,6 +504,24 @@ function Layout({ children }: { children: React.ReactNode }) {
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         )}
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Zapier">
+                            <Link href="/integrations/zapier" className="flex items-center gap-2">
+                              <Zap className="h-4 w-4" />
+                              <span>Zapier</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        {isAgentOrBroker && (
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="API Keys">
+                              <Link href="/api-keys" className="flex items-center gap-2">
+                                <Key className="h-4 w-4" />
+                                <span>API Keys</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        )}
                       </SidebarMenu>
                     </CollapsibleContent>
                   </SidebarGroup>
@@ -566,6 +588,7 @@ function Router() {
 
   return (
     <Switch>
+      <Route path="/integrations/zapier" component={ZapierPage} />
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/find-agent" component={LeadSubmitPage} />
@@ -699,6 +722,9 @@ function Router() {
           <Route path="/reminders">
             <ProtectedRoute path="/reminders" component={RemindersPage} />
           </Route>
+          <Route path="/api-keys">
+            <ProtectedRoute path="/api-keys" component={ApiKeysPage} />
+          </Route>
           <Route path="/billing">
             <ProtectedRoute path="/billing" component={BillingPage} />
           </Route>
@@ -761,6 +787,9 @@ function Router() {
           </Route>
           <Route path="/reminders">
             <ProtectedRoute path="/reminders" component={RemindersPage} />
+          </Route>
+          <Route path="/api-keys">
+            <ProtectedRoute path="/api-keys" component={ApiKeysPage} />
           </Route>
           <Route path="/billing">
             <ProtectedRoute path="/billing" component={BillingPage} />

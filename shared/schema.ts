@@ -1163,3 +1163,44 @@ export const insertScannedDocumentSchema = createInsertSchema(scannedDocuments).
 
 export type ScannedDocument = typeof scannedDocuments.$inferSelect;
 export type InsertScannedDocument = z.infer<typeof insertScannedDocumentSchema>;
+
+export const apiKeys = pgTable("api_keys", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  keyHash: text("key_hash").notNull(),
+  prefix: text("prefix").notNull(),
+  permissions: text("permissions").array().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastUsedAt: timestamp("last_used_at"),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+export const insertApiKeySchema = createInsertSchema(apiKeys).omit({
+  id: true,
+  createdAt: true,
+  lastUsedAt: true,
+});
+
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
+
+export const webhooks = pgTable("webhooks", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  url: text("url").notNull(),
+  event: text("event", {
+    enum: ["new_lead", "lead_updated", "transaction_created", "transaction_updated", "transaction_closed", "client_created", "client_updated", "document_uploaded", "message_received"]
+  }).notNull(),
+  secret: text("secret").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertWebhookSchema = createInsertSchema(webhooks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type Webhook = typeof webhooks.$inferSelect;
+export type InsertWebhook = z.infer<typeof insertWebhookSchema>;
