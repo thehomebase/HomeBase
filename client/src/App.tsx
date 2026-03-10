@@ -462,6 +462,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
+                        {isMobile && (
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Document Scanner">
                             <Link href="/scanner" className="flex items-center gap-2">
@@ -470,6 +471,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
+                        )}
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Calculators">
                             <Link href="/calculators" className="flex items-center gap-2">
