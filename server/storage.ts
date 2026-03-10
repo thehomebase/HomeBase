@@ -58,7 +58,8 @@ import {
   type SalesCompetition, type InsertSalesCompetition,
   type InsertUser, type InsertTransaction, type InsertChecklist, type InsertMessage, type InsertClient,
   type InsertDocument, type InsertContractor, type InsertContractorReview,
-  type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest
+  type InsertPropertyViewing, type InsertPropertyFeedback, type InsertShowingRequest,
+  scannedDocuments, type ScannedDocument, type InsertScannedDocument
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
@@ -448,6 +449,10 @@ export interface IStorage {
   markNotificationRead(id: number, userId?: number): Promise<boolean>;
   markAllNotificationsRead(userId: number): Promise<void>;
 
+  createScannedDocument(doc: InsertScannedDocument): Promise<ScannedDocument>;
+  getScannedDocuments(userId: number, transactionId?: number, clientId?: number): Promise<ScannedDocument[]>;
+  getScannedDocument(id: number): Promise<ScannedDocument | undefined>;
+  deleteScannedDocument(id: number): Promise<void>;
 }
 
 const PgStore = connectPgSimple(session);
@@ -6038,6 +6043,29 @@ export class DatabaseStorage implements IStorage {
     await db.execute(sql`
       UPDATE notifications SET read = true WHERE user_id = ${userId} AND read = false
     `);
+  }
+
+  async createScannedDocument(doc: InsertScannedDocument): Promise<ScannedDocument> {
+    const [result] = await db.insert(scannedDocuments).values(doc).returning();
+    return result;
+  }
+
+  async getScannedDocuments(userId: number, transactionId?: number, clientId?: number): Promise<ScannedDocument[]> {
+    let query = sql`SELECT * FROM scanned_documents WHERE user_id = ${userId}`;
+    if (transactionId) query = sql`${query} AND transaction_id = ${transactionId}`;
+    if (clientId) query = sql`${query} AND client_id = ${clientId}`;
+    query = sql`${query} ORDER BY created_at DESC`;
+    const result = await db.execute(query);
+    return result.rows as ScannedDocument[];
+  }
+
+  async getScannedDocument(id: number): Promise<ScannedDocument | undefined> {
+    const [result] = await db.select().from(scannedDocuments).where(eq(scannedDocuments.id, id));
+    return result;
+  }
+
+  async deleteScannedDocument(id: number): Promise<void> {
+    await db.delete(scannedDocuments).where(eq(scannedDocuments.id, id));
   }
 
 }

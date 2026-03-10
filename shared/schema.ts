@@ -1139,3 +1139,27 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+export const scannedDocuments = pgTable("scanned_documents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  transactionId: integer("transaction_id"),
+  clientId: integer("client_id"),
+  name: text("name").notNull(),
+  category: text("category", {
+    enum: ["contract", "disclosure", "inspection", "identification", "financial", "correspondence", "other"]
+  }).notNull().default("other"),
+  fileData: text("file_data").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertScannedDocumentSchema = createInsertSchema(scannedDocuments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ScannedDocument = typeof scannedDocuments.$inferSelect;
+export type InsertScannedDocument = z.infer<typeof insertScannedDocumentSchema>;

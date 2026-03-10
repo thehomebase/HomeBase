@@ -60,7 +60,8 @@ import {
   DollarSign,
   Briefcase,
   ChevronDown,
-  Phone
+  Phone,
+  ScanLine
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -74,6 +75,7 @@ import MapPage from "@/pages/map-page";
 import PropertySearchPage from "@/pages/property-search-page";
 import MailPage from "@/pages/mail-page";
 import PhonePage from "@/pages/phone-page";
+import DocumentScannerPage from "@/pages/document-scanner-page";
 import ClientTransactionPage from "@/pages/client-transaction-page";
 import VendorPortal from "@/pages/vendor-portal";
 import LenderPortal from "@/pages/lender-portal";
@@ -461,6 +463,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                           </SidebarMenuButton>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Document Scanner">
+                            <Link href="/scanner" className="flex items-center gap-2">
+                              <ScanLine className="h-4 w-4" />
+                              <span>Document Scanner</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Calculators">
                             <Link href="/calculators" className="flex items-center gap-2">
                               <Calculator className="h-4 w-4" />
@@ -578,6 +588,9 @@ function Router() {
       </Route>
       <Route path="/my-team">
         <ProtectedRoute path="/my-team" component={MyTeamPage} />
+      </Route>
+      <Route path="/scanner">
+        <ProtectedRoute path="/scanner" component={DocumentScannerPage} />
       </Route>
       <Route path="/calculators">
         <ProtectedRoute path="/calculators" component={CalculatorsPage} />

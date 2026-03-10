@@ -1,0 +1,586 @@
+import { useState, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  Upload, FileText, Image, Trash2, Mail, Download, Eye, Loader2,
+  Camera, ScanLine, X, Send, FileCheck
+} from "lucide-react";
+import { format } from "date-fns";
+import type { Transaction, Client, ScannedDocument } from "@shared/schema";
+
+const CATEGORIES = [
+  { value: "contract", label: "Contract" },
+  { value: "disclosure", label: "Disclosure" },
+  { value: "inspection", label: "Inspection" },
+  { value: "identification", label: "Identification" },
+  { value: "financial", label: "Financial" },
+  { value: "correspondence", label: "Correspondence" },
+  { value: "other", label: "Other" },
+];
+
+type DocMetadata = Omit<ScannedDocument, "fileData">;
+
+export default function DocumentScannerPage() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [docName, setDocName] = useState("");
+  const [docCategory, setDocCategory] = useState("other");
+  const [docTransactionId, setDocTransactionId] = useState<string>("");
+  const [docClientId, setDocClientId] = useState<string>("");
+  const [docNotes, setDocNotes] = useState("");
+
+  const [previewDoc, setPreviewDoc] = useState<DocMetadata | null>(null);
+  const [emailDoc, setEmailDoc] = useState<DocMetadata | null>(null);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+
+  const { data: documents = [], isLoading } = useQuery<DocMetadata[]>({
+    queryKey: ["/api/scanned-documents"],
+    enabled: !!user,
+  });
+
+  const { data: transactions = [] } = useQuery<Transaction[]>({
+    queryKey: ["/api/transactions"],
+    enabled: !!user,
+  });
+
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+    enabled: !!user,
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await fetch("/api/scanned-documents", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Upload failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Document uploaded successfully" });
+      resetUploadForm();
+      queryClient.invalidateQueries({ queryKey: ["/api/scanned-documents"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/scanned-documents/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Document deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/scanned-documents"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const emailMutation = useMutation({
+    mutationFn: async ({ id, to, subject, body }: { id: number; to: string; subject: string; body: string }) => {
+      const res = await apiRequest("POST", `/api/scanned-documents/${id}/email`, { to, subject, body });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Document emailed successfully" });
+      setEmailDoc(null);
+      setEmailTo("");
+      setEmailSubject("");
+      setEmailBody("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Email failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetUploadForm = () => {
+    setUploadFile(null);
+    setUploadPreview(null);
+    setDocName("");
+    setDocCategory("other");
+    setDocTransactionId("");
+    setDocClientId("");
+    setDocNotes("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
+
+  const handleFileSelect = (file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum file size is 10MB", variant: "destructive" });
+      return;
+    }
+    setUploadFile(file);
+    if (!docName) {
+      setDocName(file.name.replace(/\.[^/.]+$/, ""));
+    }
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (e) => setUploadPreview(e.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setUploadPreview(null);
+    }
+  };
+
+  const handleUpload = () => {
+    if (!uploadFile || !docName.trim()) return;
+    const formData = new FormData();
+    formData.append("file", uploadFile);
+    formData.append("name", docName.trim());
+    formData.append("category", docCategory);
+    if (docTransactionId && docTransactionId !== "none") formData.append("transactionId", docTransactionId);
+    if (docClientId && docClientId !== "none") formData.append("clientId", docClientId);
+    if (docNotes.trim()) formData.append("notes", docNotes.trim());
+    uploadMutation.mutate(formData);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getCategoryColor = (category: string) => {
+    const colors: Record<string, string> = {
+      contract: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+      disclosure: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+      inspection: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+      identification: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+      financial: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+      correspondence: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
+      other: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
+    };
+    return colors[category] || colors.other;
+  };
+
+  const isAgentOrBroker = user?.role === "agent" || user?.role === "broker";
+
+  return (
+    <div className="px-4 sm:px-8 py-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <ScanLine className="h-6 w-6" />
+          Document Scanner
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Upload, categorize, and email physical documents
+        </p>
+      </div>
+
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div
+                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                onDrop={handleDrop}
+                onDragOver={(e) => e.preventDefault()}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {uploadPreview ? (
+                  <div className="relative">
+                    <img src={uploadPreview} alt="Preview" className="max-h-48 mx-auto rounded" />
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-0 right-0 h-6 w-6"
+                      onClick={(e) => { e.stopPropagation(); resetUploadForm(); }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : uploadFile ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                    <div className="text-left">
+                      <p className="font-medium truncate max-w-[200px]">{uploadFile.name}</p>
+                      <p className="text-xs text-muted-foreground">{formatFileSize(uploadFile.size)}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 ml-2"
+                      onClick={(e) => { e.stopPropagation(); resetUploadForm(); }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Upload className="h-10 w-10 mx-auto text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Drag & drop a file here, or click to browse
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      PDF, JPG, PNG up to 10MB
+                    </p>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Browse Files
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => cameraInputRef.current?.click()}
+                >
+                  <Camera className="h-4 w-4 mr-2" />
+                  Take Photo
+                </Button>
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Document Name *</Label>
+                <Input
+                  value={docName}
+                  onChange={(e) => setDocName(e.target.value)}
+                  placeholder="e.g. Seller's Disclosure"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={docCategory} onValueChange={setDocCategory}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Link to Transaction</Label>
+                  <Select value={docTransactionId} onValueChange={setDocTransactionId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {transactions.map((t) => (
+                        <SelectItem key={t.id} value={t.id.toString()}>
+                          {t.propertyAddress || `Transaction #${t.id}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Link to Client</Label>
+                  <Select value={docClientId} onValueChange={setDocClientId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {clients.map((c) => (
+                        <SelectItem key={c.id} value={c.id.toString()}>
+                          {c.firstName} {c.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Textarea
+                  value={docNotes}
+                  onChange={(e) => setDocNotes(e.target.value)}
+                  placeholder="Optional notes about this document..."
+                  rows={2}
+                />
+              </div>
+              <Button
+                onClick={handleUpload}
+                disabled={!uploadFile || !docName.trim() || uploadMutation.isPending}
+                className="w-full"
+              >
+                {uploadMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileCheck className="h-4 w-4 mr-2" />
+                )}
+                Upload & Save
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div>
+        <h2 className="text-lg font-semibold mb-4">
+          Uploaded Documents ({documents.length})
+        </h2>
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : documents.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              <ScanLine className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>No documents uploaded yet</p>
+              <p className="text-sm mt-1">Use the upload area above to scan or upload your first document</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {documents.map((doc) => {
+              const isImage = doc.mimeType.startsWith("image/");
+              const transaction = doc.transactionId ? transactions.find(t => t.id === doc.transactionId) : null;
+              const client = doc.clientId ? clients.find(c => c.id === doc.clientId) : null;
+
+              return (
+                <Card key={doc.id} className="overflow-hidden">
+                  <div
+                    className="h-32 bg-muted flex items-center justify-center cursor-pointer"
+                    onClick={() => setPreviewDoc(doc)}
+                  >
+                    {isImage ? (
+                      <img
+                        src={`/api/scanned-documents/${doc.id}/file`}
+                        alt={doc.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <FileText className="h-12 w-12 text-muted-foreground" />
+                    )}
+                  </div>
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-medium text-sm truncate flex-1">{doc.name}</h3>
+                      <Badge className={`text-[10px] shrink-0 ${getCategoryColor(doc.category)}`}>
+                        {doc.category}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <p>{formatFileSize(doc.fileSize)} • {format(new Date(doc.createdAt), "MMM d, yyyy")}</p>
+                      {transaction && <p className="truncate">Transaction: {transaction.propertyAddress || `#${transaction.id}`}</p>}
+                      {client && <p>Client: {client.firstName} {client.lastName}</p>}
+                      {doc.notes && <p className="truncate italic">{doc.notes}</p>}
+                    </div>
+                    <div className="flex gap-1 pt-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreviewDoc(doc)} title="View">
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => {
+                          const a = document.createElement("a");
+                          a.href = `/api/scanned-documents/${doc.id}/file`;
+                          a.download = doc.name;
+                          a.click();
+                        }}
+                        title="Download"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
+                      {isAgentOrBroker && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setEmailDoc(doc);
+                            setEmailSubject(doc.name);
+                          }}
+                          title="Email via Gmail"
+                        >
+                          <Mail className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => {
+                          if (confirm("Delete this document?")) {
+                            deleteMutation.mutate(doc.id);
+                          }
+                        }}
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <Dialog open={!!previewDoc} onOpenChange={() => setPreviewDoc(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{previewDoc?.name}</DialogTitle>
+          </DialogHeader>
+          {previewDoc && (
+            <div className="mt-2">
+              {previewDoc.mimeType.startsWith("image/") ? (
+                <img
+                  src={`/api/scanned-documents/${previewDoc.id}/file`}
+                  alt={previewDoc.name}
+                  className="w-full rounded"
+                />
+              ) : (
+                <iframe
+                  src={`/api/scanned-documents/${previewDoc.id}/file`}
+                  className="w-full h-[60vh] rounded border"
+                  title={previewDoc.name}
+                />
+              )}
+              <div className="flex gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const a = document.createElement("a");
+                    a.href = `/api/scanned-documents/${previewDoc.id}/file`;
+                    a.download = previewDoc.name;
+                    a.click();
+                  }}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+                {isAgentOrBroker && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEmailDoc(previewDoc);
+                      setEmailSubject(previewDoc.name);
+                      setPreviewDoc(null);
+                    }}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Email via Gmail
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!emailDoc} onOpenChange={() => setEmailDoc(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Email Document</DialogTitle>
+          </DialogHeader>
+          {emailDoc && (
+            <div className="space-y-4 mt-2">
+              <div className="flex items-center gap-2 p-3 bg-muted rounded">
+                <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{emailDoc.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatFileSize(emailDoc.fileSize)}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>To *</Label>
+                <Input
+                  type="email"
+                  value={emailTo}
+                  onChange={(e) => setEmailTo(e.target.value)}
+                  placeholder="recipient@example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Subject *</Label>
+                <Input
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Message</Label>
+                <Textarea
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  placeholder="Optional message..."
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailDoc(null)}>Cancel</Button>
+            <Button
+              onClick={() => emailDoc && emailMutation.mutate({ id: emailDoc.id, to: emailTo, subject: emailSubject, body: emailBody })}
+              disabled={!emailTo || !emailSubject || emailMutation.isPending}
+            >
+              {emailMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Send Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

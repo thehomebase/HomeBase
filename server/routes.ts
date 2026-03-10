@@ -1358,6 +1358,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/calendar/:userId/:type", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (Number(req.params.userId) !== req.user!.id) return res.sendStatus(403);
 
     try {
       const [transactions, documents] = await Promise.all([
@@ -7076,6 +7077,114 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error marking all notifications read:', error);
       res.status(500).json({ error: 'Failed to mark all notifications read' });
+    }
+  });
+
+  app.post("/api/scanned-documents", upload.single("file"), async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const file = req.file;
+      if (!file) return res.status(400).json({ error: "No file uploaded" });
+      if (file.size > 10 * 1024 * 1024) return res.status(400).json({ error: "File size exceeds 10MB limit" });
+
+      const { name, category, transactionId, clientId, notes } = req.body;
+      if (!name) return res.status(400).json({ error: "Document name is required" });
+
+      const fileData = file.buffer.toString("base64");
+      const doc = await storage.createScannedDocument({
+        userId: req.user.id,
+        name,
+        category: category || "other",
+        fileData,
+        mimeType: file.mimetype,
+        fileSize: file.size,
+        transactionId: transactionId && transactionId !== 'none' ? parseInt(transactionId) || null : null,
+        clientId: clientId && clientId !== 'none' ? parseInt(clientId) || null : null,
+        notes: notes || null,
+      });
+
+      const { fileData: _, ...metadata } = doc;
+      res.json(metadata);
+    } catch (error) {
+      console.error("Error uploading scanned document:", error);
+      res.status(500).json({ error: "Failed to upload document" });
+    }
+  });
+
+  app.get("/api/scanned-documents", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const transactionId = req.query.transactionId ? parseInt(req.query.transactionId as string) : undefined;
+      const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : undefined;
+      const docs = await storage.getScannedDocuments(req.user.id, transactionId, clientId);
+      const metadata = docs.map(({ fileData, ...rest }) => rest);
+      res.json(metadata);
+    } catch (error) {
+      console.error("Error fetching scanned documents:", error);
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+
+  app.get("/api/scanned-documents/:id/file", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const doc = await storage.getScannedDocument(parseInt(req.params.id));
+      if (!doc) return res.status(404).json({ error: "Document not found" });
+      if (doc.userId !== req.user.id) return res.sendStatus(403);
+
+      const buffer = Buffer.from(doc.fileData, "base64");
+      res.setHeader("Content-Type", doc.mimeType);
+      res.setHeader("Content-Disposition", `inline; filename="${doc.name}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error serving scanned document:", error);
+      res.status(500).json({ error: "Failed to serve document" });
+    }
+  });
+
+  app.delete("/api/scanned-documents/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const doc = await storage.getScannedDocument(parseInt(req.params.id));
+      if (!doc) return res.status(404).json({ error: "Document not found" });
+      if (doc.userId !== req.user.id) return res.sendStatus(403);
+
+      await storage.deleteScannedDocument(doc.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting scanned document:", error);
+      res.status(500).json({ error: "Failed to delete document" });
+    }
+  });
+
+  app.post("/api/scanned-documents/:id/email", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const doc = await storage.getScannedDocument(parseInt(req.params.id));
+      if (!doc) return res.status(404).json({ error: "Document not found" });
+      if (doc.userId !== req.user.id) return res.sendStatus(403);
+
+      const { to, subject, body } = req.body;
+      if (!to || !subject) return res.status(400).json({ error: "Recipient and subject are required" });
+
+      const buffer = Buffer.from(doc.fileData, "base64");
+      const ext = doc.mimeType.includes("pdf") ? ".pdf" : doc.mimeType.includes("png") ? ".png" : doc.mimeType.includes("jpeg") || doc.mimeType.includes("jpg") ? ".jpg" : "";
+      const attachment: EmailAttachment = {
+        filename: `${doc.name}${ext}`,
+        mimeType: doc.mimeType,
+        content: buffer,
+      };
+
+      const result = await sendGmailEmail(req.user.id, to, subject, body || "", undefined, [attachment]);
+      if (result.success) {
+        res.json({ success: true, messageId: result.messageId });
+      } else {
+        res.status(500).json({ error: result.error || "Failed to send email" });
+      }
+    } catch (error) {
+      console.error("Error emailing scanned document:", error);
+      res.status(500).json({ error: "Failed to email document" });
     }
   });
 

@@ -3,12 +3,14 @@ import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { type Transaction } from "@shared/schema";
 import { format } from "date-fns";
-import { List, Calendar as CalendarIcon } from "lucide-react";
+import { List, Calendar as CalendarIcon, Copy, Check, ExternalLink, Mail } from "lucide-react";
+import { SiGoogle, SiApple } from "react-icons/si";
 import { Timeline } from "@/components/ui/timeline";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Scheduler } from "@aldabil/react-scheduler";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { useToast } from "@/hooks/use-toast";
 
 const calendarTheme = createTheme({
   palette: {
@@ -36,11 +38,47 @@ import {
 export default function CalendarPage() {
   const { user } = useAuth();
   const [showTable, setShowTable] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
 
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     enabled: !!user,
   });
+
+  const getSubscribeUrl = () => {
+    if (!user) return "";
+    return `${window.location.origin}/api/calendar/${user.id}/subscribe`;
+  };
+
+  const getWebcalUrl = () => {
+    if (!user) return "";
+    return `${window.location.origin.replace(/^https?:/, 'webcal:')}/api/calendar/${user.id}/subscribe`;
+  };
+
+  const handleCopyUrl = async () => {
+    const url = getSubscribeUrl();
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    toast({ title: "Calendar URL copied", description: "Paste this URL in your calendar app to subscribe." });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleGoogleCalendar = () => {
+    const url = getSubscribeUrl();
+    const googleUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(url)}`;
+    window.open(googleUrl, '_blank');
+  };
+
+  const handleAppleCalendar = () => {
+    window.location.href = getWebcalUrl();
+  };
+
+  const handleOutlookCalendar = () => {
+    const url = getSubscribeUrl();
+    const outlookUrl = `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(url)}&name=Homebase%20Calendar`;
+    window.open(outlookUrl, '_blank');
+  };
 
   const events = transactions.map((transaction) => {
     const events = [];
@@ -87,14 +125,14 @@ export default function CalendarPage() {
 
   return (
     <div className="flex-1 p-4 sm:p-6 w-full overflow-x-hidden">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <h2 className="text-2xl font-bold">Calendar</h2>
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
                 <CalendarIcon className="h-4 w-4" />
-                Add to Calendar
+                Export
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -117,6 +155,30 @@ export default function CalendarPage() {
           </Button>
         </div>
       </div>
+
+      <Card className="p-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Connect to:</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={handleGoogleCalendar} variant="outline" size="sm" className="gap-2">
+              <SiGoogle className="h-4 w-4 text-red-500" />
+              Google Calendar
+            </Button>
+            <Button onClick={handleAppleCalendar} variant="outline" size="sm" className="gap-2">
+              <SiApple className="h-4 w-4" />
+              Apple Calendar
+            </Button>
+            <Button onClick={handleOutlookCalendar} variant="outline" size="sm" className="gap-2">
+              <Mail className="h-4 w-4 text-blue-600" />
+              Outlook
+            </Button>
+            <Button onClick={handleCopyUrl} variant="ghost" size="sm" className="gap-2">
+              {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+              {copied ? "Copied!" : "Copy URL"}
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       <div className="w-full min-h-[calc(100vh-12rem)] relative z-0">
         <Timeline transactions={transactions} />
