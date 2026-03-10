@@ -30,6 +30,8 @@ import {
   Sun,
   Briefcase,
   DollarSign,
+  ScanLine,
+  Phone,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -96,6 +98,8 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Bell, label: "Drip Campaigns", href: "/drip", id: "drip" },
       { icon: MapPin, label: "Lead Gen", href: "/lead-gen", id: "lead-gen" },
       { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
+      { icon: ScanLine, label: "Scanner", href: "/scanner", id: "scanner" },
+      { icon: Phone, label: "Phone & SMS", href: "/phone", id: "phone" },
     ];
   }
 
@@ -132,6 +136,8 @@ function getAllNavItems(role: string | undefined): NavItem[] {
     { icon: MapPin, label: "Lead Gen", href: "/lead-gen", id: "lead-gen" },
     { icon: CreditCard, label: "Billing", href: "/billing", id: "billing" },
     { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
+    { icon: ScanLine, label: "Scanner", href: "/scanner", id: "scanner" },
+    { icon: Phone, label: "Phone & SMS", href: "/phone", id: "phone" },
   ];
 }
 
