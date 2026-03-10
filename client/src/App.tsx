@@ -45,8 +45,6 @@ import {
   BarChart3,
   Calculator,
   Book,
-  PanelLeftClose,
-  PanelLeft,
   Wrench,
   Map,
   Search,
@@ -61,7 +59,8 @@ import {
   LayoutDashboard,
   DollarSign,
   Briefcase,
-  ChevronDown
+  ChevronDown,
+  Phone
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -74,6 +73,7 @@ import ClientPage from "@/pages/client-page";
 import MapPage from "@/pages/map-page";
 import PropertySearchPage from "@/pages/property-search-page";
 import MailPage from "@/pages/mail-page";
+import PhonePage from "@/pages/phone-page";
 import ClientTransactionPage from "@/pages/client-transaction-page";
 import VendorPortal from "@/pages/vendor-portal";
 import LenderPortal from "@/pages/lender-portal";
@@ -143,7 +143,6 @@ function LeadAlertBanner() {
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
   const isMobile = useIsMobile();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
   const isClient = user?.role === 'client';
   const isVendor = user?.role === 'vendor';
   const isLender = user?.role === 'lender';
@@ -152,30 +151,18 @@ function Layout({ children }: { children: React.ReactNode }) {
   const isAgentOrBroker = user?.role === 'agent' || user?.role === 'broker';
   const tutorial = useOnboardingTutorial(user?.id, user?.role);
 
-  // Update sidebar state when mobile status changes
-  React.useEffect(() => {
-    setIsSidebarOpen(!isMobile);
-  }, [isMobile]);
-
-  const toggleCompact = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
   return (
-    <SidebarProvider defaultOpen={isSidebarOpen}>
+    <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen bg-background w-full overflow-x-clip">
         {user && !isMobile && (
-          <div className={`flex-none transition-all duration-200 ease-in-out ${
-            isSidebarOpen ? 'w-[220px]' : 'w-[60px]'
-          }`}>
+          <div className="flex-none w-[220px]">
             <Sidebar
               side="left"
-              collapsible="icon"
               className="fixed inset-y-0 left-0 z-40 border-r bg-background"
             >
               <SidebarHeader>
                 <div className="flex items-center justify-between p-2">
-                  <Logo isCompact={!isSidebarOpen} />
+                  <Logo isCompact={false} />
                 </div>
               </SidebarHeader>
               <SidebarContent>
@@ -185,7 +172,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                       <SidebarMenuButton asChild tooltip="Dashboard">
                         <Link href="/dashboard" className="flex items-center gap-2">
                           <LayoutDashboard className="h-4 w-4" />
-                          {isSidebarOpen && <span>Dashboard</span>}
+                          <span>Dashboard</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -194,7 +181,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                         <SidebarMenuButton asChild tooltip="Broker Portal">
                           <Link href="/broker-portal" className="flex items-center gap-2">
                             <Briefcase className="h-4 w-4" />
-                            {isSidebarOpen && <span>Broker Portal</span>}
+                            <span>Broker Portal</span>
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -204,24 +191,15 @@ function Layout({ children }: { children: React.ReactNode }) {
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Vendor Portal">
                             <Link href="/vendor" className="flex items-center gap-2">
-                              <div className="relative">
-                                <Wrench className="h-4 w-4" />
-                                {newLeadCount > 0 && !isSidebarOpen && (
-                                  <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-0.5 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
-                                    {newLeadCount > 99 ? "99+" : newLeadCount}
+                              <Wrench className="h-4 w-4" />
+                              <span className="flex items-center gap-2">
+                                Vendor Portal
+                                {newLeadCount > 0 && (
+                                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                                    {newLeadCount}
                                   </span>
                                 )}
-                              </div>
-                              {isSidebarOpen && (
-                                <span className="flex items-center gap-2">
-                                  Vendor Portal
-                                  {newLeadCount > 0 && (
-                                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                                      {newLeadCount}
-                                    </span>
-                                  )}
-                                </span>
-                              )}
+                              </span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -229,7 +207,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="My Ratings">
                             <Link href="/vendor-ratings" className="flex items-center gap-2">
                               <BarChart3 className="h-4 w-4" />
-                              {isSidebarOpen && <span>My Ratings</span>}
+                              <span>My Ratings</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -240,7 +218,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                         <SidebarMenuButton asChild tooltip="Loan Pipeline">
                           <Link href="/lender-portal" className="flex items-center gap-2">
                             <FileText className="h-4 w-4" />
-                            {isSidebarOpen && <span>Loan Pipeline</span>}
+                            <span>Loan Pipeline</span>
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -250,7 +228,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                         <SidebarMenuButton asChild tooltip="My Transaction">
                           <Link href="/my-transaction" className="flex items-center gap-2">
                             <FileText className="h-4 w-4" />
-                            {isSidebarOpen && <span>My Transaction</span>}
+                            <span>My Transaction</span>
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -263,8 +241,8 @@ function Layout({ children }: { children: React.ReactNode }) {
                     <SidebarGroup>
                       <SidebarGroupLabel asChild>
                         <CollapsibleTrigger className="flex w-full items-center justify-between">
-                          {isSidebarOpen ? "Deals & Clients" : ""}
-                          {isSidebarOpen && <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/deals:rotate-0 group-data-[state=closed]/deals:-rotate-90" />}
+                          Deals & Clients
+                          <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/deals:rotate-0 group-data-[state=closed]/deals:-rotate-90" />
                         </CollapsibleTrigger>
                       </SidebarGroupLabel>
                       <CollapsibleContent>
@@ -273,7 +251,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarMenuButton asChild tooltip="Transactions">
                               <Link href="/transactions" className="flex items-center gap-2">
                                 <FileText className="h-4 w-4" />
-                                {isSidebarOpen && <span>Transactions</span>}
+                                <span>Transactions</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -281,7 +259,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarMenuButton asChild tooltip="Commissions">
                               <Link href="/commissions" className="flex items-center gap-2">
                                 <DollarSign className="h-4 w-4" />
-                                {isSidebarOpen && <span>Commissions</span>}
+                                <span>Commissions</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -289,7 +267,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarMenuButton asChild tooltip="Clients">
                               <Link href="/clients" className="flex items-center gap-2">
                                 <Users className="h-4 w-4" />
-                                {isSidebarOpen && <span>Clients</span>}
+                                <span>Clients</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -304,8 +282,8 @@ function Layout({ children }: { children: React.ReactNode }) {
                     <SidebarGroup>
                       <SidebarGroupLabel asChild>
                         <CollapsibleTrigger className="flex w-full items-center justify-between">
-                          {isSidebarOpen ? "Marketing & Growth" : ""}
-                          {isSidebarOpen && <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/marketing:rotate-0 group-data-[state=closed]/marketing:-rotate-90" />}
+                          Marketing & Growth
+                          <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/marketing:rotate-0 group-data-[state=closed]/marketing:-rotate-90" />
                         </CollapsibleTrigger>
                       </SidebarGroupLabel>
                       <CollapsibleContent>
@@ -314,31 +292,22 @@ function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarMenuButton asChild tooltip="Open Houses">
                               <Link href="/open-houses" className="flex items-center gap-2">
                                 <Home className="h-4 w-4" />
-                                {isSidebarOpen && <span>Open Houses</span>}
+                                <span>Open Houses</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                           <SidebarMenuItem>
                             <SidebarMenuButton asChild tooltip="Lead Gen">
                               <Link href="/lead-gen" className="flex items-center gap-2">
-                                <div className="relative">
-                                  <MapPin className="h-4 w-4" />
-                                  {newLeadCount > 0 && !isSidebarOpen && (
-                                    <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-0.5 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
-                                      {newLeadCount > 99 ? "99+" : newLeadCount}
+                                <MapPin className="h-4 w-4" />
+                                <span className="flex items-center gap-2">
+                                  Lead Gen
+                                  {newLeadCount > 0 && (
+                                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                                      {newLeadCount}
                                     </span>
                                   )}
-                                </div>
-                                {isSidebarOpen && (
-                                  <span className="flex items-center gap-2">
-                                    Lead Gen
-                                    {newLeadCount > 0 && (
-                                      <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                                        {newLeadCount}
-                                      </span>
-                                    )}
-                                  </span>
-                                )}
+                                </span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -346,7 +315,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarMenuButton asChild tooltip="Drip Campaigns">
                               <Link href="/drip" className="flex items-center gap-2">
                                 <Bell className="h-4 w-4" />
-                                {isSidebarOpen && <span>Drip Campaigns</span>}
+                                <span>Drip Campaigns</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -354,7 +323,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarMenuButton asChild tooltip="Referrals">
                               <Link href="/referrals" className="flex items-center gap-2">
                                 <Gift className="h-4 w-4" />
-                                {isSidebarOpen && <span>Referrals</span>}
+                                <span>Referrals</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -362,7 +331,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarMenuButton asChild tooltip="Data">
                               <Link href="/data" className="flex items-center gap-2">
                                 <BarChart3 className="h-4 w-4" />
-                                {isSidebarOpen && <span>Data</span>}
+                                <span>Data</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -376,8 +345,8 @@ function Layout({ children }: { children: React.ReactNode }) {
                   <SidebarGroup>
                     <SidebarGroupLabel asChild>
                       <CollapsibleTrigger className="flex w-full items-center justify-between">
-                        {isSidebarOpen ? "Communication" : ""}
-                        {isSidebarOpen && <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/comms:rotate-0 group-data-[state=closed]/comms:-rotate-90" />}
+                        Communication
+                        <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/comms:rotate-0 group-data-[state=closed]/comms:-rotate-90" />
                       </CollapsibleTrigger>
                     </SidebarGroupLabel>
                     <CollapsibleContent>
@@ -386,7 +355,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="Messages">
                             <Link href="/messages" className="flex items-center gap-2">
                               <MessageSquare className="h-4 w-4" />
-                              {isSidebarOpen && <span>Messages</span>}
+                              <span>Messages</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -396,7 +365,15 @@ function Layout({ children }: { children: React.ReactNode }) {
                               <SidebarMenuButton asChild tooltip="Mail">
                                 <Link href="/mail" className="flex items-center gap-2">
                                   <Mail className="h-4 w-4" />
-                                  {isSidebarOpen && <span>Mail</span>}
+                                  <span>Mail</span>
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                              <SidebarMenuButton asChild tooltip="Phone & SMS">
+                                <Link href="/phone" className="flex items-center gap-2">
+                                  <Phone className="h-4 w-4" />
+                                  <span>Phone & SMS</span>
                                 </Link>
                               </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -404,7 +381,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                               <SidebarMenuButton asChild tooltip="Reminders">
                                 <Link href="/reminders" className="flex items-center gap-2">
                                   <Bell className="h-4 w-4" />
-                                  {isSidebarOpen && <span>Reminders</span>}
+                                  <span>Reminders</span>
                                 </Link>
                               </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -419,8 +396,8 @@ function Layout({ children }: { children: React.ReactNode }) {
                   <SidebarGroup>
                     <SidebarGroupLabel asChild>
                       <CollapsibleTrigger className="flex w-full items-center justify-between">
-                        {isSidebarOpen ? "Tools & Services" : ""}
-                        {isSidebarOpen && <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/tools:rotate-0 group-data-[state=closed]/tools:-rotate-90" />}
+                        Tools & Services
+                        <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/tools:rotate-0 group-data-[state=closed]/tools:-rotate-90" />
                       </CollapsibleTrigger>
                     </SidebarGroupLabel>
                     <CollapsibleContent>
@@ -429,7 +406,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="HomeBase Pros">
                             <Link href="/marketplace" className="flex items-center gap-2">
                               <Store className="h-4 w-4" />
-                              {isSidebarOpen && <span>HomeBase Pros</span>}
+                              <span>HomeBase Pros</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -437,7 +414,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="My Team">
                             <Link href="/my-team" className="flex items-center gap-2">
                               <HardHat className="h-4 w-4" />
-                              {isSidebarOpen && <span>My Team</span>}
+                              <span>My Team</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -445,7 +422,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="Find Agents">
                             <Link href="/top-agents" className="flex items-center gap-2">
                               <Star className="h-4 w-4" />
-                              {isSidebarOpen && <span>Find Agents</span>}
+                              <span>Find Agents</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -453,7 +430,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="Property Search">
                             <Link href="/property-search" className="flex items-center gap-2">
                               <Search className="h-4 w-4" />
-                              {isSidebarOpen && <span>Property Search</span>}
+                              <span>Property Search</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -462,7 +439,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarMenuButton asChild tooltip="Map">
                               <Link href="/map" className="flex items-center gap-2">
                                 <Map className="h-4 w-4" />
-                                {isSidebarOpen && <span>Map</span>}
+                                <span>Map</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -471,7 +448,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="Calendar">
                             <Link href="/calendar" className="flex items-center gap-2">
                               <Calendar className="h-4 w-4" />
-                              {isSidebarOpen && <span>Calendar</span>}
+                              <span>Calendar</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -479,7 +456,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="MyHome">
                             <Link href="/my-home" className="flex items-center gap-2">
                               <Home className="h-4 w-4" />
-                              {isSidebarOpen && <span>MyHome</span>}
+                              <span>MyHome</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -487,7 +464,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                           <SidebarMenuButton asChild tooltip="Calculators">
                             <Link href="/calculators" className="flex items-center gap-2">
                               <Calculator className="h-4 w-4" />
-                              {isSidebarOpen && <span>Calculators</span>}
+                              <span>Calculators</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -496,7 +473,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarMenuButton asChild tooltip="Glossary">
                               <Link href="/glossary" className="flex items-center gap-2">
                                 <Book className="h-4 w-4" />
-                                {isSidebarOpen && <span>Glossary</span>}
+                                <span>Glossary</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -506,7 +483,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarMenuButton asChild tooltip="Billing">
                               <Link href="/billing" className="flex items-center gap-2">
                                 <CreditCard className="h-4 w-4" />
-                                {isSidebarOpen && <span>Billing</span>}
+                                <span>Billing</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -518,37 +495,22 @@ function Layout({ children }: { children: React.ReactNode }) {
               </SidebarContent>
               <SidebarFooter>
                 <div className="p-2">
-                  {isSidebarOpen && (
-                    <span className="text-xs text-muted-foreground block mb-2 px-2 truncate">
-                      {user?.email} ({user?.role})
-                    </span>
-                  )}
+                  <span className="text-xs text-muted-foreground block mb-2 px-2 truncate">
+                    {user?.email} ({user?.role})
+                  </span>
                   <div className="flex flex-col gap-2">
-                    <Button
-                      variant="ghost"
-                      size={!isSidebarOpen ? "icon" : "sm"}
-                      onClick={toggleCompact}
-                      className="w-full hidden md:flex"
-                    >
-                      {!isSidebarOpen ? (
-                        <PanelLeft className="h-4 w-4" />
-                      ) : (
-                        <PanelLeftClose className="h-4 w-4" />
-                      )}
-                      {isSidebarOpen && <span className="ml-2">Compact View</span>}
-                    </Button>
                     {isAgentOrBroker && (
                       <TutorialStartButton onClick={tutorial.startTutorial} />
                     )}
-                    <BiometricSetupButton compact={!isSidebarOpen} />
+                    <BiometricSetupButton compact={false} />
                     <Button
                       variant="outline"
-                      size={!isSidebarOpen ? "icon" : "sm"}
+                      size="sm"
                       onClick={() => logoutMutation.mutate()}
                       className="w-full"
                     >
                       <LogOut className="h-4 w-4" />
-                      {isSidebarOpen && <span className="ml-2">Logout</span>}
+                      <span className="ml-2">Logout</span>
                     </Button>
                   </div>
                 </div>
@@ -707,6 +669,9 @@ function Router() {
           <Route path="/mail">
             <ProtectedRoute path="/mail" component={MailPage} />
           </Route>
+          <Route path="/phone">
+            <ProtectedRoute path="/phone" component={PhonePage} />
+          </Route>
           <Route path="/referrals">
             <ProtectedRoute path="/referrals" component={ReferralPage} />
           </Route>
@@ -766,6 +731,9 @@ function Router() {
           </Route>
           <Route path="/mail">
             <ProtectedRoute path="/mail" component={MailPage} />
+          </Route>
+          <Route path="/phone">
+            <ProtectedRoute path="/phone" component={PhonePage} />
           </Route>
           <Route path="/referrals">
             <ProtectedRoute path="/referrals" component={ReferralPage} />

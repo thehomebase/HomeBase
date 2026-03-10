@@ -761,7 +761,7 @@ export default function MapPage() {
   const savedPropsWithValidCoords = savedPropsWithCoords.filter(p => p.latitude && p.longitude);
 
   return (
-    <div style={{ position: "fixed", top: 0, left: isMobile ? 0 : "60px", right: 0, bottom: isMobile ? "80px" : 0 }}>
+    <div style={{ position: "fixed", top: 0, left: isMobile ? 0 : "220px", right: 0, bottom: isMobile ? "80px" : 0 }}>
       <MapContainer
         center={mapCenter}
         zoom={mapZoom}

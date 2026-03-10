@@ -1625,23 +1625,32 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (role === "vendor") {
-      const bidsResult = await db.execute(sql`
-        SELECT
-          COUNT(*) FILTER (WHERE status = 'pending')::int as pending,
-          COUNT(*) FILTER (WHERE status = 'accepted')::int as accepted,
-          COUNT(*)::int as total
-        FROM bids WHERE vendor_id = ${userId}
+      const contractorResult = await db.execute(sql`
+        SELECT id FROM contractors WHERE vendor_user_id = ${userId} LIMIT 1
       `);
+      const contractorId = (contractorResult.rows[0] as any)?.id;
+
+      let bids: any = { pending: 0, accepted: 0, total: 0 };
+      if (contractorId) {
+        const bidsResult = await db.execute(sql`
+          SELECT
+            COUNT(*) FILTER (WHERE status = 'submitted')::int as pending,
+            COUNT(*) FILTER (WHERE status = 'accepted')::int as accepted,
+            COUNT(*)::int as total
+          FROM bids WHERE contractor_id = ${contractorId}
+        `);
+        bids = (bidsResult.rows[0] as any) || bids;
+      }
+
       const leadsResult = await db.execute(sql`
         SELECT COUNT(*)::int as total,
           COUNT(*) FILTER (WHERE status = 'new')::int as new_leads
-        FROM vendor_leads WHERE vendor_id = ${userId}
+        FROM vendor_leads WHERE assigned_vendor_id = ${userId}
       `);
       const unreadResult = await db.execute(sql`
         SELECT COUNT(*)::int as count FROM private_messages
         WHERE recipient_id = ${userId} AND read = false
       `);
-      const bids = (bidsResult.rows[0] as any) || {};
       const leads = (leadsResult.rows[0] as any) || {};
       return {
         role: "vendor",

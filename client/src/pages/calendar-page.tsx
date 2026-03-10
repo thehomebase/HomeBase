@@ -1,6 +1,4 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { type Transaction } from "@shared/schema";
@@ -87,13 +85,8 @@ export default function CalendarPage() {
     }
   };
 
-  const isMobile = useIsMobile();
-
   return (
-    <main className={cn(
-      "flex-1 p-6 w-full",
-      !isMobile && "w-screen lg:max-w-[calc(100vw-230px)] md:max-w-[calc(100vw-230px)] sm:max-w-[calc(100vw-70px)] xs:max-w-[calc(100vw-10px)] max-w-full"
-    )}>
+    <div className="flex-1 p-4 sm:p-6 w-full overflow-x-hidden">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <h2 className="text-2xl font-bold">Calendar</h2>
         <div className="flex items-center gap-2">
@@ -214,6 +207,6 @@ export default function CalendarPage() {
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

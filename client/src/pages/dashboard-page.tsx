@@ -886,19 +886,34 @@ export default function DashboardPage() {
               <CommunicationsWidget />
             </div>
           )}
-          {isWidgetVisible("bids") && dashData.leads && (
+          {isWidgetVisible("bids") && (
             <Card className="p-4 mb-6">
-              <h3 className="font-semibold text-sm mb-3">Leads</h3>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-emerald-500" />
+                  <h3 className="font-semibold text-sm">Leads</h3>
+                </div>
+                <Link href="/vendor">
+                  <Button variant="ghost" size="sm" className="text-xs h-7 gap-1">
+                    View All <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="text-center p-3 rounded-lg bg-muted/40">
-                  <p className="text-2xl font-bold">{dashData.leads.new}</p>
+                  <p className="text-2xl font-bold">{dashData.leads?.new || 0}</p>
                   <p className="text-xs text-muted-foreground">New Leads</p>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-muted/40">
-                  <p className="text-2xl font-bold">{dashData.leads.total}</p>
+                  <p className="text-2xl font-bold">{dashData.leads?.total || 0}</p>
                   <p className="text-xs text-muted-foreground">Total</p>
                 </div>
               </div>
+              {(!dashData.leads?.total) && (
+                <p className="text-sm text-muted-foreground text-center mt-3">
+                  No leads yet. Claim zip codes in the Vendor Portal to start receiving leads.
+                </p>
+              )}
             </Card>
           )}
           {isWidgetVisible("quick_actions") && <QuickActionsWidget role="vendor" />}

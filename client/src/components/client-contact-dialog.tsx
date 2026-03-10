@@ -283,7 +283,7 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Contact {client.firstName} {client.lastName}
@@ -674,10 +674,10 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
               }
 
               return (
-                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                <div className="space-y-2 max-h-[400px] overflow-y-auto overflow-x-hidden">
                   {items.map((item) => (
-                    <div key={item.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                      <div className="mt-0.5">
+                    <div key={item.id} className="flex items-start gap-3 p-3 border rounded-lg overflow-hidden">
+                      <div className="mt-0.5 shrink-0">
                         {item.type === "sms" ? (
                           <MessageSquare className="h-4 w-4 text-green-600" />
                         ) : item.type === "call" ? (
@@ -686,13 +686,13 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
                           <Mail className={`h-4 w-4 ${item.direction === "received" ? "text-purple-600" : "text-blue-600"}`} />
                         )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="text-xs">
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <Badge variant="outline" className="text-xs shrink-0">
                             {item.type === "sms" ? "SMS" : item.type === "call" ? "CALL" : "EMAIL"}
                           </Badge>
                           {item.direction === "failed" ? (
-                            <Badge variant="destructive" className="text-xs">
+                            <Badge variant="destructive" className="text-xs shrink-0">
                               <XCircle className="h-3 w-3 mr-1" /> Failed
                             </Badge>
                           ) : (
@@ -700,15 +700,15 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
                               {item.type === "call" ? "Logged" : item.direction === "sent" ? "Sent" : "Received"}
                             </span>
                           )}
-                          <span className="text-xs text-muted-foreground ml-auto">
+                          <span className="text-xs text-muted-foreground ml-auto shrink-0">
                             {format(item.date, "MMM d, h:mm a")}
                           </span>
                         </div>
                         {item.subject && (
-                          <p className="text-sm font-medium truncate">{item.subject}</p>
+                          <p className="text-sm font-medium truncate break-words">{item.subject}</p>
                         )}
                         {item.preview && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">{item.preview}</p>
+                          <p className="text-sm text-muted-foreground line-clamp-2 break-words">{item.preview}</p>
                         )}
                       </div>
                     </div>

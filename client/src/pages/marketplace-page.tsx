@@ -714,7 +714,7 @@ export default function MarketplacePage() {
   const isLoading = proximityEnabled ? proximityLoading : contractorsLoading;
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="px-4 sm:px-8 py-6 space-y-6 overflow-x-hidden">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold">HomeBase Pros</h1>

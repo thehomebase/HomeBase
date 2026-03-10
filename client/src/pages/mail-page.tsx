@@ -775,8 +775,23 @@ export default function MailPage() {
             <h3 className="text-lg font-medium mb-2">Gmail Not Connected</h3>
             <p className="text-sm text-muted-foreground mb-4">
               Connect your Gmail account to view and send emails here.
-              You can connect it from any client's contact dialog.
             </p>
+            <Button
+              onClick={async () => {
+                try {
+                  const res = await fetch("/api/gmail/auth-url", { credentials: "include" });
+                  if (!res.ok) throw new Error("Failed to get auth URL");
+                  const data = await res.json();
+                  if (data.url) {
+                    window.location.href = data.url;
+                  }
+                } catch (err: any) {
+                  toast({ title: "Failed to connect Gmail", description: err.message, variant: "destructive" });
+                }
+              }}
+            >
+              <Mail className="h-4 w-4 mr-2" /> Connect Gmail Account
+            </Button>
           </CardContent>
         </Card>
       </div>

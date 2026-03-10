@@ -36,6 +36,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Plus,
   Copy,
   ChevronDown,
@@ -46,6 +52,10 @@ import {
   Calendar,
   Clock,
   MapPin,
+  Play,
+  CheckCircle2,
+  ExternalLink,
+  Link2,
 } from "lucide-react";
 
 function StatusBadge({ status }: { status: string }) {
@@ -323,18 +333,33 @@ export default function OpenHousesPage() {
                       <Copy className="h-4 w-4" />
                     </Button>
                     {nextStatus[oh.status] && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={updatingStatusId === oh.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setUpdatingStatusId(oh.id);
-                          updateMutation.mutate({ id: oh.id, data: { status: nextStatus[oh.status] } });
-                        }}
-                      >
-                        {updatingStatusId === oh.id ? "Updating..." : nextStatus[oh.status] === "active" ? "Start" : "Complete"}
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={nextStatus[oh.status] === "active" ? "default" : "outline"}
+                              size="sm"
+                              disabled={updatingStatusId === oh.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setUpdatingStatusId(oh.id);
+                                updateMutation.mutate({ id: oh.id, data: { status: nextStatus[oh.status] } });
+                              }}
+                            >
+                              {updatingStatusId === oh.id ? "Updating..." : nextStatus[oh.status] === "active" ? (
+                                <><Play className="h-3.5 w-3.5 mr-1.5" />Go Live</>
+                              ) : (
+                                <><CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />End Session</>
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[220px] text-center">
+                            {nextStatus[oh.status] === "active"
+                              ? "Start the open house session and enable the visitor sign-in page for guests"
+                              : "End the open house session and close the visitor sign-in page"}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                     <Dialog open={editingHouse?.id === oh.id} onOpenChange={(open) => !open && setEditingHouse(null)}>
                       <DialogTrigger asChild>
@@ -382,6 +407,28 @@ export default function OpenHousesPage() {
                   </div>
                 </div>
               </div>
+              {oh.status === "active" && (
+                <div className="border-t bg-green-50 dark:bg-green-950/30 px-4 py-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-sm font-semibold text-green-800 dark:text-green-200">Live — Visitor Sign-In Active</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">Share this link with visitors so they can sign in on their phone:</p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-white dark:bg-gray-900 border rounded-md px-3 py-2 text-sm font-mono truncate">
+                      {window.location.origin}/open-house/{oh.slug}
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => copySignInLink(oh.slug)}>
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />Copy
+                    </Button>
+                    <Button size="sm" variant="outline" asChild>
+                      <a href={`/open-house/${oh.slug}`} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3.5 w-3.5 mr-1.5" />Open
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              )}
               {expandedId === oh.id && (
                 <div className="border-t px-4 py-3">
                   {oh.notes && <p className="text-sm text-muted-foreground mb-3">{oh.notes}</p>}
