@@ -5,8 +5,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import {
   ArrowRight, BarChart3, FileText, Users, MessageSquare, Map, Shield,
   Zap, Phone, Mail, Home, Star, ChevronRight, CheckCircle2, Briefcase,
-  Building2, TrendingUp, Clock, Target, Award
+  Building2, TrendingUp, Clock, Target, Award, ExternalLink, ArrowRightLeft
 } from "lucide-react";
+import { SiSlack, SiMailchimp, SiGooglesheets, SiCalendly, SiTrello, SiHubspot, SiSalesforce, SiZapier, SiAirtable, SiNotion } from "react-icons/si";
 import heroImage from "@/assets/landing-hero.png";
 
 export default function LandingPage() {
@@ -26,6 +27,7 @@ export default function LandingPage() {
               <nav className="flex items-center gap-6 mr-6">
                 <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
                 <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">How It Works</a>
+                <a href="#integrations" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Integrations</a>
                 <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
               </nav>
             )}
@@ -184,6 +186,95 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section id="integrations" className={`relative overflow-hidden bg-gradient-to-b from-background via-primary/5 to-background ${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl" />
+        </div>
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-xs font-semibold mb-4 uppercase tracking-wider">
+              <Zap className="h-3.5 w-3.5" /> Powered by Zapier
+            </div>
+            <h2 className={`font-bold tracking-tight mb-4 ${isMobile ? "text-3xl" : "text-4xl lg:text-5xl"}`}>
+              Connect to <span className="text-primary">5,000+ apps</span>
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+              Automate your entire workflow. When something happens in HomeBase, trigger actions across your favorite tools — no code required.
+            </p>
+          </div>
+
+          <div className={`flex items-center justify-center gap-3 mb-12 ${isMobile ? "flex-wrap" : ""}`}>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border shadow-sm">
+              <img src="/homebaselogoicon_nobg.png" alt="HomeBase" className="h-5 w-5 dark:invert" />
+              <span className="font-semibold text-sm">HomeBase</span>
+            </div>
+            <div className="flex items-center justify-center">
+              <ArrowRightLeft className="h-5 w-5 text-orange-500" />
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 shadow-sm">
+              <SiZapier className="h-4 w-4 text-orange-500" />
+              <span className="font-semibold text-sm text-orange-600 dark:text-orange-400">Zapier</span>
+            </div>
+            <div className="flex items-center justify-center">
+              <ArrowRightLeft className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div className="px-4 py-2 rounded-full bg-card border shadow-sm">
+              <span className="font-semibold text-sm text-muted-foreground">5,000+ Apps</span>
+            </div>
+          </div>
+
+          <div className="grid gap-3 mb-12 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+            {zapierApps.map((app) => (
+              <div key={app.name} className="group flex items-center gap-3 px-4 py-3 rounded-xl bg-card border hover:border-primary/30 hover:shadow-md transition-all duration-300 cursor-default">
+                <div className={`h-9 w-9 rounded-lg ${app.bg} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
+                  <app.icon className={`h-[18px] w-[18px] ${app.color}`} />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{app.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{app.action}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className={`grid gap-6 mb-10 ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
+            <Card className="bg-card/80 backdrop-blur border hover:shadow-lg transition-shadow">
+              <CardContent className="p-6 text-center">
+                <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-3">
+                  <Zap className="h-6 w-6 text-green-600" />
+                </div>
+                <h4 className="font-semibold mb-1">Triggers</h4>
+                <p className="text-sm text-muted-foreground">New Lead, Transaction Created, Client Added, Deal Closed, Document Uploaded</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/80 backdrop-blur border hover:shadow-lg transition-shadow">
+              <CardContent className="p-6 text-center">
+                <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-3">
+                  <ArrowRightLeft className="h-6 w-6 text-blue-600" />
+                </div>
+                <h4 className="font-semibold mb-1">Actions</h4>
+                <p className="text-sm text-muted-foreground">Create Lead, Create Client, Create Transaction, Update Client, Search Records</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/80 backdrop-blur border hover:shadow-lg transition-shadow">
+              <CardContent className="p-6 text-center">
+                <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mx-auto mb-3">
+                  <Shield className="h-6 w-6 text-purple-600" />
+                </div>
+                <h4 className="font-semibold mb-1">Secure API</h4>
+                <p className="text-sm text-muted-foreground">API key authentication, HMAC-signed webhooks, HTTPS-only, role-based access</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="text-center">
+            <Button size="lg" className="gap-2 text-base px-8" onClick={() => setLocation("/integrations/zapier")}>
+              Explore Integrations <ExternalLink className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
       <section id="pricing" className={`bg-muted/30 ${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-sm text-primary font-medium uppercase tracking-wider mb-2">Pricing</p>
@@ -329,6 +420,19 @@ const steps = [
     title: "Close More Deals",
     description: "Stay organized with your dashboard, communicate with clients, and never miss a deadline again."
   },
+];
+
+const zapierApps = [
+  { icon: SiSlack, name: "Slack", action: "Post new leads", bg: "bg-purple-100 dark:bg-purple-900/30", color: "text-purple-600" },
+  { icon: SiMailchimp, name: "Mailchimp", action: "Sync contacts", bg: "bg-yellow-100 dark:bg-yellow-900/30", color: "text-yellow-600" },
+  { icon: SiGooglesheets, name: "Google Sheets", action: "Log transactions", bg: "bg-green-100 dark:bg-green-900/30", color: "text-green-600" },
+  { icon: SiCalendly, name: "Calendly", action: "Schedule showings", bg: "bg-blue-100 dark:bg-blue-900/30", color: "text-blue-600" },
+  { icon: SiTrello, name: "Trello", action: "Create task cards", bg: "bg-sky-100 dark:bg-sky-900/30", color: "text-sky-600" },
+  { icon: SiHubspot, name: "HubSpot", action: "Sync CRM data", bg: "bg-orange-100 dark:bg-orange-900/30", color: "text-orange-600" },
+  { icon: SiSalesforce, name: "Salesforce", action: "Push deals", bg: "bg-blue-100 dark:bg-blue-900/30", color: "text-blue-500" },
+  { icon: SiAirtable, name: "Airtable", action: "Track pipeline", bg: "bg-teal-100 dark:bg-teal-900/30", color: "text-teal-600" },
+  { icon: SiNotion, name: "Notion", action: "Create docs", bg: "bg-gray-100 dark:bg-gray-800", color: "text-gray-800 dark:text-gray-200" },
+  { icon: Mail, name: "Gmail", action: "Send follow-ups", bg: "bg-red-100 dark:bg-red-900/30", color: "text-red-500" },
 ];
 
 const roles = [

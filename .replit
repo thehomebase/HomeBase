@@ -65,24 +65,6 @@ task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
 
-[[workflows.workflow]]
-name = "Dev Server"
-author = 36894477
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "NODE_ENV=development tsx server/index.ts"
-
-[[workflows.workflow]]
-name = "Dev Server (Nodemon)"
-author = 36894477
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "nodemon"
-
 [userenv]
 
 [userenv.shared]
