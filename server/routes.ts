@@ -7238,6 +7238,42 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  const ALLOWED_SCAN_MIMES = new Set([
+    "image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif",
+    "application/pdf",
+  ]);
+
+  const MAGIC_BYTES: Array<{ mime: string; bytes: number[]; offset?: number }> = [
+    { mime: "image/jpeg", bytes: [0xFF, 0xD8, 0xFF] },
+    { mime: "image/png", bytes: [0x89, 0x50, 0x4E, 0x47] },
+    { mime: "image/webp", bytes: [0x52, 0x49, 0x46, 0x46], offset: 0 },
+    { mime: "application/pdf", bytes: [0x25, 0x50, 0x44, 0x46] },
+  ];
+
+  function validateFileContent(buffer: Buffer, claimedMime: string): boolean {
+    if (buffer.length < 8) return false;
+    const normalizedMime = claimedMime === "image/jpg" ? "image/jpeg" : claimedMime;
+    if (normalizedMime === "image/heic" || normalizedMime === "image/heif") return true;
+    const match = MAGIC_BYTES.find(m => {
+      const offset = m.offset ?? 0;
+      return m.bytes.every((b, i) => buffer[offset + i] === b);
+    });
+    if (!match) return false;
+    if (normalizedMime === "image/webp") return match.mime === "image/webp";
+    if (normalizedMime.startsWith("image/")) return match.mime.startsWith("image/");
+    return match.mime === normalizedMime;
+  }
+
+  function sanitizeFileName(name: string): string {
+    return name
+      .replace(/[^\w\s\-_.()]/g, '')
+      .replace(/\.{2,}/g, '.')
+      .replace(/\//g, '')
+      .replace(/\\/g, '')
+      .trim()
+      .slice(0, 200) || 'document';
+  }
+
   app.post("/api/scanned-documents", upload.single("file"), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
@@ -7245,13 +7281,23 @@ export function registerRoutes(app: Express): Server {
       if (!file) return res.status(400).json({ error: "No file uploaded" });
       if (file.size > 10 * 1024 * 1024) return res.status(400).json({ error: "File size exceeds 10MB limit" });
 
+      if (!ALLOWED_SCAN_MIMES.has(file.mimetype)) {
+        return res.status(400).json({ error: "File type not allowed. Please upload PDF, JPG, PNG, or WebP files only." });
+      }
+
+      if (!validateFileContent(file.buffer, file.mimetype)) {
+        return res.status(400).json({ error: "File content does not match its type. The file may be corrupted or invalid." });
+      }
+
       const { name, category, transactionId, clientId, notes } = req.body;
       if (!name) return res.status(400).json({ error: "Document name is required" });
+
+      const safeName = sanitizeFileName(name);
 
       const fileData = file.buffer.toString("base64");
       const doc = await storage.createScannedDocument({
         userId: req.user.id,
-        name,
+        name: safeName,
         category: category || "other",
         fileData,
         mimeType: file.mimetype,
@@ -7260,6 +7306,8 @@ export function registerRoutes(app: Express): Server {
         clientId: clientId && clientId !== 'none' ? parseInt(clientId) || null : null,
         notes: notes || null,
       });
+
+      console.log(`[Audit] Document uploaded: id=${doc.id}, user=${req.user.id}, type=${file.mimetype}, size=${file.size}`);
 
       const { fileData: _, ...metadata } = doc;
       res.json(metadata);
@@ -7294,8 +7342,12 @@ export function registerRoutes(app: Express): Server {
       if (doc.userId !== req.user.id) return res.sendStatus(403);
 
       const buffer = Buffer.from(doc.fileData, "base64");
+      const safeName = sanitizeFileName(doc.name).replace(/[^\w\-_.]/g, '_');
       res.setHeader("Content-Type", doc.mimeType);
-      res.setHeader("Content-Disposition", `inline; filename="${doc.name}"`);
+      res.setHeader("Content-Disposition", `inline; filename="${safeName}"`);
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("Content-Security-Policy", "default-src 'none'");
       res.send(buffer);
     } catch (error) {
       console.error("Error serving scanned document:", error);
@@ -7311,6 +7363,7 @@ export function registerRoutes(app: Express): Server {
       if (doc.userId !== req.user.id) return res.sendStatus(403);
 
       await storage.deleteScannedDocument(doc.id);
+      console.log(`[Audit] Document deleted: id=${doc.id}, user=${req.user.id}`);
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting scanned document:", error);
@@ -7331,14 +7384,16 @@ export function registerRoutes(app: Express): Server {
 
       const buffer = Buffer.from(doc.fileData, "base64");
       const ext = doc.mimeType.includes("pdf") ? ".pdf" : doc.mimeType.includes("png") ? ".png" : doc.mimeType.includes("jpeg") || doc.mimeType.includes("jpg") ? ".jpg" : "";
+      const safeName = sanitizeFileName(doc.name);
       const attachment: EmailAttachment = {
-        filename: `${doc.name}${ext}`,
+        filename: `${safeName}${ext}`,
         mimeType: doc.mimeType,
         content: buffer,
       };
 
       const result = await sendGmailEmail(req.user.id, to, subject, body || "", undefined, [attachment]);
       if (result.success) {
+        console.log(`[Audit] Document emailed: id=${doc.id}, user=${req.user.id}, to=${to}`);
         res.json({ success: true, messageId: result.messageId });
       } else {
         res.status(500).json({ error: result.error || "Failed to send email" });
