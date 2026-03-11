@@ -17,7 +17,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Switch, Route, Link } from "wouter";
+import { Switch, Route, Link, useLocation } from "wouter";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import TransactionsPage from "@/pages/transactions-page";
@@ -149,6 +149,8 @@ function LeadAlertBanner() {
 function Layout({ children }: { children: React.ReactNode }) {
   const { user, logoutMutation } = useAuth();
   const isMobile = useIsMobile();
+  const [location] = useLocation();
+  const isMapPage = location === '/map';
   const isClient = user?.role === 'client';
   const isVendor = user?.role === 'vendor';
   const isLender = user?.role === 'lender';
@@ -553,7 +555,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             </Sidebar>
         )}
         <main className="flex-1 min-h-screen min-w-0 overflow-x-clip relative">
-          {user && (
+          {user && !(isMobile && isMapPage) && (
             <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
               <div className="flex items-center justify-between px-4 py-2">
                 {isMobile && <Logo isCompact={false} />}

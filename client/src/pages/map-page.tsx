@@ -761,7 +761,7 @@ export default function MapPage() {
   const savedPropsWithValidCoords = savedPropsWithCoords.filter(p => p.latitude && p.longitude);
 
   return (
-    <div className="w-full relative" style={{ height: isMobile ? "calc(100dvh - 125px)" : "calc(100dvh - 45px)" }}>
+    <div className="w-full relative" style={{ height: isMobile ? "calc(100dvh - 80px)" : "calc(100dvh - 45px)" }}>
       <MapContainer
         center={mapCenter}
         zoom={mapZoom}
@@ -998,7 +998,7 @@ export default function MapPage() {
         )}
       </MapContainer>
 
-      <div className={`absolute top-4 z-[1000] flex flex-col gap-2 ${isMobile ? "left-3 right-3" : "left-4 right-4"}`}>
+      <div className={`absolute z-[1000] flex flex-col gap-2 ${isMobile ? "left-3 right-3" : "left-4 right-4 top-4"}`} style={isMobile ? { top: "max(env(safe-area-inset-top, 12px), 12px)" } : undefined}>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1108,10 +1108,11 @@ export default function MapPage() {
         </div>
       </div>
 
-      <div className={`absolute z-[1000] flex gap-2 ${isMobile ? "top-[120px] right-3" : "top-4 right-4"}`}>
+      <div className={`absolute z-[1000] flex gap-2 ${isMobile ? "right-3" : "top-4 right-4"}`} style={isMobile ? { top: "max(env(safe-area-inset-top, 12px), 12px)", right: "12px" } : undefined}>
         {isAgent && !routePlanningMode && viewingsWithCoords.length >= 2 && (
           <Button 
             variant="outline" 
+            size={isMobile ? "sm" : "default"}
             className="shadow-lg bg-background" 
             onClick={() => setRoutePlanningMode(true)}
             data-testid="button-plan-route"
@@ -1123,6 +1124,7 @@ export default function MapPage() {
           <div className="flex gap-2">
             <Button 
               onClick={planRoute} 
+              size={isMobile ? "sm" : "default"}
               disabled={selectedForRoute.size < 2 || planRouteMutation.isPending}
               className="shadow-lg"
               data-testid="button-calculate-route"
@@ -1132,6 +1134,7 @@ export default function MapPage() {
             </Button>
             <Button 
               variant="outline" 
+              size={isMobile ? "sm" : "default"}
               className="shadow-lg bg-background" 
               onClick={clearRoute}
               data-testid="button-cancel-route"
@@ -1143,8 +1146,8 @@ export default function MapPage() {
         {isAgent && (
           <Dialog open={showAddViewing} onOpenChange={setShowAddViewing}>
             <DialogTrigger asChild>
-              <Button className="shadow-lg" data-testid="button-add-viewing">
-                <Plus className="h-4 w-4 mr-2" /> Add Property
+              <Button size={isMobile ? "sm" : "default"} className="shadow-lg" data-testid="button-add-viewing">
+                <Plus className="h-4 w-4 mr-2" /> {isMobile ? "Add" : "Add Property"}
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -1256,6 +1259,7 @@ export default function MapPage() {
         )}
         <Button 
           variant="outline" 
+          size={isMobile ? "sm" : "default"}
           className="shadow-lg bg-background relative" 
           onClick={() => setShowRequestsPanel(!showRequestsPanel)} 
           data-testid="button-showing-requests"
@@ -1267,7 +1271,7 @@ export default function MapPage() {
             </span>
           )}
         </Button>
-        <Button variant="outline" className="shadow-lg bg-background" onClick={() => setSidebarOpen(!sidebarOpen)} data-testid="button-toggle-sidebar">
+        <Button variant="outline" size={isMobile ? "sm" : "default"} className="shadow-lg bg-background" onClick={() => setSidebarOpen(!sidebarOpen)} data-testid="button-toggle-sidebar">
           {sidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
         </Button>
       </div>
@@ -1691,7 +1695,7 @@ export default function MapPage() {
       </Dialog>
 
       {showRequestsPanel && (
-        <div className={`absolute top-16 z-[1002] bg-background rounded-lg shadow-xl border max-h-96 overflow-y-auto ${isMobile ? "left-3 right-3" : "right-4 w-80"}`}>
+        <div className={`absolute z-[1002] bg-background rounded-lg shadow-xl border max-h-96 overflow-y-auto ${isMobile ? "left-3 right-3" : "right-4 w-80"}`} style={{ top: isMobile ? "calc(max(env(safe-area-inset-top, 12px), 12px) + 44px)" : "64px" }}>
           <div className="flex items-center justify-between p-3 border-b sticky top-0 bg-background">
             <h3 className="font-semibold flex items-center gap-2">
               <Bell className="h-4 w-4" /> Showing Requests
