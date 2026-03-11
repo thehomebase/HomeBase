@@ -41,6 +41,10 @@ export default function TransactionPage() {
     closingDate: "",
     mlsNumber: "",
     financing: "",
+    streetName: "",
+    city: "",
+    state: "",
+    zipCode: "",
   });
 
   const { data: transaction, isLoading, error } = useQuery<Transaction>({
@@ -80,6 +84,10 @@ export default function TransactionPage() {
         closingDate: formatDateForInput(transaction.closingDate),
         mlsNumber: transaction.mlsNumber || "",
         financing: transaction.financing || "",
+        streetName: transaction.streetName || "",
+        city: transaction.city || "",
+        state: transaction.state || "",
+        zipCode: transaction.zipCode || "",
       });
     }
   }, [transaction, isEditing]);
@@ -167,13 +175,28 @@ export default function TransactionPage() {
     on_hold: "bg-gray-100 text-gray-800",
   };
 
+  const BUYER_ADDRESS_STAGES = new Set(["offer_submitted", "under_contract", "closing"]);
+
   const handleSave = () => {
+    const isBuyerEarlyStage = editForm.type === 'buy' && !BUYER_ADDRESS_STAGES.has(editForm.status);
     const updateData: Record<string, unknown> = {
       status: editForm.status,
       type: editForm.type,
       mlsNumber: editForm.mlsNumber || null,
       financing: editForm.financing || null,
     };
+
+    if (isBuyerEarlyStage) {
+      updateData.streetName = null;
+      updateData.city = null;
+      updateData.state = null;
+      updateData.zipCode = null;
+    } else {
+      updateData.streetName = editForm.streetName?.trim() || null;
+      updateData.city = editForm.city?.trim() || null;
+      updateData.state = editForm.state?.trim() || null;
+      updateData.zipCode = editForm.zipCode?.trim() || null;
+    }
 
     if (editForm.contractPrice) {
       updateData.contractPrice = parseInt(editForm.contractPrice);
@@ -247,17 +270,29 @@ export default function TransactionPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">
-            {transaction.streetName || (transaction.type === 'buy' ? 'Buyer Transaction' : `Transaction #${transaction.id}`)}
-          </h1>
-          {(transaction.city || transaction.state || transaction.zipCode) && (
-            <p className="text-muted-foreground">
-              {[transaction.city, transaction.state].filter(Boolean).join(', ')} {transaction.zipCode || ''}
-            </p>
-          )}
-          {!transaction.streetName && transaction.type === 'buy' && (
-            <p className="text-sm text-muted-foreground italic">Property address will be added when a home is found</p>
-          )}
+          {(() => {
+            const buyerAddressStages = new Set(["offer_submitted", "under_contract", "closing"]);
+            const showAddress = transaction.type !== 'buy' || buyerAddressStages.has(transaction.status);
+            const hasAddress = showAddress && transaction.streetName && transaction.streetName.trim();
+            return (
+              <>
+                <h1 className="text-2xl font-bold">
+                  {hasAddress ? transaction.streetName : (transaction.type === 'buy' ? 'Buyer Transaction' : `Transaction #${transaction.id}`)}
+                </h1>
+                {hasAddress && (transaction.city || transaction.state || transaction.zipCode) && (
+                  <p className="text-muted-foreground">
+                    {[transaction.city, transaction.state].filter(Boolean).join(', ')} {transaction.zipCode || ''}
+                  </p>
+                )}
+                {transaction.type === 'buy' && !showAddress && (
+                  <p className="text-sm text-muted-foreground italic">Address will appear once an offer is submitted</p>
+                )}
+                {transaction.type === 'buy' && showAddress && !transaction.streetName && (
+                  <p className="text-sm text-muted-foreground italic">No property address set yet</p>
+                )}
+              </>
+            );
+          })()}
           <p className="text-sm text-muted-foreground">Transaction ID: {transaction.id}</p>
         </div>
       </div>
@@ -680,6 +715,54 @@ export default function TransactionPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {(editForm.type !== 'buy' || BUYER_ADDRESS_STAGES.has(editForm.status)) && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="streetName">Street Name</Label>
+                  <Input
+                    id="streetName"
+                    value={editForm.streetName}
+                    onChange={(e) => setEditForm({ ...editForm, streetName: e.target.value })}
+                    placeholder="Enter street name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    value={editForm.city}
+                    onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                    placeholder="Enter city"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="state">State</Label>
+                  <Input
+                    id="state"
+                    value={editForm.state}
+                    onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                    placeholder="Enter state"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="zipCode">Zip Code</Label>
+                  <Input
+                    id="zipCode"
+                    value={editForm.zipCode}
+                    onChange={(e) => setEditForm({ ...editForm, zipCode: e.target.value })}
+                    placeholder="Enter zip code"
+                  />
+                </div>
+              </>
+            )}
+            {editForm.type === 'buy' && !BUYER_ADDRESS_STAGES.has(editForm.status) && (
+              <div className="col-span-full rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-3 py-2">
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  Address fields will become available once the status reaches "Offer Submitted."
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditing(false)} data-testid="button-cancel-edit">

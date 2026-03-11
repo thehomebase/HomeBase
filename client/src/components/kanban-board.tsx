@@ -49,6 +49,8 @@ const buyerColumns = [
   { id: "closing", title: "Closing" },
 ];
 
+const BUYER_ADDRESS_STAGES = new Set(["offer_submitted", "under_contract", "closing"]);
+
 const sellerColumns = [
   { id: "prospect", title: "Prospect" },
   { id: "active_listing_prep", title: "Active Listing Prep" },
@@ -67,8 +69,8 @@ const formatPrice = (price: number | null) => {
   }).format(price);
 };
 
-function getCardTitle(transaction: Transaction, clients: Client[]): string {
-  if (transaction.streetName && transaction.streetName.trim()) {
+function getCardTitle(transaction: Transaction, clients: Client[], hideAddress = false): string {
+  if (!hideAddress && transaction.streetName && transaction.streetName.trim()) {
     return transaction.streetName;
   }
   const client = clients.find((c) => c.id === transaction.clientId);
@@ -98,8 +100,9 @@ function DraggableCard({
   } : undefined;
 
   const client = clients.find((c) => c.id === transaction.clientId);
-  const hasAddress = transaction.streetName && transaction.streetName.trim();
-  const cardTitle = getCardTitle(transaction, clients);
+  const isBuyerEarlyStage = transaction.type === 'buy' && !BUYER_ADDRESS_STAGES.has(transaction.status);
+  const hasAddress = !isBuyerEarlyStage && transaction.streetName && transaction.streetName.trim();
+  const cardTitle = getCardTitle(transaction, clients, isBuyerEarlyStage);
 
   return (
     <Card
@@ -149,9 +152,14 @@ function DraggableCard({
                 : 'Not set'}
             </div>
           )}
-          {!hasAddress && (
+          {!hasAddress && isBuyerEarlyStage && (
             <div className="text-muted-foreground italic text-[11px]">
-              No property yet
+              Searching for property
+            </div>
+          )}
+          {!hasAddress && !isBuyerEarlyStage && transaction.type === 'sell' && (
+            <div className="text-muted-foreground italic text-[11px]">
+              No property address
             </div>
           )}
         </div>
@@ -234,11 +242,16 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
   );
 
   const updateTransactionStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+    mutationFn: async ({ id, status, streetName, city, state, zipCode }: { id: number; status: string; streetName?: string | null; city?: string | null; state?: string | null; zipCode?: string | null }) => {
+      const body: Record<string, unknown> = { status: status.toLowerCase() };
+      if (streetName !== undefined) body.streetName = streetName;
+      if (city !== undefined) body.city = city;
+      if (state !== undefined) body.state = state;
+      if (zipCode !== undefined) body.zipCode = zipCode;
       const response = await apiRequest(
         "PATCH",
         `/api/transactions/${id}`,
-        { status: status.toLowerCase() }
+        body
       );
       if (!response.ok) {
         throw new Error("Failed to update transaction");
@@ -285,14 +298,30 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
     if (!validStatuses.includes(newStatus)) return;
     if (draggedTransaction.status === newStatus) return;
 
+    const movingToEarlyBuyerStage = draggedTransaction.type === 'buy' && !BUYER_ADDRESS_STAGES.has(newStatus);
     const updatedTransactions = localTransactions.map(t => 
       t.id === draggedId 
-        ? { ...t, status: newStatus.toLowerCase() }
+        ? { 
+            ...t, 
+            status: newStatus.toLowerCase(),
+            ...(movingToEarlyBuyerStage ? { streetName: null, city: null, state: null, zipCode: null } : {})
+          }
         : t
     );
 
     setLocalTransactions(updatedTransactions);
-    updateTransactionStatusMutation.mutate({ id: draggedId, status: newStatus });
+    if (movingToEarlyBuyerStage) {
+      updateTransactionStatusMutation.mutate({ 
+        id: draggedId, 
+        status: newStatus,
+        streetName: null,
+        city: null,
+        state: null,
+        zipCode: null
+      });
+    } else {
+      updateTransactionStatusMutation.mutate({ id: draggedId, status: newStatus });
+    }
   };
 
   useEffect(() => {
@@ -387,23 +416,26 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
       </div>
 
       <DragOverlay>
-        {activeId && activeTransaction ? (
-          <Card className="p-3 w-[180px] shadow-lg cursor-grabbing dark:bg-neutral-600 dark:border-neutral-500">
-            <div className="font-medium text-sm truncate">
-              {getCardTitle(activeTransaction, clientsData)}
-            </div>
-            <div className="text-sm text-primary">
-              {activeTransaction.client
-                ? `${activeTransaction.client.firstName} ${activeTransaction.client.lastName}`
-                : activeTransaction.streetName && activeTransaction.streetName.trim()
-                  ? 'No client'
-                  : ''}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {activeTransaction.type === "buy" ? "Purchase" : "Sale"}
-            </div>
-          </Card>
-        ) : null}
+        {activeId && activeTransaction ? (() => {
+          const isEarlyBuyer = activeTransaction.type === 'buy' && !BUYER_ADDRESS_STAGES.has(activeTransaction.status);
+          return (
+            <Card className="p-3 w-[180px] shadow-lg cursor-grabbing dark:bg-neutral-600 dark:border-neutral-500">
+              <div className="font-medium text-sm truncate">
+                {getCardTitle(activeTransaction, clientsData, isEarlyBuyer)}
+              </div>
+              <div className="text-sm text-primary">
+                {activeTransaction.client
+                  ? `${activeTransaction.client.firstName} ${activeTransaction.client.lastName}`
+                  : !isEarlyBuyer && activeTransaction.streetName && activeTransaction.streetName.trim()
+                    ? 'No client'
+                    : ''}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {activeTransaction.type === "buy" ? "Purchase" : "Sale"}
+              </div>
+            </Card>
+          );
+        })() : null}
       </DragOverlay>
     </DndContext>
   );

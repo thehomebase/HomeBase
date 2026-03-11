@@ -23,6 +23,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
+const BUYER_ADDRESS_STAGES = new Set(["offer_submitted", "under_contract", "closing"]);
+
 interface Transaction {
   id: number;
   streetName: string;
@@ -234,13 +236,12 @@ export function TransactionTable({
   const getColumnValue = (transaction: Transaction, columnId: string) => {
     switch (columnId) {
       case 'streetName':
-        return transaction.streetName;
       case 'city':
-        return transaction.city;
       case 'state':
-        return transaction.state;
-      case 'zipCode':
-        return transaction.zipCode;
+      case 'zipCode': {
+        const showAddr = transaction.type !== 'buy' || BUYER_ADDRESS_STAGES.has(transaction.status);
+        return showAddr ? (transaction as any)[columnId] : '';
+      }
       case 'closed_sales_price':
         return formatValue(transaction.contractPrice, 'currency');
       case 'commission':

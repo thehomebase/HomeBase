@@ -150,7 +150,12 @@ function SaveTransactionAsTemplate({
         <option value="">Select a transaction...</option>
         {transactions.map((tx) => (
           <option key={tx.id} value={tx.id}>
-            {tx.streetName ? `${tx.streetName} — ${tx.city}, ${tx.state}` : `Transaction #${tx.id}`}
+            {(() => {
+              const BUYER_ADDRESS_STAGES = new Set(["offer_submitted", "under_contract", "closing"]);
+              const showAddress = tx.type !== 'buy' || BUYER_ADDRESS_STAGES.has(tx.status);
+              if (showAddress && tx.streetName) return `${tx.streetName} — ${tx.city}, ${tx.state}`;
+              return `Transaction #${tx.id}`;
+            })()}
           </option>
         ))}
       </select>
@@ -674,86 +679,86 @@ export default function TransactionsPage() {
                       {form.watch("type") === "buy" && (
                         <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-3 py-2">
                           <p className="text-xs text-blue-700 dark:text-blue-300">
-                            You can add the property address later once your buyer finds a home.
+                            Address fields will become available once the transaction reaches the "Offer Submitted" stage.
                           </p>
                         </div>
                       )}
-                      <FormField
-                        control={form.control}
-                        name="streetName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              Street Name
-                              {form.watch("type") === "sell" && <span className="text-destructive ml-1">*</span>}
-                              {form.watch("type") === "buy" && <span className="text-muted-foreground ml-1 text-xs font-normal">(optional)</span>}
-                            </FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="Enter street name" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="city"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              City
-                              {form.watch("type") === "sell" && <span className="text-destructive ml-1">*</span>}
-                              {form.watch("type") === "buy" && <span className="text-muted-foreground ml-1 text-xs font-normal">(optional)</span>}
-                            </FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="Enter city" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="state"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              State
-                              {form.watch("type") === "sell" && <span className="text-destructive ml-1">*</span>}
-                              {form.watch("type") === "buy" && <span className="text-muted-foreground ml-1 text-xs font-normal">(optional)</span>}
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="Enter state"
-                                maxLength={2}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="zipCode"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              ZIP Code
-                              {form.watch("type") === "sell" && <span className="text-destructive ml-1">*</span>}
-                              {form.watch("type") === "buy" && <span className="text-muted-foreground ml-1 text-xs font-normal">(optional)</span>}
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="Enter ZIP code"
-                                maxLength={5}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      {form.watch("type") !== "buy" && (
+                        <>
+                          <FormField
+                            control={form.control}
+                            name="streetName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  Street Name
+                                  <span className="text-destructive ml-1">*</span>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="Enter street name" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="city"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  City
+                                  <span className="text-destructive ml-1">*</span>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="Enter city" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="state"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  State
+                                  <span className="text-destructive ml-1">*</span>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    placeholder="Enter state"
+                                    maxLength={2}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="zipCode"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  ZIP Code
+                                  <span className="text-destructive ml-1">*</span>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    placeholder="Enter ZIP code"
+                                    maxLength={5}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </>
+                      )}
                       <FormField
                         control={form.control}
                         name="accessCode"
@@ -892,7 +897,12 @@ export default function TransactionsPage() {
                       setLocation(`/transactions/${transaction.id}`)
                     }
                   >
-                    {transaction.streetName || (transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : `Transaction #${transaction.id}`)}
+                    {(() => {
+                      const BUYER_ADDRESS_STAGES = new Set(["offer_submitted", "under_contract", "closing"]);
+                      const showAddress = transaction.type !== 'buy' || BUYER_ADDRESS_STAGES.has(transaction.status);
+                      if (!showAddress) return transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : `Transaction #${transaction.id}`;
+                      return transaction.streetName || (transaction.client ? `${transaction.client.firstName} ${transaction.client.lastName}` : `Transaction #${transaction.id}`);
+                    })()}
                   </CardTitle>
                   {(user?.role === "agent" || user?.role === "broker") && (
                     <Button
