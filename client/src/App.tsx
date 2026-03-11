@@ -161,10 +161,11 @@ function Layout({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen bg-background w-full overflow-x-clip">
         {user && !isMobile && (
-          <div className="flex-none w-[220px]">
             <Sidebar
               side="left"
-              className="fixed inset-y-0 left-0 z-40 border-r bg-background"
+              variant="sidebar"
+              collapsible="none"
+              className="border-r sticky top-0 h-screen overflow-y-auto shrink-0"
             >
               <SidebarHeader>
                 <div className="flex items-center justify-between p-2">
@@ -550,7 +551,6 @@ function Layout({ children }: { children: React.ReactNode }) {
                 </div>
               </SidebarFooter>
             </Sidebar>
-          </div>
         )}
         <main className="flex-1 min-h-screen min-w-0 overflow-x-clip relative">
           {user && (

@@ -761,7 +761,7 @@ export default function MapPage() {
   const savedPropsWithValidCoords = savedPropsWithCoords.filter(p => p.latitude && p.longitude);
 
   return (
-    <div className="w-full relative" style={{ height: isMobile ? "calc(100vh - 125px)" : "calc(100vh - 45px)" }}>
+    <div className="w-full relative" style={{ height: isMobile ? "calc(100dvh - 125px)" : "calc(100dvh - 45px)" }}>
       <MapContainer
         center={mapCenter}
         zoom={mapZoom}
@@ -998,7 +998,7 @@ export default function MapPage() {
         )}
       </MapContainer>
 
-      <div className={`absolute top-4 z-[1000] flex flex-col gap-2 ${isMobile ? "left-3 right-3" : ""}`} style={isMobile ? undefined : { left: "180px" }}>
+      <div className={`absolute top-4 z-[1000] flex flex-col gap-2 ${isMobile ? "left-3 right-3" : "left-4 right-4"}`}>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
