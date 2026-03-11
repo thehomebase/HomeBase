@@ -355,7 +355,7 @@ export default function TransactionsPage() {
         state: data.state?.trim() || (isBuyer ? null : data.state),
         zipCode: data.zipCode?.trim() || (isBuyer ? null : data.zipCode),
         agentId: user?.id,
-        status: "prospect",
+        status: isBuyer ? "qualified_buyer" : "prospect",
         participants: [],
         clientId: data.clientId || null,
         secondaryClientId: data.secondaryClientId || null,

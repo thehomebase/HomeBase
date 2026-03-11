@@ -520,11 +520,23 @@ export default function TransactionPage() {
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="prospect">Prospect</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="under_contract">Under Contract</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  {transaction.type === 'buy' ? (
+                    <>
+                      <SelectItem value="qualified_buyer">Qualified Buyer</SelectItem>
+                      <SelectItem value="active_search">Active Search</SelectItem>
+                      <SelectItem value="offer_submitted">Offer Submitted</SelectItem>
+                      <SelectItem value="under_contract">Under Contract</SelectItem>
+                      <SelectItem value="closing">Closing</SelectItem>
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="prospect">Prospect</SelectItem>
+                      <SelectItem value="active_listing_prep">Active Listing Prep</SelectItem>
+                      <SelectItem value="live_listing">Live Listing</SelectItem>
+                      <SelectItem value="under_contract">Under Contract</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>

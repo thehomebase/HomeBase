@@ -332,19 +332,27 @@ function CommunicationsWidget() {
 }
 
 function PipelineWidget({ stages }: { stages: Record<string, number> }) {
-  const stageOrder = ["prospect", "active_listing_prep", "live_listing", "under_contract", "closed"];
+  const stageOrder = ["prospect", "qualified_buyer", "active_search", "active_listing_prep", "live_listing", "offer_submitted", "under_contract", "closing", "closed"];
   const stageLabels: Record<string, string> = {
     prospect: "Prospect",
+    qualified_buyer: "Qualified Buyer",
+    active_search: "Active Search",
     active_listing_prep: "Listing Prep",
     live_listing: "Live Listing",
+    offer_submitted: "Offer Submitted",
     under_contract: "Under Contract",
+    closing: "Closing",
     closed: "Closed",
   };
   const stageColors: Record<string, string> = {
     prospect: "bg-slate-400",
+    qualified_buyer: "bg-indigo-300",
+    active_search: "bg-indigo-400",
     active_listing_prep: "bg-blue-400",
     live_listing: "bg-amber-400",
+    offer_submitted: "bg-orange-400",
     under_contract: "bg-emerald-400",
+    closing: "bg-green-500",
     closed: "bg-green-600",
   };
   const total = Object.values(stages).reduce((s, v) => s + v, 0);

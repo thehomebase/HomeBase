@@ -677,7 +677,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: "Not authorized to update this transaction" });
       }
 
-      const VALID_BUYER_STATUSES = ['prospect', 'active_buyer', 'under_contract', 'closing', 'closed'];
+      const VALID_BUYER_STATUSES = ['prospect', 'qualified_buyer', 'active_search', 'offer_submitted', 'under_contract', 'closing', 'closed'];
       const VALID_SELLER_STATUSES = ['prospect', 'active_listing_prep', 'live_listing', 'under_contract', 'closed'];
       if (data.status) {
         const txType = data.type || oldTransaction.type || 'buy';
@@ -866,10 +866,11 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Street name is required for seller transactions" });
       }
 
+      const defaultStatus = parsed.data.type === 'buy' ? 'qualified_buyer' : 'prospect';
       const transaction = await storage.createTransaction({
         ...parsed.data,
         agentId: req.user.id,
-        status: 'prospect',
+        status: parsed.data.status || defaultStatus,
         participants: []
       });
 
@@ -6930,7 +6931,7 @@ export function registerRoutes(app: Express): Server {
       const transaction = await storage.createTransaction({
         streetName: streetName || null, city: city || null, state: state || null, zipCode: zipCode || null,
         accessCode, type: effectiveType,
-        agentId: req.user.id, clientId: clientId || null, status: 'prospect',
+        agentId: req.user.id, clientId: clientId || null, status: effectiveType === 'buy' ? 'qualified_buyer' : 'prospect',
       });
 
       if (template.checklist_items) {
@@ -7502,7 +7503,8 @@ export function registerRoutes(app: Express): Server {
     try {
       const agentId = (req as any).apiKeyUserId;
       const data = req.body;
-      const transaction = await storage.createTransaction({ ...data, agentId, status: data.status || 'prospect', participants: data.participants || [] });
+      const defaultStatus = (data.type === 'buy') ? 'qualified_buyer' : 'prospect';
+      const transaction = await storage.createTransaction({ ...data, agentId, status: data.status || defaultStatus, participants: data.participants || [] });
       fireWebhook("transaction_created", transaction);
       res.status(201).json(transaction);
     } catch (error) {

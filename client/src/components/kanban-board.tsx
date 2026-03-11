@@ -42,11 +42,11 @@ interface Client {
 }
 
 const buyerColumns = [
-  { id: "prospect", title: "Prospect" },
-  { id: "active_buyer", title: "Active Buyer" },
+  { id: "qualified_buyer", title: "Qualified Buyer" },
+  { id: "active_search", title: "Active Search" },
+  { id: "offer_submitted", title: "Offer Submitted" },
   { id: "under_contract", title: "Under Contract" },
   { id: "closing", title: "Closing" },
-  { id: "closed", title: "Closed" },
 ];
 
 const sellerColumns = [
@@ -305,7 +305,7 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
   const sellerStatusSet = new Set(sellerColumns.map(c => c.id));
   const buyerTransactions = localTransactions
     .filter(t => t.type === 'buy')
-    .map(t => buyerStatusSet.has(t.status) ? t : { ...t, status: 'prospect' });
+    .map(t => buyerStatusSet.has(t.status) ? t : { ...t, status: 'qualified_buyer' });
   const sellerTransactions = localTransactions
     .filter(t => t.type === 'sell')
     .map(t => sellerStatusSet.has(t.status) ? t : { ...t, status: 'prospect' });

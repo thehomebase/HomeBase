@@ -128,11 +128,14 @@ function StatCard({
 }
 
 const PIPELINE_STAGES = [
-  { key: "prospect", label: "Prospect", shade: "bg-foreground/15" },
+  { key: "prospect", label: "Prospect", shade: "bg-foreground/10" },
+  { key: "qualified_buyer", label: "Qualified Buyer", shade: "bg-foreground/15" },
+  { key: "active_search", label: "Active Search", shade: "bg-foreground/25" },
   { key: "active_listing_prep", label: "Active Listing Prep", shade: "bg-foreground/30" },
-  { key: "live_listing", label: "Live Listing", shade: "bg-foreground/45" },
-  { key: "active", label: "Active", shade: "bg-foreground/55" },
-  { key: "under_contract", label: "Under Contract", shade: "bg-foreground/75" },
+  { key: "live_listing", label: "Live Listing", shade: "bg-foreground/40" },
+  { key: "offer_submitted", label: "Offer Submitted", shade: "bg-foreground/50" },
+  { key: "under_contract", label: "Under Contract", shade: "bg-foreground/65" },
+  { key: "closing", label: "Closing", shade: "bg-foreground/80" },
   { key: "closed", label: "Closed", shade: "bg-foreground" },
 ];
 
@@ -341,11 +344,14 @@ export default function DataPage() {
   const statusBadge = (status: string) => {
     const styles: Record<string, string> = {
       closed: "bg-foreground text-background",
-      active: "bg-foreground/20 text-foreground",
-      prospect: "bg-foreground/10 text-foreground",
+      closing: "bg-foreground/80 text-background",
       under_contract: "bg-foreground/40 text-foreground",
-      active_listing_prep: "bg-foreground/15 text-foreground",
+      offer_submitted: "bg-foreground/30 text-foreground",
       live_listing: "bg-foreground/25 text-foreground",
+      active_listing_prep: "bg-foreground/15 text-foreground",
+      active_search: "bg-foreground/20 text-foreground",
+      qualified_buyer: "bg-foreground/12 text-foreground",
+      prospect: "bg-foreground/10 text-foreground",
     };
     return (
       <span

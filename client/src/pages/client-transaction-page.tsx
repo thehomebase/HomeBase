@@ -40,16 +40,29 @@ interface MyTransactionResponse {
   timeline: TransactionTimeline | null;
 }
 
-const STAGES = [
+const BUYER_STAGES = [
+  { key: "qualified_buyer", label: "Qualified Buyer" },
+  { key: "active_search", label: "Active Search" },
+  { key: "offer_submitted", label: "Offer Submitted" },
+  { key: "under_contract", label: "Under Contract" },
+  { key: "closing", label: "Closing" },
+];
+
+const SELLER_STAGES = [
   { key: "prospect", label: "Prospect" },
   { key: "active_listing_prep", label: "Active Listing Prep" },
-  { key: "active", label: "Live Listing" },
+  { key: "live_listing", label: "Live Listing" },
   { key: "under_contract", label: "Under Contract" },
   { key: "closed", label: "Closed" },
 ];
 
-function getStageIndex(status: string): number {
-  const idx = STAGES.findIndex((s) => s.key === status);
+function getStagesForType(type: string) {
+  return type === 'buy' ? BUYER_STAGES : SELLER_STAGES;
+}
+
+function getStageIndex(status: string, type: string): number {
+  const stages = getStagesForType(type);
+  const idx = stages.findIndex((s) => s.key === status);
   return idx >= 0 ? idx : 0;
 }
 
@@ -66,13 +79,14 @@ function formatDate(value: Date | string | null | undefined): string {
   return new Date(value).toLocaleDateString();
 }
 
-function StageProgress({ status }: { status: string }) {
-  const currentIndex = getStageIndex(status);
+function StageProgress({ status, type }: { status: string; type: string }) {
+  const stages = getStagesForType(type);
+  const currentIndex = getStageIndex(status, type);
 
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-2">
-        {STAGES.map((stage, i) => (
+        {stages.map((stage, i) => (
           <div key={stage.key} className="flex flex-col items-center flex-1">
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
@@ -103,7 +117,7 @@ function StageProgress({ status }: { status: string }) {
         <div
           className="absolute h-full bg-primary rounded-full transition-all"
           style={{
-            width: `${(currentIndex / (STAGES.length - 1)) * 100}%`,
+            width: `${(currentIndex / (stages.length - 1)) * 100}%`,
           }}
         />
       </div>
@@ -203,7 +217,7 @@ export default function ClientTransactionPage() {
           <CardTitle className="text-lg">Transaction Progress</CardTitle>
         </CardHeader>
         <CardContent>
-          <StageProgress status={transaction.status} />
+          <StageProgress status={transaction.status} type={transaction.type} />
         </CardContent>
       </Card>
 
