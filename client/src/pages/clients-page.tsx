@@ -1733,7 +1733,7 @@ export default function ClientsPage() {
         </Card>
       )}
 
-      <Card className="w-full min-w-0 overflow-hidden">
+      <Card className="w-full min-w-0">
         <div className="w-full overflow-x-auto">
           <ClientTable
             clients={clients}
