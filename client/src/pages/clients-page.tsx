@@ -825,14 +825,14 @@ const TableContent = ({
     <>
       {/* Desktop view - Table */}
       <div className="hidden md:block w-full min-w-0 overflow-x-auto">
-        <Table className="w-full table-auto">
-          <TableHeader>
-            <TableRow className="bg-gray-100 dark:bg-gray-800">
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <Table className="w-full table-auto">
+            <TableHeader>
+              <TableRow className="bg-gray-100 dark:bg-gray-800">
                 <SortableContext
                   items={columns.map(col => col.id)}
                   strategy={horizontalListSortingStrategy}
@@ -846,34 +846,34 @@ const TableContent = ({
                     />
                   ))}
                 </SortableContext>
-              </DndContext>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortData(clients, sortConfig).map((client, index) => (
-              <TableRow
-                key={client.id}
-                className={`hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
-                  index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
-                }`}
-                onClick={() => setSelectedClient(client)}
-              >
-                {columns.map((column) => (
-                  <TableCell key={column.id} className="py-3">
-                    {renderCell(client, column.id)}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortData(clients, sortConfig).map((client, index) => (
+                <TableRow
+                  key={client.id}
+                  className={`hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
+                    index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
+                  }`}
+                  onClick={() => setSelectedClient(client)}
+                >
+                  {columns.map((column) => (
+                    <TableCell key={column.id} className="py-3">
+                      {renderCell(client, column.id)}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+              {clients.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="text-center text-muted-foreground">
+                    No clients found. Add your first client to get started!
                   </TableCell>
-                ))}
-              </TableRow>
-            ))}
-            {clients.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="text-center text-muted-foreground">
-                  No clients found. Add your first client to get started!
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </DndContext>
       </div>
 
       {/* Mobile view - Cards */}

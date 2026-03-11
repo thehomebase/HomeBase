@@ -345,14 +345,14 @@ export function TransactionTable({
       </div>
 
       <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
                 <SortableContext
                   items={columns.filter(col => col.visible).map(col => col.id)}
                   strategy={horizontalListSortingStrategy}
@@ -368,37 +368,37 @@ export function TransactionTable({
                       />
                     ))}
                 </SortableContext>
-              </DndContext>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredTransactions.map((transaction) => (
-              <TableRow
-                key={transaction.id}
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() => onTransactionClick(transaction.id)}
-              >
-                {columns
-                  .filter(column => column.visible)
-                  .map((column) => (
-                    <TableCell key={column.id}>
-                      {getColumnValue(transaction, column.id)}
-                    </TableCell>
-                  ))}
               </TableRow>
-            ))}
-            {filteredTransactions.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.filter(col => col.visible).length}
-                  className="h-24 text-center"
+            </TableHeader>
+            <TableBody>
+              {filteredTransactions.map((transaction) => (
+                <TableRow
+                  key={transaction.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => onTransactionClick(transaction.id)}
                 >
-                  No transactions found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                  {columns
+                    .filter(column => column.visible)
+                    .map((column) => (
+                      <TableCell key={column.id}>
+                        {getColumnValue(transaction, column.id)}
+                      </TableCell>
+                    ))}
+                </TableRow>
+              ))}
+              {filteredTransactions.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.filter(col => col.visible).length}
+                    className="h-24 text-center"
+                  >
+                    No transactions found.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </DndContext>
       </div>
 
       <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
