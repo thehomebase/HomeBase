@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap, Circle, GeoJSON } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, Circle, GeoJSON, ZoomControl } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
@@ -765,8 +765,10 @@ export default function MapPage() {
       <MapContainer
         center={mapCenter}
         zoom={mapZoom}
+        zoomControl={false}
         style={{ height: "100%", width: "100%" }}
       >
+        <ZoomControl position="bottomright" />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
