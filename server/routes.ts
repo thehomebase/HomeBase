@@ -7275,7 +7275,10 @@ export function registerRoutes(app: Express): Server {
       const transactionId = req.query.transactionId ? parseInt(req.query.transactionId as string) : undefined;
       const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : undefined;
       const docs = await storage.getScannedDocuments(req.user.id, transactionId, clientId);
-      const metadata = docs.map(({ fileData, ...rest }) => rest);
+      const metadata = docs.map(({ fileData, ...rest }) => {
+        const { file_data, ...clean } = rest as any;
+        return clean;
+      });
       res.json(metadata);
     } catch (error) {
       console.error("Error fetching scanned documents:", error);

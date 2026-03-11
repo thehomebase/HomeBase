@@ -590,18 +590,19 @@ export default function DocumentScannerPage() {
               return (
                 <Card key={doc.id} className="overflow-hidden">
                   <div
-                    className="h-32 bg-muted flex items-center justify-center cursor-pointer"
+                    className="h-32 bg-muted flex items-center justify-center cursor-pointer relative"
                     onClick={() => setPreviewDoc(doc)}
                   >
+                    <FileText className="h-12 w-12 text-muted-foreground absolute" />
                     {isImage ? (
                       <img
                         src={`/api/scanned-documents/${doc.id}/file`}
                         alt={doc.name}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-cover relative z-10"
+                        loading="lazy"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
-                    ) : (
-                      <FileText className="h-12 w-12 text-muted-foreground" />
-                    )}
+                    ) : null}
                   </div>
                   <CardContent className="p-3 space-y-2">
                     <div className="flex items-start justify-between gap-2">

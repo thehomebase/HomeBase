@@ -66,6 +66,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
+import { eq, and, desc } from 'drizzle-orm';
 import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import { pool } from './db';
@@ -6156,12 +6157,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getScannedDocuments(userId: number, transactionId?: number, clientId?: number): Promise<ScannedDocument[]> {
-    let query = sql`SELECT * FROM scanned_documents WHERE user_id = ${userId}`;
-    if (transactionId) query = sql`${query} AND transaction_id = ${transactionId}`;
-    if (clientId) query = sql`${query} AND client_id = ${clientId}`;
-    query = sql`${query} ORDER BY created_at DESC`;
-    const result = await db.execute(query);
-    return result.rows as ScannedDocument[];
+    const conditions = [eq(scannedDocuments.userId, userId)];
+    if (transactionId) conditions.push(eq(scannedDocuments.transactionId, transactionId));
+    if (clientId) conditions.push(eq(scannedDocuments.clientId, clientId));
+    return db.select({
+      id: scannedDocuments.id,
+      userId: scannedDocuments.userId,
+      transactionId: scannedDocuments.transactionId,
+      clientId: scannedDocuments.clientId,
+      name: scannedDocuments.name,
+      category: scannedDocuments.category,
+      fileData: sql<string>`''`.as('fileData'),
+      mimeType: scannedDocuments.mimeType,
+      fileSize: scannedDocuments.fileSize,
+      notes: scannedDocuments.notes,
+      createdAt: scannedDocuments.createdAt,
+    }).from(scannedDocuments).where(and(...conditions)).orderBy(desc(scannedDocuments.createdAt));
   }
 
   async getScannedDocument(id: number): Promise<ScannedDocument | undefined> {
