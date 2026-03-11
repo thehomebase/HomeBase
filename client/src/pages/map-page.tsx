@@ -999,7 +999,7 @@ export default function MapPage() {
       </MapContainer>
 
       <div className={`absolute z-[1000] flex flex-col gap-2 ${isMobile ? "left-3 right-3" : "left-4 right-4 top-4"}`} style={isMobile ? { top: "max(env(safe-area-inset-top, 12px), 12px)" } : undefined}>
-        <div className="flex gap-1.5 items-center">
+        <div className="flex gap-2">
           <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -1011,31 +1011,67 @@ export default function MapPage() {
               data-testid="input-address-search"
             />
           </div>
-          <Button onClick={searchAddress} disabled={isSearching} size={isMobile ? "sm" : "default"} className="shadow-lg shrink-0" data-testid="button-search">
-            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{isMobile ? <Search className="h-4 w-4" /> : "Search"}</>}
-          </Button>
-          {isMobile && (
-            <>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="shadow-lg bg-background relative shrink-0" 
-                onClick={() => setShowRequestsPanel(!showRequestsPanel)} 
-                data-testid="button-showing-requests-mobile"
-              >
-                <Bell className="h-4 w-4" />
+          {!isMobile && (
+            <Button onClick={searchAddress} disabled={isSearching} className="shadow-lg shrink-0" data-testid="button-search">
+              {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+            </Button>
+          )}
+        </div>
+
+        {isMobile && isAgent && (
+          <div className="flex gap-1.5 items-center justify-between">
+            <div className="flex gap-1.5 items-center">
+              {!routePlanningMode && viewingsWithCoords.length >= 2 && (
+                <Button variant="outline" size="sm" className="shadow-lg bg-background h-8 text-xs" onClick={() => setRoutePlanningMode(true)} data-testid="button-plan-route-mobile">
+                  <Route className="h-3 w-3 mr-1" /> Route
+                </Button>
+              )}
+              {routePlanningMode && (
+                <>
+                  <Button size="sm" disabled={selectedForRoute.size < 2 || planRouteMutation.isPending} className="shadow-lg h-8 text-xs" onClick={planRoute} data-testid="button-calculate-route-mobile">
+                    {planRouteMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Navigation className="h-3 w-3 mr-1" />}
+                    Go ({selectedForRoute.size})
+                  </Button>
+                  <Button variant="outline" size="sm" className="shadow-lg bg-background h-8" onClick={clearRoute} data-testid="button-cancel-route-mobile">
+                    <X className="h-3 w-3" />
+                  </Button>
+                </>
+              )}
+              <Button size="sm" className="shadow-lg h-8 text-xs" onClick={() => setShowAddViewing(true)} data-testid="button-add-viewing-mobile">
+                <Plus className="h-3 w-3 mr-1" /> Add
+              </Button>
+            </div>
+            <div className="flex gap-1.5 items-center">
+              <Button variant="outline" size="sm" className="shadow-lg bg-background relative h-8" onClick={() => setShowRequestsPanel(!showRequestsPanel)} data-testid="button-showing-requests-mobile">
+                <Bell className="h-3.5 w-3.5" />
                 {pendingRequests.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center" style={{ fontSize: '10px' }}>
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full h-4 w-4 flex items-center justify-center" style={{ fontSize: '10px' }}>
                     {pendingRequests.length}
                   </span>
                 )}
               </Button>
-              <Button variant="outline" size="sm" className="shadow-lg bg-background shrink-0" onClick={() => setSidebarOpen(!sidebarOpen)} data-testid="button-toggle-sidebar-mobile">
-                {sidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+              <Button variant="outline" size="sm" className="shadow-lg bg-background h-8" onClick={() => setSidebarOpen(!sidebarOpen)} data-testid="button-toggle-sidebar-mobile">
+                {sidebarOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
               </Button>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
+
+        {isMobile && !isAgent && (
+          <div className="flex gap-1.5 items-center justify-end">
+            <Button variant="outline" size="sm" className="shadow-lg bg-background relative h-8" onClick={() => setShowRequestsPanel(!showRequestsPanel)} data-testid="button-showing-requests-mobile">
+              <Bell className="h-3.5 w-3.5" />
+              {pendingRequests.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full h-4 w-4 flex items-center justify-center" style={{ fontSize: '10px' }}>
+                  {pendingRequests.length}
+                </span>
+              )}
+            </Button>
+            <Button variant="outline" size="sm" className="shadow-lg bg-background h-8" onClick={() => setSidebarOpen(!sidebarOpen)} data-testid="button-toggle-sidebar-mobile">
+              {sidebarOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+            </Button>
+          </div>
+        )}
 
         {searchResults.length > 0 && (
           <Card className={`bg-background shadow-lg ${isMobile ? "w-full" : "w-96"}`}>
@@ -1129,11 +1165,11 @@ export default function MapPage() {
         </div>
       </div>
 
-      <div className={`absolute z-[1000] flex gap-2 ${isMobile ? "left-3 right-3 justify-end" : "top-4 right-4"}`} style={isMobile ? { top: "calc(max(env(safe-area-inset-top, 12px), 12px) + 44px)" } : undefined}>
+      {!isMobile && (
+      <div className="absolute z-[1000] flex gap-2 top-4 right-4">
         {isAgent && !routePlanningMode && viewingsWithCoords.length >= 2 && (
           <Button 
             variant="outline" 
-            size={isMobile ? "sm" : "default"}
             className="shadow-lg bg-background" 
             onClick={() => setRoutePlanningMode(true)}
             data-testid="button-plan-route"
@@ -1145,7 +1181,6 @@ export default function MapPage() {
           <div className="flex gap-2">
             <Button 
               onClick={planRoute} 
-              size={isMobile ? "sm" : "default"}
               disabled={selectedForRoute.size < 2 || planRouteMutation.isPending}
               className="shadow-lg"
               data-testid="button-calculate-route"
@@ -1155,7 +1190,6 @@ export default function MapPage() {
             </Button>
             <Button 
               variant="outline" 
-              size={isMobile ? "sm" : "default"}
               className="shadow-lg bg-background" 
               onClick={clearRoute}
               data-testid="button-cancel-route"
@@ -1165,13 +1199,32 @@ export default function MapPage() {
           </div>
         )}
         {isAgent && (
-          <Dialog open={showAddViewing} onOpenChange={setShowAddViewing}>
-            <DialogTrigger asChild>
-              <Button size={isMobile ? "sm" : "default"} className="shadow-lg" data-testid="button-add-viewing">
-                <Plus className="h-4 w-4 mr-2" /> {isMobile ? "Add" : "Add Property"}
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
+          <Button className="shadow-lg" onClick={() => setShowAddViewing(true)} data-testid="button-add-viewing">
+            <Plus className="h-4 w-4 mr-2" /> Add Property
+          </Button>
+        )}
+        <Button 
+          variant="outline" 
+          className="shadow-lg bg-background relative" 
+          onClick={() => setShowRequestsPanel(!showRequestsPanel)} 
+          data-testid="button-showing-requests"
+        >
+          <Bell className="h-4 w-4" />
+          {pendingRequests.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              {pendingRequests.length}
+            </span>
+          )}
+        </Button>
+        <Button variant="outline" className="shadow-lg bg-background" onClick={() => setSidebarOpen(!sidebarOpen)} data-testid="button-toggle-sidebar">
+          {sidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+        </Button>
+      </div>
+      )}
+
+      {isAgent && (
+        <Dialog open={showAddViewing} onOpenChange={setShowAddViewing}>
+          <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add Property</DialogTitle>
               </DialogHeader>
@@ -1278,27 +1331,7 @@ export default function MapPage() {
             </DialogContent>
           </Dialog>
         )}
-        {!isMobile && (
-          <>
-            <Button 
-              variant="outline" 
-              className="shadow-lg bg-background relative" 
-              onClick={() => setShowRequestsPanel(!showRequestsPanel)} 
-              data-testid="button-showing-requests"
-            >
-              <Bell className="h-4 w-4" />
-              {pendingRequests.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {pendingRequests.length}
-                </span>
-              )}
-            </Button>
-            <Button variant="outline" className="shadow-lg bg-background" onClick={() => setSidebarOpen(!sidebarOpen)} data-testid="button-toggle-sidebar">
-              {sidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
-            </Button>
-          </>
-        )}
-      </div>
+      
 
       <div className={`absolute top-0 right-0 h-full bg-background border-l shadow-xl z-[1001] transform transition-transform duration-300 ease-in-out ${isMobile ? "w-full" : "w-80"} ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex items-center justify-between p-4 border-b">
@@ -1719,7 +1752,7 @@ export default function MapPage() {
       </Dialog>
 
       {showRequestsPanel && (
-        <div className={`absolute z-[1002] bg-background rounded-lg shadow-xl border max-h-96 overflow-y-auto ${isMobile ? "left-3 right-3" : "right-4 w-80"}`} style={{ top: isMobile ? "calc(max(env(safe-area-inset-top, 12px), 12px) + 44px)" : "64px" }}>
+        <div className={`absolute z-[1002] bg-background rounded-lg shadow-xl border max-h-96 overflow-y-auto ${isMobile ? "left-3 right-3" : "right-4 w-80"}`} style={{ top: isMobile ? "calc(max(env(safe-area-inset-top, 12px), 12px) + 80px)" : "64px" }}>
           <div className="flex items-center justify-between p-3 border-b sticky top-0 bg-background">
             <h3 className="font-semibold flex items-center gap-2">
               <Bell className="h-4 w-4" /> Showing Requests
