@@ -999,8 +999,8 @@ export default function MapPage() {
       </MapContainer>
 
       <div className={`absolute z-[1000] flex flex-col gap-2 ${isMobile ? "left-3 right-3" : "left-4 right-4 top-4"}`} style={isMobile ? { top: "max(env(safe-area-inset-top, 12px), 12px)" } : undefined}>
-        <div className="flex gap-2">
-          <div className="relative flex-1 min-w-0">
+        <div className="flex gap-2 items-center">
+          <div className={`relative ${isMobile ? "flex-1 min-w-0" : ""}`}>
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search for an address..."
@@ -1012,9 +1012,44 @@ export default function MapPage() {
             />
           </div>
           {!isMobile && (
-            <Button onClick={searchAddress} disabled={isSearching} className="shadow-lg shrink-0" data-testid="button-search">
-              {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
-            </Button>
+            <>
+              <Button onClick={searchAddress} disabled={isSearching} className="shadow-lg shrink-0" data-testid="button-search">
+                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+              </Button>
+              <div className="flex-1" />
+              {isAgent && !routePlanningMode && viewingsWithCoords.length >= 2 && (
+                <Button variant="outline" className="shadow-lg bg-background shrink-0" onClick={() => setRoutePlanningMode(true)} data-testid="button-plan-route">
+                  <Route className="h-4 w-4 mr-2" /> Plan Route
+                </Button>
+              )}
+              {isAgent && routePlanningMode && (
+                <div className="flex gap-2 shrink-0">
+                  <Button onClick={planRoute} disabled={selectedForRoute.size < 2 || planRouteMutation.isPending} className="shadow-lg" data-testid="button-calculate-route">
+                    {planRouteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Navigation className="h-4 w-4 mr-2" />}
+                    Calculate ({selectedForRoute.size})
+                  </Button>
+                  <Button variant="outline" className="shadow-lg bg-background" onClick={clearRoute} data-testid="button-cancel-route">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              {isAgent && (
+                <Button className="shadow-lg shrink-0" onClick={() => setShowAddViewing(true)} data-testid="button-add-viewing">
+                  <Plus className="h-4 w-4 mr-2" /> Add Property
+                </Button>
+              )}
+              <Button variant="outline" className="shadow-lg bg-background relative shrink-0" onClick={() => setShowRequestsPanel(!showRequestsPanel)} data-testid="button-showing-requests">
+                <Bell className="h-4 w-4" />
+                {pendingRequests.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {pendingRequests.length}
+                  </span>
+                )}
+              </Button>
+              <Button variant="outline" className="shadow-lg bg-background shrink-0" onClick={() => setSidebarOpen(!sidebarOpen)} data-testid="button-toggle-sidebar">
+                {sidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+              </Button>
+            </>
           )}
         </div>
 
@@ -1165,62 +1200,8 @@ export default function MapPage() {
         </div>
       </div>
 
-      {!isMobile && (
-      <div className="absolute z-[1000] flex gap-2 top-4 right-4">
-        {isAgent && !routePlanningMode && viewingsWithCoords.length >= 2 && (
-          <Button 
-            variant="outline" 
-            className="shadow-lg bg-background" 
-            onClick={() => setRoutePlanningMode(true)}
-            data-testid="button-plan-route"
-          >
-            <Route className="h-4 w-4 mr-2" /> Plan Route
-          </Button>
-        )}
-        {isAgent && routePlanningMode && (
-          <div className="flex gap-2">
-            <Button 
-              onClick={planRoute} 
-              disabled={selectedForRoute.size < 2 || planRouteMutation.isPending}
-              className="shadow-lg"
-              data-testid="button-calculate-route"
-            >
-              {planRouteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Navigation className="h-4 w-4 mr-2" />}
-              Calculate ({selectedForRoute.size})
-            </Button>
-            <Button 
-              variant="outline" 
-              className="shadow-lg bg-background" 
-              onClick={clearRoute}
-              data-testid="button-cancel-route"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-        {isAgent && (
-          <Button className="shadow-lg" onClick={() => setShowAddViewing(true)} data-testid="button-add-viewing">
-            <Plus className="h-4 w-4 mr-2" /> Add Property
-          </Button>
-        )}
-        <Button 
-          variant="outline" 
-          className="shadow-lg bg-background relative" 
-          onClick={() => setShowRequestsPanel(!showRequestsPanel)} 
-          data-testid="button-showing-requests"
-        >
-          <Bell className="h-4 w-4" />
-          {pendingRequests.length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-              {pendingRequests.length}
-            </span>
-          )}
-        </Button>
-        <Button variant="outline" className="shadow-lg bg-background" onClick={() => setSidebarOpen(!sidebarOpen)} data-testid="button-toggle-sidebar">
-          {sidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
-        </Button>
-      </div>
-      )}
+
+
 
       {isAgent && (
         <Dialog open={showAddViewing} onOpenChange={setShowAddViewing}>
