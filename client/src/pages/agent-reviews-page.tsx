@@ -384,7 +384,7 @@ export function AgentReviewsPage() {
 
   if (!agentId) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
+      <div className="p-4 md:p-6">
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">Invalid agent ID.</p>
@@ -395,7 +395,7 @@ export function AgentReviewsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
+    <div className="p-4 md:p-6">
       <AgentProfileView agentId={agentId} />
     </div>
   );
@@ -403,9 +403,9 @@ export function AgentReviewsPage() {
 
 export function TopAgentsPage() {
   return (
-    <div className="container mx-auto p-6 max-w-6xl space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Find Agents</h1>
+        <h1 className="text-2xl font-bold">Find Agents</h1>
         <p className="text-muted-foreground mt-1">
           Discover top-rated real estate agents based on client reviews
         </p>

@@ -270,7 +270,7 @@ export default function MessagesPage() {
     : null;
 
   return (
-    <main className="container mx-auto px-4 py-4 md:py-8 h-[calc(100vh-120px)] md:h-[calc(100vh-80px)]">
+    <main className="px-4 sm:px-8 py-4 md:py-6 h-[calc(100vh-120px)] md:h-[calc(100vh-80px)]">
       <div className="flex items-center gap-3 mb-4">
         <MessageSquare className="h-6 w-6 text-primary" />
         <h2 className="text-2xl font-bold">Messages</h2>

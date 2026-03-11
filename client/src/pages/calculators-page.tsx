@@ -80,8 +80,8 @@ export default function CalculatorsPage() {
   return (
     <div className="w-full px-4 sm:px-8 py-6 relative">
       <header className="border-b">
-        <div className="container px-2 py-4">
-          <h1 className="text-2xl font-bold ">Financial Calculators</h1>
+        <div className="px-2 py-4">
+          <h1 className="text-2xl font-bold">Financial Calculators</h1>
         </div>
       </header>
       <div className="min-h-screen bg-background overflow-x-hidden">

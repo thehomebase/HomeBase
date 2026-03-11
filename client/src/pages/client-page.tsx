@@ -21,7 +21,7 @@ export default function ClientPage() {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main className="px-4 sm:px-8 py-6">
       <h1 className="text-2xl font-bold mb-6">{client.firstName} {client.lastName}</h1>
       <div className="grid gap-6">
         <Card className="p-6">

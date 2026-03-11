@@ -765,7 +765,7 @@ export default function MailPage() {
 
   if (!gmailConnected) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <div className="p-4 md:p-6">
         <h1 className="text-2xl font-bold flex items-center gap-2 mb-6">
           <Mail className="h-6 w-6" /> Mail
         </h1>
@@ -802,7 +802,7 @@ export default function MailPage() {
     const totalAttSize = attachments.reduce((s, a) => s + a.file.size, 0);
 
     return (
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="p-4 md:p-6">
         <Button variant="ghost" size="sm" className="mb-4" onClick={backToInbox}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back to inbox
         </Button>
@@ -1011,7 +1011,7 @@ export default function MailPage() {
   if (viewMode === "snippets") {
     const snippets = snippetsQuery.data || [];
     return (
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="p-4 md:p-6">
         <Button variant="ghost" size="sm" className="mb-4" onClick={backToInbox}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back to inbox
         </Button>
@@ -1106,7 +1106,7 @@ export default function MailPage() {
   if (viewMode === "tracking") {
     const records = trackingQuery.data || [];
     return (
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="p-4 md:p-6">
         <Button variant="ghost" size="sm" className="mb-4" onClick={backToInbox}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back to inbox
         </Button>
@@ -1189,7 +1189,7 @@ export default function MailPage() {
   if (viewMode === "detail") {
     const msg = messageQuery.data?.message;
     return (
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="p-4 md:p-6">
         <Button variant="ghost" size="sm" className="mb-4" onClick={backToInbox}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back to inbox
         </Button>
@@ -1244,7 +1244,7 @@ export default function MailPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6">
       <div className="flex items-start justify-between gap-2 mb-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold flex items-center gap-2">

@@ -577,7 +577,7 @@ export default function PropertySearchPage() {
   const apiStatus = rentcastStatus as { apiCallsUsed: number; apiCallsLimit: number } | undefined;
 
   return (
-    <div className="px-4 pt-6 pb-4 md:p-6 max-w-6xl mx-auto space-y-6 overflow-x-hidden">
+    <div className="px-4 pt-6 pb-4 md:p-6 space-y-6 overflow-x-hidden">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">

@@ -166,8 +166,8 @@ export default function BillingPage() {
 
   if (userRole !== 'agent' && userRole !== 'vendor') {
     return (
-      <div className="container mx-auto p-6 max-w-3xl">
-        <h1 className="text-3xl font-bold mb-4">Billing</h1>
+      <div className="p-4 md:p-6">
+        <h1 className="text-2xl font-bold mb-4">Billing</h1>
         <Card>
           <CardContent className="pt-6 text-center py-12">
             <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-40" />
@@ -181,7 +181,7 @@ export default function BillingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       {(isSuccess || isSetupSuccess || isCanceled) && (
-        <div className="container mx-auto px-4 pt-4 max-w-5xl">
+        <div className="px-4 sm:px-8 pt-4">
           {isSuccess && (
             <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -209,7 +209,7 @@ export default function BillingPage() {
         </div>
       )}
 
-      <div className={`container mx-auto px-4 ${isMobile ? "pt-6 pb-24" : "py-12"} max-w-5xl`}>
+      <div className={`px-4 sm:px-8 ${isMobile ? "pt-6 pb-24" : "py-12"}`}>
         <div className="text-center mb-10">
           <Badge variant="outline" className="mb-4 px-3 py-1 text-xs font-medium tracking-wider uppercase">
             Pricing

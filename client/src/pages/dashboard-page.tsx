@@ -745,7 +745,7 @@ export default function DashboardPage() {
 
   if (isLoading || !dashData) {
     return (
-      <div className="container mx-auto px-4 py-6">
+      <div className="px-4 sm:px-8 py-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <Skeleton className="h-8 w-48 mb-2" />
@@ -764,7 +764,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="px-4 sm:px-8 py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

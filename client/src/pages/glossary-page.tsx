@@ -21,7 +21,7 @@ export default function GlossaryPage() {
   ];
 
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main className="px-4 sm:px-8 py-6">
       <h2 className="text-2xl font-bold mb-8">Real Estate Glossary</h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {glossaryTerms.map((item, index) => (

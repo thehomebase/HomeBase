@@ -160,9 +160,9 @@ export default function ApiKeysPage() {
   };
 
   return (
-    <div className={`container mx-auto px-4 ${isMobile ? "pt-4 pb-24" : "py-8"} max-w-4xl`}>
+    <div className={`px-4 sm:px-8 ${isMobile ? "pt-4 pb-24" : "py-6"}`}>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+        <h1 className="text-2xl font-bold flex items-center gap-3">
           <Key className="h-8 w-8 text-primary" />
           API Keys & Webhooks
         </h1>

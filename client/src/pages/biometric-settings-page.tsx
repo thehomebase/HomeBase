@@ -66,7 +66,7 @@ export default function BiometricSettingsPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-lg mx-auto space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
       <Button variant="ghost" size="sm" onClick={() => setLocation("/transactions")} className="gap-2 -ml-2">
         <ArrowLeft className="h-4 w-4" />
         Back

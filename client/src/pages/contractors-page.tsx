@@ -805,7 +805,7 @@ export default function ContractorsPage() {
 
   if (!user) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="px-4 sm:px-8 py-6">
         <p className="text-center">Please log in to view contractors.</p>
       </div>
     );

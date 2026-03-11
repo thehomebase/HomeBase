@@ -18,7 +18,7 @@ export default function ChatPage() {
   // Early return if no valid ID
   if (!parsedId || isNaN(parsedId)) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="px-4 sm:px-8 py-6">
         <div className="text-center">
           <p className="text-xl text-destructive">Invalid transaction ID</p>
           <Link to="/transactions">
@@ -45,7 +45,7 @@ export default function ChatPage() {
 
   if (!user) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="px-4 sm:px-8 py-6">
         <div className="text-center">
           <p className="text-xl">Please log in to access the chat.</p>
         </div>
@@ -54,7 +54,7 @@ export default function ChatPage() {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main className="px-4 sm:px-8 py-6">
       <div className="mb-6 flex items-center gap-4">
         <Link to="/transactions">
           <Button variant="ghost" size="icon">

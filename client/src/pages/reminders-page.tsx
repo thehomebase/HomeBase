@@ -205,7 +205,7 @@ export default function RemindersPage() {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Bell className="h-6 w-6 text-primary" />

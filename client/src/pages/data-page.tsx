@@ -317,7 +317,7 @@ export default function DataPage() {
 
   if (!user || (user.role !== "agent" && user.role !== "broker")) {
     return (
-      <main className="container mx-auto px-4 py-8">
+      <main className="px-4 sm:px-8 py-6">
         <h2 className="text-2xl font-bold mb-8">Dashboard</h2>
         <Card className="p-6">
           <p className="text-center text-muted-foreground">
@@ -330,7 +330,7 @@ export default function DataPage() {
 
   if (isLoading) {
     return (
-      <main className="container mx-auto px-4 py-8">
+      <main className="px-4 sm:px-8 py-6">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -359,7 +359,7 @@ export default function DataPage() {
   };
 
   return (
-    <main className="container mx-auto px-4 py-6 pb-24 md:pb-6 max-w-7xl">
+    <main className="px-4 sm:px-8 py-6 pb-24 md:pb-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>

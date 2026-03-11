@@ -184,7 +184,7 @@ export default function LenderTransactionPage() {
 
   if (!user) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
+      <div className="px-4 sm:px-8 py-6 text-center">
         <p className="text-xl">Please log in to view this transaction.</p>
       </div>
     );
@@ -192,7 +192,7 @@ export default function LenderTransactionPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8 flex items-center justify-center">
+      <div className="px-4 sm:px-8 py-6 flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
     );
@@ -200,7 +200,7 @@ export default function LenderTransactionPage() {
 
   if (!transaction) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
+      <div className="px-4 sm:px-8 py-6 text-center">
         <p className="text-xl text-destructive">Transaction not found</p>
         <Link to="/lender-portal">
           <Button variant="outline" className="mt-4">Back to Pipeline</Button>
