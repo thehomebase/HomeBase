@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,14 +9,57 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
-  Upload, FileText, Image, Trash2, Mail, Download, Eye, Loader2,
-  Camera, ScanLine, X, Send, FileCheck
+  Upload, FileText, Trash2, Mail, Download, Eye, Loader2,
+  Camera, ScanLine, X, Send, FileCheck, FileDown
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Transaction, Client, ScannedDocument } from "@shared/schema";
+
+function compressImage(file: File, maxWidth = 1600, quality = 0.8): Promise<File> {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith("image/")) {
+      resolve(file);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      try {
+        let { width, height } = img;
+        if (width <= maxWidth) {
+          URL.revokeObjectURL(objectUrl);
+          resolve(file);
+          return;
+        }
+        const ratio = maxWidth / width;
+        width = maxWidth;
+        height = Math.round(height * ratio);
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { URL.revokeObjectURL(objectUrl); resolve(file); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(objectUrl);
+            if (!blob) { resolve(file); return; }
+            resolve(new File([blob], file.name, { type: "image/jpeg", lastModified: Date.now() }));
+          },
+          "image/jpeg",
+          quality
+        );
+      } catch { URL.revokeObjectURL(objectUrl); resolve(file); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+    img.src = objectUrl;
+  });
+}
+
 
 const CATEGORIES = [
   { value: "contract", label: "Contract" },
@@ -46,6 +89,8 @@ export default function DocumentScannerPage() {
 
   const [previewDoc, setPreviewDoc] = useState<DocMetadata | null>(null);
   const [emailDoc, setEmailDoc] = useState<DocMetadata | null>(null);
+  const [pdfExporting, setPdfExporting] = useState<number | null>(null);
+  const [pdfGrayscale, setPdfGrayscale] = useState(false);
   const [emailTo, setEmailTo] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
@@ -130,25 +175,29 @@ export default function DocumentScannerPage() {
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
     if (file.size > 10 * 1024 * 1024) {
       toast({ title: "File too large", description: "Maximum file size is 10MB", variant: "destructive" });
       return;
     }
-    setUploadFile(file);
+    let processedFile = file;
+    if (file.type.startsWith("image/")) {
+      processedFile = await compressImage(file);
+    }
+    setUploadFile(processedFile);
     if (!docName) {
       setDocName(file.name.replace(/\.[^/.]+$/, ""));
     }
-    if (file.type.startsWith("image/")) {
+    if (processedFile.type.startsWith("image/")) {
       const reader = new FileReader();
       reader.onload = (e) => setUploadPreview(e.target?.result as string);
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(processedFile);
     } else {
       setUploadPreview(null);
     }
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!uploadFile || !docName.trim()) return;
     const formData = new FormData();
     formData.append("file", uploadFile);
@@ -183,6 +232,145 @@ export default function DocumentScannerPage() {
       other: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
     };
     return colors[category] || colors.other;
+  };
+
+  const exportAsPdf = useCallback(async (doc: DocMetadata, grayscale: boolean) => {
+    setPdfExporting(doc.id);
+    let imageSrc: string | null = null;
+    try {
+      const isImage = doc.mimeType.startsWith("image/");
+      if (!isImage) {
+        const a = document.createElement("a");
+        a.href = `/api/scanned-documents/${doc.id}/file`;
+        a.download = doc.name.endsWith(".pdf") ? doc.name : `${doc.name}.pdf`;
+        a.click();
+        return;
+      }
+
+      const response = await fetch(`/api/scanned-documents/${doc.id}/file`, { credentials: "include" });
+      if (!response.ok) throw new Error(`Failed to fetch document (${response.status})`);
+      const blob = await response.blob();
+      imageSrc = URL.createObjectURL(blob);
+
+      const img = new window.Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = imageSrc;
+      });
+
+      const maxExportDim = 2000;
+      let canvasW = img.width;
+      let canvasH = img.height;
+      if (canvasW > maxExportDim || canvasH > maxExportDim) {
+        const downscale = Math.min(maxExportDim / canvasW, maxExportDim / canvasH);
+        canvasW = Math.round(canvasW * downscale);
+        canvasH = Math.round(canvasH * downscale);
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas not supported");
+
+      ctx.drawImage(img, 0, 0, canvasW, canvasH);
+
+      if (grayscale) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+          data[i] = gray;
+          data[i + 1] = gray;
+          data[i + 2] = gray;
+        }
+        ctx.putImageData(imageData, 0, 0);
+      }
+
+      const imgWidth = canvasW;
+      const imgHeight = canvasH;
+      const pdfPageWidth = 595.28;
+      const pdfPageHeight = 841.89;
+      const margin = 20;
+      const maxW = pdfPageWidth - margin * 2;
+      const maxH = pdfPageHeight - margin * 2;
+      const scale = Math.min(maxW / imgWidth, maxH / imgHeight);
+      const drawW = imgWidth * scale;
+      const drawH = imgHeight * scale;
+      const offsetX = (pdfPageWidth - drawW) / 2;
+      const offsetY = (pdfPageHeight - drawH) / 2;
+
+      const imgDataUrl = canvas.toDataURL("image/jpeg", 0.92);
+
+      const rawImgData = atob(imgDataUrl.split(",")[1]);
+      const imgBytes = new Uint8Array(rawImgData.length);
+      for (let i = 0; i < rawImgData.length; i++) imgBytes[i] = rawImgData.charCodeAt(i);
+
+      const streamContent = `q ${drawW} 0 0 ${drawH} ${offsetX} ${pdfPageHeight - offsetY - drawH} cm /Img0 Do Q`;
+
+      const offsets: number[] = [];
+      const encoder = new TextEncoder();
+
+      const parts: Uint8Array[] = [];
+      let pos = 0;
+      const addText = (text: string) => { const b = encoder.encode(text); parts.push(b); pos += b.length; };
+      const addBytes = (b: Uint8Array) => { parts.push(b); pos += b.length; };
+
+      addText(`%PDF-1.4\n`);
+
+      offsets.push(pos);
+      addText(`1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n\n`);
+
+      offsets.push(pos);
+      addText(`2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n\n`);
+
+      offsets.push(pos);
+      addText(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pdfPageWidth} ${pdfPageHeight}] /Contents 4 0 R /Resources << /XObject << /Img0 5 0 R >> >> >>\nendobj\n\n`);
+
+      offsets.push(pos);
+      addText(`4 0 obj\n<< /Length ${streamContent.length} >>\nstream\n${streamContent}\nendstream\nendobj\n\n`);
+
+      offsets.push(pos);
+      addText(`5 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imgWidth} /Height ${imgHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imgBytes.length} >>\nstream\n`);
+      addBytes(imgBytes);
+      addText(`\nendstream\nendobj\n\n`);
+
+      const xrefPos = pos;
+      addText(`xref\n0 6\n0000000000 65535 f \n`);
+      for (let i = 0; i < offsets.length; i++) {
+        addText(`${offsets[i].toString().padStart(10, "0")} 00000 n \n`);
+      }
+      addText(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF\n`);
+
+      const totalLength = parts.reduce((a, b) => a + b.length, 0);
+      const pdfBytes = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const part of parts) {
+        pdfBytes.set(part, offset);
+        offset += part.length;
+      }
+
+      const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = doc.name.replace(/\.[^/.]+$/, "") + ".pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: `PDF saved${grayscale ? " (grayscale)" : " (color)"}` });
+    } catch (error) {
+      console.error("PDF export error:", error);
+      toast({ title: "PDF export failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+    } finally {
+      if (imageSrc) URL.revokeObjectURL(imageSrc);
+      setPdfExporting(null);
+    }
+  }, [toast]);
+
+  const getTransactionLabel = (t: Transaction) => {
+    const addr = [t.streetName, t.city, t.state].filter(Boolean).join(", ");
+    return addr || `Transaction #${t.id}`;
   };
 
   const isAgentOrBroker = user?.role === "agent" || user?.role === "broker";
@@ -317,7 +505,7 @@ export default function DocumentScannerPage() {
                       <SelectItem value="none">None</SelectItem>
                       {transactions.map((t) => (
                         <SelectItem key={t.id} value={t.id.toString()}>
-                          {t.propertyAddress || `Transaction #${t.id}`}
+                          {getTransactionLabel(t)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -367,9 +555,19 @@ export default function DocumentScannerPage() {
       </Card>
 
       <div>
-        <h2 className="text-lg font-semibold mb-4">
-          Uploaded Documents ({documents.length})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">
+            Uploaded Documents ({documents.length})
+          </h2>
+          {documents.length > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <Label htmlFor="pdf-grayscale" className="text-muted-foreground cursor-pointer">PDF Mode:</Label>
+              <span className={`text-xs ${!pdfGrayscale ? "font-semibold" : "text-muted-foreground"}`}>Color</span>
+              <Switch id="pdf-grayscale" checked={pdfGrayscale} onCheckedChange={setPdfGrayscale} />
+              <span className={`text-xs ${pdfGrayscale ? "font-semibold" : "text-muted-foreground"}`}>Grayscale</span>
+            </div>
+          )}
+        </div>
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -414,7 +612,7 @@ export default function DocumentScannerPage() {
                     </div>
                     <div className="text-xs text-muted-foreground space-y-0.5">
                       <p>{formatFileSize(doc.fileSize)} • {format(new Date(doc.createdAt), "MMM d, yyyy")}</p>
-                      {transaction && <p className="truncate">Transaction: {transaction.propertyAddress || `#${transaction.id}`}</p>}
+                      {transaction && <p className="truncate">Transaction: {getTransactionLabel(transaction)}</p>}
                       {client && <p>Client: {client.firstName} {client.lastName}</p>}
                       {doc.notes && <p className="truncate italic">{doc.notes}</p>}
                     </div>
@@ -436,6 +634,18 @@ export default function DocumentScannerPage() {
                       >
                         <Download className="h-3.5 w-3.5" />
                       </Button>
+                      {doc.mimeType.startsWith("image/") && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => exportAsPdf(doc, pdfGrayscale)}
+                          disabled={pdfExporting === doc.id}
+                          title={`Save as PDF (${pdfGrayscale ? "grayscale" : "color"})`}
+                        >
+                          {pdfExporting === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+                        </Button>
+                      )}
                       {isAgentOrBroker && (
                         <Button
                           variant="ghost"
@@ -492,7 +702,7 @@ export default function DocumentScannerPage() {
                   title={previewDoc.name}
                 />
               )}
-              <div className="flex gap-2 mt-4">
+              <div className="flex flex-wrap gap-2 mt-4">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -505,6 +715,26 @@ export default function DocumentScannerPage() {
                   <Download className="h-4 w-4 mr-2" />
                   Download
                 </Button>
+                {previewDoc.mimeType.startsWith("image/") && (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => exportAsPdf(previewDoc, false)}
+                      disabled={pdfExporting === previewDoc.id}
+                    >
+                      {pdfExporting === previewDoc.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+                      PDF (Color)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => exportAsPdf(previewDoc, true)}
+                      disabled={pdfExporting === previewDoc.id}
+                    >
+                      {pdfExporting === previewDoc.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+                      PDF (Grayscale)
+                    </Button>
+                  </>
+                )}
                 {isAgentOrBroker && (
                   <Button
                     variant="outline"
