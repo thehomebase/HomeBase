@@ -166,61 +166,239 @@ const listingIcon = new L.Icon({
   shadowSize: [41, 41],
 });
 
-function DrawControl({
+function simplifyPoints(points: L.LatLng[], tolerance: number): L.LatLng[] {
+  if (points.length <= 2) return points;
+  let maxDist = 0;
+  let maxIdx = 0;
+  const start = points[0];
+  const end = points[points.length - 1];
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = perpendicularDist(points[i], start, end);
+    if (d > maxDist) { maxDist = d; maxIdx = i; }
+  }
+  if (maxDist > tolerance) {
+    const left = simplifyPoints(points.slice(0, maxIdx + 1), tolerance);
+    const right = simplifyPoints(points.slice(maxIdx), tolerance);
+    return [...left.slice(0, -1), ...right];
+  }
+  return [start, end];
+}
+
+function perpendicularDist(point: L.LatLng, lineStart: L.LatLng, lineEnd: L.LatLng): number {
+  const dx = lineEnd.lng - lineStart.lng;
+  const dy = lineEnd.lat - lineStart.lat;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) return Math.sqrt((point.lng - lineStart.lng) ** 2 + (point.lat - lineStart.lat) ** 2);
+  return Math.abs(dy * point.lng - dx * point.lat + lineEnd.lng * lineStart.lat - lineEnd.lat * lineStart.lng) / len;
+}
+
+function smoothPolygon(points: L.LatLng[], iterations = 2): L.LatLng[] {
+  let pts = points;
+  for (let iter = 0; iter < iterations; iter++) {
+    const smoothed: L.LatLng[] = [];
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const prev = pts[(i - 1 + n) % n];
+      const curr = pts[i];
+      const next = pts[(i + 1) % n];
+      smoothed.push(L.latLng(
+        curr.lat * 0.5 + prev.lat * 0.25 + next.lat * 0.25,
+        curr.lng * 0.5 + prev.lng * 0.25 + next.lng * 0.25
+      ));
+    }
+    pts = smoothed;
+  }
+  return pts;
+}
+
+function FreehandDrawControl({
   onPolygonCreated,
   onPolygonDeleted,
+  hasPolygon,
 }: {
   onPolygonCreated: (polygon: L.LatLng[]) => void;
   onPolygonDeleted: () => void;
+  hasPolygon: boolean;
 }) {
   const map = useMap();
+  const isDrawing = useRef(false);
+  const points = useRef<L.LatLng[]>([]);
+  const polyline = useRef<L.Polyline | null>(null);
+  const polygon = useRef<L.Polygon | null>(null);
+  const btnRef = useRef<L.Control | null>(null);
+  const drawingActive = useRef(false);
+
+  const clearShape = useCallback(() => {
+    if (polygon.current) {
+      map.removeLayer(polygon.current);
+      polygon.current = null;
+    }
+    if (polyline.current) {
+      map.removeLayer(polyline.current);
+      polyline.current = null;
+    }
+    onPolygonDeleted();
+  }, [map, onPolygonDeleted]);
+
+  const startDrawMode = useCallback(() => {
+    clearShape();
+    drawingActive.current = true;
+    map.dragging.disable();
+    map.getContainer().style.cursor = "crosshair";
+  }, [map, clearShape]);
+
+  const stopDrawMode = useCallback(() => {
+    drawingActive.current = false;
+    map.dragging.enable();
+    map.getContainer().style.cursor = "";
+  }, [map]);
+
+  const finishDrawing = useCallback(() => {
+    if (polyline.current) {
+      map.removeLayer(polyline.current);
+      polyline.current = null;
+    }
+
+    let pts = points.current;
+    if (pts.length < 3) {
+      stopDrawMode();
+      return;
+    }
+
+    const mapZoom = map.getZoom();
+    const tolerance = 0.00005 * Math.pow(2, 15 - mapZoom);
+    pts = simplifyPoints(pts, tolerance);
+    if (pts.length >= 3) {
+      pts = smoothPolygon(pts, 3);
+    }
+
+    polygon.current = L.polygon(pts, {
+      color: "#1a1a1a",
+      weight: 2.5,
+      fillColor: "#000000",
+      fillOpacity: 0.12,
+      smoothFactor: 1.5,
+    }).addTo(map);
+
+    onPolygonCreated(pts);
+    stopDrawMode();
+  }, [map, onPolygonCreated, stopDrawMode]);
 
   useEffect(() => {
-    const drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
-
-    const drawControl = new (L.Control as any).Draw({
-      position: "topright",
-      draw: {
-        polygon: {
-          allowIntersection: false,
-          shapeOptions: { color: "#3b82f6", weight: 2, fillOpacity: 0.1 },
-        },
-        rectangle: {
-          shapeOptions: { color: "#3b82f6", weight: 2, fillOpacity: 0.1 },
-        },
-        circle: false,
-        circlemarker: false,
-        marker: false,
-        polyline: false,
+    const DrawButton = L.Control.extend({
+      onAdd: () => {
+        const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+        const btn = L.DomUtil.create("a", "", container);
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin:5px"><path d="M12 3c7.2 0 9 1.8 9 9s-1.8 9-9 9-9-1.8-9-9 1.8-9 9-9"/><path d="M17 8l-5 5"/></svg>`;
+        btn.title = "Draw freehand boundary";
+        btn.href = "#";
+        btn.style.width = "28px";
+        btn.style.height = "28px";
+        btn.style.display = "flex";
+        btn.style.alignItems = "center";
+        btn.style.justifyContent = "center";
+        btn.role = "button";
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(btn, "click", (e: Event) => {
+          e.preventDefault();
+          e.stopPropagation();
+          startDrawMode();
+        });
+        return container;
       },
-      edit: { featureGroup: drawnItems, remove: true },
     });
 
-    map.addControl(drawControl);
+    const ctrl = new DrawButton({ position: "topright" });
+    ctrl.addTo(map);
+    btnRef.current = ctrl;
 
-    const onCreated = (e: any) => {
-      drawnItems.clearLayers();
-      drawnItems.addLayer(e.layer);
-      const latlngs = e.layer.getLatLngs();
-      const polygon: L.LatLng[] = Array.isArray(latlngs[0]) ? latlngs[0] : latlngs;
-      onPolygonCreated(polygon);
+    const onMouseDown = (e: L.LeafletMouseEvent) => {
+      if (!drawingActive.current) return;
+      isDrawing.current = true;
+      points.current = [e.latlng];
+      polyline.current = L.polyline([e.latlng], {
+        color: "#1a1a1a",
+        weight: 2.5,
+        dashArray: "6,4",
+      }).addTo(map);
     };
 
-    const onDeleted = () => {
-      onPolygonDeleted();
+    const onMouseMove = (e: L.LeafletMouseEvent) => {
+      if (!isDrawing.current || !drawingActive.current) return;
+      points.current.push(e.latlng);
+      polyline.current?.addLatLng(e.latlng);
     };
 
-    map.on(L.Draw.Event.CREATED, onCreated);
-    map.on(L.Draw.Event.DELETED, onDeleted);
+    const onMouseUp = () => {
+      if (!isDrawing.current || !drawingActive.current) return;
+      isDrawing.current = false;
+      finishDrawing();
+    };
+
+    map.on("mousedown", onMouseDown);
+    map.on("mousemove", onMouseMove);
+    map.on("mouseup", onMouseUp);
+
+    const container = map.getContainer();
+    const onTouchStart = (e: TouchEvent) => {
+      if (!drawingActive.current || e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const pt = map.containerPointToLatLng(L.point(
+        touch.clientX - container.getBoundingClientRect().left,
+        touch.clientY - container.getBoundingClientRect().top
+      ));
+      isDrawing.current = true;
+      points.current = [pt];
+      polyline.current = L.polyline([pt], {
+        color: "#1a1a1a",
+        weight: 2.5,
+        dashArray: "6,4",
+      }).addTo(map);
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isDrawing.current || !drawingActive.current) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const pt = map.containerPointToLatLng(L.point(
+        touch.clientX - container.getBoundingClientRect().left,
+        touch.clientY - container.getBoundingClientRect().top
+      ));
+      points.current.push(pt);
+      polyline.current?.addLatLng(pt);
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!isDrawing.current || !drawingActive.current) return;
+      e.preventDefault();
+      isDrawing.current = false;
+      finishDrawing();
+    };
+
+    container.addEventListener("touchstart", onTouchStart, { passive: false });
+    container.addEventListener("touchmove", onTouchMove, { passive: false });
+    container.addEventListener("touchend", onTouchEnd, { passive: false });
 
     return () => {
-      map.off(L.Draw.Event.CREATED, onCreated);
-      map.off(L.Draw.Event.DELETED, onDeleted);
-      map.removeControl(drawControl);
-      map.removeLayer(drawnItems);
+      map.off("mousedown", onMouseDown);
+      map.off("mousemove", onMouseMove);
+      map.off("mouseup", onMouseUp);
+      container.removeEventListener("touchstart", onTouchStart);
+      container.removeEventListener("touchmove", onTouchMove);
+      container.removeEventListener("touchend", onTouchEnd);
+      if (btnRef.current) map.removeControl(btnRef.current);
+      if (polygon.current) map.removeLayer(polygon.current);
+      if (polyline.current) map.removeLayer(polyline.current);
     };
-  }, [map, onPolygonCreated, onPolygonDeleted]);
+  }, [map, startDrawMode, finishDrawing]);
+
+  useEffect(() => {
+    if (!hasPolygon && polygon.current) {
+      map.removeLayer(polygon.current);
+      polygon.current = null;
+    }
+  }, [hasPolygon, map]);
 
   return null;
 }
@@ -648,7 +826,7 @@ export default function MapDrawSearch() {
         <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
         <div className="text-sm text-blue-700 dark:text-blue-300">
           <p className="font-medium">How to use Map Search</p>
-          <p className="mt-1">Use the drawing tools on the right side of the map to draw a rectangle or polygon around your area of interest. Then click "Search This Area" to find active listings.</p>
+          <p className="mt-1">Tap the draw button on the map, then draw a freehand boundary around your area of interest. Click "Search This Area" to find active listings.</p>
         </div>
       </div>
 
@@ -746,7 +924,13 @@ export default function MapDrawSearch() {
           scrollWheelZoom={true}
         >
           <LayersControl position="topleft">
-            <LayersControl.BaseLayer checked name="Street">
+            <LayersControl.BaseLayer checked name="Grayscale">
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+              />
+            </LayersControl.BaseLayer>
+            <LayersControl.BaseLayer name="Street">
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -760,9 +944,10 @@ export default function MapDrawSearch() {
             </LayersControl.BaseLayer>
           </LayersControl>
           <InvalidateMapSize />
-          <DrawControl
+          <FreehandDrawControl
             onPolygonCreated={handlePolygonCreated}
             onPolygonDeleted={handlePolygonDeleted}
+            hasPolygon={!!drawnPolygon}
           />
           {filteredListings.map((listing) => (
             <Marker
@@ -883,7 +1068,7 @@ export default function MapDrawSearch() {
             className="gap-2"
           >
             <Trash2 className="h-4 w-4" />
-            Clear Area
+            Remove Boundaries
           </Button>
         )}
 
