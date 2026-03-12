@@ -1,16 +1,26 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
   Users,
   Phone,
   Mail,
+  MessageSquare,
   Globe,
   Trash2,
   ShoppingBag,
@@ -32,6 +42,12 @@ import {
   Layers,
   Settings,
   Search,
+  User as UserIcon,
+  Loader2,
+  ExternalLink,
+  Smartphone,
+  PhoneOutgoing,
+  X,
 } from "lucide-react";
 import type { Contractor, HomeTeamMember } from "@shared/schema";
 
@@ -61,11 +77,6 @@ const CATEGORY_ICONS: Record<string, any> = {
   other: Wrench,
 };
 
-function getCategoryIcon(category: string) {
-  const Icon = CATEGORY_ICONS[category] || Wrench;
-  return <Icon className="h-4 w-4" />;
-}
-
 function formatCategoryName(category: string): string {
   return category
     .split("_")
@@ -73,9 +84,286 @@ function formatCategoryName(category: string): string {
     .join(" ");
 }
 
+function ContactActions({ contractor, onRemove, isRemoving }: { contractor: Contractor | null; onRemove: () => void; isRemoving: boolean }) {
+  const { toast } = useToast();
+  const [contactMode, setContactMode] = useState<"phone" | "sms" | "email" | null>(null);
+  const [smsMessage, setSmsMessage] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+
+  const { data: commStatus } = useQuery<{ twilio: boolean; twilioPhone?: string; hasOwnNumber?: boolean; gmail: { connected: boolean; email?: string } }>({
+    queryKey: ["/api/communications/status"],
+    enabled: contactMode !== null,
+  });
+
+  const smsMutation = useMutation({
+    mutationFn: async (data: { phone: string; message: string }) => {
+      await apiRequest("POST", "/api/communications/sms", {
+        to: data.phone,
+        message: data.message,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "SMS sent" });
+      setSmsMessage("");
+      setContactMode(null);
+    },
+    onError: () => toast({ title: "Failed to send SMS", variant: "destructive" }),
+  });
+
+  const emailMutation = useMutation({
+    mutationFn: async (data: { to: string; subject: string; body: string }) => {
+      await apiRequest("POST", "/api/gmail/send", data);
+    },
+    onSuccess: () => {
+      toast({ title: "Email sent" });
+      setEmailSubject("");
+      setEmailBody("");
+      setContactMode(null);
+    },
+    onError: () => toast({ title: "Failed to send email", variant: "destructive" }),
+  });
+
+  if (!contractor) return null;
+
+  return (
+    <>
+      <div className="flex items-center justify-center gap-1 mt-2">
+        {contractor.phone && (
+          <button
+            onClick={() => setContactMode("phone")}
+            className="p-2 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-primary"
+            title="Call"
+          >
+            <Phone className="h-4 w-4" />
+          </button>
+        )}
+        {contractor.phone && (
+          <button
+            onClick={() => setContactMode("sms")}
+            className="p-2 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-primary"
+            title="Text"
+          >
+            <MessageSquare className="h-4 w-4" />
+          </button>
+        )}
+        {contractor.email && (
+          <button
+            onClick={() => setContactMode("email")}
+            className="p-2 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-primary"
+            title="Email"
+          >
+            <Mail className="h-4 w-4" />
+          </button>
+        )}
+        <button
+          onClick={onRemove}
+          disabled={isRemoving}
+          className="p-2 rounded-full hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
+          title="Remove from team"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+
+      <Dialog open={contactMode === "phone"} onOpenChange={(o) => !o && setContactMode(null)}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-base">Call {contractor.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <a href={`tel:${contractor.phone}`}>
+              <Button variant="outline" className="w-full justify-start gap-3">
+                <Smartphone className="h-4 w-4" />
+                <div className="text-left">
+                  <div className="text-sm font-medium">Personal Phone</div>
+                  <div className="text-xs text-muted-foreground">Call from your device</div>
+                </div>
+              </Button>
+            </a>
+            {commStatus?.twilio && commStatus?.twilioPhone && (
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-3"
+                onClick={() => {
+                  toast({ title: "Twilio call", description: "Call logging available via the Phone page." });
+                  setContactMode(null);
+                }}
+              >
+                <PhoneOutgoing className="h-4 w-4" />
+                <div className="text-left">
+                  <div className="text-sm font-medium">Twilio Number</div>
+                  <div className="text-xs text-muted-foreground">{commStatus.twilioPhone}</div>
+                </div>
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground text-center">{contractor.phone}</p>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={contactMode === "sms"} onOpenChange={(o) => !o && setContactMode(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-base">Text {contractor.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <a href={`sms:${contractor.phone}`}>
+              <Button variant="outline" className="w-full justify-start gap-3">
+                <Smartphone className="h-4 w-4" />
+                <div className="text-left">
+                  <div className="text-sm font-medium">Personal Phone</div>
+                  <div className="text-xs text-muted-foreground">Open your messaging app</div>
+                </div>
+              </Button>
+            </a>
+            {commStatus?.twilio && commStatus?.twilioPhone && (
+              <div className="border rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <PhoneOutgoing className="h-4 w-4" />
+                  Send via Twilio
+                </div>
+                <p className="text-xs text-muted-foreground">From: {commStatus.twilioPhone}</p>
+                <Textarea
+                  value={smsMessage}
+                  onChange={(e) => setSmsMessage(e.target.value)}
+                  placeholder="Type your message..."
+                  rows={3}
+                />
+                <Button
+                  size="sm"
+                  className="w-full"
+                  onClick={() => smsMutation.mutate({ phone: contractor.phone!, message: smsMessage })}
+                  disabled={!smsMessage.trim() || smsMutation.isPending}
+                >
+                  {smsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <MessageSquare className="h-4 w-4 mr-2" />}
+                  Send SMS
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={contactMode === "email"} onOpenChange={(o) => !o && setContactMode(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-base">Email {contractor.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <a href={`mailto:${contractor.email}`}>
+              <Button variant="outline" className="w-full justify-start gap-3">
+                <Mail className="h-4 w-4" />
+                <div className="text-left">
+                  <div className="text-sm font-medium">Default Email App</div>
+                  <div className="text-xs text-muted-foreground">Open your email client</div>
+                </div>
+              </Button>
+            </a>
+            {commStatus?.gmail?.connected && (
+              <div className="border rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Mail className="h-4 w-4" />
+                  Send via Gmail
+                </div>
+                <p className="text-xs text-muted-foreground">From: {commStatus.gmail.email}</p>
+                <div>
+                  <Label className="text-xs">Subject</Label>
+                  <Input
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    placeholder="Subject line..."
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Message</Label>
+                  <Textarea
+                    value={emailBody}
+                    onChange={(e) => setEmailBody(e.target.value)}
+                    placeholder="Type your message..."
+                    rows={4}
+                    className="mt-1"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  className="w-full"
+                  onClick={() => emailMutation.mutate({ to: contractor.email!, subject: emailSubject, body: emailBody })}
+                  disabled={!emailBody.trim() || !emailSubject.trim() || emailMutation.isPending}
+                >
+                  {emailMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
+                  Send Email
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function TeamMemberCard({ member, onRemove, isRemoving }: { member: TeamMemberWithContractor; onRemove: () => void; isRemoving: boolean }) {
+  const c = member.contractor;
+  const name = c?.name || "Unknown";
+  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+  return (
+    <div className="flex flex-col items-center text-center group">
+      <Link href={c?.vendorUserId ? `/profile/${c.vendorUserId}` : "#"}>
+        <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-muted border-2 border-border overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted-foreground/10">
+            <UserIcon className="h-12 w-12 text-muted-foreground/40" />
+          </div>
+        </div>
+      </Link>
+      <h3 className="font-semibold text-sm mt-3 leading-tight">{name}</h3>
+      {(c?.city || c?.state) && (
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {[c?.city, c?.state].filter(Boolean).join(", ")}
+        </p>
+      )}
+      <div className="flex items-center gap-1 mt-1">
+        {c?.agentRating && (
+          <div className="flex items-center gap-0.5">
+            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+            <span className="text-xs text-muted-foreground">{c.agentRating}/5</span>
+          </div>
+        )}
+        {c?.vendorUserId && (
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+            <Shield className="h-2.5 w-2.5 mr-0.5" />
+            Verified
+          </Badge>
+        )}
+      </div>
+      {member.notes && (
+        <p className="text-[11px] text-muted-foreground italic mt-1 max-w-[140px] line-clamp-2">
+          "{member.notes}"
+        </p>
+      )}
+      <ContactActions contractor={c} onRemove={onRemove} isRemoving={isRemoving} />
+      {c?.website && (
+        <a
+          href={c.website.startsWith("http") ? c.website : `https://${c.website}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1"
+        >
+          <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground gap-1 px-2">
+            <Globe className="h-3 w-3" /> Website
+          </Button>
+        </a>
+      )}
+    </div>
+  );
+}
+
 export default function MyTeamPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [activeCategory, setActiveCategory] = useState<string>("all");
 
   const { data: teamMembers, isLoading } = useQuery<TeamMemberWithContractor[]>({
     queryKey: ["/api/my-team"],
@@ -94,28 +382,32 @@ export default function MyTeamPage() {
     },
   });
 
-  const grouped = (teamMembers || []).reduce<Record<string, TeamMemberWithContractor[]>>(
-    (acc, member) => {
-      const cat = member.category || "other";
-      if (!acc[cat]) acc[cat] = [];
-      acc[cat].push(member);
-      return acc;
-    },
-    {}
-  );
+  const allMembers = teamMembers || [];
 
-  const sortedCategories = Object.keys(grouped).sort();
+  const categories = Array.from(new Set(allMembers.map(m => m.category || "other"))).sort();
+
+  const filteredMembers = activeCategory === "all"
+    ? allMembers
+    : allMembers.filter(m => (m.category || "other") === activeCategory);
 
   if (isLoading) {
     return (
-      <div className="p-4 md:p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-10 w-32" />
+      <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-8">
+        <div className="text-center space-y-2">
+          <Skeleton className="h-5 w-24 mx-auto" />
+          <Skeleton className="h-8 w-56 mx-auto" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Skeleton key={i} className="h-48 w-full" />
+        <div className="flex justify-center gap-2">
+          <Skeleton className="h-9 w-24 rounded-full" />
+          <Skeleton className="h-9 w-24 rounded-full" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <div key={i} className="flex flex-col items-center gap-3">
+              <Skeleton className="h-28 w-28 rounded-full" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-3 w-16" />
+            </div>
           ))}
         </div>
       </div>
@@ -123,136 +415,86 @@ export default function MyTeamPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="h-6 w-6" />
-            My Home Team
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Your preferred service providers for all home-related needs
-          </p>
-        </div>
-        <Link href="/marketplace">
-          <Button>
-            <ShoppingBag className="h-4 w-4 mr-2" />
-            Browse Pros
-          </Button>
-        </Link>
+    <div className="p-4 md:p-8 max-w-5xl mx-auto pb-24 md:pb-8">
+      <div className="text-center mb-8">
+        <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">My Team</p>
+        <h1 className="text-2xl md:text-3xl font-bold">Your Home Team</h1>
+        <p className="text-muted-foreground mt-2 text-sm max-w-md mx-auto">
+          Your preferred service providers for all home-related needs
+        </p>
       </div>
 
-      {sortedCategories.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <Users className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No team members yet</h3>
-            <p className="text-muted-foreground mb-6 max-w-md">
-              Build your home team by browsing our marketplace and adding your preferred contractors for each service category.
-            </p>
+      {allMembers.length > 0 && categories.length > 1 && (
+        <div className="flex flex-wrap justify-center gap-2 mb-8">
+          <button
+            onClick={() => setActiveCategory("all")}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              activeCategory === "all"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            All ({allMembers.length})
+          </button>
+          {categories.map((cat) => {
+            const count = allMembers.filter(m => (m.category || "other") === cat).length;
+            const Icon = CATEGORY_ICONS[cat] || Wrench;
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                  activeCategory === cat
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {formatCategoryName(cat)} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {allMembers.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Users className="h-10 w-10 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">No team members yet</h3>
+          <p className="text-muted-foreground mb-6 max-w-md text-sm">
+            Build your home team by browsing our marketplace and adding your preferred contractors for each service category.
+          </p>
+          <Link href="/marketplace">
+            <Button>
+              <ShoppingBag className="h-4 w-4 mr-2" />
+              Browse Pros
+            </Button>
+          </Link>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-6 gap-y-10">
+            {filteredMembers.map((member) => (
+              <TeamMemberCard
+                key={member.id}
+                member={member}
+                onRemove={() => removeMutation.mutate(member.id)}
+                isRemoving={removeMutation.isPending}
+              />
+            ))}
+          </div>
+
+          <div className="flex justify-center mt-12">
             <Link href="/marketplace">
-              <Button>
-                <ShoppingBag className="h-4 w-4 mr-2" />
-                Browse Pros
+              <Button variant="outline" className="gap-2">
+                <ShoppingBag className="h-4 w-4" />
+                Add More Pros
               </Button>
             </Link>
-          </CardContent>
-        </Card>
-      ) : (
-        sortedCategories.map((category) => (
-          <div key={category} className="space-y-3">
-            <div className="flex items-center gap-2">
-              {getCategoryIcon(category)}
-              <h2 className="text-lg font-semibold">{formatCategoryName(category)}</h2>
-              <Badge variant="secondary" className="ml-1">
-                {grouped[category].length}
-              </Badge>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {grouped[category].map((member) => {
-                const c = member.contractor;
-                return (
-                  <Card key={member.id} className="relative group">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <CardTitle className="text-base">
-                          {c?.name || "Unknown Contractor"}
-                        </CardTitle>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                          onClick={() => removeMutation.mutate(member.id)}
-                          disabled={removeMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      {c?.phone && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-3.5 w-3.5" />
-                          <a href={`tel:${c.phone}`} className="hover:underline">
-                            {c.phone}
-                          </a>
-                        </div>
-                      )}
-                      {c?.email && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Mail className="h-3.5 w-3.5" />
-                          <a href={`mailto:${c.email}`} className="hover:underline truncate">
-                            {c.email}
-                          </a>
-                        </div>
-                      )}
-                      {c?.website && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Globe className="h-3.5 w-3.5" />
-                          <a
-                            href={c.website.startsWith("http") ? c.website : `https://${c.website}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hover:underline truncate"
-                          >
-                            {c.website}
-                          </a>
-                        </div>
-                      )}
-                      {(c?.city || c?.state) && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <MapPin className="h-3.5 w-3.5" />
-                          <span>
-                            {[c?.city, c?.state].filter(Boolean).join(", ")}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 pt-1">
-                        {c?.agentRating && (
-                          <Badge variant="outline" className="text-xs">
-                            <Star className="h-3 w-3 mr-1 fill-yellow-400 text-yellow-400" />
-                            {c.agentRating}/5
-                          </Badge>
-                        )}
-                        {c?.vendorUserId && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Shield className="h-3 w-3 mr-1" />
-                            Verified
-                          </Badge>
-                        )}
-                      </div>
-                      {member.notes && (
-                        <p className="text-xs text-muted-foreground italic pt-1 border-t">
-                          {member.notes}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
           </div>
-        ))
+        </>
       )}
     </div>
   );
