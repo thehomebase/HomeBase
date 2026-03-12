@@ -916,6 +916,63 @@ export type InsertVendorLead = z.infer<typeof insertVendorLeadSchema>;
 export type VendorLeadRotation = typeof vendorLeadRotations.$inferSelect;
 export type InsertVendorLeadRotation = z.infer<typeof insertVendorLeadRotationSchema>;
 
+export const lenderZipCodes = pgTable("lender_zip_codes", {
+  id: serial("id").primaryKey(),
+  lenderId: integer("lender_id").notNull(),
+  zipCode: text("zip_code").notNull(),
+  isActive: boolean("is_active").default(true),
+  monthlyRate: integer("monthly_rate").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("lender_zip_unique").on(table.lenderId, table.zipCode),
+]);
+
+export const lenderLeads = pgTable("lender_leads", {
+  id: serial("id").primaryKey(),
+  zipCode: text("zip_code").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  loanType: text("loan_type", { enum: ['conventional', 'fha', 'va', 'usda', 'other'] }).notNull().default('conventional'),
+  purchasePrice: text("purchase_price"),
+  downPayment: text("down_payment"),
+  creditScore: text("credit_score"),
+  message: text("message"),
+  status: text("status", { enum: ['new', 'assigned', 'accepted', 'rejected', 'converted'] }).notNull().default('new'),
+  assignedLenderId: integer("assigned_lender_id"),
+  assignedAt: timestamp("assigned_at"),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const lenderLeadRotations = pgTable("lender_lead_rotations", {
+  id: serial("id").primaryKey(),
+  zipCode: text("zip_code").notNull().unique(),
+  lastLenderId: integer("last_lender_id"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLenderZipCodeSchema = createInsertSchema(lenderZipCodes).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertLenderLeadSchema = createInsertSchema(lenderLeads).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertLenderLeadRotationSchema = createInsertSchema(lenderLeadRotations).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type LenderZipCode = typeof lenderZipCodes.$inferSelect;
+export type InsertLenderZipCode = z.infer<typeof insertLenderZipCodeSchema>;
+export type LenderLead = typeof lenderLeads.$inferSelect;
+export type InsertLenderLead = z.infer<typeof insertLenderLeadSchema>;
+export type LenderLeadRotation = typeof lenderLeadRotations.$inferSelect;
+export type InsertLenderLeadRotation = z.infer<typeof insertLenderLeadRotationSchema>;
+
 export const lenderTransactions = pgTable("lender_transactions", {
   id: serial("id").primaryKey(),
   lenderId: integer("lender_id").notNull(),

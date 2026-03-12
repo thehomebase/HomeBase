@@ -633,6 +633,7 @@ export default function LeadSubmitPage() {
 
             <p className="text-xs text-muted-foreground text-center mt-6">
               By continuing, you agree to be connected with a local real estate agent.
+              Agents shown are advertising participants and their inclusion does not constitute an endorsement or recommendation.
             </p>
           </CardContent>
         </Card>

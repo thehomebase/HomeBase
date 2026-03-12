@@ -49,6 +49,9 @@ import {
   type VendorZipCode, type InsertVendorZipCode,
   type VendorLead, type InsertVendorLead,
   type VendorLeadRotation, type InsertVendorLeadRotation,
+  type LenderZipCode, type InsertLenderZipCode,
+  type LenderLead, type InsertLenderLead,
+  type LenderLeadRotation, type InsertLenderLeadRotation,
   type LenderTransaction, type InsertLenderTransaction,
   type LenderChecklist, type InsertLenderChecklist,
   type LenderChecklistMapping, type InsertLenderChecklistMapping,
@@ -383,6 +386,22 @@ export interface IStorage {
 
   getVendorLeadRotation(zipCode: string, category: string): Promise<VendorLeadRotation | undefined>;
   upsertVendorLeadRotation(zipCode: string, category: string, lastVendorId: number): Promise<VendorLeadRotation>;
+
+  claimLenderZipCode(data: InsertLenderZipCode): Promise<LenderZipCode>;
+  releaseLenderZipCode(id: number, lenderId: number): Promise<void>;
+  getLenderZipCodes(lenderId: number): Promise<LenderZipCode[]>;
+  getLendersForZipCode(zipCode: string): Promise<LenderZipCode[]>;
+  isLenderZipClaimed(lenderId: number, zipCode: string): Promise<boolean>;
+  getLenderCountForZipCode(zipCode: string): Promise<number>;
+  countLenderZipCodes(lenderId: number): Promise<number>;
+
+  createLenderLead(data: InsertLenderLead): Promise<LenderLead>;
+  getLenderLead(id: number): Promise<LenderLead | undefined>;
+  getLenderLeadsByLender(lenderId: number): Promise<LenderLead[]>;
+  updateLenderLeadStatus(id: number, status: string, lenderId?: number): Promise<LenderLead>;
+
+  getLenderLeadRotation(zipCode: string): Promise<LenderLeadRotation | undefined>;
+  upsertLenderLeadRotation(zipCode: string, lastLenderId: number): Promise<LenderLeadRotation>;
 
   getAgentResponseMetrics(agentId: number): Promise<{ avgResponseMs: number; fastestMs: number; slowestMs: number; totalResponded: number; responseRate: number }>;
   getVendorResponseMetrics(vendorId: number): Promise<{ avgResponseMs: number; fastestMs: number; slowestMs: number; totalResponded: number; responseRate: number }>;
@@ -5299,6 +5318,147 @@ export class DatabaseStorage implements IStorage {
     `);
     if (!result.rows[0]) throw new Error('Failed to create vendor lead rotation');
     return this.mapVendorLeadRotationRow(result.rows[0]);
+  }
+
+  private mapLenderZipCodeRow(row: any): LenderZipCode {
+    return {
+      id: Number(row.id),
+      lenderId: Number(row.lender_id),
+      zipCode: String(row.zip_code),
+      isActive: row.is_active ?? true,
+      monthlyRate: Number(row.monthly_rate ?? 0),
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+    };
+  }
+
+  private mapLenderLeadRow(row: any): LenderLead {
+    return {
+      id: Number(row.id),
+      zipCode: String(row.zip_code),
+      firstName: String(row.first_name),
+      lastName: String(row.last_name),
+      email: String(row.email),
+      phone: row.phone || null,
+      loanType: row.loan_type || 'conventional',
+      purchasePrice: row.purchase_price || null,
+      downPayment: row.down_payment || null,
+      creditScore: row.credit_score || null,
+      message: row.message || null,
+      status: row.status || 'new',
+      assignedLenderId: row.assigned_lender_id ? Number(row.assigned_lender_id) : null,
+      assignedAt: row.assigned_at ? new Date(row.assigned_at) : null,
+      respondedAt: row.responded_at ? new Date(row.responded_at) : null,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+    };
+  }
+
+  private mapLenderLeadRotationRow(row: any): LenderLeadRotation {
+    return {
+      id: Number(row.id),
+      zipCode: String(row.zip_code),
+      lastLenderId: row.last_lender_id ? Number(row.last_lender_id) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null,
+    };
+  }
+
+  async claimLenderZipCode(data: InsertLenderZipCode): Promise<LenderZipCode> {
+    const result = await db.execute(sql`
+      INSERT INTO lender_zip_codes (lender_id, zip_code, is_active, monthly_rate)
+      SELECT ${data.lenderId}, ${data.zipCode}, ${data.isActive ?? true}, ${data.monthlyRate ?? 0}
+      WHERE (SELECT COUNT(*) FROM lender_zip_codes WHERE zip_code = ${data.zipCode} AND is_active = true) < 5
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Zip code is full — max 5 lenders reached');
+    return this.mapLenderZipCodeRow(result.rows[0]);
+  }
+
+  async releaseLenderZipCode(id: number, lenderId: number): Promise<void> {
+    await db.execute(sql`DELETE FROM lender_zip_codes WHERE id = ${id} AND lender_id = ${lenderId}`);
+  }
+
+  async getLenderZipCodes(lenderId: number): Promise<LenderZipCode[]> {
+    const result = await db.execute(sql`SELECT * FROM lender_zip_codes WHERE lender_id = ${lenderId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => this.mapLenderZipCodeRow(row));
+  }
+
+  async getLendersForZipCode(zipCode: string): Promise<LenderZipCode[]> {
+    const result = await db.execute(sql`SELECT * FROM lender_zip_codes WHERE zip_code = ${zipCode} AND is_active = true ORDER BY created_at ASC, id ASC`);
+    return (result.rows as any[]).map(row => this.mapLenderZipCodeRow(row));
+  }
+
+  async isLenderZipClaimed(lenderId: number, zipCode: string): Promise<boolean> {
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM lender_zip_codes WHERE lender_id = ${lenderId} AND zip_code = ${zipCode}`);
+    return Number(result.rows[0]?.count) > 0;
+  }
+
+  async getLenderCountForZipCode(zipCode: string): Promise<number> {
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM lender_zip_codes WHERE zip_code = ${zipCode} AND is_active = true`);
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async countLenderZipCodes(lenderId: number): Promise<number> {
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM lender_zip_codes WHERE lender_id = ${lenderId}`);
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async createLenderLead(data: InsertLenderLead): Promise<LenderLead> {
+    const assignedAt = data.assignedLenderId ? new Date() : null;
+    const result = await db.execute(sql`
+      INSERT INTO lender_leads (zip_code, first_name, last_name, email, phone, loan_type, purchase_price, down_payment, credit_score, message, status, assigned_lender_id, assigned_at)
+      VALUES (${data.zipCode}, ${data.firstName}, ${data.lastName}, ${data.email}, ${data.phone || null}, ${data.loanType || 'conventional'}, ${data.purchasePrice || null}, ${data.downPayment || null}, ${data.creditScore || null}, ${data.message || null}, ${data.status || 'new'}, ${data.assignedLenderId || null}, ${assignedAt})
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to create lender lead');
+    return this.mapLenderLeadRow(result.rows[0]);
+  }
+
+  async getLenderLead(id: number): Promise<LenderLead | undefined> {
+    const result = await db.execute(sql`SELECT * FROM lender_leads WHERE id = ${id}`);
+    if (!result.rows[0]) return undefined;
+    return this.mapLenderLeadRow(result.rows[0]);
+  }
+
+  async getLenderLeadsByLender(lenderId: number): Promise<LenderLead[]> {
+    const result = await db.execute(sql`SELECT * FROM lender_leads WHERE assigned_lender_id = ${lenderId} ORDER BY created_at DESC`);
+    return (result.rows as any[]).map(row => this.mapLenderLeadRow(row));
+  }
+
+  async updateLenderLeadStatus(id: number, status: string, lenderId?: number): Promise<LenderLead> {
+    let result;
+    const isResponse = status === 'accepted' || status === 'rejected';
+    if (lenderId !== undefined && isResponse) {
+      result = await db.execute(sql`UPDATE lender_leads SET status = ${status}, assigned_lender_id = ${lenderId}, responded_at = NOW() WHERE id = ${id} RETURNING *`);
+    } else if (lenderId !== undefined) {
+      result = await db.execute(sql`UPDATE lender_leads SET status = ${status}, assigned_lender_id = ${lenderId} WHERE id = ${id} RETURNING *`);
+    } else if (isResponse) {
+      result = await db.execute(sql`UPDATE lender_leads SET status = ${status}, responded_at = NOW() WHERE id = ${id} RETURNING *`);
+    } else {
+      result = await db.execute(sql`UPDATE lender_leads SET status = ${status} WHERE id = ${id} RETURNING *`);
+    }
+    if (!result.rows[0]) throw new Error('Lender lead not found');
+    return this.mapLenderLeadRow(result.rows[0]);
+  }
+
+  async getLenderLeadRotation(zipCode: string): Promise<LenderLeadRotation | undefined> {
+    const result = await db.execute(sql`SELECT * FROM lender_lead_rotations WHERE zip_code = ${zipCode} LIMIT 1`);
+    if (!result.rows[0]) return undefined;
+    return this.mapLenderLeadRotationRow(result.rows[0]);
+  }
+
+  async upsertLenderLeadRotation(zipCode: string, lastLenderId: number): Promise<LenderLeadRotation> {
+    const existing = await this.getLenderLeadRotation(zipCode);
+    if (existing) {
+      const result = await db.execute(sql`UPDATE lender_lead_rotations SET last_lender_id = ${lastLenderId}, updated_at = NOW() WHERE id = ${existing.id} RETURNING *`);
+      if (!result.rows[0]) throw new Error('Failed to update lender lead rotation');
+      return this.mapLenderLeadRotationRow(result.rows[0]);
+    }
+    const result = await db.execute(sql`
+      INSERT INTO lender_lead_rotations (zip_code, last_lender_id, updated_at)
+      VALUES (${zipCode}, ${lastLenderId}, NOW())
+      RETURNING *
+    `);
+    if (!result.rows[0]) throw new Error('Failed to create lender lead rotation');
+    return this.mapLenderLeadRotationRow(result.rows[0]);
   }
 
   async getAgentResponseMetrics(agentId: number): Promise<{ avgResponseMs: number; fastestMs: number; slowestMs: number; totalResponded: number; responseRate: number }> {

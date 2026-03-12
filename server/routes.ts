@@ -6792,6 +6792,225 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  const MAX_LENDERS_PER_ZIP = 5;
+  const LENDER_FLAT_RATE = 2500;
+
+  app.get("/api/lender-leads/zip-pricing/:zipCode", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "lender") return res.sendStatus(403);
+
+    try {
+      const zipCode = req.params.zipCode.trim();
+      if (!/^\d{5}$/.test(zipCode)) {
+        return res.status(400).json({ error: 'Invalid zip code' });
+      }
+
+      const lenderCount = await storage.getLenderCountForZipCode(zipCode);
+      const alreadyClaimed = await storage.isLenderZipClaimed(req.user.id, zipCode);
+
+      res.json({
+        zipCode,
+        currentLenders: lenderCount,
+        maxLenders: MAX_LENDERS_PER_ZIP,
+        spotsRemaining: MAX_LENDERS_PER_ZIP - lenderCount,
+        isFull: lenderCount >= MAX_LENDERS_PER_ZIP,
+        alreadyClaimed,
+        monthlyRate: LENDER_FLAT_RATE,
+        monthlyRateDisplay: `$${(LENDER_FLAT_RATE / 100).toFixed(2)}/mo`,
+      });
+    } catch (error) {
+      console.error('Error fetching lender zip pricing:', error);
+      res.status(500).json({ error: 'Failed to fetch pricing' });
+    }
+  });
+
+  app.post("/api/lender-leads/zip-codes", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "lender") return res.sendStatus(403);
+
+    try {
+      const { zipCode } = req.body;
+      if (!zipCode || typeof zipCode !== 'string') {
+        return res.status(400).json({ error: 'Zip code is required' });
+      }
+
+      const trimmedZip = zipCode.trim();
+      if (!/^\d{5}$/.test(trimmedZip)) {
+        return res.status(400).json({ error: 'Please enter a valid 5-digit zip code' });
+      }
+
+      const alreadyClaimed = await storage.isLenderZipClaimed(req.user.id, trimmedZip);
+      if (alreadyClaimed) {
+        return res.status(409).json({ error: 'You have already claimed this zip code' });
+      }
+
+      const lenderCount = await storage.getLenderCountForZipCode(trimmedZip);
+      if (lenderCount >= MAX_LENDERS_PER_ZIP) {
+        return res.status(409).json({ error: `This zip code is full (max ${MAX_LENDERS_PER_ZIP} lenders). Try a nearby zip code.` });
+      }
+
+      const claimed = await storage.claimLenderZipCode({
+        lenderId: req.user.id,
+        zipCode: trimmedZip,
+        isActive: true,
+        monthlyRate: LENDER_FLAT_RATE,
+      });
+      res.status(201).json({
+        ...claimed,
+        currentLenders: lenderCount + 1,
+        maxLenders: MAX_LENDERS_PER_ZIP,
+      });
+    } catch (error: any) {
+      console.error('Error claiming lender zip code:', error);
+      if (error.message?.includes('max 5 lenders')) {
+        return res.status(409).json({ error: `This zip code is full (max ${MAX_LENDERS_PER_ZIP} lenders). Try a nearby zip code.` });
+      }
+      res.status(500).json({ error: 'Failed to claim zip code' });
+    }
+  });
+
+  app.delete("/api/lender-leads/zip-codes/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "lender") return res.sendStatus(403);
+
+    try {
+      const id = Number(req.params.id);
+      const lenderZips = await storage.getLenderZipCodes(req.user.id);
+      const owns = lenderZips.find(z => z.id === id);
+      if (!owns) {
+        return res.status(403).json({ error: 'You do not own this zip code claim' });
+      }
+
+      await storage.releaseLenderZipCode(id, req.user.id);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error releasing lender zip code:', error);
+      res.status(500).json({ error: 'Failed to release zip code' });
+    }
+  });
+
+  app.get("/api/lender-leads/zip-codes", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "lender") return res.sendStatus(403);
+
+    try {
+      const zipCodes = await storage.getLenderZipCodes(req.user.id);
+      res.json({
+        zipCodes,
+        maxLendersPerZip: MAX_LENDERS_PER_ZIP,
+        flatRate: LENDER_FLAT_RATE,
+      });
+    } catch (error) {
+      console.error('Error fetching lender zip codes:', error);
+      res.status(500).json({ error: 'Failed to fetch zip codes' });
+    }
+  });
+
+  async function assignLenderLead(zipCode: string): Promise<{ assignedLenderId: number | null; status: string }> {
+    const lenders = await storage.getLendersForZipCode(zipCode);
+    if (lenders.length === 0) return { assignedLenderId: null, status: 'new' };
+
+    const rotation = await storage.getLenderLeadRotation(zipCode);
+    const lastLenderId = rotation?.lastLenderId;
+
+    let nextLender: typeof lenders[0];
+    if (lastLenderId) {
+      const lastIndex = lenders.findIndex(l => l.lenderId === lastLenderId);
+      const nextIndex = (lastIndex + 1) % lenders.length;
+      nextLender = lenders[nextIndex];
+    } else {
+      nextLender = lenders[0];
+    }
+
+    await storage.upsertLenderLeadRotation(zipCode, nextLender.lenderId);
+    return { assignedLenderId: nextLender.lenderId, status: 'assigned' };
+  }
+
+  app.post("/api/lender-leads/submit", async (req, res) => {
+    try {
+      const schema = z.object({
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        email: z.string().email(),
+        phone: z.string().optional().nullable(),
+        zipCode: z.string().regex(/^\d{5}$/, "Invalid zip code"),
+        loanType: z.enum(['conventional', 'fha', 'va', 'usda', 'other']).optional().default('conventional'),
+        purchasePrice: z.string().optional().nullable(),
+        downPayment: z.string().optional().nullable(),
+        creditScore: z.string().optional().nullable(),
+        message: z.string().optional().nullable(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json(parsed.error);
+
+      const data = parsed.data;
+      const { assignedLenderId, status } = await assignLenderLead(data.zipCode);
+
+      const lead = await storage.createLenderLead({
+        ...data,
+        phone: data.phone || null,
+        purchasePrice: data.purchasePrice || null,
+        downPayment: data.downPayment || null,
+        creditScore: data.creditScore || null,
+        message: data.message || null,
+        status,
+        assignedLenderId,
+      });
+
+      if (assignedLenderId) {
+        try {
+          const lender = await storage.getUser(assignedLenderId);
+          if (lender) {
+            notify(
+              assignedLenderId,
+              'lead_new',
+              'New Lender Lead',
+              `${data.firstName} ${data.lastName} in ${data.zipCode} — ${data.loanType} loan`,
+              lead.id,
+              'lender_lead'
+            ).catch(() => {});
+          }
+        } catch (notifErr) {
+          console.error('Error sending lender lead notification:', notifErr);
+        }
+      }
+
+      res.status(201).json({ success: true, assigned: !!assignedLenderId });
+    } catch (error) {
+      console.error('Error submitting lender lead:', error);
+      res.status(500).json({ error: 'Failed to submit lender request' });
+    }
+  });
+
+  app.get("/api/lender/leads", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'lender') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const leads = await storage.getLenderLeadsByLender(req.user.id);
+      res.json(leads);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch lender leads' });
+    }
+  });
+
+  app.patch("/api/lender/leads/:id/status", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'lender') return res.status(403).json({ error: 'Forbidden' });
+    try {
+      const { status } = req.body;
+      if (!['accepted', 'rejected', 'converted'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+      }
+      const lead = await storage.getLenderLead(Number(req.params.id));
+      if (!lead || lead.assignedLenderId !== req.user.id) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+      const updated = await storage.updateLenderLeadStatus(lead.id, status);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update lead status' });
+    }
+  });
+
   // ===== LENDER PORTAL ROUTES =====
 
   const LENDER_STAGES = ['invited', 'under_contract', 'processing', 'underwriting', 'conditions_clearing', 'clear_to_close', 'closed', 'on_hold'];

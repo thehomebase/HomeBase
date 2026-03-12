@@ -98,6 +98,7 @@ import { TopAgentsPage, AgentReviewsPage } from "@/pages/agent-reviews-page";
 import LeadGenerationPage from "@/pages/lead-generation-page";
 import DashboardPage from "@/pages/dashboard-page";
 import LeadSubmitPage from "@/pages/lead-submit-page";
+import LenderLeadSubmitPage from "@/pages/lender-lead-submit-page";
 import FindContractorPage from "@/pages/find-contractor-page";
 import VendorRatingsPage from "@/pages/vendor-ratings-page";
 import BiometricSettingsPage from "@/pages/biometric-settings-page";
@@ -613,6 +614,7 @@ function Router() {
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/find-agent" component={LeadSubmitPage} />
+      <Route path="/find-lender" component={LenderLeadSubmitPage} />
       <Route path="/find-contractor" component={FindContractorPage} />
       <Route path="/agents/:agentId/reviews" component={AgentReviewsPage} />
       <Route path="/top-agents" component={TopAgentsPage} />
