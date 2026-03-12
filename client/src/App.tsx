@@ -63,12 +63,14 @@ import {
   Phone,
   ScanLine,
   Zap,
-  Key
+  Key,
+  User as UserIcon
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { OnboardingTutorial, useOnboardingTutorial, TutorialStartButton } from "@/components/onboarding-tutorial";
 import CalculatorsPage from "@/pages/calculators-page";
+import ProfilePage from "@/pages/profile-page";
 import GlossaryPage from "./pages/glossary-page";
 import MessagesPage from "./pages/messages-page";
 import ClientPage from "@/pages/client-page";
@@ -540,6 +542,12 @@ function Layout({ children }: { children: React.ReactNode }) {
                       <TutorialStartButton onClick={tutorial.startTutorial} />
                     )}
                     <BiometricSetupButton compact={false} />
+                    <Link href="/profile">
+                      <Button variant="outline" size="sm" className="w-full">
+                        <UserIcon className="h-4 w-4" />
+                        <span className="ml-2">My Profile</span>
+                      </Button>
+                    </Link>
                     <Button
                       variant="outline"
                       size="sm"
@@ -621,6 +629,12 @@ function Router() {
       </Route>
       <Route path="/calculators">
         <ProtectedRoute path="/calculators" component={CalculatorsPage} />
+      </Route>
+      <Route path="/profile/:id">
+        <ProtectedRoute path="/profile/:id" component={ProfilePage} />
+      </Route>
+      <Route path="/profile">
+        <ProtectedRoute path="/profile" component={ProfilePage} />
       </Route>
       <Route path="/calendar">
         <ProtectedRoute path="/calendar" component={CalendarPage} />

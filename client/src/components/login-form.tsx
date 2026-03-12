@@ -79,13 +79,23 @@ export function LoginForm({
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const referralCode = formData.get("referralCode") as string;
+    const role = formData.get("role") as string;
+    const isAgentOrBroker = role === "agent" || role === "broker";
+    const licenseNumber = formData.get("licenseNumber") as string;
+    const licenseState = formData.get("licenseState") as string;
+    const brokerageName = formData.get("brokerageName") as string;
+    if (isAgentOrBroker && (!licenseNumber || !licenseState || !brokerageName)) {
+      toast({ title: "License number, state, and brokerage name are required for agents and brokers", variant: "destructive" });
+      return;
+    }
     registerMutation.mutate({
       email: formData.get("email") as string,
       password: formData.get("password") as string,
       firstName: formData.get("firstName") as string,
       lastName: formData.get("lastName") as string,
-      role: formData.get("role") as string,
+      role,
       ...(referralCode ? { referralCode } : {}),
+      ...(isAgentOrBroker ? { licenseNumber, licenseState, brokerageName } : {}),
     } as any);
     setShowRegister(false);
   };
@@ -222,6 +232,41 @@ export function LoginForm({
                 </SelectContent>
               </Select>
             </div>
+            {(selectedRole === "agent" || selectedRole === "broker") && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="reg-licenseNumber">License Number *</Label>
+                  <Input
+                    id="reg-licenseNumber"
+                    name="licenseNumber"
+                    placeholder="e.g. 0654321"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reg-licenseState">License State *</Label>
+                  <Select name="licenseState">
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"].map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reg-brokerageName">Brokerage Name *</Label>
+                  <Input
+                    id="reg-brokerageName"
+                    name="brokerageName"
+                    placeholder="e.g. Keller Williams Realty"
+                    required
+                  />
+                </div>
+              </>
+            )}
             {selectedRole !== "lender" && selectedRole !== "broker" && (
               <div className="space-y-2">
                 <Label htmlFor="reg-referralCode">Referral Code (optional)</Label>

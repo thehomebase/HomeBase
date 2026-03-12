@@ -32,6 +32,13 @@ export const users = pgTable("users", {
   emailVerificationExpires: timestamp("email_verification_expires"),
   registrationIp: text("registration_ip"),
   brokerageId: integer("brokerage_id"),
+  licenseNumber: text("license_number"),
+  licenseState: text("license_state"),
+  brokerageName: text("brokerage_name"),
+  verificationStatus: text("verification_status").default("unverified"),
+  profilePhotoUrl: text("profile_photo_url"),
+  profileBio: text("profile_bio"),
+  profilePhone: text("profile_phone"),
 });
 
 export const clients = pgTable("clients", {

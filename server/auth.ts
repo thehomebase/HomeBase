@@ -218,14 +218,34 @@ export function setupAuth(app: Express) {
       const hashedCode = hashVerificationCode(verificationCode);
       const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
+      const role = ['agent', 'client', 'vendor', 'lender', 'broker'].includes(req.body.role) ? req.body.role : 'client';
+      const isAgentOrBroker = role === 'agent' || role === 'broker';
+
+      if (isAgentOrBroker && (!req.body.licenseNumber || !req.body.licenseState || !req.body.brokerageName)) {
+        return res.status(400).json({ error: "License number, state, and brokerage name are required for agents and brokers" });
+      }
+
       const user = await storage.createUser({
         email: req.body.email,
         password: await hashPassword(req.body.password),
         firstName: req.body.firstName,
         lastName: req.body.lastName,
-        role: ['agent', 'client', 'vendor', 'lender', 'broker'].includes(req.body.role) ? req.body.role : 'client',
+        role,
         registrationIp: clientIp
       });
+
+      if (isAgentOrBroker) {
+        await storage.updateUser(user.id, {
+          licenseNumber: req.body.licenseNumber,
+          licenseState: req.body.licenseState,
+          brokerageName: req.body.brokerageName,
+          verificationStatus: 'licensed',
+        });
+        user.licenseNumber = req.body.licenseNumber;
+        user.licenseState = req.body.licenseState;
+        user.brokerageName = req.body.brokerageName;
+        user.verificationStatus = 'licensed';
+      }
 
       await storage.updateUser(user.id, {
         emailVerified: false,

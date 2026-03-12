@@ -13,6 +13,7 @@ import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, type EmailAttachment } from "./gmail-service";
 import { randomUUID } from "crypto";
+import sharp from "sharp";
 import { notify } from "./notification-helper";
 import { getEstimatedHomeValue } from "./zip-home-values";
 import {
@@ -3503,6 +3504,131 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error("Error sending calculator results email:", error);
       res.status(500).json({ error: error.message || "Failed to send email" });
+    }
+  });
+
+  // ============ Profile & Verification ============
+
+  app.get("/api/profile/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "Invalid ID" });
+      const user = await storage.getUser(id);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      const isOwn = req.user.id === id;
+      const publicProfile: any = {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        brokerageName: user.brokerageName,
+        licenseNumber: user.licenseNumber,
+        licenseState: user.licenseState,
+        verificationStatus: user.verificationStatus,
+        profilePhotoUrl: user.profilePhotoUrl,
+        profileBio: user.profileBio,
+        profilePhone: user.profilePhone,
+      };
+      if (isOwn) {
+        publicProfile.stripeCustomerId = user.stripeCustomerId;
+        publicProfile.stripeSubscriptionId = user.stripeSubscriptionId;
+        publicProfile.emailVerified = user.emailVerified;
+        publicProfile.dashboardPreferences = user.dashboardPreferences;
+        publicProfile.brokerageId = user.brokerageId;
+        publicProfile.agentId = user.agentId;
+      }
+      res.json(publicProfile);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch profile" });
+    }
+  });
+
+  app.patch("/api/profile", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const schema = z.object({
+      profileBio: z.string().max(1000).optional(),
+      profilePhone: z.string().max(50).optional(),
+      brokerageName: z.string().max(200).optional(),
+      licenseNumber: z.string().max(50).optional(),
+      licenseState: z.string().max(5).optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid data" });
+    try {
+      const updated = await storage.updateUser(req.user.id, parsed.data);
+      const { password, emailVerificationToken, ...safe } = updated;
+      res.json(safe);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  app.post("/api/profile/photo", upload.single("photo"), async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      if (!req.file.mimetype.startsWith("image/")) return res.status(400).json({ error: "File must be an image" });
+
+      const photoWidth = 400;
+      const photoHeight = 500;
+      const bgColor = { r: 235, g: 235, b: 235, alpha: 1 };
+
+      const resizedPhoto = await sharp(req.file.buffer)
+        .resize(photoWidth, photoHeight, { fit: "cover", position: "top" })
+        .png()
+        .toBuffer();
+
+      const base64 = `data:image/png;base64,${resizedPhoto.toString("base64")}`;
+      const updated = await storage.updateUser(req.user.id, { profilePhotoUrl: base64 });
+      const { password, emailVerificationToken, ...safe } = updated;
+      res.json(safe);
+    } catch (error) {
+      console.error("Profile photo upload error:", error);
+      res.status(500).json({ error: "Failed to upload photo" });
+    }
+  });
+
+  app.post("/api/broker/verify-agent/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    if (req.user.role !== "broker") return res.status(403).json({ error: "Only brokers can verify agents" });
+    const broker = await storage.getUser(req.user.id);
+    if (!broker || (broker.verificationStatus !== "admin_verified" && broker.verificationStatus !== "broker_verified")) {
+      return res.status(403).json({ error: "You must be a verified broker to verify agents" });
+    }
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "Invalid ID" });
+    try {
+      const targetUser = await storage.getUser(id);
+      if (!targetUser) return res.status(404).json({ error: "User not found" });
+      if (targetUser.role !== "agent") return res.status(400).json({ error: "Can only verify agents" });
+      const updated = await storage.updateUser(id, { verificationStatus: "broker_verified" });
+      const { password, emailVerificationToken, ...safe } = updated;
+      res.json(safe);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to verify agent" });
+    }
+  });
+
+  app.get("/api/agents", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, first_name, last_name, email, role, brokerage_name, license_number, license_state, 
+               verification_status, profile_photo_url, profile_bio, profile_phone
+        FROM users WHERE role IN ('agent', 'broker') AND email_verified = true
+        ORDER BY 
+          CASE verification_status 
+            WHEN 'admin_verified' THEN 1 
+            WHEN 'broker_verified' THEN 2 
+            WHEN 'licensed' THEN 3 
+            ELSE 4 
+          END ASC,
+          first_name ASC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch agents" });
     }
   });
 
