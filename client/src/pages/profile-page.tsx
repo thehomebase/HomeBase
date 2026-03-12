@@ -666,6 +666,7 @@ export default function ProfilePage() {
   }
 
   const isAgentOrBroker = profile.role === "agent" || profile.role === "broker";
+  const isLicensedRole = profile.role === "agent" || profile.role === "broker" || profile.role === "lender";
   const profileName = `${profile.firstName} ${profile.lastName}`;
 
   return (
@@ -687,11 +688,36 @@ export default function ProfilePage() {
               <ConfirmedCheckItem label="Identity" confirmed={!!profile.profilePhotoUrl} />
               <ConfirmedCheckItem label="Email" confirmed={!!profile.emailVerified || !!profile.email} />
               <ConfirmedCheckItem label="Phone" confirmed={!!profile.profilePhone} />
-              {isAgentOrBroker && (
+              {isLicensedRole && (
                 <ConfirmedCheckItem label="License" confirmed={!!profile.licenseNumber} />
               )}
             </div>
-            {isAgentOrBroker && (
+            {isLicensedRole && (profile.licenseNumber || profile.nmlsNumber) && (
+              <div className="mt-4 pt-3 border-t space-y-2">
+                <span className="text-xs font-medium text-muted-foreground">License Details</span>
+                {profile.licenseNumber && (
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium">{profile.licenseNumber}</span>
+                      {profile.licenseState && (
+                        <span className="text-xs text-muted-foreground ml-1.5">({profile.licenseState})</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {profile.nmlsNumber && (
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-xs text-muted-foreground">NMLS# </span>
+                      <span className="text-sm font-medium">{profile.nmlsNumber}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {isLicensedRole && (
               <div className="mt-4 pt-3 border-t">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Verification</span>
@@ -705,7 +731,7 @@ export default function ProfilePage() {
                 )}
               </div>
             )}
-            {isOwn && isAgentOrBroker && <VerifyIdentitySection profile={profile} />}
+            {isOwn && isLicensedRole && <VerifyIdentitySection profile={profile} />}
           </CardContent>
         </Card>
 

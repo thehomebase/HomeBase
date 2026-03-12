@@ -3526,6 +3526,7 @@ export function registerRoutes(app: Express): Server {
         brokerageName: user.brokerageName,
         licenseNumber: user.licenseNumber,
         licenseState: user.licenseState,
+        nmlsNumber: user.nmlsNumber,
         verificationStatus: user.verificationStatus,
         profilePhotoUrl: user.profilePhotoUrl,
         profileBio: user.profileBio,
