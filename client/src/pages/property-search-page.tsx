@@ -526,9 +526,11 @@ function ListingDetailDialog({
   return (
     <Dialog open={!!listing} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+        <DialogHeader className="text-left">
           <DialogTitle className="flex items-start gap-2">
-            <Home className="h-7 w-7 shrink-0 mt-0.5 fill-current" />
+            <svg viewBox="0 0 100 90" className="h-7 w-7 shrink-0 mt-0.5 fill-current" aria-hidden="true">
+              <polygon points="50,2 2,45 2,88 98,88 98,45" />
+            </svg>
             <div className="min-w-0">
               <h2 className="text-lg font-bold">{listing.addressLine1}</h2>
               <p className="text-sm text-muted-foreground font-normal">
