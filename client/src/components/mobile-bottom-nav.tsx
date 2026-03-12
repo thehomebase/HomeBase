@@ -35,6 +35,7 @@ import {
   Zap,
   Key,
   User,
+  Settings,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -61,8 +62,8 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Star, label: "Find Agents", href: "/top-agents", id: "top-agents" },
       { icon: Search, label: "Search", href: "/property-search", id: "search" },
       { icon: Calendar, label: "Calendar", href: "/calendar", id: "calendar" },
-      { icon: CreditCard, label: "Billing", href: "/billing", id: "billing" },
       { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
+      { icon: Settings, label: "Settings", href: "/settings", id: "settings" },
     ];
   }
 
@@ -76,8 +77,8 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Home, label: "MyHome", href: "/my-home", id: "my-home" },
       { icon: Star, label: "Find Agents", href: "/top-agents", id: "top-agents" },
       { icon: Calendar, label: "Calendar", href: "/calendar", id: "calendar" },
-      { icon: CreditCard, label: "Billing", href: "/billing", id: "billing" },
       { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
+      { icon: Settings, label: "Settings", href: "/settings", id: "settings" },
     ];
   }
 
@@ -103,8 +104,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
       { icon: ScanLine, label: "Scanner", href: "/scanner", id: "scanner" },
       { icon: Phone, label: "Phone & SMS", href: "/phone", id: "phone" },
-      { icon: Zap, label: "Zapier", href: "/integrations/zapier", id: "zapier" },
-      { icon: Key, label: "API Keys", href: "/api-keys", id: "api-keys" },
+      { icon: Settings, label: "Settings", href: "/settings", id: "settings" },
     ];
   }
 
@@ -120,6 +120,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Calendar, label: "Calendar", href: "/calendar", id: "calendar" },
       { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
       { icon: Book, label: "Glossary", href: "/glossary", id: "glossary" },
+      { icon: Settings, label: "Settings", href: "/settings", id: "settings" },
     ];
   }
 
@@ -139,12 +140,10 @@ function getAllNavItems(role: string | undefined): NavItem[] {
     { icon: Gift, label: "Referrals", href: "/referrals", id: "referrals" },
     { icon: Bell, label: "Drip Campaigns", href: "/drip", id: "drip" },
     { icon: MapPin, label: "Lead Gen", href: "/lead-gen", id: "lead-gen" },
-    { icon: CreditCard, label: "Billing", href: "/billing", id: "billing" },
     { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
     { icon: ScanLine, label: "Scanner", href: "/scanner", id: "scanner" },
     { icon: Phone, label: "Phone & SMS", href: "/phone", id: "phone" },
-    { icon: Zap, label: "Zapier", href: "/integrations/zapier", id: "zapier" },
-    { icon: Key, label: "API Keys", href: "/api-keys", id: "api-keys" },
+    { icon: Settings, label: "Settings", href: "/settings", id: "settings" },
   ];
 }
 
@@ -336,6 +335,14 @@ export function MobileBottomNav() {
                 <User className="h-5 w-5" />
                 <span className="text-sm">My Profile</span>
               </Link>
+              <Link
+                href="/settings"
+                onClick={() => setShowMore(false)}
+                className="flex items-center gap-3 w-full p-3 rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-transform"
+              >
+                <Settings className="h-5 w-5" />
+                <span className="text-sm">Settings</span>
+              </Link>
               <button
                 onClick={() => {
                   const nowDark = document.documentElement.classList.toggle("dark");
@@ -356,16 +363,6 @@ export function MobileBottomNav() {
               >
                 <Settings2 className="h-5 w-5" />
                 <span className="text-sm">Customize Bottom Bar</span>
-              </button>
-              <button
-                onClick={() => {
-                  setShowMore(false);
-                  setLocation("/settings/biometric");
-                }}
-                className="flex items-center gap-3 w-full p-3 rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-transform"
-              >
-                <Fingerprint className="h-5 w-5" />
-                <span className="text-sm">Biometric Login</span>
               </button>
               <button
                 onClick={() => logoutMutation.mutate()}

@@ -3579,6 +3579,7 @@ export function registerRoutes(app: Express): Server {
     const schema = z.object({
       profileBio: z.string().max(1000).optional(),
       profilePhone: z.string().max(50).optional(),
+      profilePhotoUrl: z.string().nullable().optional(),
       brokerageName: z.string().max(200).optional(),
       licenseNumber: z.string().max(50).optional(),
       licenseState: z.string().max(5).optional(),
@@ -3595,6 +3596,35 @@ export function registerRoutes(app: Express): Server {
       res.json(safe);
     } catch (error) {
       res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  app.post("/api/profile/change-password", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const schema = z.object({
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(8, "Password must be at least 8 characters"),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid data" });
+    try {
+      const { hashPassword } = await import('./auth');
+      const user = await storage.getUser(req.user.id);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      const { scrypt, randomBytes, timingSafeEqual } = await import("crypto");
+      const { promisify } = await import("util");
+      const scryptAsync = promisify(scrypt);
+      const [hashed, salt] = user.password.split(".");
+      const hashedBuf = Buffer.from(hashed, "hex");
+      const suppliedBuf = (await scryptAsync(parsed.data.currentPassword, salt, 64)) as Buffer;
+      if (!timingSafeEqual(hashedBuf, suppliedBuf)) {
+        return res.status(400).json({ error: "Current password is incorrect" });
+      }
+      const newHashed = await hashPassword(parsed.data.newPassword);
+      await storage.updateUser(req.user.id, { password: newHashed });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to change password" });
     }
   });
 

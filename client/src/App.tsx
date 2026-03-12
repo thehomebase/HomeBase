@@ -64,7 +64,8 @@ import {
   ScanLine,
   Zap,
   Key,
-  User as UserIcon
+  User as UserIcon,
+  Settings
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -102,6 +103,7 @@ import LenderLeadSubmitPage from "@/pages/lender-lead-submit-page";
 import FindContractorPage from "@/pages/find-contractor-page";
 import VendorRatingsPage from "@/pages/vendor-ratings-page";
 import BiometricSettingsPage from "@/pages/biometric-settings-page";
+import SettingsPage from "@/pages/settings-page";
 import LandingPage from "@/pages/landing-page";
 import FeedbackPage from "@/pages/feedback-page";
 import VerifyEmailPage from "@/pages/verify-email-page";
@@ -510,65 +512,52 @@ function Layout({ children }: { children: React.ReactNode }) {
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         )}
-                        {(user?.role === 'agent' || user?.role === 'vendor') && (
-                          <SidebarMenuItem>
-                            <SidebarMenuButton asChild tooltip="Billing">
-                              <Link href="/billing" className="flex items-center gap-2">
-                                <CreditCard className="h-4 w-4" />
-                                <span>Billing</span>
-                              </Link>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        )}
                         <SidebarMenuItem>
-                          <SidebarMenuButton asChild tooltip="Zapier">
-                            <Link href="/integrations/zapier" className="flex items-center gap-2">
-                              <Zap className="h-4 w-4" />
-                              <span>Zapier</span>
+                          <SidebarMenuButton asChild tooltip="Settings">
+                            <Link href="/settings" className="flex items-center gap-2">
+                              <Settings className="h-4 w-4" />
+                              <span>Settings</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
-                        {isAgentOrBroker && (
-                          <SidebarMenuItem>
-                            <SidebarMenuButton asChild tooltip="API Keys">
-                              <Link href="/api-keys" className="flex items-center gap-2">
-                                <Key className="h-4 w-4" />
-                                <span>API Keys</span>
-                              </Link>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        )}
                       </SidebarMenu>
                     </CollapsibleContent>
                   </SidebarGroup>
                 </Collapsible>
               </SidebarContent>
               <SidebarFooter>
-                <div className="p-2">
-                  <span className="text-xs text-muted-foreground block mb-2 px-2 truncate">
-                    {user?.email} ({user?.role})
-                  </span>
-                  <div className="flex flex-col gap-2">
-                    {isAgentOrBroker && (
-                      <TutorialStartButton onClick={tutorial.startTutorial} />
+                <div className="p-2 space-y-2">
+                  {isAgentOrBroker && (
+                    <TutorialStartButton onClick={tutorial.startTutorial} />
+                  )}
+                  <Link href="/settings" className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors">
+                    {user?.profilePhotoUrl ? (
+                      <img
+                        src={user.profilePhotoUrl}
+                        alt={`${user.firstName} ${user.lastName}`}
+                        className="h-9 w-9 rounded-full object-cover border-2 border-border shrink-0"
+                      />
+                    ) : (
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border-2 border-border shrink-0">
+                        <span className="text-sm font-semibold text-primary">
+                          {(user?.firstName?.[0] || "").toUpperCase()}{(user?.lastName?.[0] || "").toUpperCase()}
+                        </span>
+                      </div>
                     )}
-                    <BiometricSetupButton compact={false} />
-                    <Link href="/profile">
-                      <Button variant="outline" size="sm" className="w-full">
-                        <UserIcon className="h-4 w-4" />
-                        <span className="ml-2">My Profile</span>
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => logoutMutation.mutate()}
-                      className="w-full"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span className="ml-2">Logout</span>
-                    </Button>
-                  </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{user?.firstName} {user?.lastName}</p>
+                      <p className="text-xs text-muted-foreground capitalize truncate">{user?.role}</p>
+                    </div>
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => logoutMutation.mutate()}
+                    className="w-full justify-start text-muted-foreground hover:text-foreground"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </Button>
                 </div>
               </SidebarFooter>
             </Sidebar>
@@ -657,6 +646,9 @@ function Router() {
       </Route>
       <Route path="/settings/biometric">
         <ProtectedRoute path="/settings/biometric" component={BiometricSettingsPage} />
+      </Route>
+      <Route path="/settings">
+        <ProtectedRoute path="/settings" component={SettingsPage} />
       </Route>
 
       {user?.role === "vendor" ? (

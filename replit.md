@@ -15,7 +15,7 @@ Preferred communication style: Simple, everyday language.
 - **Form Handling**: React Hook Form with Zod
 - **Routing**: Client-side routing
 - **PWA & Mobile**: Progressive Web App with service worker, mobile navigation, and biometric login (WebAuthn). Dark mode is available.
-- **UI/UX**: Customizable role-aware dashboards with widgets, Omostate-inspired profile pages, interactive onboarding tutorial, always-full-width sidebar on desktop.
+- **UI/UX**: Customizable role-aware dashboards with widgets, Omostate-inspired profile pages, interactive onboarding tutorial, always-full-width sidebar on desktop, unified Settings page (`/settings`) with sub-sections (Profile, Security, Billing, API Keys & Integrations, Notifications), profile photo thumbnail with name/role in sidebar footer.
 
 ### Backend
 - **Runtime**: Node.js with Express (TypeScript)
