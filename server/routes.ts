@@ -34,6 +34,47 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024, files: 10 },
 });
 
+function getClientIp(req: import('express').Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
+  return req.ip || req.socket.remoteAddress || 'unknown';
+}
+
+function createRateLimiter(windowMs: number, maxRequests: number) {
+  const hits = new Map<string, { count: number; resetTime: number }>();
+
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, val] of hits) {
+      if (now > val.resetTime) hits.delete(key);
+    }
+  }, 60_000);
+
+  return (req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => {
+    const key = getClientIp(req);
+    const now = Date.now();
+    const record = hits.get(key);
+
+    if (!record || now > record.resetTime) {
+      hits.set(key, { count: 1, resetTime: now + windowMs });
+      return next();
+    }
+
+    record.count++;
+    if (record.count > maxRequests) {
+      const retryAfter = Math.ceil((record.resetTime - now) / 1000);
+      res.set('Retry-After', String(retryAfter));
+      return res.status(429).json({ error: "Too many requests. Please slow down and try again shortly." });
+    }
+    next();
+  };
+}
+
+const apiLimiter = createRateLimiter(60_000, 120);
+const authLimiter = createRateLimiter(15 * 60_000, 15);
+const rentcastLimiter = createRateLimiter(60_000, 5);
+const sensitiveApiLimiter = createRateLimiter(60_000, 30);
+
 // Seller checklist items
 const SELLER_CHECKLIST_ITEMS = [
   { id: "assess-value", text: "Assess Home Value", phase: "Pre-Listing Preparation" },
