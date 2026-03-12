@@ -231,56 +231,61 @@ function ListingCard({ listing, isSelected, onToggleSelect }: { listing: RentCas
         )}
       </div>
 
-      {(listing.listingAgent || listing.listingOffice) && (
-        <div className="text-xs border-t pt-2 space-y-1.5">
-          <div className="text-muted-foreground">
-            {listing.listingAgent && (
-              <span><span className="font-medium">Agent:</span> {listing.listingAgent.name}</span>
-            )}
-            {listing.listingOffice && <span> · {listing.listingOffice.name}</span>}
-          </div>
-          {(listing.listingAgent?.phone || listing.listingAgent?.email) && (
-            <div className="flex flex-wrap gap-1.5">
-              {listing.listingAgent?.phone && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 text-[11px] gap-1 px-2"
-                    onClick={() => window.open(`tel:${listing.listingAgent!.phone}`, "_self")}
-                  >
-                    <Phone className="h-3 w-3" />
-                    Call
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 text-[11px] gap-1 px-2"
-                    onClick={() => window.open(`sms:${listing.listingAgent!.phone}`, "_self")}
-                  >
-                    <MessageSquare className="h-3 w-3" />
-                    Text
-                  </Button>
-                </>
+      {(listing.listingAgent || listing.listingOffice) && (() => {
+        const contactPhone = listing.listingAgent?.phone || listing.listingOffice?.phone;
+        const contactEmail = listing.listingAgent?.email || listing.listingOffice?.email;
+        const contactLabel = listing.listingAgent?.phone ? "Agent" : listing.listingOffice?.phone ? "Office" : "";
+        return (
+          <div className="text-xs border-t pt-2 space-y-1.5">
+            <div className="text-muted-foreground">
+              {listing.listingAgent && (
+                <span><span className="font-medium">Agent:</span> {listing.listingAgent.name}</span>
               )}
-              {listing.listingAgent?.email && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 text-[11px] gap-1 px-2"
-                  onClick={() => window.open(`mailto:${listing.listingAgent!.email}?subject=${encodeURIComponent(`Inquiry about ${listing.formattedAddress}`)}`)}
-                >
-                  <Mail className="h-3 w-3" />
-                  Email
-                </Button>
-              )}
-              <span className="text-[11px] text-muted-foreground self-center">
-                {[listing.listingAgent?.phone, listing.listingAgent?.email].filter(Boolean).join(" · ")}
-              </span>
+              {listing.listingOffice && <span> · {listing.listingOffice.name}</span>}
             </div>
-          )}
-        </div>
-      )}
+            {(contactPhone || contactEmail) && (
+              <div className="flex flex-wrap gap-1.5">
+                {contactPhone && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[11px] gap-1 px-2"
+                      onClick={() => window.open(`tel:${contactPhone}`, "_self")}
+                    >
+                      <Phone className="h-3 w-3" />
+                      Call {contactLabel}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[11px] gap-1 px-2"
+                      onClick={() => window.open(`sms:${contactPhone}`, "_self")}
+                    >
+                      <MessageSquare className="h-3 w-3" />
+                      Text
+                    </Button>
+                  </>
+                )}
+                {contactEmail && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 text-[11px] gap-1 px-2"
+                    onClick={() => window.open(`mailto:${contactEmail}?subject=${encodeURIComponent(`Inquiry about ${listing.formattedAddress}`)}`)}
+                  >
+                    <Mail className="h-3 w-3" />
+                    Email
+                  </Button>
+                )}
+                <span className="text-[11px] text-muted-foreground self-center">
+                  {[contactPhone, contactEmail].filter(Boolean).join(" · ")}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="flex gap-2 pt-1">
         <Button
@@ -406,52 +411,63 @@ function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll }: { 
                     {listing.daysOnMarket}
                   </Badge>
                 </td>
-                <td className="px-3 py-2.5 hidden md:table-cell text-xs text-muted-foreground">
-                  <div className="truncate max-w-[140px]">{listing.listingAgent?.name || '—'}</div>
-                  {listing.listingOffice && (
-                    <div className="truncate max-w-[140px] text-[11px] opacity-70">{listing.listingOffice.name}</div>
-                  )}
-                </td>
-                <td className="px-3 py-2.5 hidden md:table-cell">
-                  <div className="flex gap-1 justify-center">
-                    {listing.listingAgent?.phone && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          title={`Call ${listing.listingAgent.phone}`}
-                          onClick={() => window.open(`tel:${listing.listingAgent!.phone}`, "_self")}
-                        >
-                          <Phone className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          title={`Text ${listing.listingAgent.phone}`}
-                          onClick={() => window.open(`sms:${listing.listingAgent!.phone}`, "_self")}
-                        >
-                          <MessageSquare className="h-3 w-3" />
-                        </Button>
-                      </>
-                    )}
-                    {listing.listingAgent?.email && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        title={`Email ${listing.listingAgent.email}`}
-                        onClick={() => window.open(`mailto:${listing.listingAgent!.email}?subject=${encodeURIComponent(`Inquiry about ${listing.formattedAddress}`)}`)}
-                      >
-                        <Mail className="h-3 w-3" />
-                      </Button>
-                    )}
-                    {!listing.listingAgent?.phone && !listing.listingAgent?.email && (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </div>
-                </td>
+                {(() => {
+                  const tPhone = listing.listingAgent?.phone || listing.listingOffice?.phone;
+                  const tEmail = listing.listingAgent?.email || listing.listingOffice?.email;
+                  return (
+                    <>
+                      <td className="px-3 py-2.5 hidden md:table-cell text-xs text-muted-foreground">
+                        <div className="truncate max-w-[140px]">{listing.listingAgent?.name || '—'}</div>
+                        {listing.listingOffice && (
+                          <div className="truncate max-w-[140px] text-[11px] opacity-70">{listing.listingOffice.name}</div>
+                        )}
+                        {tPhone && (
+                          <div className="truncate max-w-[140px] text-[11px]">{tPhone}</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 hidden md:table-cell">
+                        <div className="flex gap-1 justify-center">
+                          {tPhone && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                title={`Call ${tPhone}`}
+                                onClick={() => window.open(`tel:${tPhone}`, "_self")}
+                              >
+                                <Phone className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                title={`Text ${tPhone}`}
+                                onClick={() => window.open(`sms:${tPhone}`, "_self")}
+                              >
+                                <MessageSquare className="h-3 w-3" />
+                              </Button>
+                            </>
+                          )}
+                          {tEmail && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              title={`Email ${tEmail}`}
+                              onClick={() => window.open(`mailto:${tEmail}?subject=${encodeURIComponent(`Inquiry about ${listing.formattedAddress}`)}`)}
+                            >
+                              <Mail className="h-3 w-3" />
+                            </Button>
+                          )}
+                          {!tPhone && !tEmail && (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </td>
+                    </>
+                  );
+                })()}
                 <td className="px-3 py-2.5 text-center">
                   <Badge variant={listing.status === "Active" ? "default" : "secondary"} className="text-xs">
                     {listing.status}

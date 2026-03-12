@@ -13,7 +13,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Loader2, Trash2, Search, MapPin, BedDouble, Bath, Ruler, Building2, Droplets,
-  DollarSign, ExternalLink, Heart, AlertTriangle, Info, ArrowUp, ArrowDown, ArrowUpDown, CheckSquare
+  DollarSign, ExternalLink, Heart, AlertTriangle, Info, ArrowUp, ArrowDown, ArrowUpDown, CheckSquare,
+  Phone, Mail, MessageSquare, Clock
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -36,8 +37,8 @@ interface RentCastListing {
   status: string;
   price: number;
   daysOnMarket: number;
-  listingAgent?: { name: string };
-  listingOffice?: { name: string };
+  listingAgent?: { name: string; phone?: string; email?: string };
+  listingOffice?: { name: string; phone?: string; email?: string };
   mlsNumber?: string;
   features?: string[];
 }
@@ -389,9 +390,9 @@ function MapSearchResultsTable({
                 {thSortable("Baths", "bathrooms", "text-center")}
                 {thSortable("Sqft", "squareFootage", "text-right", "hidden sm:table-cell")}
                 {thSortable("Year", "yearBuilt", "text-center", "hidden md:table-cell")}
-                {thSortable("DOM", "daysOnMarket", "text-center", "hidden md:table-cell")}
-                <th className="text-left px-2 py-2 font-medium hidden lg:table-cell">Agent</th>
-                <th className="text-left px-2 py-2 font-medium hidden lg:table-cell">MLS#</th>
+                {thSortable("DOM", "daysOnMarket", "text-center")}
+                <th className="text-left px-2 py-2 font-medium hidden md:table-cell">Agent</th>
+                <th className="text-center px-2 py-2 font-medium hidden md:table-cell">Contact</th>
                 <th className="px-2 py-2 w-8"></th>
               </tr>
             </thead>
@@ -425,15 +426,48 @@ function MapSearchResultsTable({
                     <td className="px-2 py-2 text-center hidden md:table-cell text-muted-foreground">
                       {listing.yearBuilt || "—"}
                     </td>
-                    <td className="px-2 py-2 text-center hidden md:table-cell text-muted-foreground">
-                      {listing.daysOnMarket}
+                    <td className="px-2 py-2 text-center">
+                      <Badge variant="outline" className="text-xs font-medium">
+                        {listing.daysOnMarket}
+                      </Badge>
                     </td>
-                    <td className="px-2 py-2 hidden lg:table-cell text-xs text-muted-foreground truncate max-w-[120px]">
-                      {listing.listingAgent?.name || "—"}
-                    </td>
-                    <td className="px-2 py-2 hidden lg:table-cell text-xs text-muted-foreground">
-                      {listing.mlsNumber || "—"}
-                    </td>
+                    {(() => {
+                      const mPhone = listing.listingAgent?.phone || listing.listingOffice?.phone;
+                      const mEmail = listing.listingAgent?.email || listing.listingOffice?.email;
+                      return (
+                        <>
+                          <td className="px-2 py-2 hidden md:table-cell text-xs text-muted-foreground">
+                            <div className="truncate max-w-[120px]">{listing.listingAgent?.name || "—"}</div>
+                            {listing.listingOffice && (
+                              <div className="truncate max-w-[120px] text-[11px] opacity-70">{listing.listingOffice.name}</div>
+                            )}
+                          </td>
+                          <td className="px-2 py-2 hidden md:table-cell">
+                            <div className="flex gap-1 justify-center">
+                              {mPhone && (
+                                <>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" title={`Call ${mPhone}`}
+                                    onClick={() => window.open(`tel:${mPhone}`, "_self")}>
+                                    <Phone className="h-3 w-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" title={`Text ${mPhone}`}
+                                    onClick={() => window.open(`sms:${mPhone}`, "_self")}>
+                                    <MessageSquare className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              )}
+                              {mEmail && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6" title={`Email ${mEmail}`}
+                                  onClick={() => window.open(`mailto:${mEmail}?subject=${encodeURIComponent(`Inquiry about ${listing.formattedAddress}`)}`)}>
+                                  <Mail className="h-3 w-3" />
+                                </Button>
+                              )}
+                              {!mPhone && !mEmail && <span className="text-xs text-muted-foreground">—</span>}
+                            </div>
+                          </td>
+                        </>
+                      );
+                    })()}
                     <td className="px-2 py-2">
                       <Button
                         variant="ghost"
@@ -746,9 +780,46 @@ export default function MapDrawSearch() {
                     {listing.bathrooms > 0 && <span>{listing.bathrooms} ba</span>}
                     {listing.squareFootage > 0 && <span>{listing.squareFootage.toLocaleString()} sqft</span>}
                   </div>
+                  <p className="text-gray-500">
+                    <span className="font-medium">{listing.daysOnMarket}</span> days on market
+                  </p>
                   {listing.listingAgent && (
                     <p className="text-gray-500">Agent: {listing.listingAgent.name}</p>
                   )}
+                  {listing.listingOffice && (
+                    <p className="text-gray-400">{listing.listingOffice.name}</p>
+                  )}
+                  {(() => {
+                    const pPhone = listing.listingAgent?.phone || listing.listingOffice?.phone;
+                    const pEmail = listing.listingAgent?.email || listing.listingOffice?.email;
+                    if (!pPhone && !pEmail) return null;
+                    return (
+                      <div className="flex flex-wrap gap-1 pt-0.5">
+                        {pPhone && (
+                          <>
+                            <button className="text-blue-600 underline text-xs" onClick={() => window.open(`tel:${pPhone}`, "_self")}>
+                              Call
+                            </button>
+                            <span className="text-gray-400">·</span>
+                            <button className="text-blue-600 underline text-xs" onClick={() => window.open(`sms:${pPhone}`, "_self")}>
+                              Text
+                            </button>
+                            <span className="text-gray-400">·</span>
+                          </>
+                        )}
+                        {pEmail && (
+                          <>
+                            <button className="text-blue-600 underline text-xs"
+                              onClick={() => window.open(`mailto:${pEmail}?subject=${encodeURIComponent(`Inquiry about ${listing.formattedAddress}`)}`)}>
+                              Email
+                            </button>
+                            <span className="text-gray-400">·</span>
+                          </>
+                        )}
+                        <span className="text-gray-400 text-xs">{pPhone || pEmail}</span>
+                      </div>
+                    );
+                  })()}
                   <div className="flex gap-1 pt-1">
                     <button
                       className="text-blue-600 underline text-xs"
