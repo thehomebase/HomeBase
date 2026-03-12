@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiLinkedin } from "react-icons/si";
 import { PhotoTouchup } from "@/components/photo-touchup";
+import { PhotoPositionEditor } from "@/components/photo-position-editor";
+import { Move } from "lucide-react";
 import type { User } from "@shared/schema";
 
 type PublicProfile = Omit<User, "password" | "emailVerificationToken" | "emailVerificationExpires" | "registrationIp">;
@@ -236,9 +238,16 @@ function ProfilePhotoCard({ profile, isOwn }: { profile: PublicProfile; isOwn: b
   const photoRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [showTouchup, setShowTouchup] = useState(false);
+  const [showPositionEditor, setShowPositionEditor] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const { toast } = useToast();
 
   async function handleUpload(file: File) {
+    setPendingFile(file);
+    setShowPositionEditor(true);
+  }
+
+  async function doUpload(file: File) {
     setUploading(true);
     try {
       const fd = new FormData();
@@ -297,13 +306,29 @@ function ProfilePhotoCard({ profile, isOwn }: { profile: PublicProfile; isOwn: b
         {isOwn && (
           <div className="absolute top-3 right-3 z-10 flex gap-1.5">
             {profile.profilePhotoUrl && (
-              <button
-                className="bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
-                onClick={() => setShowTouchup(true)}
-                title="Touch up photo"
-              >
-                <Eraser className="h-4 w-4" />
-              </button>
+              <>
+                <button
+                  className="bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                  onClick={() => setShowTouchup(true)}
+                  title="Touch up photo"
+                >
+                  <Eraser className="h-4 w-4" />
+                </button>
+                <button
+                  className="bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                  onClick={() => {
+                    fetch(profile.profilePhotoUrl)
+                      .then(r => r.blob())
+                      .then(b => {
+                        setPendingFile(new File([b], "current.png", { type: "image/png" }));
+                        setShowPositionEditor(true);
+                      });
+                  }}
+                  title="Reposition photo"
+                >
+                  <Move className="h-4 w-4" />
+                </button>
+              </>
             )}
             <button
               className="bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
@@ -329,6 +354,18 @@ function ProfilePhotoCard({ profile, isOwn }: { profile: PublicProfile; isOwn: b
           onClose={() => setShowTouchup(false)}
           photoUrl={profile.profilePhotoUrl}
           onSave={handleTouchupSave}
+        />
+      )}
+
+      {pendingFile && (
+        <PhotoPositionEditor
+          open={showPositionEditor}
+          onClose={() => { setShowPositionEditor(false); setPendingFile(null); }}
+          imageFile={pendingFile}
+          onSave={async (blob) => {
+            const file = new File([blob], "positioned.png", { type: "image/png" });
+            await doUpload(file);
+          }}
         />
       )}
     </div>

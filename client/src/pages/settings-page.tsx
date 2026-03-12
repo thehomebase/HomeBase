@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useLocation } from "wouter";
+import { PhotoTouchup } from "@/components/photo-touchup";
+import { PhotoPositionEditor } from "@/components/photo-position-editor";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -48,6 +50,8 @@ import {
   Camera,
   Fingerprint,
   Trash2,
+  Eraser,
+  Move,
   ShieldCheck,
   Plus,
   Copy,
@@ -185,6 +189,9 @@ function ProfileSection() {
   const [lastName, setLastName] = useState(user?.lastName || "");
   const [bio, setBio] = useState("");
   const [phone, setPhone] = useState("");
+  const [showTouchup, setShowTouchup] = useState(false);
+  const [showPositionEditor, setShowPositionEditor] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["/api/profile", user?.id],
@@ -197,13 +204,17 @@ function ProfileSection() {
     }
   }, [profile]);
 
+  const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+  }, []);
+
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
       await apiRequest("PATCH", "/api/profile", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      invalidateAll();
       toast({ title: "Profile updated" });
     },
     onError: () => {
@@ -224,9 +235,8 @@ function ProfileSection() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      toast({ title: "Photo updated" });
+      invalidateAll();
+      toast({ title: "Photo updated (background removed)" });
     },
     onError: () => {
       toast({ title: "Failed to upload photo", variant: "destructive" });
@@ -238,11 +248,42 @@ function ProfileSection() {
       await apiRequest("PATCH", "/api/profile", { profilePhotoUrl: null });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      invalidateAll();
       toast({ title: "Photo removed" });
     },
   });
+
+  const handleTouchupSave = useCallback(async (blob: Blob) => {
+    const fd = new FormData();
+    fd.append("photo", blob, "touchup.png");
+    const res = await fetch("/api/profile/photo/touchup", { method: "POST", body: fd, credentials: "include" });
+    if (!res.ok) throw new Error("Save failed");
+    invalidateAll();
+    toast({ title: "Photo touch-up saved" });
+  }, [invalidateAll, toast]);
+
+  const handlePositionSave = useCallback(async (blob: Blob) => {
+    const fd = new FormData();
+    fd.append("photo", blob, "positioned.png");
+    const res = await fetch("/api/profile/photo/touchup", { method: "POST", body: fd, credentials: "include" });
+    if (!res.ok) throw new Error("Save failed");
+    invalidateAll();
+    toast({ title: "Photo position saved" });
+  }, [invalidateAll, toast]);
+
+  function handleFileSelect() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        setPendingFile(file);
+        setShowPositionEditor(true);
+      }
+    };
+    input.click();
+  }
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
 
@@ -268,38 +309,77 @@ function ProfileSection() {
             </div>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
             variant="outline"
-            onClick={() => {
-              const input = document.createElement("input");
-              input.type = "file";
-              input.accept = "image/*";
-              input.onchange = (e) => {
-                const file = (e.target as HTMLInputElement).files?.[0];
-                if (file) photoMutation.mutate(file);
-              };
-              input.click();
-            }}
+            onClick={handleFileSelect}
             disabled={photoMutation.isPending}
           >
             <Camera className="h-4 w-4 mr-1" />
             {photoMutation.isPending ? "Uploading..." : "Change Image"}
           </Button>
           {user?.profilePhotoUrl && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => removePhotoMutation.mutate()}
-              disabled={removePhotoMutation.isPending}
-            >
-              Remove Image
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowTouchup(true)}
+                title="Touch up / erase artifacts"
+              >
+                <Eraser className="h-4 w-4 mr-1" />
+                Touch Up
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  fetch(user.profilePhotoUrl)
+                    .then(r => r.blob())
+                    .then(b => {
+                      setPendingFile(new File([b], "current.png", { type: "image/png" }));
+                      setShowPositionEditor(true);
+                    });
+                }}
+                title="Reposition or resize photo"
+              >
+                <Move className="h-4 w-4 mr-1" />
+                Reposition
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => removePhotoMutation.mutate()}
+                disabled={removePhotoMutation.isPending}
+              >
+                Remove
+              </Button>
+            </>
           )}
         </div>
         <p className="text-xs text-muted-foreground hidden md:block">PNGs, JPEGs and GIFs under 2MB</p>
       </div>
+
+      {user?.profilePhotoUrl && (
+        <PhotoTouchup
+          open={showTouchup}
+          onClose={() => setShowTouchup(false)}
+          photoUrl={user.profilePhotoUrl}
+          onSave={handleTouchupSave}
+        />
+      )}
+
+      {pendingFile && (
+        <PhotoPositionEditor
+          open={showPositionEditor}
+          onClose={() => { setShowPositionEditor(false); setPendingFile(null); }}
+          imageFile={pendingFile}
+          onSave={async (blob) => {
+            const file = new File([blob], "positioned.png", { type: "image/png" });
+            await photoMutation.mutateAsync(file);
+          }}
+        />
+      )}
 
       <div className={`grid ${isMobile ? "grid-cols-1" : "grid-cols-2"} gap-4`}>
         <div className="space-y-2">
