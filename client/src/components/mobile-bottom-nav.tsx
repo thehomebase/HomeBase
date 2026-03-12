@@ -276,7 +276,7 @@ export function MobileBottomNav() {
   return (
     <>
       {showMore && (
-        <div className="fixed inset-0 z-[60] bg-black/50" onClick={() => setShowMore(false)}>
+        <div className="fixed inset-0 z-[1100] bg-black/50" onClick={() => setShowMore(false)}>
           <div
             className="absolute bottom-0 left-0 right-0 bg-background border-t rounded-t-2xl max-h-[70vh] overflow-y-auto pb-safe"
             onClick={(e) => e.stopPropagation()}
@@ -390,7 +390,7 @@ export function MobileBottomNav() {
         />
       )}
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-[1050] bg-background/95 backdrop-blur-md border-t md:hidden">
         <div className="flex items-center px-1 pt-1 pb-safe">
           {leftItems.map(renderNavButton)}
 
