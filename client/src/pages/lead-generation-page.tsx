@@ -173,7 +173,9 @@ function ZipMetricsDialog({
   });
 
   useEffect(() => {
-    if (open) setDialogBudget(budgetOptions[0] || 2500);
+    if (open) {
+      setDialogBudget(budgetOptions[0] || 2500);
+    }
   }, [open, budgetOptions]);
 
   return (
@@ -251,19 +253,28 @@ function ZipMetricsDialog({
                   <div>
                     <p className="text-sm font-medium mb-2">Choose your monthly budget</p>
                     <div className="flex flex-wrap gap-2">
-                      {budgetOptions.map((opt) => (
-                        <Button
-                          key={opt}
-                          size="sm"
-                          variant={dialogBudget === opt ? "default" : "outline"}
-                          onClick={() => setDialogBudget(opt)}
-                        >
-                          ${(opt / 100).toFixed(0)}
-                        </Button>
-                      ))}
+                      {budgetOptions.map((opt) => {
+                        const hasCompetition = metrics.currentAgents > 0;
+                        const isMin = opt === budgetOptions[0];
+                        const disabled = !hasCompetition && !isMin;
+                        return (
+                          <Button
+                            key={opt}
+                            size="sm"
+                            variant={dialogBudget === opt ? "default" : "outline"}
+                            onClick={() => setDialogBudget(opt)}
+                            disabled={disabled}
+                            className={disabled ? "opacity-40" : ""}
+                          >
+                            ${(opt / 100).toFixed(0)}
+                          </Button>
+                        );
+                      })}
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Higher budget = larger share of voice = more leads routed to you
+                      {metrics.currentAgents > 0
+                        ? "Higher budget = larger share of voice = more leads routed to you"
+                        : "You'll get 100% of leads as the first agent — increase your budget later when others join"}
                     </p>
                   </div>
                   <Button
@@ -825,6 +836,12 @@ export default function LeadGenerationPage() {
     enabled: /^\d{5}$/.test(previewZip),
   });
 
+  useEffect(() => {
+    if (pricing && pricing.currentAgents === 0) {
+      setSelectedBudget(budgetOptions[0] || 2500);
+    }
+  }, [pricing, budgetOptions]);
+
   const claimZipMutation = useMutation({
     mutationFn: async ({ zipCode, budget }: { zipCode: string; budget: number }) => {
       const res = await apiRequest("POST", "/api/leads/zip-codes", { zipCode, monthlyBudget: budget });
@@ -1380,19 +1397,28 @@ export default function LeadGenerationPage() {
                           <div>
                             <p className="text-sm font-medium mb-2">Choose your monthly budget</p>
                             <div className="flex flex-wrap gap-2">
-                              {budgetOptions.map((opt: number) => (
-                                <Button
-                                  key={opt}
-                                  size="sm"
-                                  variant={selectedBudget === opt ? "default" : "outline"}
-                                  onClick={() => setSelectedBudget(opt)}
-                                >
-                                  ${(opt / 100).toFixed(0)}
-                                </Button>
-                              ))}
+                              {budgetOptions.map((opt: number) => {
+                                const hasCompetition = pricing.currentAgents > 0;
+                                const isMin = opt === budgetOptions[0];
+                                const disabled = !hasCompetition && !isMin;
+                                return (
+                                  <Button
+                                    key={opt}
+                                    size="sm"
+                                    variant={selectedBudget === opt ? "default" : "outline"}
+                                    onClick={() => setSelectedBudget(opt)}
+                                    disabled={disabled}
+                                    className={disabled ? "opacity-40" : ""}
+                                  >
+                                    ${(opt / 100).toFixed(0)}
+                                  </Button>
+                                );
+                              })}
                             </div>
                             <p className="text-xs text-muted-foreground mt-2">
-                              Higher budget = larger share of voice = more leads routed to you
+                              {pricing.currentAgents > 0
+                                ? "Higher budget = larger share of voice = more leads routed to you"
+                                : "You'll get 100% of leads as the first agent — increase your budget later when others join"}
                             </p>
                           </div>
                           <Button
