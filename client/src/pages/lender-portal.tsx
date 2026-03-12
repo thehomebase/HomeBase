@@ -5,13 +5,16 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import type { LenderTransaction } from "@shared/schema";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { LenderTransaction, LenderZipCode, LenderLead } from "@shared/schema";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -66,6 +69,15 @@ import {
   ClipboardList,
   SendHorizonal,
   Landmark,
+  Trash2,
+  Search,
+  Inbox,
+  Activity,
+  Users,
+  Lock,
+  Target,
+  Mail,
+  Phone,
 } from "lucide-react";
 
 const LENDER_STAGES = [
@@ -339,12 +351,28 @@ export default function LenderPortal() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Briefcase className="h-6 w-6" />
-              Loan Pipeline
+              Lender Portal
             </h1>
             <p className="text-sm text-muted-foreground">
-              Manage your active loans and track progress
+              Manage loans and generate leads
             </p>
           </div>
+        </div>
+
+        <Tabs defaultValue="pipeline" className="w-full">
+          <TabsList>
+            <TabsTrigger value="pipeline" className="gap-1.5">
+              <ClipboardList className="h-4 w-4" />
+              Loan Pipeline
+            </TabsTrigger>
+            <TabsTrigger value="leads" className="gap-1.5">
+              <Target className="h-4 w-4" />
+              Lead Generation
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pipeline" className="space-y-6 mt-4">
+          <div className="flex justify-end">
           <Dialog open={showNewLoanDialog} onOpenChange={setShowNewLoanDialog}>
             <DialogTrigger asChild>
               <Button className="whitespace-nowrap">
@@ -597,7 +625,436 @@ export default function LenderPortal() {
             ) : null}
           </DragOverlay>
         </DndContext>
+          </TabsContent>
+
+          <TabsContent value="leads" className="mt-4">
+            <LenderLeadGenTab />
+          </TabsContent>
+        </Tabs>
       </div>
     </main>
+  );
+}
+
+interface LenderZipPricing {
+  zipCode: string;
+  currentLenders: number;
+  maxLenders: number;
+  spotsRemaining: number;
+  isFull: boolean;
+  alreadyClaimed: boolean;
+  currentRate: number;
+  rateIfJoined: number;
+  currentRateDisplay: string;
+  rateIfJoinedDisplay: string;
+  tierSchedule: { lenders: number; rate: number; rateDisplay: string }[];
+  leadActivity?: { last30: number; last60: number; last90: number };
+  noLeadsNoCharge?: boolean;
+}
+
+const LEAD_STATUS_COLORS: Record<string, string> = {
+  new: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  assigned: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+  accepted: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  rejected: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+  converted: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+};
+
+function LenderLeadGenTab() {
+  const { toast } = useToast();
+  const [newZipCode, setNewZipCode] = useState("");
+  const [previewZip, setPreviewZip] = useState("");
+
+  const { data: zipData, isLoading: zipsLoading } = useQuery<{
+    zipCodes: LenderZipCode[];
+    maxLendersPerZip: number;
+    tierRates: Record<string, number>;
+  }>({
+    queryKey: ["/api/lender-leads/zip-codes"],
+  });
+
+  const { data: leads = [], isLoading: leadsLoading } = useQuery<LenderLead[]>({
+    queryKey: ["/api/lender/leads"],
+  });
+
+  const { data: pricing, isLoading: pricingLoading } = useQuery<LenderZipPricing>({
+    queryKey: ["/api/lender-leads/zip-pricing", previewZip],
+    queryFn: async () => {
+      const res = await fetch(`/api/lender-leads/zip-pricing/${previewZip}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch pricing");
+      return res.json();
+    },
+    enabled: /^\d{5}$/.test(previewZip),
+  });
+
+  const claimMutation = useMutation({
+    mutationFn: async (zipCode: string) => {
+      const res = await apiRequest("POST", "/api/lender-leads/zip-codes", { zipCode });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lender-leads/zip-codes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lender-leads/zip-pricing"] });
+      setNewZipCode("");
+      setPreviewZip("");
+      toast({ title: "Zip code claimed!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to claim zip code", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const releaseMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/lender-leads/zip-codes/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lender-leads/zip-codes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lender-leads/zip-pricing"] });
+      toast({ title: "Zip code released" });
+    },
+    onError: () => {
+      toast({ title: "Failed to release zip code", variant: "destructive" });
+    },
+  });
+
+  const updateLeadMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/lender/leads/${id}/status`, { status });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lender/leads"] });
+      toast({ title: "Lead status updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update lead", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleZipInput = (value: string) => {
+    const cleaned = value.replace(/\D/g, "").slice(0, 5);
+    setNewZipCode(cleaned);
+    if (cleaned.length === 5) {
+      setPreviewZip(cleaned);
+    } else {
+      setPreviewZip("");
+    }
+  };
+
+  const zipCodes = zipData?.zipCodes ?? [];
+  const tierRates = zipData?.tierRates ?? {};
+  const totalMonthlyRate = zipCodes.reduce((sum, zc) => sum + (zc.monthlyRate || 0), 0);
+  const newLeads = leads.filter(l => l.status === "new" || l.status === "assigned");
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Active Zip Codes</CardTitle>
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{zipCodes.length}</div>
+            <p className="text-xs text-muted-foreground">Coverage areas</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Monthly Cost</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {totalMonthlyRate === 0 ? "Free" : `$${(totalMonthlyRate / 100).toFixed(0)}`}
+            </div>
+            <p className="text-xs text-muted-foreground">Across all zip codes</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">New Leads</CardTitle>
+            <Inbox className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{newLeads.length}</div>
+            <p className="text-xs text-muted-foreground">{leads.length} total received</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Plus className="h-5 w-5" /> Add Zip Code
+          </CardTitle>
+          <CardDescription>
+            Claim zip codes to receive mortgage leads. Pricing is based on how many lenders are in each zip code.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-3 max-w-md">
+            <Input
+              placeholder="Enter 5-digit zip code"
+              value={newZipCode}
+              onChange={(e) => handleZipInput(e.target.value)}
+              maxLength={5}
+              className="flex-1"
+            />
+            <Button
+              onClick={() => claimMutation.mutate(previewZip)}
+              disabled={!pricing || pricing.isFull || pricing.alreadyClaimed || claimMutation.isPending}
+            >
+              {claimMutation.isPending ? "Claiming..." : "Claim"}
+            </Button>
+          </div>
+
+          {previewZip && (
+            <div className="max-w-md">
+              {pricingLoading ? (
+                <Skeleton className="h-40 w-full" />
+              ) : pricing ? (
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-primary" />
+                      <span className="text-lg font-bold">{pricing.zipCode}</span>
+                    </div>
+                    {pricing.alreadyClaimed ? (
+                      <Badge variant="secondary">Already Claimed</Badge>
+                    ) : pricing.isFull ? (
+                      <Badge variant="destructive" className="gap-1">
+                        <Lock className="h-3 w-3" /> Full
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">
+                        {pricing.spotsRemaining} spot{pricing.spotsRemaining !== 1 ? "s" : ""} left
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Lenders in this zip</span>
+                      <span className="font-medium">{pricing.currentLenders}/{pricing.maxLenders}</span>
+                    </div>
+                    <Progress value={(pricing.currentLenders / pricing.maxLenders) * 100} className="h-2" />
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Your rate if you join</span>
+                    <span className="font-semibold text-base">
+                      {pricing.rateIfJoined === 0 ? (
+                        <span className="text-green-600">Free</span>
+                      ) : (
+                        pricing.rateIfJoinedDisplay
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="border rounded-md p-3 bg-muted/30">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Tier Pricing</p>
+                    <div className="space-y-1">
+                      {pricing.tierSchedule.map((tier) => (
+                        <div key={tier.lenders} className="flex items-center justify-between text-xs">
+                          <span className={pricing.currentLenders + (pricing.alreadyClaimed ? 0 : 1) === tier.lenders ? "font-bold" : "text-muted-foreground"}>
+                            {tier.lenders} lender{tier.lenders !== 1 ? "s" : ""}
+                          </span>
+                          <span className={pricing.currentLenders + (pricing.alreadyClaimed ? 0 : 1) === tier.lenders ? "font-bold" : "text-muted-foreground"}>
+                            {tier.rateDisplay}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2">All lenders in a zip share the same rate. Rates adjust automatically as lenders join or leave.</p>
+                  </div>
+
+                  {pricing.leadActivity && (
+                    <div className="border rounded-md p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lead Activity</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div>
+                          <p className="text-lg font-bold">{pricing.leadActivity.last30}</p>
+                          <p className="text-[10px] text-muted-foreground">30 Days</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold">{pricing.leadActivity.last60}</p>
+                          <p className="text-[10px] text-muted-foreground">60 Days</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold">{pricing.leadActivity.last90}</p>
+                          <p className="text-[10px] text-muted-foreground">90 Days</p>
+                        </div>
+                      </div>
+                      {pricing.leadActivity.last90 === 0 && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">No leads recorded yet in this area</p>
+                      )}
+                    </div>
+                  )}
+
+                  {pricing.noLeadsNoCharge && (
+                    <div className="flex items-start gap-2 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 p-2.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                      <p className="text-[11px] text-green-700 dark:text-green-300">
+                        <span className="font-semibold">No Leads, No Charge:</span> Zero leads in a billing cycle = no charge that month.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Your Zip Codes ({zipCodes.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {zipsLoading ? (
+            <Skeleton className="h-32" />
+          ) : zipCodes.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <MapPin className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p>No zip codes claimed yet. Add one above to start receiving leads.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {zipCodes.map((zc) => (
+                <div key={zc.id} className="rounded-lg border p-4 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      <span className="font-bold text-lg">{zc.zipCode}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {(zc.monthlyRate || 0) === 0 ? (
+                        <span className="text-green-600 font-medium">Free</span>
+                      ) : (
+                        <span>${((zc.monthlyRate || 0) / 100).toFixed(0)}/mo</span>
+                      )}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => releaseMutation.mutate(zc.id)}
+                    disabled={releaseMutation.isPending}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Inbox className="h-5 w-5" /> Your Leads ({leads.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {leadsLoading ? (
+            <Skeleton className="h-32" />
+          ) : leads.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Inbox className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p>No leads received yet. Claim zip codes above to start receiving mortgage leads.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Zip</TableHead>
+                    <TableHead>Loan Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leads.map((lead) => (
+                    <TableRow key={lead.id}>
+                      <TableCell className="font-medium">
+                        {lead.firstName} {lead.lastName}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5 text-sm">
+                          <span className="flex items-center gap-1">
+                            <Mail className="h-3 w-3" /> {lead.email}
+                          </span>
+                          {lead.phone && (
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              <Phone className="h-3 w-3" /> {lead.phone}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{lead.zipCode}</TableCell>
+                      <TableCell className="capitalize">{lead.loanType}</TableCell>
+                      <TableCell>
+                        <Badge className={`text-xs ${LEAD_STATUS_COLORS[lead.status] || ""}`}>
+                          {lead.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {(lead.status === "new" || lead.status === "assigned") && (
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-green-600 hover:text-green-700 h-7 text-xs"
+                              onClick={() => updateLeadMutation.mutate({ id: lead.id, status: "accepted" })}
+                              disabled={updateLeadMutation.isPending}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive h-7 text-xs"
+                              onClick={() => updateLeadMutation.mutate({ id: lead.id, status: "rejected" })}
+                              disabled={updateLeadMutation.isPending}
+                            >
+                              Decline
+                            </Button>
+                          </div>
+                        )}
+                        {lead.status === "accepted" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-purple-600 hover:text-purple-700 h-7 text-xs"
+                            onClick={() => updateLeadMutation.mutate({ id: lead.id, status: "converted" })}
+                            disabled={updateLeadMutation.isPending}
+                          >
+                            Mark Converted
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
