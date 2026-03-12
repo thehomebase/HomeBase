@@ -26,6 +26,7 @@ import {
   Phone,
   Mail,
   Search,
+  CreditCard,
 } from "lucide-react";
 import type { AgentReview } from "@shared/schema";
 
@@ -72,6 +73,13 @@ function VerificationBadge({ status }: { status: string | null | undefined }) {
     return (
       <Badge className="gap-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-blue-300 dark:border-blue-700 text-[10px] px-1.5 py-0">
         <Shield className="h-3 w-3" /> Broker Verified
+      </Badge>
+    );
+  }
+  if (status === "payment_verified") {
+    return (
+      <Badge className="gap-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 text-[10px] px-1.5 py-0">
+        <CreditCard className="h-3 w-3" /> Payment Verified
       </Badge>
     );
   }

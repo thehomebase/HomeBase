@@ -39,7 +39,32 @@ export const users = pgTable("users", {
   profilePhotoUrl: text("profile_photo_url"),
   profileBio: text("profile_bio"),
   profilePhone: text("profile_phone"),
+  nmlsNumber: text("nmls_number"),
+  stripeNameVerified: boolean("stripe_name_verified").default(false),
+  stripeCardholderName: text("stripe_cardholder_name"),
+  licenseVerifiedAt: timestamp("license_verified_at"),
+  licenseVerifiedBy: integer("license_verified_by"),
 });
+
+export const licenseVerifications = pgTable("license_verifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  licenseNumber: text("license_number").notNull(),
+  licenseState: text("license_state").notNull(),
+  profileName: text("profile_name").notNull(),
+  cardholderName: text("cardholder_name"),
+  nameMatchScore: real("name_match_score"),
+  nameMatched: boolean("name_matched").default(false),
+  verifiedBy: integer("verified_by"),
+  verificationMethod: text("verification_method").notNull(),
+  lookupUrl: text("lookup_url"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLicenseVerificationSchema = createInsertSchema(licenseVerifications).omit({ id: true, createdAt: true });
+export type InsertLicenseVerification = z.infer<typeof insertLicenseVerificationSchema>;
+export type LicenseVerification = typeof licenseVerifications.$inferSelect;
 
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),

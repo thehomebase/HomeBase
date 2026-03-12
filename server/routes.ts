@@ -3538,6 +3538,11 @@ export function registerRoutes(app: Express): Server {
         publicProfile.dashboardPreferences = user.dashboardPreferences;
         publicProfile.brokerageId = user.brokerageId;
         publicProfile.agentId = user.agentId;
+        publicProfile.stripeNameVerified = user.stripeNameVerified;
+        publicProfile.stripeCardholderName = user.stripeCardholderName;
+        publicProfile.licenseVerifiedAt = user.licenseVerifiedAt;
+        publicProfile.licenseVerifiedBy = user.licenseVerifiedBy;
+        publicProfile.nmlsNumber = user.nmlsNumber;
       }
       res.json(publicProfile);
     } catch (error) {
@@ -3656,6 +3661,147 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/verification/state-lookup/:state", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const { getStateLookupUrl } = await import("./license-verification");
+    const lookup = getStateLookupUrl(req.params.state);
+    if (!lookup) return res.status(404).json({ error: "State not found" });
+    res.json(lookup);
+  });
+
+  app.get("/api/verification/all-state-lookups", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const { getAllStateLookups } = await import("./license-verification");
+    res.json(getAllStateLookups());
+  });
+
+  app.post("/api/verification/check-stripe-name", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    if (req.user.role !== "agent" && req.user.role !== "broker" && req.user.role !== "lender") {
+      return res.status(403).json({ error: "Only agents, brokers, and lenders can verify" });
+    }
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      if (!user.stripeCustomerId) {
+        return res.status(400).json({ error: "No payment method on file. Please subscribe first." });
+      }
+
+      const { getUncachableStripeClient } = await import("./stripeClient");
+      const stripe = await getUncachableStripeClient();
+
+      const paymentMethods = await stripe.paymentMethods.list({
+        customer: user.stripeCustomerId,
+        type: "card",
+      });
+
+      if (paymentMethods.data.length === 0) {
+        return res.status(400).json({ error: "No credit card found on your account." });
+      }
+
+      const cardName = paymentMethods.data[0].billing_details?.name;
+      if (!cardName) {
+        return res.status(400).json({ error: "No cardholder name found on your payment method." });
+      }
+
+      const profileName = `${user.firstName} ${user.lastName}`;
+      const { fuzzyNameMatch } = await import("./license-verification");
+      const match = fuzzyNameMatch(profileName, cardName);
+
+      await storage.updateUser(user.id, {
+        stripeCardholderName: cardName,
+        stripeNameVerified: match.matched,
+      });
+
+      const { getStateLookupUrl } = await import("./license-verification");
+      const lookupInfo = user.licenseState ? getStateLookupUrl(user.licenseState) : null;
+
+      await db.execute(sql`
+        INSERT INTO license_verifications (user_id, license_number, license_state, profile_name, cardholder_name, name_match_score, name_matched, verification_method, lookup_url, notes)
+        VALUES (${user.id}, ${user.licenseNumber || "N/A"}, ${user.licenseState || "N/A"}, ${profileName}, ${cardName}, ${match.score}, ${match.matched}, ${"stripe_name_check"}, ${lookupInfo?.url || null}, ${match.matched ? "Automatic name match" : "Name mismatch - manual review recommended"})
+      `);
+
+      if (match.matched && user.verificationStatus === "licensed") {
+        await storage.updateUser(user.id, { verificationStatus: "payment_verified" });
+      }
+
+      res.json({
+        profileName,
+        cardholderName: cardName,
+        score: match.score,
+        matched: match.matched,
+        verificationStatus: match.matched ? "payment_verified" : user.verificationStatus,
+        lookupUrl: lookupInfo?.url || null,
+        stateName: lookupInfo?.name || null,
+      });
+    } catch (error) {
+      console.error("Stripe name verification error:", error);
+      res.status(500).json({ error: "Failed to verify name" });
+    }
+  });
+
+  app.get("/api/verification/history/:userId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const userId = parseInt(req.params.userId, 10);
+    if (req.user.id !== userId && req.user.role !== "broker") {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+    try {
+      const rows = await db.execute(sql`
+        SELECT id, user_id, license_number, license_state, profile_name, verified_by, 
+               verification_method, lookup_url, name_match_score, name_matched, notes, created_at
+        FROM license_verifications WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 20
+      `);
+      res.json(rows.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch verification history" });
+    }
+  });
+
+  app.post("/api/verification/manual-verify/:userId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    if (req.user.role !== "broker") return res.status(403).json({ error: "Only brokers can manually verify" });
+
+    const broker = await storage.getUser(req.user.id);
+    if (!broker || (broker.verificationStatus !== "admin_verified" && broker.verificationStatus !== "broker_verified")) {
+      return res.status(403).json({ error: "You must be a verified broker" });
+    }
+
+    const userId = parseInt(req.params.userId, 10);
+    if (!Number.isFinite(userId) || userId <= 0) return res.status(400).json({ error: "Invalid user ID" });
+
+    try {
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) return res.status(404).json({ error: "User not found" });
+
+      if (!["agent", "broker", "lender"].includes(targetUser.role)) {
+        return res.status(400).json({ error: "Can only verify agents, brokers, or lenders" });
+      }
+
+      const { notes } = req.body || {};
+
+      const { getStateLookupUrl } = await import("./license-verification");
+      const lookupInfo = targetUser.licenseState ? getStateLookupUrl(targetUser.licenseState) : null;
+
+      await db.execute(sql`
+        INSERT INTO license_verifications (user_id, license_number, license_state, profile_name, verified_by, verification_method, lookup_url, notes, name_matched)
+        VALUES (${userId}, ${targetUser.licenseNumber || "N/A"}, ${targetUser.licenseState || "N/A"}, ${targetUser.firstName + " " + targetUser.lastName}, ${req.user.id}, ${"manual_broker_review"}, ${lookupInfo?.url || null}, ${notes || "Manually verified by broker"}, ${true})
+      `);
+
+      const updated = await storage.updateUser(userId, {
+        verificationStatus: "broker_verified",
+        licenseVerifiedAt: new Date(),
+        licenseVerifiedBy: req.user.id,
+      });
+
+      const { password, emailVerificationToken, ...safe } = updated;
+      res.json(safe);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to verify user" });
+    }
+  });
+
   app.get("/api/agents", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
     try {
@@ -3667,8 +3813,9 @@ export function registerRoutes(app: Express): Server {
           CASE verification_status 
             WHEN 'admin_verified' THEN 1 
             WHEN 'broker_verified' THEN 2 
-            WHEN 'licensed' THEN 3 
-            ELSE 4 
+            WHEN 'payment_verified' THEN 3 
+            WHEN 'licensed' THEN 4 
+            ELSE 5 
           END ASC,
           first_name ASC
       `);

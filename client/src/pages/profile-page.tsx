@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Camera, Shield, ShieldCheck, CheckCircle2, MapPin, Phone, Mail, Pencil,
   Building2, FileText, User as UserIcon, Star, ChevronLeft, ChevronRight,
-  Home, Plus, Trash2, ImagePlus, X, Eraser
+  Home, Plus, Trash2, ImagePlus, X, Eraser, CreditCard, ExternalLink, Loader2
 } from "lucide-react";
 import { PhotoTouchup } from "@/components/photo-touchup";
 import type { User } from "@shared/schema";
@@ -63,6 +63,13 @@ function VerificationBadge({ status }: { status: string | null | undefined }) {
       </Badge>
     );
   }
+  if (status === "payment_verified") {
+    return (
+      <Badge className="gap-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700">
+        <CreditCard className="h-3 w-3" /> Payment Verified
+      </Badge>
+    );
+  }
   if (status === "licensed") {
     return (
       <Badge className="gap-1 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700">
@@ -107,6 +114,119 @@ function StarDisplay({ rating, size = 14 }: { rating: number; size?: number }) {
           strokeWidth={1.5}
         />
       ))}
+    </div>
+  );
+}
+
+function VerifyIdentitySection({ profile }: { profile: PublicProfile }) {
+  const [verifying, setVerifying] = useState(false);
+  const [result, setResult] = useState<{
+    profileName: string;
+    cardholderName: string;
+    score: number;
+    matched: boolean;
+    lookupUrl: string | null;
+    stateName: string | null;
+  } | null>(null);
+  const { toast } = useToast();
+
+  const alreadyVerified = profile.verificationStatus === "payment_verified" ||
+    profile.verificationStatus === "broker_verified" ||
+    profile.verificationStatus === "admin_verified";
+
+  const { data: stateLookup } = useQuery<{ url: string; name: string; notes: string } | null>({
+    queryKey: [`/api/verification/state-lookup/${profile.licenseState}`],
+    enabled: !!profile.licenseState,
+  });
+
+  async function handleStripeVerify() {
+    setVerifying(true);
+    try {
+      const res = await fetch("/api/verification/check-stripe-name", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: data.error || "Verification failed", variant: "destructive" });
+        setVerifying(false);
+        return;
+      }
+      setResult(data);
+      if (data.matched) {
+        toast({ title: "Identity verified! Your credit card name matches your profile." });
+        queryClient.invalidateQueries({ queryKey: ["/api/profile", profile.id] });
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      } else {
+        toast({
+          title: "Name mismatch detected",
+          description: `Card: "${data.cardholderName}" vs Profile: "${data.profileName}"`,
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({ title: "Verification failed", variant: "destructive" });
+    }
+    setVerifying(false);
+  }
+
+  return (
+    <div className="mt-4 pt-3 border-t">
+      <h4 className="text-xs font-semibold text-muted-foreground mb-3">VERIFY YOUR IDENTITY</h4>
+
+      {!alreadyVerified && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full mb-2 text-xs"
+          onClick={handleStripeVerify}
+          disabled={verifying}
+        >
+          {verifying ? (
+            <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Checking...</>
+          ) : (
+            <><CreditCard className="h-3 w-3 mr-1.5" /> Verify with Payment Name</>
+          )}
+        </Button>
+      )}
+
+      {alreadyVerified && !result && (
+        <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-2">
+          Your identity has been verified.
+        </p>
+      )}
+
+      {result && (
+        <div className={`rounded-lg p-2.5 text-xs mb-2 ${result.matched ? "bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800" : "bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800"}`}>
+          <div className="flex justify-between mb-1">
+            <span className="text-muted-foreground">Profile:</span>
+            <span className="font-medium">{result.profileName}</span>
+          </div>
+          <div className="flex justify-between mb-1">
+            <span className="text-muted-foreground">Credit Card:</span>
+            <span className="font-medium">{result.cardholderName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Match:</span>
+            <span className={`font-medium ${result.matched ? "text-emerald-600" : "text-amber-600"}`}>
+              {result.matched ? "Verified" : "Mismatch"} ({Math.round(result.score * 100)}%)
+            </span>
+          </div>
+        </div>
+      )}
+
+      {stateLookup && profile.licenseState && (
+        <a
+          href={stateLookup.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          <ExternalLink className="h-3 w-3" />
+          Look up license on {stateLookup.name}
+        </a>
+      )}
     </div>
   );
 }
@@ -577,8 +697,15 @@ export default function ProfilePage() {
                   <span className="text-xs text-muted-foreground">Verification</span>
                   <VerificationBadge status={profile.verificationStatus} />
                 </div>
+                {profile.stripeNameVerified && (
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <CreditCard className="h-3 w-3 text-emerald-600" />
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400">Payment name verified</span>
+                  </div>
+                )}
               </div>
             )}
+            {isOwn && isAgentOrBroker && <VerifyIdentitySection profile={profile} />}
           </CardContent>
         </Card>
 
