@@ -5794,20 +5794,9 @@ export function registerRoutes(app: Express): Server {
 
   // ===== Lead Zip Code Routes (agent-only, authenticated) =====
 
-  const FREE_ZIP_CODES_PER_AGENT = 3;
   const MAX_AGENTS_PER_ZIP = 5;
-  const FREE_ELIGIBLE_MIN_OPEN_SLOTS = 3;
-  const ZIP_BASE_PRICE = 1000; // $10.00 in cents
-  const ZIP_PRICE_INCREMENT = 500; // $5.00 in cents
-
-  function calculateZipCodePrice(currentAgentCount: number): number {
-    return ZIP_BASE_PRICE + (currentAgentCount * ZIP_PRICE_INCREMENT);
-  }
-
-  function isZipFreeEligible(agentCount: number): boolean {
-    const openSlots = MAX_AGENTS_PER_ZIP - agentCount;
-    return openSlots >= FREE_ELIGIBLE_MIN_OPEN_SLOTS;
-  }
+  const AGENT_MIN_BUDGET = 2500; // $25.00 minimum monthly spend in cents
+  const AGENT_BUDGET_OPTIONS = [2500, 5000, 10000, 20000, 50000]; // $25, $50, $100, $200, $500
 
   app.get("/api/leads/zip-pricing/:zipCode", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
@@ -5820,12 +5809,10 @@ export function registerRoutes(app: Express): Server {
       }
 
       const agentCount = await storage.getAgentCountForZipCode(zipCode);
-      const freeZipsUsed = await storage.countAgentFreeZipCodes(req.user.id);
       const alreadyClaimed = await storage.isZipCodeClaimed(req.user.id, zipCode);
-      const hasFreeSlots = freeZipsUsed < FREE_ZIP_CODES_PER_AGENT;
-      const zipEligibleForFree = isZipFreeEligible(agentCount);
-      const isFreeSlot = hasFreeSlots && zipEligibleForFree;
-      const price = isFreeSlot ? 0 : calculateZipCodePrice(agentCount);
+      const agents = await storage.getAgentsForZipCode(zipCode);
+      const totalSpend = agents.reduce((sum, a) => sum + (a.monthlyRate || AGENT_MIN_BUDGET), 0);
+      const mySpend = agents.find(a => a.agentId === req.user.id)?.monthlyRate || AGENT_MIN_BUDGET;
 
       res.json({
         zipCode,
@@ -5834,13 +5821,11 @@ export function registerRoutes(app: Express): Server {
         spotsRemaining: MAX_AGENTS_PER_ZIP - agentCount,
         isFull: agentCount >= MAX_AGENTS_PER_ZIP,
         alreadyClaimed,
-        freeZipsUsed,
-        freeZipsTotal: FREE_ZIP_CODES_PER_AGENT,
-        hasFreeSlots,
-        zipEligibleForFree,
-        isFreeSlot,
-        monthlyRate: price,
-        monthlyRateDisplay: isFreeSlot ? "Free (included)" : `$${(price / 100).toFixed(2)}/mo`,
+        minBudget: AGENT_MIN_BUDGET,
+        budgetOptions: AGENT_BUDGET_OPTIONS,
+        totalSpendInZip: totalSpend,
+        mySpend,
+        shareOfVoice: totalSpend > 0 && mySpend > 0 ? Math.round((mySpend / totalSpend) * 100) : 0,
       });
     } catch (error) {
       console.error('Error fetching zip pricing:', error);
@@ -5853,7 +5838,7 @@ export function registerRoutes(app: Express): Server {
     if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
     try {
-      const { zipCode } = req.body;
+      const { zipCode, monthlyBudget } = req.body;
       if (!zipCode || typeof zipCode !== 'string') {
         return res.status(400).json({ error: 'Zip code is required' });
       }
@@ -5861,6 +5846,11 @@ export function registerRoutes(app: Express): Server {
       const trimmedZip = zipCode.trim();
       if (!/^\d{5}$/.test(trimmedZip)) {
         return res.status(400).json({ error: 'Please enter a valid 5-digit zip code' });
+      }
+
+      const budget = Number(monthlyBudget) || AGENT_MIN_BUDGET;
+      if (!AGENT_BUDGET_OPTIONS.includes(budget)) {
+        return res.status(400).json({ error: `Budget must be one of: ${AGENT_BUDGET_OPTIONS.map(o => '$' + (o/100)).join(', ')}` });
       }
 
       const alreadyClaimed = await storage.isZipCodeClaimed(req.user.id, trimmedZip);
@@ -5873,23 +5863,21 @@ export function registerRoutes(app: Express): Server {
         return res.status(409).json({ error: `This zip code is full (max ${MAX_AGENTS_PER_ZIP} agents). Try a nearby zip code.` });
       }
 
-      const freeZipsUsed = await storage.countAgentFreeZipCodes(req.user.id);
-      const hasFreeSlots = freeZipsUsed < FREE_ZIP_CODES_PER_AGENT;
-      const zipEligibleForFree = isZipFreeEligible(agentCount);
-      const isFreeSlot = hasFreeSlots && zipEligibleForFree;
-      const monthlyRate = isFreeSlot ? 0 : calculateZipCodePrice(agentCount);
-
       const claimed = await storage.claimZipCode({
         agentId: req.user.id,
         zipCode: trimmedZip,
         isActive: true,
-        monthlyRate,
+        monthlyRate: budget,
       });
+
+      const agents = await storage.getAgentsForZipCode(trimmedZip);
+      const totalSpend = agents.reduce((sum, a) => sum + (a.monthlyRate || 0), 0);
+
       res.status(201).json({
         ...claimed,
-        isFreeSlot,
         currentAgents: agentCount + 1,
         maxAgents: MAX_AGENTS_PER_ZIP,
+        shareOfVoice: totalSpend > 0 ? Math.round((budget / totalSpend) * 100) : 100,
       });
     } catch (error) {
       console.error('Error claiming zip code:', error);
@@ -5923,25 +5911,55 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const zips = await storage.getAgentZipCodes(req.user.id);
-      const freeZipsUsed = await storage.countAgentFreeZipCodes(req.user.id);
       const enriched = await Promise.all(zips.map(async (zc) => {
-        const agentCount = await storage.getAgentCountForZipCode(zc.zipCode);
+        const agents = await storage.getAgentsForZipCode(zc.zipCode);
+        const agentCount = agents.length;
+        const totalSpend = agents.reduce((sum, a) => sum + (a.monthlyRate || AGENT_MIN_BUDGET), 0);
+        const myShare = totalSpend > 0 ? Math.round(((zc.monthlyRate || AGENT_MIN_BUDGET) / totalSpend) * 100) : 100;
         return {
           ...zc,
           currentAgents: agentCount,
           maxAgents: MAX_AGENTS_PER_ZIP,
-          isFreeSlot: zc.monthlyRate === 0,
+          shareOfVoice: myShare,
+          totalSpendInZip: totalSpend,
         };
       }));
       res.json({
         zipCodes: enriched,
-        freeZipsUsed,
-        freeZipsTotal: FREE_ZIP_CODES_PER_AGENT,
         maxAgentsPerZip: MAX_AGENTS_PER_ZIP,
+        budgetOptions: AGENT_BUDGET_OPTIONS,
+        minBudget: AGENT_MIN_BUDGET,
       });
     } catch (error) {
       console.error('Error fetching zip codes:', error);
       res.status(500).json({ error: 'Failed to fetch zip codes' });
+    }
+  });
+
+  app.patch("/api/leads/zip-codes/:id/budget", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+
+    try {
+      const id = Number(req.params.id);
+      const { monthlyBudget } = req.body;
+      const budget = Number(monthlyBudget);
+
+      if (!budget || !AGENT_BUDGET_OPTIONS.includes(budget)) {
+        return res.status(400).json({ error: `Budget must be one of: ${AGENT_BUDGET_OPTIONS.map(o => '$' + (o/100)).join(', ')}` });
+      }
+
+      const agentZips = await storage.getAgentZipCodes(req.user.id);
+      const owns = agentZips.find(z => z.id === id);
+      if (!owns) {
+        return res.status(403).json({ error: 'You do not own this zip code claim' });
+      }
+
+      await storage.updateZipCodeBudget(id, budget);
+      res.json({ success: true, monthlyRate: budget });
+    } catch (error) {
+      console.error('Error updating zip code budget:', error);
+      res.status(500).json({ error: 'Failed to update budget' });
     }
   });
 
@@ -5951,20 +5969,26 @@ export function registerRoutes(app: Express): Server {
     const agents = await storage.getAgentsForZipCode(zipCode);
     if (agents.length === 0) return { assignedAgentId: null, status: 'new' };
 
-    const rotation = await storage.getLeadRotation(zipCode);
-    const lastAgentId = rotation?.lastAgentId;
-
-    let nextAgent: typeof agents[0];
-    if (lastAgentId) {
-      const lastIndex = agents.findIndex(a => a.agentId === lastAgentId);
-      const nextIndex = (lastIndex + 1) % agents.length;
-      nextAgent = agents[nextIndex];
-    } else {
-      nextAgent = agents[0];
+    if (agents.length === 1) {
+      await storage.upsertLeadRotation(zipCode, agents[0].agentId);
+      return { assignedAgentId: agents[0].agentId, status: 'assigned' };
     }
 
-    await storage.upsertLeadRotation(zipCode, nextAgent.agentId);
-    return { assignedAgentId: nextAgent.agentId, status: 'assigned' };
+    const totalSpend = agents.reduce((sum, a) => sum + (a.monthlyRate || AGENT_MIN_BUDGET), 0);
+    const rand = Math.random() * totalSpend;
+    let cumulative = 0;
+    let selectedAgent = agents[0];
+
+    for (const agent of agents) {
+      cumulative += (agent.monthlyRate || AGENT_MIN_BUDGET);
+      if (rand <= cumulative) {
+        selectedAgent = agent;
+        break;
+      }
+    }
+
+    await storage.upsertLeadRotation(zipCode, selectedAgent.agentId);
+    return { assignedAgentId: selectedAgent.agentId, status: 'assigned' };
   }
 
   app.post("/api/leads/submit", async (req, res) => {
@@ -6298,7 +6322,6 @@ export function registerRoutes(app: Express): Server {
       if (!/^\d{5}$/.test(zipCode)) return res.status(400).json({ error: "Invalid zip code" });
 
       const agentCount = await storage.getAgentCountForZipCode(zipCode);
-      const freeZipsUsed = await storage.countAgentFreeZipCodes(req.user.id);
       const alreadyClaimed = await storage.isZipCodeClaimed(req.user.id, zipCode);
 
       const txResult = await db.execute(sql`
@@ -6321,7 +6344,12 @@ export function registerRoutes(app: Express): Server {
       `);
       const leadStats = leadResult.rows[0] || { total_leads: 0, monthly_leads: 0, six_month_leads: 0 };
 
-      const shareOfVoice = agentCount > 0 ? Math.round((1 / (agentCount + (alreadyClaimed ? 0 : 1))) * 100) : 100;
+      const allAgents = await storage.getAgentsForZipCode(zipCode);
+      const totalSpend = allAgents.reduce((sum, a) => sum + (a.monthlyRate || AGENT_MIN_BUDGET), 0);
+      const myAgent = allAgents.find(a => a.agentId === req.user.id);
+      const mySpend = myAgent?.monthlyRate || AGENT_MIN_BUDGET;
+      const projectedTotalSpend = alreadyClaimed ? totalSpend : totalSpend + mySpend;
+      const shareOfVoice = projectedTotalSpend > 0 ? Math.round((mySpend / projectedTotalSpend) * 100) : 100;
       const estMonthlyLeads = Number(leadStats.monthly_leads) || 0;
       const estConnectionsPerAgent = agentCount > 0
         ? Math.round((estMonthlyLeads / agentCount) * 10) / 10
@@ -6334,12 +6362,11 @@ export function registerRoutes(app: Express): Server {
       const conversionRate = 0.05;
       const estRevenue = estLeadsForAgent * conversionRate * avgCommission;
 
-      const hasFreeSlots = freeZipsUsed < FREE_ZIP_CODES_PER_AGENT;
-      const zipEligibleForFree = isZipFreeEligible(agentCount);
-      const isFreeSlot = hasFreeSlots && zipEligibleForFree;
-      const monthlyRate = isFreeSlot ? 0 : calculateZipCodePrice(agentCount);
+      const monthlyRate = myAgent?.monthlyRate || AGENT_MIN_BUDGET;
       const sixMonthCost = monthlyRate * 6;
-      const roi = sixMonthCost > 0 ? Math.round((estRevenue / (sixMonthCost / 100)) * 100) / 100 : 0;
+      const estLeadsForMe = shareOfVoice > 0 ? Math.round((estSixMonthLeads * shareOfVoice / 100) * 10) / 10 : estLeadsForAgent;
+      const estRevenueForMe = estLeadsForMe * conversionRate * avgCommission;
+      const roi = sixMonthCost > 0 ? Math.round((estRevenueForMe / (sixMonthCost / 100)) * 100) / 100 : 0;
 
       res.json({
         zipCode,
@@ -6357,11 +6384,10 @@ export function registerRoutes(app: Express): Server {
         totalLeads: Number(leadStats.total_leads),
         sixMonthLeads: estSixMonthLeads,
         monthlyRate,
-        monthlyRateDisplay: isFreeSlot ? "Free" : `$${(monthlyRate / 100).toFixed(0)}`,
-        isFreeSlot,
-        hasFreeSlots,
-        freeZipsUsed,
-        freeZipsTotal: FREE_ZIP_CODES_PER_AGENT,
+        monthlyRateDisplay: `$${(monthlyRate / 100).toFixed(0)}`,
+        minBudget: AGENT_MIN_BUDGET,
+        budgetOptions: AGENT_BUDGET_OPTIONS,
+        totalSpendInZip: totalSpend,
       });
     } catch (error) {
       console.error("Error fetching zip metrics:", error);
@@ -6793,7 +6819,27 @@ export function registerRoutes(app: Express): Server {
   });
 
   const MAX_LENDERS_PER_ZIP = 5;
-  const LENDER_FLAT_RATE = 2500;
+  const LENDER_TIER_RATES: Record<number, number> = {
+    1: 0,      // 1 lender: free
+    2: 0,      // 2 lenders: free
+    3: 2500,   // 3 lenders: $25/mo each
+    4: 5000,   // 4 lenders: $50/mo each
+    5: 10000,  // 5 lenders: $100/mo each
+  };
+
+  function getLenderTierRate(occupancy: number): number {
+    return LENDER_TIER_RATES[Math.min(occupancy, MAX_LENDERS_PER_ZIP)] ?? 10000;
+  }
+
+  async function syncLenderRatesForZip(zipCode: string) {
+    const lenders = await storage.getLendersForZipCode(zipCode);
+    const newRate = getLenderTierRate(lenders.length);
+    for (const lender of lenders) {
+      if (lender.monthlyRate !== newRate) {
+        await storage.updateLenderZipCodeRate(lender.id, newRate);
+      }
+    }
+  }
 
   app.get("/api/lender-leads/zip-pricing/:zipCode", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
@@ -6807,6 +6853,8 @@ export function registerRoutes(app: Express): Server {
 
       const lenderCount = await storage.getLenderCountForZipCode(zipCode);
       const alreadyClaimed = await storage.isLenderZipClaimed(req.user.id, zipCode);
+      const currentRate = getLenderTierRate(lenderCount);
+      const rateIfJoined = getLenderTierRate(lenderCount + (alreadyClaimed ? 0 : 1));
 
       res.json({
         zipCode,
@@ -6815,8 +6863,15 @@ export function registerRoutes(app: Express): Server {
         spotsRemaining: MAX_LENDERS_PER_ZIP - lenderCount,
         isFull: lenderCount >= MAX_LENDERS_PER_ZIP,
         alreadyClaimed,
-        monthlyRate: LENDER_FLAT_RATE,
-        monthlyRateDisplay: `$${(LENDER_FLAT_RATE / 100).toFixed(2)}/mo`,
+        currentRate,
+        rateIfJoined,
+        currentRateDisplay: currentRate === 0 ? "Free" : `$${(currentRate / 100).toFixed(0)}/mo`,
+        rateIfJoinedDisplay: rateIfJoined === 0 ? "Free" : `$${(rateIfJoined / 100).toFixed(0)}/mo`,
+        tierSchedule: Object.entries(LENDER_TIER_RATES).map(([count, rate]) => ({
+          lenders: Number(count),
+          rate,
+          rateDisplay: rate === 0 ? "Free" : `$${(rate / 100).toFixed(0)}/mo`,
+        })),
       });
     } catch (error) {
       console.error('Error fetching lender zip pricing:', error);
@@ -6849,15 +6904,22 @@ export function registerRoutes(app: Express): Server {
         return res.status(409).json({ error: `This zip code is full (max ${MAX_LENDERS_PER_ZIP} lenders). Try a nearby zip code.` });
       }
 
+      const newOccupancy = lenderCount + 1;
+      const newRate = getLenderTierRate(newOccupancy);
+
       const claimed = await storage.claimLenderZipCode({
         lenderId: req.user.id,
         zipCode: trimmedZip,
         isActive: true,
-        monthlyRate: LENDER_FLAT_RATE,
+        monthlyRate: newRate,
       });
+
+      await syncLenderRatesForZip(trimmedZip);
+
       res.status(201).json({
         ...claimed,
-        currentLenders: lenderCount + 1,
+        monthlyRate: newRate,
+        currentLenders: newOccupancy,
         maxLenders: MAX_LENDERS_PER_ZIP,
       });
     } catch (error: any) {
@@ -6881,7 +6943,10 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: 'You do not own this zip code claim' });
       }
 
+      const zipCode = owns.zipCode;
       await storage.releaseLenderZipCode(id, req.user.id);
+      await syncLenderRatesForZip(zipCode);
+
       res.sendStatus(200);
     } catch (error) {
       console.error('Error releasing lender zip code:', error);
@@ -6898,7 +6963,7 @@ export function registerRoutes(app: Express): Server {
       res.json({
         zipCodes,
         maxLendersPerZip: MAX_LENDERS_PER_ZIP,
-        flatRate: LENDER_FLAT_RATE,
+        tierRates: LENDER_TIER_RATES,
       });
     } catch (error) {
       console.error('Error fetching lender zip codes:', error);

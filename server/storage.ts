@@ -328,6 +328,7 @@ export interface IStorage {
   getAgentCountForZipCode(zipCode: string): Promise<number>;
   countAgentZipCodes(agentId: number): Promise<number>;
   countAgentFreeZipCodes(agentId: number): Promise<number>;
+  updateZipCodeBudget(id: number, monthlyRate: number): Promise<void>;
 
   createLead(data: InsertLead): Promise<Lead>;
   getLead(id: number): Promise<Lead | undefined>;
@@ -394,6 +395,7 @@ export interface IStorage {
   isLenderZipClaimed(lenderId: number, zipCode: string): Promise<boolean>;
   getLenderCountForZipCode(zipCode: string): Promise<number>;
   countLenderZipCodes(lenderId: number): Promise<number>;
+  updateLenderZipCodeRate(id: number, monthlyRate: number): Promise<void>;
 
   createLenderLead(data: InsertLenderLead): Promise<LenderLead>;
   getLenderLead(id: number): Promise<LenderLead | undefined>;
@@ -4836,6 +4838,10 @@ export class DatabaseStorage implements IStorage {
     return Number(result.rows[0]?.count ?? 0);
   }
 
+  async updateZipCodeBudget(id: number, monthlyRate: number): Promise<void> {
+    await db.execute(sql`UPDATE lead_zip_codes SET monthly_rate = ${monthlyRate} WHERE id = ${id}`);
+  }
+
   async createLead(data: InsertLead): Promise<Lead> {
     const assignedAt = data.assignedAgentId ? new Date() : null;
     const exclusiveUntil = data.exclusiveUntil || (data.assignedAgentId ? new Date(Date.now() + 15 * 60 * 1000) : null);
@@ -5399,6 +5405,10 @@ export class DatabaseStorage implements IStorage {
   async countLenderZipCodes(lenderId: number): Promise<number> {
     const result = await db.execute(sql`SELECT COUNT(*) as count FROM lender_zip_codes WHERE lender_id = ${lenderId}`);
     return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async updateLenderZipCodeRate(id: number, monthlyRate: number): Promise<void> {
+    await db.execute(sql`UPDATE lender_zip_codes SET monthly_rate = ${monthlyRate} WHERE id = ${id}`);
   }
 
   async createLenderLead(data: InsertLenderLead): Promise<LenderLead> {

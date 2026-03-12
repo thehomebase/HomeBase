@@ -35,7 +35,7 @@ Preferred communication style: Simple, everyday language.
 - **HomeBase Pros (Unified Vendor/Contractor Hub)**: Centralized marketplace for vendors with search, team management, ratings, inspection bid system, and vendor self-registration with agent team request functionality.
 - **Communication Tools**: Encrypted private messaging (AES-256-GCM), SMS via Twilio, email integration via Google OAuth, call logging, communication metrics dashboard, and snippet management.
 - **Post-Close Engagement**: "MyHome" hub for homeowners.
-- **Growth & Lead Generation**: Affiliate referral system, drip campaigns, zip code-based lead generation with interactive map, Open House Manager, lead source tagging, connection rate tracking, timed exclusive lead routing, and RESPA-compliant lender lead generation.
+- **Growth & Lead Generation**: Affiliate referral system, drip campaigns, zip code-based lead generation with interactive map, Open House Manager, lead source tagging, connection rate tracking, timed exclusive lead routing, RESPA-compliant lead generation for agents (spend-based share of voice, min $25/mo) and lenders (occupancy-tiered pricing: 1-2 free, 3@$25, 4@$50, 5@$100 per zip).
 - **Listing & Price Alerts**: Saved search alerts with daily cron jobs checking for new listings and price changes from RentCast API, with multi-channel notifications.
 - **Specialized Portals**: Lender Portal (loan pipelines, checklist sync), Broker Portal (agent oversight, sales competitions, lead routing).
 - **Zapier Integration**: API key authentication, webhook triggers for key events, public REST API for data access.

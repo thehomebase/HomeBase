@@ -99,14 +99,15 @@ interface ZipCodeData {
   createdAt: string;
   currentAgents: number;
   maxAgents: number;
-  isFreeSlot: boolean;
+  shareOfVoice: number;
+  totalSpendInZip: number;
 }
 
 interface ZipCodesResponse {
   zipCodes: ZipCodeData[];
-  freeZipsUsed: number;
-  freeZipsTotal: number;
   maxAgentsPerZip: number;
+  budgetOptions: number[];
+  minBudget: number;
 }
 
 interface ZipPricing {
@@ -116,13 +117,11 @@ interface ZipPricing {
   spotsRemaining: number;
   isFull: boolean;
   alreadyClaimed: boolean;
-  freeZipsUsed: number;
-  freeZipsTotal: number;
-  hasFreeSlots: boolean;
-  zipEligibleForFree: boolean;
-  isFreeSlot: boolean;
-  monthlyRate: number;
-  monthlyRateDisplay: string;
+  minBudget: number;
+  budgetOptions: number[];
+  totalSpendInZip: number;
+  mySpend: number;
+  shareOfVoice: number;
 }
 
 interface ZipMetrics {
@@ -142,10 +141,9 @@ interface ZipMetrics {
   sixMonthLeads: number;
   monthlyRate: number;
   monthlyRateDisplay: string;
-  isFreeSlot: boolean;
-  hasFreeSlots: boolean;
-  freeZipsUsed: number;
-  freeZipsTotal: number;
+  minBudget: number;
+  budgetOptions: number[];
+  totalSpendInZip: number;
 }
 
 function ZipMetricsDialog({
@@ -243,19 +241,13 @@ function ZipMetricsDialog({
 
               <div className="flex items-center justify-between pt-2 border-t">
                 <div>
-                  <p className="text-xs text-muted-foreground">Monthly Cost</p>
+                  <p className="text-xs text-muted-foreground">Your Budget</p>
                   <p className="text-2xl font-bold">
-                    {metrics.isFreeSlot ? (
-                      <span className="text-green-600">Free</span>
-                    ) : (
-                      metrics.monthlyRateDisplay + "/mo"
-                    )}
+                    {metrics.monthlyRateDisplay}/mo
                   </p>
-                  {metrics.isFreeSlot && (
-                    <p className="text-[10px] text-muted-foreground">
-                      Free slot ({metrics.freeZipsUsed + 1} of {metrics.freeZipsTotal})
-                    </p>
-                  )}
+                  <p className="text-[10px] text-muted-foreground">
+                    Spend-based share of voice
+                  </p>
                 </div>
                 {!metrics.alreadyClaimed && !metrics.isFull ? (
                   <Button onClick={() => onClaim(metrics.zipCode)} disabled={claiming} className="gap-2">
@@ -728,6 +720,7 @@ export default function LeadGenerationPage() {
   const [pushUnsupportedMsg, setPushUnsupportedMsg] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState("all");
   const [contactPromptLeadId, setContactPromptLeadId] = useState<number | null>(null);
+  const [selectedBudget, setSelectedBudget] = useState(2500);
 
   useEffect(() => {
     const checkPush = async () => {
@@ -795,7 +788,7 @@ export default function LeadGenerationPage() {
 
   const claimZipMutation = useMutation({
     mutationFn: async (zipCode: string) => {
-      const res = await apiRequest("POST", "/api/leads/zip-codes", { zipCode });
+      const res = await apiRequest("POST", "/api/leads/zip-codes", { zipCode, monthlyBudget: selectedBudget });
       return await res.json();
     },
     onSuccess: () => {
@@ -820,6 +813,20 @@ export default function LeadGenerationPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/leads/zip-codes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leads/zip-pricing"] });
       toast({ title: "Zip code removed" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateBudgetMutation = useMutation({
+    mutationFn: async ({ id, monthlyBudget }: { id: number; monthlyBudget: number }) => {
+      const res = await apiRequest("PATCH", `/api/leads/zip-codes/${id}/budget`, { monthlyBudget });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/zip-codes"] });
+      toast({ title: "Budget updated" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -873,8 +880,7 @@ export default function LeadGenerationPage() {
   );
 
   const zipCodes = zipData?.zipCodes ?? [];
-  const freeZipsUsed = zipData?.freeZipsUsed ?? 0;
-  const freeZipsTotal = zipData?.freeZipsTotal ?? 3;
+  const budgetOptions = zipData?.budgetOptions ?? [2500, 5000, 10000, 20000, 50000];
   const totalMonthlyBudget = zipCodes.reduce((sum, zc) => sum + zc.monthlyRate, 0);
 
   const handleZipInput = (value: string) => {
@@ -1178,20 +1184,16 @@ export default function LeadGenerationPage() {
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="p-2 bg-primary/10 rounded-lg">
-                    <Shield className="h-5 w-5 text-primary" />
+                    <Target className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="font-semibold text-sm">Free Zip Codes</p>
-                    <p className="text-xs text-muted-foreground">Included with Agent Plan</p>
+                    <p className="font-semibold text-sm">Share of Voice</p>
+                    <p className="text-xs text-muted-foreground">Spend more = more leads</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Progress value={(freeZipsUsed / freeZipsTotal) * 100} className="flex-1 h-2" />
-                  <span className="text-sm font-medium whitespace-nowrap">{freeZipsUsed}/{freeZipsTotal} used</span>
-                </div>
-                {freeZipsUsed < freeZipsTotal && (
-                  <p className="text-xs text-green-600 mt-2">{freeZipsTotal - freeZipsUsed} free slot{freeZipsTotal - freeZipsUsed !== 1 ? "s" : ""} remaining</p>
-                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Your budget determines your share of leads in each zip. Higher spend = higher priority.
+                </p>
               </CardContent>
             </Card>
 
@@ -1333,43 +1335,46 @@ export default function LeadGenerationPage() {
                         />
                       </div>
 
-                      <div className="flex items-center justify-between pt-1 border-t">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Your cost</p>
-                          <p className="text-lg font-bold">
-                            {pricing.isFreeSlot ? (
-                              <span className="text-green-600">Free</span>
-                            ) : (
-                              pricing.monthlyRateDisplay
-                            )}
-                          </p>
-                          {pricing.isFreeSlot && (
-                            <p className="text-xs text-muted-foreground">
-                              Using free slot ({pricing.freeZipsUsed + 1} of {pricing.freeZipsTotal})
+                      {!pricing.alreadyClaimed && !pricing.isFull && (
+                        <div className="pt-2 border-t space-y-3">
+                          <div>
+                            <p className="text-sm font-medium mb-2">Choose your monthly budget</p>
+                            <div className="flex flex-wrap gap-2">
+                              {budgetOptions.map((opt: number) => (
+                                <Button
+                                  key={opt}
+                                  size="sm"
+                                  variant={selectedBudget === opt ? "default" : "outline"}
+                                  onClick={() => setSelectedBudget(opt)}
+                                >
+                                  ${(opt / 100).toFixed(0)}
+                                </Button>
+                              ))}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Higher budget = larger share of voice = more leads routed to you
                             </p>
-                          )}
-                        </div>
-                        {!pricing.alreadyClaimed && !pricing.isFull && (
+                          </div>
                           <Button
                             onClick={handleClaimZip}
                             disabled={claimZipMutation.isPending}
-                            className="gap-2"
+                            className="w-full gap-2"
                           >
                             <Plus className="h-4 w-4" />
-                            Claim
+                            Claim for ${(selectedBudget / 100).toFixed(0)}/mo
                           </Button>
-                        )}
-                      </div>
-
-                      {!pricing.isFreeSlot && !pricing.alreadyClaimed && !pricing.isFull && (
-                        <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-800 dark:text-amber-300">
-                          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                          <span>
-                            {pricing.hasFreeSlots && !pricing.zipEligibleForFree
-                              ? `This zip code has too much competition for a free slot (needs 3+ open spots). You can claim it for ${pricing.monthlyRateDisplay}, or pick a less competitive zip to use your free slot.`
-                              : `You've used all ${pricing.freeZipsTotal} free slots. This zip will cost ${pricing.monthlyRateDisplay}. Price is based on competition level.`
-                            }
-                          </span>
+                        </div>
+                      )}
+                      {pricing.alreadyClaimed && (
+                        <div className="pt-2 border-t">
+                          <Badge variant="secondary" className="text-sm py-1.5 px-3">Already Claimed</Badge>
+                        </div>
+                      )}
+                      {!pricing.alreadyClaimed && pricing.isFull && (
+                        <div className="pt-2 border-t">
+                          <Badge variant="destructive" className="text-sm py-1.5 px-3 gap-1">
+                            <Lock className="h-3 w-3" /> Full
+                          </Badge>
                         </div>
                       )}
                     </div>
@@ -1401,16 +1406,14 @@ export default function LeadGenerationPage() {
                       <TableHead className="text-center">Agents</TableHead>
                       <TableHead className="text-center">Competition</TableHead>
                       <TableHead className="text-center hidden sm:table-cell">Share of Voice</TableHead>
-                      <TableHead className="text-right">Monthly Cost</TableHead>
+                      <TableHead className="text-center">Budget</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {zipCodes.map(zc => {
                       const comp = competitionLevel(zc.currentAgents, zc.maxAgents);
-                      const sov = zc.currentAgents > 0
-                        ? Math.round((1 / zc.currentAgents) * 100)
-                        : 100;
+                      const sov = zc.shareOfVoice ?? (zc.currentAgents > 0 ? Math.round((1 / zc.currentAgents) * 100) : 100);
                       return (
                         <TableRow key={zc.id}>
                           <TableCell>
@@ -1435,12 +1438,17 @@ export default function LeadGenerationPage() {
                               <span className="text-xs font-medium">{sov}%</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {zc.isFreeSlot ? (
-                              <Badge variant="outline" className="text-green-600 border-green-300 text-[10px]">Free</Badge>
-                            ) : (
-                              <span>${(zc.monthlyRate / 100).toFixed(0)}</span>
-                            )}
+                          <TableCell className="text-center">
+                            <select
+                              className="text-xs border rounded px-1.5 py-1 bg-background"
+                              value={zc.monthlyRate}
+                              onChange={(e) => updateBudgetMutation.mutate({ id: zc.id, monthlyBudget: Number(e.target.value) })}
+                              disabled={updateBudgetMutation.isPending}
+                            >
+                              {budgetOptions.map((opt: number) => (
+                                <option key={opt} value={opt}>${(opt / 100).toFixed(0)}/mo</option>
+                              ))}
+                            </select>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-1 justify-end">
