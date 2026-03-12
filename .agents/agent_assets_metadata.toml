@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Og6oxqfbB37C7fECHSYGm"
+uri = "file://attached_assets/generated_images/homebase_facebook_ad.png"
+type = "image"
+title = "HomeBase Facebook Ad — Base Graphic (1080x1080)"
