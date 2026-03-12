@@ -3614,6 +3614,27 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/profile/photo/touchup", upload.single("photo"), async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      if (!req.file.mimetype.startsWith("image/")) return res.status(400).json({ error: "File must be an image" });
+
+      const resized = await sharp(req.file.buffer)
+        .resize(400, 500, { fit: "cover", position: "top" })
+        .png()
+        .toBuffer();
+
+      const base64 = `data:image/png;base64,${resized.toString("base64")}`;
+      const updated = await storage.updateUser(req.user.id, { profilePhotoUrl: base64 });
+      const { password, emailVerificationToken, ...safe } = updated;
+      res.json(safe);
+    } catch (error) {
+      console.error("Profile photo touchup error:", error);
+      res.status(500).json({ error: "Failed to save touchup" });
+    }
+  });
+
   app.post("/api/broker/verify-agent/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
     if (req.user.role !== "broker") return res.status(403).json({ error: "Only brokers can verify agents" });

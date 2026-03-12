@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,8 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Camera, Shield, ShieldCheck, CheckCircle2, MapPin, Phone, Mail, Pencil,
   Building2, FileText, User as UserIcon, Star, ChevronLeft, ChevronRight,
-  Home, Plus, Trash2, ImagePlus, X
+  Home, Plus, Trash2, ImagePlus, X, Eraser
 } from "lucide-react";
+import { PhotoTouchup } from "@/components/photo-touchup";
 import type { User } from "@shared/schema";
 
 type PublicProfile = Omit<User, "password" | "emailVerificationToken" | "emailVerificationExpires" | "registrationIp">;
@@ -113,6 +114,7 @@ function StarDisplay({ rating, size = 14 }: { rating: number; size?: number }) {
 function ProfilePhotoCard({ profile, isOwn }: { profile: PublicProfile; isOwn: boolean }) {
   const photoRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [showTouchup, setShowTouchup] = useState(false);
   const { toast } = useToast();
 
   async function handleUpload(file: File) {
@@ -130,6 +132,16 @@ function ProfilePhotoCard({ profile, isOwn }: { profile: PublicProfile; isOwn: b
     }
     setUploading(false);
   }
+
+  const handleTouchupSave = useCallback(async (blob: Blob) => {
+    const fd = new FormData();
+    fd.append("photo", blob, "touchup.png");
+    const res = await fetch("/api/profile/photo/touchup", { method: "POST", body: fd, credentials: "include" });
+    if (!res.ok) throw new Error("Save failed");
+    queryClient.invalidateQueries({ queryKey: ["/api/profile", profile.id] });
+    queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    toast({ title: "Photo touch-up saved" });
+  }, [profile.id, toast]);
 
   return (
     <div className="relative">
@@ -162,13 +174,25 @@ function ProfilePhotoCard({ profile, isOwn }: { profile: PublicProfile; isOwn: b
         </div>
 
         {isOwn && (
-          <button
-            className="absolute top-3 right-3 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors z-10"
-            onClick={() => photoRef.current?.click()}
-            disabled={uploading}
-          >
-            <Camera className="h-4 w-4" />
-          </button>
+          <div className="absolute top-3 right-3 z-10 flex gap-1.5">
+            {profile.profilePhotoUrl && (
+              <button
+                className="bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                onClick={() => setShowTouchup(true)}
+                title="Touch up photo"
+              >
+                <Eraser className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              className="bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+              onClick={() => photoRef.current?.click()}
+              disabled={uploading}
+              title="Upload new photo"
+            >
+              <Camera className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </div>
 
@@ -177,6 +201,15 @@ function ProfilePhotoCard({ profile, isOwn }: { profile: PublicProfile; isOwn: b
         if (file) handleUpload(file);
         e.target.value = "";
       }} />
+
+      {profile.profilePhotoUrl && (
+        <PhotoTouchup
+          open={showTouchup}
+          onClose={() => setShowTouchup(false)}
+          photoUrl={profile.profilePhotoUrl}
+          onSave={handleTouchupSave}
+        />
+      )}
     </div>
   );
 }
