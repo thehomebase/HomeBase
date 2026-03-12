@@ -41,6 +41,8 @@ import {
   Target,
   X,
   Loader2,
+  ShieldCheck,
+  Activity,
 } from "lucide-react";
 import type { Lead } from "@shared/schema";
 import { isPushSupported, subscribeToPush, unsubscribeFromPush, isCurrentlySubscribed, getPushPermissionState, getPushUnsupportedReason, isIOS } from "@/lib/push-notifications";
@@ -110,6 +112,12 @@ interface ZipCodesResponse {
   minBudget: number;
 }
 
+interface LeadActivity {
+  last30: number;
+  last60: number;
+  last90: number;
+}
+
 interface ZipPricing {
   zipCode: string;
   currentAgents: number;
@@ -122,6 +130,8 @@ interface ZipPricing {
   totalSpendInZip: number;
   mySpend: number;
   shareOfVoice: number;
+  leadActivity?: LeadActivity;
+  noLeadsNoCharge?: boolean;
 }
 
 interface ZipMetrics {
@@ -144,6 +154,8 @@ interface ZipMetrics {
   minBudget: number;
   budgetOptions: number[];
   totalSpendInZip: number;
+  leadActivity?: LeadActivity;
+  noLeadsNoCharge?: boolean;
 }
 
 function ZipMetricsDialog({
@@ -247,6 +259,38 @@ function ZipMetricsDialog({
                   ))}
                 </div>
               </div>
+
+              {metrics.leadActivity && (
+                <div className="border rounded-lg p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Lead Activity</p>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-xl font-bold">{metrics.leadActivity.last30}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase">Last 30 Days</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold">{metrics.leadActivity.last60}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase">Last 60 Days</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold">{metrics.leadActivity.last90}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase">Last 90 Days</p>
+                    </div>
+                  </div>
+                  {metrics.leadActivity.last90 === 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">No leads recorded yet in this area</p>
+                  )}
+                </div>
+              )}
+
+              {metrics.noLeadsNoCharge && (
+                <div className="flex items-start gap-2 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 p-3">
+                  <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-green-700 dark:text-green-300">
+                    <span className="font-semibold">No Leads, No Charge:</span> If zero leads are generated in your zip code during a billing cycle, you won't be charged for that month.
+                  </p>
+                </div>
+              )}
 
               {!metrics.alreadyClaimed && !metrics.isFull && (
                 <div className="pt-2 border-t space-y-3">
@@ -1391,6 +1435,41 @@ export default function LeadGenerationPage() {
                           className="h-2"
                         />
                       </div>
+
+                      {pricing.leadActivity && (
+                        <div className="border rounded-lg p-3">
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lead Activity</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3 text-center">
+                            <div>
+                              <p className="text-lg font-bold">{pricing.leadActivity.last30}</p>
+                              <p className="text-[10px] text-muted-foreground">30 Days</p>
+                            </div>
+                            <div>
+                              <p className="text-lg font-bold">{pricing.leadActivity.last60}</p>
+                              <p className="text-[10px] text-muted-foreground">60 Days</p>
+                            </div>
+                            <div>
+                              <p className="text-lg font-bold">{pricing.leadActivity.last90}</p>
+                              <p className="text-[10px] text-muted-foreground">90 Days</p>
+                            </div>
+                          </div>
+                          {pricing.leadActivity.last90 === 0 && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">No leads recorded yet in this area</p>
+                          )}
+                        </div>
+                      )}
+
+                      {pricing.noLeadsNoCharge && (
+                        <div className="flex items-start gap-2 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 p-2.5">
+                          <ShieldCheck className="h-3.5 w-3.5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                          <p className="text-[11px] text-green-700 dark:text-green-300">
+                            <span className="font-semibold">No Leads, No Charge:</span> Zero leads in a billing cycle = no charge that month.
+                          </p>
+                        </div>
+                      )}
 
                       {!pricing.alreadyClaimed && !pricing.isFull && (
                         <div className="pt-2 border-t space-y-3">

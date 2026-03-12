@@ -45,6 +45,7 @@ import {
   Search,
   Send,
   UserPlus,
+  ShieldCheck,
 } from "lucide-react";
 import { SiGoogle, SiYelp } from "react-icons/si";
 import { useForm } from "react-hook-form";
@@ -1133,6 +1134,8 @@ function ZipCodesTab() {
   const { data: pricing } = useQuery<{
     currentVendors: number; maxVendors: number; isFull: boolean; alreadyClaimed: boolean;
     monthlyRate: number; freeSlots: number; totalClaimed: number; freeEligible: boolean;
+    leadActivity?: { last30: number; last60: number; last90: number };
+    noLeadsNoCharge?: boolean;
   }>({
     queryKey: ["/api/vendor/zip-codes/pricing", watchZip, watchCat],
     queryFn: async () => {
@@ -1253,6 +1256,36 @@ function ZipCodesTab() {
                   )}
                   {pricing.alreadyClaimed && (
                     <p className="text-xs text-red-600">You already claimed this zip code for this category.</p>
+                  )}
+                  {pricing.leadActivity && (
+                    <div className="border rounded-md p-3 mt-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Lead Activity</p>
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div>
+                          <p className="text-lg font-bold">{pricing.leadActivity.last30}</p>
+                          <p className="text-[10px] text-muted-foreground">30 Days</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold">{pricing.leadActivity.last60}</p>
+                          <p className="text-[10px] text-muted-foreground">60 Days</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold">{pricing.leadActivity.last90}</p>
+                          <p className="text-[10px] text-muted-foreground">90 Days</p>
+                        </div>
+                      </div>
+                      {pricing.leadActivity.last90 === 0 && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">No leads recorded yet for this area & category</p>
+                      )}
+                    </div>
+                  )}
+                  {pricing.noLeadsNoCharge && (
+                    <div className="flex items-start gap-2 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 p-2.5 mt-2">
+                      <ShieldCheck className="h-3.5 w-3.5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                      <p className="text-[11px] text-green-700 dark:text-green-300">
+                        <span className="font-semibold">No Leads, No Charge:</span> Zero leads in a billing cycle = no charge that month.
+                      </p>
+                    </div>
                   )}
                 </div>
               )}

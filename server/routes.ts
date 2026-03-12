@@ -5814,6 +5814,12 @@ export function registerRoutes(app: Express): Server {
       const totalSpend = agents.reduce((sum, a) => sum + (a.monthlyRate || AGENT_MIN_BUDGET), 0);
       const mySpend = agents.find(a => a.agentId === req.user.id)?.monthlyRate || AGENT_MIN_BUDGET;
 
+      const [leads30, leads60, leads90] = await Promise.all([
+        storage.getLeadCountForZip(zipCode, 30),
+        storage.getLeadCountForZip(zipCode, 60),
+        storage.getLeadCountForZip(zipCode, 90),
+      ]);
+
       res.json({
         zipCode,
         currentAgents: agentCount,
@@ -5826,6 +5832,8 @@ export function registerRoutes(app: Express): Server {
         totalSpendInZip: totalSpend,
         mySpend,
         shareOfVoice: totalSpend > 0 && mySpend > 0 ? Math.round((mySpend / totalSpend) * 100) : 0,
+        leadActivity: { last30: leads30, last60: leads60, last90: leads90 },
+        noLeadsNoCharge: true,
       });
     } catch (error) {
       console.error('Error fetching zip pricing:', error);
@@ -6368,6 +6376,12 @@ export function registerRoutes(app: Express): Server {
       const estRevenueForMe = estLeadsForMe * conversionRate * avgCommission;
       const roi = sixMonthCost > 0 ? Math.round((estRevenueForMe / (sixMonthCost / 100)) * 100) / 100 : 0;
 
+      const [leads30, leads60, leads90] = await Promise.all([
+        storage.getLeadCountForZip(zipCode, 30),
+        storage.getLeadCountForZip(zipCode, 60),
+        storage.getLeadCountForZip(zipCode, 90),
+      ]);
+
       res.json({
         zipCode,
         avgHomeValue,
@@ -6388,6 +6402,8 @@ export function registerRoutes(app: Express): Server {
         minBudget: AGENT_MIN_BUDGET,
         budgetOptions: AGENT_BUDGET_OPTIONS,
         totalSpendInZip: totalSpend,
+        leadActivity: { last30: leads30, last60: leads60, last90: leads90 },
+        noLeadsNoCharge: true,
       });
     } catch (error) {
       console.error("Error fetching zip metrics:", error);
@@ -6625,6 +6641,12 @@ export function registerRoutes(app: Express): Server {
       const freeEligible = isVendorZipFreeEligible(currentCount);
       const hasFreeSlots = freeZipsUsed < FREE_VENDOR_ZIPS && freeEligible;
 
+      const [leads30, leads60, leads90] = await Promise.all([
+        storage.getVendorLeadCountForZip(String(zipCode), String(category), 30),
+        storage.getVendorLeadCountForZip(String(zipCode), String(category), 60),
+        storage.getVendorLeadCountForZip(String(zipCode), String(category), 90),
+      ]);
+
       res.json({
         zipCode: String(zipCode),
         category: String(category),
@@ -6636,6 +6658,8 @@ export function registerRoutes(app: Express): Server {
         freeSlots: FREE_VENDOR_ZIPS - freeZipsUsed,
         totalClaimed: totalVendorZips,
         freeEligible,
+        leadActivity: { last30: leads30, last60: leads60, last90: leads90 },
+        noLeadsNoCharge: true,
       });
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch pricing' });
@@ -6856,6 +6880,12 @@ export function registerRoutes(app: Express): Server {
       const currentRate = getLenderTierRate(lenderCount);
       const rateIfJoined = getLenderTierRate(lenderCount + (alreadyClaimed ? 0 : 1));
 
+      const [leads30, leads60, leads90] = await Promise.all([
+        storage.getLenderLeadCountForZip(zipCode, 30),
+        storage.getLenderLeadCountForZip(zipCode, 60),
+        storage.getLenderLeadCountForZip(zipCode, 90),
+      ]);
+
       res.json({
         zipCode,
         currentLenders: lenderCount,
@@ -6872,6 +6902,8 @@ export function registerRoutes(app: Express): Server {
           rate,
           rateDisplay: rate === 0 ? "Free" : `$${(rate / 100).toFixed(0)}/mo`,
         })),
+        leadActivity: { last30: leads30, last60: leads60, last90: leads90 },
+        noLeadsNoCharge: true,
       });
     } catch (error) {
       console.error('Error fetching lender zip pricing:', error);

@@ -330,6 +330,10 @@ export interface IStorage {
   countAgentFreeZipCodes(agentId: number): Promise<number>;
   updateZipCodeBudget(id: number, monthlyRate: number): Promise<void>;
 
+  getLeadCountForZip(zipCode: string, days: number): Promise<number>;
+  getLenderLeadCountForZip(zipCode: string, days: number): Promise<number>;
+  getVendorLeadCountForZip(zipCode: string, category: string, days: number): Promise<number>;
+
   createLead(data: InsertLead): Promise<Lead>;
   getLead(id: number): Promise<Lead | undefined>;
   getLeadsByAgent(agentId: number): Promise<Lead[]>;
@@ -4840,6 +4844,24 @@ export class DatabaseStorage implements IStorage {
 
   async updateZipCodeBudget(id: number, monthlyRate: number): Promise<void> {
     await db.execute(sql`UPDATE lead_zip_codes SET monthly_rate = ${monthlyRate} WHERE id = ${id}`);
+  }
+
+  async getLeadCountForZip(zipCode: string, days: number): Promise<number> {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM leads WHERE zip_code = ${zipCode} AND created_at >= ${since}`);
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async getLenderLeadCountForZip(zipCode: string, days: number): Promise<number> {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM lender_leads WHERE zip_code = ${zipCode} AND created_at >= ${since}`);
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async getVendorLeadCountForZip(zipCode: string, category: string, days: number): Promise<number> {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const result = await db.execute(sql`SELECT COUNT(*) as count FROM vendor_leads WHERE zip_code = ${zipCode} AND category = ${category} AND created_at >= ${since}`);
+    return Number(result.rows[0]?.count ?? 0);
   }
 
   async createLead(data: InsertLead): Promise<Lead> {
