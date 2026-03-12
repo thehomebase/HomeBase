@@ -285,8 +285,6 @@ function ProfileSection() {
     input.click();
   }
 
-  if (isLoading) return <Skeleton className="h-64 w-full" />;
-
   return (
     <div className="space-y-6">
       <div>
@@ -296,15 +294,15 @@ function ProfileSection() {
       <Separator />
 
       <div className="flex items-center gap-4">
-        <div className="relative">
+        <div className="relative w-16 h-16 flex-shrink-0">
           {user?.profilePhotoUrl ? (
             <img
               src={user.profilePhotoUrl}
               alt="Profile"
-              className="h-16 w-16 rounded-full object-cover border-2 border-border"
+              className="w-16 h-16 rounded-full object-cover border-2 border-border aspect-square"
             />
           ) : (
-            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center border-2 border-border">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center border-2 border-border aspect-square">
               <User className="h-8 w-8 text-muted-foreground" />
             </div>
           )}
