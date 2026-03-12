@@ -527,11 +527,11 @@ function ListingDetailDialog({
     <Dialog open={!!listing} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-start gap-0">
+          <DialogTitle className="flex items-start gap-1.5">
             <img
               src="/favicon.png"
               alt="HomeBase"
-              className="h-12 w-12 shrink-0 -ml-2 -mr-2 -mt-1 dark:invert"
+              className="h-12 w-12 shrink-0 -ml-2 -mt-1 dark:invert"
             />
             <div className="min-w-0">
               <h2 className="text-lg font-bold">{listing.addressLine1}</h2>
