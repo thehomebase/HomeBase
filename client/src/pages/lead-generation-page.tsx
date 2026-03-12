@@ -836,12 +836,6 @@ export default function LeadGenerationPage() {
     enabled: /^\d{5}$/.test(previewZip),
   });
 
-  useEffect(() => {
-    if (pricing && pricing.currentAgents === 0) {
-      setSelectedBudget(budgetOptions[0] || 2500);
-    }
-  }, [pricing, budgetOptions]);
-
   const claimZipMutation = useMutation({
     mutationFn: async ({ zipCode, budget }: { zipCode: string; budget: number }) => {
       const res = await apiRequest("POST", "/api/leads/zip-codes", { zipCode, monthlyBudget: budget });
@@ -939,6 +933,12 @@ export default function LeadGenerationPage() {
   const zipCodes = zipData?.zipCodes ?? [];
   const budgetOptions = zipData?.budgetOptions ?? [2500, 5000, 10000, 20000, 50000];
   const totalMonthlyBudget = zipCodes.reduce((sum, zc) => sum + zc.monthlyRate, 0);
+
+  useEffect(() => {
+    if (pricing && pricing.currentAgents === 0) {
+      setSelectedBudget(budgetOptions[0] || 2500);
+    }
+  }, [pricing?.currentAgents]);
 
   const handleZipInput = (value: string) => {
     const cleaned = value.replace(/\D/g, "").slice(0, 5);
