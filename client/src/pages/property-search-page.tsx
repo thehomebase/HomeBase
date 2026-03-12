@@ -531,7 +531,7 @@ function ListingDetailDialog({
             <img
               src="/favicon.png"
               alt="HomeBase"
-              className="h-8 w-8 shrink-0 mt-0.5 dark:invert"
+              className="h-12 w-12 shrink-0 -ml-1 -mt-1 dark:invert"
             />
             <div className="min-w-0">
               <h2 className="text-lg font-bold">{listing.addressLine1}</h2>
