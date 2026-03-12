@@ -319,6 +319,9 @@ function TeamMemberCard({ member, onRemove, isRemoving }: { member: TeamMemberWi
         </div>
       </Link>
       <h3 className="font-semibold text-sm mt-3 leading-tight">{name}</h3>
+      <p className="text-xs text-primary/80 font-medium mt-0.5">
+        {formatCategoryName(member.category || "other")}
+      </p>
       {(c?.city || c?.state) && (
         <p className="text-xs text-muted-foreground mt-0.5">
           {[c?.city, c?.state].filter(Boolean).join(", ")}
