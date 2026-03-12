@@ -3404,6 +3404,108 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // ============ Calculator Email Results ============
+  app.post("/api/calculators/email-results", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const calcSchema = z.object({
+        type: z.enum(["mortgage", "affordability", "refinance", "rent_vs_buy"]),
+        results: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+      });
+      const parsed = calcSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Invalid calculator data" });
+      const { type, results } = parsed.data;
+
+      const userEmail = req.user.email;
+      if (!userEmail) return res.status(400).json({ error: "No email on your account" });
+
+      const esc = (v: any) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      const formatCurrency = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(n) || 0);
+      const formatCurrencyDec = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
+
+      let subject = "Your HomeBase Calculator Results";
+      let rows = "";
+
+      if (type === "mortgage") {
+        subject = "Your Mortgage Calculation Results";
+        const r = results;
+        rows = `
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Property</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${esc(r.address) || "Not specified"}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Purchase Price</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrency(r.purchasePrice)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Down Payment</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrency(r.downPayment)} (${r.downPaymentPct}%)</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Loan Amount</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrency(r.loanAmount)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Interest Rate</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${r.interestRate}%</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Loan Term</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${r.loanTerm} years</td></tr>
+          <tr style="background:#f9f9f9"><td style="padding:12px;font-weight:600;font-size:16px">Monthly Payment</td><td style="padding:12px;font-weight:700;font-size:18px">${formatCurrencyDec(r.monthlyPayment)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Principal & Interest</td><td style="padding:8px;border-bottom:1px solid #eee">${formatCurrencyDec(r.principalAndInterest)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Taxes</td><td style="padding:8px;border-bottom:1px solid #eee">${formatCurrencyDec(r.monthlyTaxes)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Insurance</td><td style="padding:8px;border-bottom:1px solid #eee">${formatCurrencyDec(r.monthlyInsurance)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Total Interest Paid</td><td style="padding:8px;border-bottom:1px solid #eee">${formatCurrency(r.totalInterest)}</td></tr>
+        `;
+      } else if (type === "affordability") {
+        subject = "Your Affordability Calculation Results";
+        const r = results;
+        rows = `
+          <tr style="background:#f9f9f9"><td style="padding:12px;font-weight:600;font-size:16px">Max Home Price</td><td style="padding:12px;font-weight:700;font-size:18px">${formatCurrency(r.maxHomePrice)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Annual Income</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrency(r.annualIncome)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Monthly Debts</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrencyDec(r.monthlyDebts)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Down Payment Saved</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrency(r.downPaymentSaved)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Max Monthly Payment</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrencyDec(r.maxMonthlyPayment)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Target DTI</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${r.dtiTarget}%</td></tr>
+        `;
+      } else if (type === "refinance") {
+        subject = "Your Refinance Calculation Results";
+        const r = results;
+        rows = `
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Current Balance</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrency(r.currentBalance)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Current Rate</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${r.currentRate}%</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Current Payment</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrencyDec(r.currentPayment)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">New Rate</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${r.newRate}%</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">New Payment</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrencyDec(r.newPayment)}</td></tr>
+          <tr style="background:#f9f9f9"><td style="padding:12px;font-weight:600;font-size:16px">Monthly Savings</td><td style="padding:12px;font-weight:700;font-size:18px">${formatCurrencyDec(r.monthlySavings)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Break-even</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${r.breakEven} months</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Lifetime Savings</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrency(r.lifetimeSavings)}</td></tr>
+        `;
+      } else if (type === "rent_vs_buy") {
+        subject = "Your Rent vs. Buy Comparison Results";
+        const r = results;
+        rows = `
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Monthly Rent</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrencyDec(r.monthlyRent)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Monthly Buy Payment</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrencyDec(r.monthlyBuyPayment)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Home Price</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrency(r.homePrice)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Years Compared</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${r.yearsCompared}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Total Rent Cost</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrency(r.totalRentCost)}</td></tr>
+          <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#666">Total Buy Cost</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600">${formatCurrency(r.totalBuyCost)}</td></tr>
+          <tr style="background:#f9f9f9"><td style="padding:12px;font-weight:600;font-size:16px">${r.buyAdvantage > 0 ? "Buying Saves" : "Renting Saves"}</td><td style="padding:12px;font-weight:700;font-size:18px">${formatCurrency(Math.abs(r.buyAdvantage))}</td></tr>
+        `;
+      }
+
+      const html = `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto">
+          <div style="background:#000;color:#fff;padding:24px 20px;border-radius:8px 8px 0 0">
+            <h1 style="margin:0;font-size:20px">${subject}</h1>
+            <p style="margin:8px 0 0;opacity:0.7;font-size:13px">Generated by HomeBase Financial Tools</p>
+          </div>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #eee;border-top:none">
+            ${rows}
+          </table>
+          <div style="padding:16px 20px;background:#f9f9f9;border:1px solid #eee;border-top:none;border-radius:0 0 8px 8px;text-align:center">
+            <p style="margin:0;font-size:12px;color:#999">This is an estimate for informational purposes only. Contact a lender for exact figures.</p>
+          </div>
+        </div>
+      `;
+
+      const result = await sendGmailEmail(req.user.id, userEmail, subject, html);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error || "Failed to send email. Please connect Gmail first." });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error sending calculator results email:", error);
+      res.status(500).json({ error: error.message || "Failed to send email" });
+    }
+  });
+
   // ============ Gmail Bulk Actions ============
   app.post("/api/gmail/batch-modify", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
