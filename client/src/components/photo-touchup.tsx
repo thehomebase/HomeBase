@@ -25,6 +25,7 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
   const [tool, setTool] = useState<Tool>("eraser");
   const isDrawing = useRef(false);
   const isPanning = useRef(false);
+  const isTouchPanning = useRef(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
   const panStart = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -99,6 +100,15 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
     return { x: e.clientX, y: e.clientY };
   }
 
+  function getTouchMidpoint(e: React.TouchEvent) {
+    const t0 = e.touches[0];
+    const t1 = e.touches[1];
+    return {
+      x: (t0.clientX + t1.clientX) / 2,
+      y: (t0.clientY + t1.clientY) / 2,
+    };
+  }
+
   function drawAt(x: number, y: number) {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -129,20 +139,36 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
     ctx.stroke();
   }
 
-  function handleStart(e: React.MouseEvent | React.TouchEvent) {
+  function startPan(clientX: number, clientY: number) {
+    isPanning.current = true;
+    const container = containerRef.current;
+    if (container) {
+      panStart.current = {
+        x: clientX,
+        y: clientY,
+        scrollLeft: container.scrollLeft,
+        scrollTop: container.scrollTop,
+      };
+    }
+  }
+
+  function movePan(clientX: number, clientY: number) {
+    const container = containerRef.current;
+    if (container && panStart.current) {
+      container.scrollLeft = panStart.current.scrollLeft - (clientX - panStart.current.x);
+      container.scrollTop = panStart.current.scrollTop - (clientY - panStart.current.y);
+    }
+  }
+
+  function endPan() {
+    isPanning.current = false;
+    panStart.current = null;
+  }
+
+  function handleMouseDown(e: React.MouseEvent) {
     e.preventDefault();
     if (tool === "pan") {
-      isPanning.current = true;
-      const pos = getClientPos(e);
-      const container = containerRef.current;
-      if (container) {
-        panStart.current = {
-          x: pos.x,
-          y: pos.y,
-          scrollLeft: container.scrollLeft,
-          scrollTop: container.scrollTop,
-        };
-      }
+      startPan(e.clientX, e.clientY);
       return;
     }
     isDrawing.current = true;
@@ -152,15 +178,10 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
     drawAt(pos.x, pos.y);
   }
 
-  function handleMove(e: React.MouseEvent | React.TouchEvent) {
+  function handleMouseMove(e: React.MouseEvent) {
     e.preventDefault();
     if (tool === "pan" && isPanning.current) {
-      const pos = getClientPos(e);
-      const container = containerRef.current;
-      if (container && panStart.current) {
-        container.scrollLeft = panStart.current.scrollLeft - (pos.x - panStart.current.x);
-        container.scrollTop = panStart.current.scrollTop - (pos.y - panStart.current.y);
-      }
+      movePan(e.clientX, e.clientY);
       return;
     }
     if (!isDrawing.current) return;
@@ -172,11 +193,79 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
     lastPos.current = pos;
   }
 
-  function handleEnd(e: React.MouseEvent | React.TouchEvent) {
+  function handleMouseUp(e: React.MouseEvent) {
     e.preventDefault();
     if (tool === "pan") {
-      isPanning.current = false;
-      panStart.current = null;
+      endPan();
+      return;
+    }
+    if (isDrawing.current) {
+      isDrawing.current = false;
+      lastPos.current = null;
+      saveSnapshot();
+    }
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    e.preventDefault();
+    if (e.touches.length >= 2) {
+      if (isDrawing.current) {
+        isDrawing.current = false;
+        lastPos.current = null;
+        saveSnapshot();
+      }
+      isTouchPanning.current = true;
+      const mid = getTouchMidpoint(e);
+      startPan(mid.x, mid.y);
+      return;
+    }
+    if (tool === "pan") {
+      startPan(e.touches[0].clientX, e.touches[0].clientY);
+      return;
+    }
+    isDrawing.current = true;
+    const pos = getCanvasPos(e);
+    if (!pos) return;
+    lastPos.current = pos;
+    drawAt(pos.x, pos.y);
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    e.preventDefault();
+    if (e.touches.length >= 2 || isTouchPanning.current) {
+      if (e.touches.length >= 2) {
+        const mid = getTouchMidpoint(e);
+        movePan(mid.x, mid.y);
+      }
+      return;
+    }
+    if (tool === "pan" && isPanning.current) {
+      movePan(e.touches[0].clientX, e.touches[0].clientY);
+      return;
+    }
+    if (!isDrawing.current) return;
+    const pos = getCanvasPos(e);
+    if (!pos) return;
+    if (lastPos.current) {
+      drawLine(lastPos.current, pos);
+    }
+    lastPos.current = pos;
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    e.preventDefault();
+    if (isTouchPanning.current) {
+      if (e.touches.length === 0) {
+        isTouchPanning.current = false;
+        endPan();
+      } else if (e.touches.length === 1) {
+        isTouchPanning.current = false;
+        endPan();
+      }
+      return;
+    }
+    if (tool === "pan") {
+      endPan();
       return;
     }
     if (isDrawing.current) {
@@ -213,12 +302,12 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
             Touch Up Photo
           </DialogTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            Paint over artifacts or use the hand tool to pan around when zoomed in
+            Paint over artifacts. On mobile, use two fingers to pan around.
           </p>
         </DialogHeader>
 
         <div className="px-4 pb-2 flex items-center gap-3">
-          <div className="flex gap-0.5 border rounded-md p-0.5">
+          <div className="hidden sm:flex gap-0.5 border rounded-md p-0.5">
             <Button
               variant={tool === "eraser" ? "default" : "ghost"}
               size="icon"
@@ -255,7 +344,7 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
           {tool === "pan" && (
             <span className="text-xs text-muted-foreground flex-1">Drag to pan around the image</span>
           )}
-          <div className="flex gap-1 ml-2">
+          <div className="flex gap-1 ml-auto">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.min(z + 0.25, 3))}>
               <ZoomIn className="h-3.5 w-3.5" />
             </Button>
@@ -279,16 +368,16 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
             style={{
               width: displayW * zoom,
               height: displayH * zoom,
-              cursor: tool === "pan" ? (isPanning.current ? "grabbing" : "grab") : "crosshair",
+              cursor: tool === "pan" ? "grab" : "crosshair",
               touchAction: "none",
             }}
-            onMouseDown={handleStart}
-            onMouseMove={handleMove}
-            onMouseUp={handleEnd}
-            onMouseLeave={handleEnd}
-            onTouchStart={handleStart}
-            onTouchMove={handleMove}
-            onTouchEnd={handleEnd}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           />
         </div>
 
