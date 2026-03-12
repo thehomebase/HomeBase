@@ -2548,6 +2548,25 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.patch("/api/saved-properties/:id/price-alert", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { priceAlertEnabled } = req.body;
+      if (typeof priceAlertEnabled !== "boolean") {
+        return res.status(400).json({ error: "priceAlertEnabled must be a boolean" });
+      }
+      const id = Number(req.params.id);
+      await db.execute(sql`
+        UPDATE saved_properties SET price_alert_enabled = ${priceAlertEnabled}
+        WHERE id = ${id} AND user_id = ${req.user.id}
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating price alert:', error);
+      res.status(500).json({ error: 'Failed to update price alert' });
+    }
+  });
+
   app.delete("/api/saved-properties/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
@@ -3817,6 +3836,12 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/listing-alerts", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+
+    const existingCount = await db.execute(sql`SELECT COUNT(*) as count FROM listing_alerts WHERE user_id = ${req.user.id}`);
+    if (Number((existingCount.rows[0] as any).count) >= 1) {
+      return res.status(400).json({ error: "You can only have one listing alert. Edit or delete your existing alert to create a new one." });
+    }
+
     const schema = z.object({
       name: z.string().min(1).max(100),
       city: z.string().max(100).optional().nullable(),

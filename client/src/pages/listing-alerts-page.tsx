@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,8 +15,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
   Bell, Plus, Trash2, Pencil, MapPin, DollarSign, BedDouble, Bath,
-  Home, Mail, MessageSquare, Smartphone, Clock, ChevronDown, ChevronUp,
-  Power, PowerOff, Search, Building2
+  Mail, Smartphone, Clock, ChevronDown, ChevronUp,
+  Power, PowerOff, Search, Building2, TrendingDown, TrendingUp, Star
 } from "lucide-react";
 
 interface ListingAlert {
@@ -48,6 +48,16 @@ interface AlertResult {
   listing_bedrooms: number | null;
   listing_bathrooms: number | null;
   notified_at: string;
+}
+
+interface SavedProperty {
+  id: number;
+  streetAddress: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+  lastKnownPrice: number | null;
+  priceAlertEnabled: boolean;
 }
 
 const PROPERTY_TYPES = [
@@ -104,6 +114,10 @@ export default function ListingAlertsPage() {
     queryKey: ["/api/listing-alerts"],
   });
 
+  const { data: savedProperties = [] } = useQuery<SavedProperty[]>({
+    queryKey: ["/api/saved-properties"],
+  });
+
   const { data: expandedResults = [] } = useQuery<AlertResult[]>({
     queryKey: ["/api/listing-alerts", expandedId, "results"],
     queryFn: async () => {
@@ -114,6 +128,8 @@ export default function ListingAlertsPage() {
     },
     enabled: !!expandedId,
   });
+
+  const hasAlert = alerts.length > 0;
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -165,6 +181,16 @@ export default function ListingAlertsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/listing-alerts"] });
+    },
+  });
+
+  const togglePriceAlert = useMutation({
+    mutationFn: async ({ id, enabled }: { id: number; enabled: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/saved-properties/${id}/price-alert`, { priceAlertEnabled: enabled });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-properties"] });
     },
   });
 
@@ -225,6 +251,8 @@ export default function ListingAlertsPage() {
     setForm(defaultForm);
   }
 
+  const propsWithPrice = savedProperties.filter(p => p.streetAddress);
+
   if (isLoading) {
     return (
       <div className="w-full px-4 sm:px-8 py-6 max-w-4xl mx-auto space-y-4">
@@ -243,24 +271,27 @@ export default function ListingAlertsPage() {
             <Bell className="h-6 w-6" /> Listing Alerts
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Get notified when new listings match your search criteria
+            Get notified about new listings and price changes on saved properties
           </p>
         </div>
-        <Button onClick={() => { setForm(defaultForm); setEditingId(null); setShowForm(true); }} className="gap-2">
-          <Plus className="h-4 w-4" /> New Alert
-        </Button>
+        {!hasAlert && (
+          <Button onClick={() => { setForm(defaultForm); setEditingId(null); setShowForm(true); }} className="gap-2">
+            <Plus className="h-4 w-4" /> New Alert
+          </Button>
+        )}
       </div>
 
-      {alerts.length === 0 ? (
+      {!hasAlert ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <Search className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Listing Alerts Yet</h3>
+            <h3 className="text-lg font-semibold mb-2">No Listing Alert Set Up</h3>
             <p className="text-muted-foreground mb-6 max-w-md">
-              Set up alerts to automatically get notified when new property listings match your search criteria. Choose to receive notifications via email, SMS, or in-app.
+              Create a listing alert to get notified when new properties match your search criteria.
+              You can also get price change alerts for your saved properties.
             </p>
             <Button onClick={() => setShowForm(true)} className="gap-2">
-              <Plus className="h-4 w-4" /> Create Your First Alert
+              <Plus className="h-4 w-4" /> Create Your Alert
             </Button>
           </CardContent>
         </Card>
@@ -394,6 +425,52 @@ export default function ListingAlertsPage() {
         </div>
       )}
 
+      {propsWithPrice.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
+            <Star className="h-5 w-5" /> Saved Property Price Alerts
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Price changes on your saved properties are checked daily. Toggle alerts on or off per property.
+          </p>
+          <Card>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {propsWithPrice.map(prop => (
+                  <div key={prop.id} className="flex items-center justify-between px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{prop.streetAddress}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {[prop.city, prop.state, prop.zipCode].filter(Boolean).join(", ")}
+                      </p>
+                      {prop.lastKnownPrice ? (
+                        <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                          <DollarSign className="h-3 w-3" />
+                          Last known: ${prop.lastKnownPrice.toLocaleString()}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Price will be tracked on next check
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-muted-foreground">
+                        {prop.priceAlertEnabled ? "On" : "Off"}
+                      </span>
+                      <Switch
+                        checked={prop.priceAlertEnabled}
+                        onCheckedChange={v => togglePriceAlert.mutate({ id: prop.id, enabled: v })}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <Dialog open={showForm} onOpenChange={(open) => { if (!open) closeForm(); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader className="text-left">
@@ -509,6 +586,9 @@ export default function ListingAlertsPage() {
 
             <Separator />
             <p className="text-sm font-medium">How to notify you</p>
+            <p className="text-xs text-muted-foreground -mt-2">
+              These settings also apply to price change alerts on your saved properties
+            </p>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">

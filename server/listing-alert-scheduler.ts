@@ -29,6 +29,18 @@ interface UserRow {
   profile_phone: string | null;
 }
 
+interface SavedPropertyRow {
+  id: number;
+  user_id: number;
+  street_address: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  last_known_price: number | null;
+  listing_id: string | null;
+  price_alert_enabled: boolean;
+}
+
 interface RentCastListing {
   id: string;
   formattedAddress: string;
@@ -43,6 +55,14 @@ interface RentCastListing {
   city: string;
   state: string;
   zipCode: string;
+}
+
+interface PriceChange {
+  address: string;
+  oldPrice: number;
+  newPrice: number;
+  change: number;
+  changePercent: string;
 }
 
 function buildSearchKey(alert: AlertRow): string {
@@ -100,6 +120,26 @@ async function fetchListings(params: URLSearchParams): Promise<RentCastListing[]
   }
 }
 
+async function fetchPropertyByAddress(address: string): Promise<RentCastListing | null> {
+  const apiKey = process.env.RENTCAST_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const params = new URLSearchParams({ address });
+    const url = `https://api.rentcast.io/v1/properties?${params.toString()}`;
+    const response = await fetch(url, {
+      headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (Array.isArray(data) && data.length > 0) return data[0];
+    if (data && data.id) return data;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function formatListingsSummary(listings: RentCastListing[], alertName: string): string {
   const header = `🏠 ${listings.length} new listing${listings.length !== 1 ? "s" : ""} matching "${alertName}":\n\n`;
   const items = listings.slice(0, 5).map((l, i) =>
@@ -107,6 +147,15 @@ function formatListingsSummary(listings: RentCastListing[], alertName: string): 
   ).join("\n\n");
   const more = listings.length > 5 ? `\n\n...and ${listings.length - 5} more. Check the app for full details.` : "";
   return header + items + more;
+}
+
+function formatPriceChangesSummary(changes: PriceChange[]): string {
+  const header = `💰 ${changes.length} price change${changes.length !== 1 ? "s" : ""} on your saved properties:\n\n`;
+  const items = changes.map((c, i) => {
+    const direction = c.change < 0 ? "↓" : "↑";
+    return `${i + 1}. ${c.address}\n   $${c.oldPrice.toLocaleString()} → $${c.newPrice.toLocaleString()} (${direction} ${c.changePercent})`;
+  }).join("\n\n");
+  return header + items;
 }
 
 function formatListingsHtml(listings: RentCastListing[], alertName: string): string {
@@ -140,8 +189,171 @@ function formatListingsHtml(listings: RentCastListing[], alertName: string): str
   `;
 }
 
-async function processAlerts(): Promise<void> {
-  console.log("[ListingAlerts] Starting daily listing alert check...");
+function formatPriceChangesHtml(changes: PriceChange[]): string {
+  const rows = changes.map(c => {
+    const direction = c.change < 0 ? "↓" : "↑";
+    const color = c.change < 0 ? "#16a34a" : "#dc2626";
+    return `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #eee">${c.address}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee">$${c.oldPrice.toLocaleString()}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee">$${c.newPrice.toLocaleString()}</td>
+        <td style="padding:8px;border-bottom:1px solid #eee;color:${color};font-weight:600">${direction} ${c.changePercent}</td>
+      </tr>
+    `;
+  }).join("");
+
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+      <h2 style="color:#1a1a2e">💰 Price Changes on Your Saved Properties</h2>
+      <p>${changes.length} of your saved properties had a price change.</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0">
+        <thead>
+          <tr style="background:#f5f5f5">
+            <th style="padding:8px;text-align:left">Address</th>
+            <th style="padding:8px;text-align:left">Was</th>
+            <th style="padding:8px;text-align:left">Now</th>
+            <th style="padding:8px;text-align:left">Change</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="color:#666;font-size:12px;margin-top:24px">You're receiving this because you have saved properties with price alerts enabled on HomeBase.</p>
+    </div>
+  `;
+}
+
+async function sendAlertNotifications(
+  userId: number,
+  alert: AlertRow,
+  title: string,
+  summary: string,
+  html: string,
+  subject: string,
+  link: string
+): Promise<void> {
+  const userResult = await db.execute(sql`
+    SELECT id, email, first_name, last_name, profile_phone FROM users WHERE id = ${userId}
+  `);
+  const user = userResult.rows[0] as unknown as UserRow;
+  if (!user) return;
+
+  if (alert.notify_in_app) {
+    await notify(userId, "listing_alert", title, summary, link);
+  }
+
+  if (alert.notify_sms && user.profile_phone) {
+    try {
+      const truncated = summary.length > 1500 ? summary.substring(0, 1497) + "..." : summary;
+      await sendSMS(user.profile_phone, truncated);
+      console.log(`[ListingAlerts] SMS sent to user ${userId}`);
+    } catch (err) {
+      console.error(`[ListingAlerts] SMS failed for user ${userId}:`, err);
+    }
+  }
+
+  if (alert.notify_email && user.email) {
+    try {
+      await sendGmailEmail(userId, user.email, subject, html);
+      console.log(`[ListingAlerts] Email sent to user ${userId}`);
+    } catch (err) {
+      console.error(`[ListingAlerts] Email failed for user ${userId}:`, err);
+    }
+  }
+}
+
+async function processPriceChanges(): Promise<void> {
+  console.log("[ListingAlerts] Checking saved properties for price changes...");
+
+  try {
+    const propsResult = await db.execute(sql`
+      SELECT sp.id, sp.user_id, sp.street_address, sp.city, sp.state, sp.zip_code,
+             sp.last_known_price, sp.listing_id, sp.price_alert_enabled
+      FROM saved_properties sp
+      WHERE sp.price_alert_enabled = true AND sp.street_address IS NOT NULL
+    `);
+    const savedProps = propsResult.rows as unknown as SavedPropertyRow[];
+
+    if (savedProps.length === 0) {
+      console.log("[ListingAlerts] No saved properties with price alerts");
+      return;
+    }
+
+    const userGroups = new Map<number, SavedPropertyRow[]>();
+    for (const prop of savedProps) {
+      if (!userGroups.has(prop.user_id)) userGroups.set(prop.user_id, []);
+      userGroups.get(prop.user_id)!.push(prop);
+    }
+
+    let apiCallsUsed = 0;
+    const MAX_PRICE_API_CALLS = 2;
+
+    for (const [userId, props] of userGroups) {
+      const priceChanges: PriceChange[] = [];
+
+      const alertResult = await db.execute(sql`
+        SELECT * FROM listing_alerts WHERE user_id = ${userId} AND is_active = true LIMIT 1
+      `);
+      const alert = alertResult.rows[0] as unknown as AlertRow | undefined;
+
+      for (const prop of props) {
+        if (apiCallsUsed >= MAX_PRICE_API_CALLS) break;
+
+        const address = [prop.street_address, prop.city, prop.state, prop.zip_code].filter(Boolean).join(", ");
+        if (!address) continue;
+
+        const listing = await fetchPropertyByAddress(address);
+        apiCallsUsed++;
+
+        if (!listing || !listing.price) continue;
+
+        if (prop.last_known_price && prop.last_known_price !== listing.price) {
+          const change = listing.price - prop.last_known_price;
+          const pct = Math.abs((change / prop.last_known_price) * 100).toFixed(1) + "%";
+          priceChanges.push({
+            address: listing.formattedAddress || address,
+            oldPrice: prop.last_known_price,
+            newPrice: listing.price,
+            change,
+            changePercent: pct,
+          });
+        }
+
+        await db.execute(sql`
+          UPDATE saved_properties SET last_known_price = ${listing.price}, listing_id = ${listing.id}
+          WHERE id = ${prop.id}
+        `);
+      }
+
+      if (priceChanges.length > 0 && alert) {
+        console.log(`[ListingAlerts] User ${userId}: ${priceChanges.length} price change(s) detected`);
+        const summary = formatPriceChangesSummary(priceChanges);
+        const html = formatPriceChangesHtml(priceChanges);
+        await sendAlertNotifications(
+          userId,
+          alert,
+          `${priceChanges.length} price change${priceChanges.length !== 1 ? "s" : ""} on saved properties`,
+          summary,
+          html,
+          `💰 Price Changes on Saved Properties`,
+          "/listing-alerts"
+        );
+      }
+
+      if (apiCallsUsed >= MAX_PRICE_API_CALLS) {
+        console.log(`[ListingAlerts] Reached max price check API calls (${MAX_PRICE_API_CALLS})`);
+        break;
+      }
+    }
+
+    console.log(`[ListingAlerts] Price check complete. Used ${apiCallsUsed} API call(s).`);
+  } catch (error) {
+    console.error("[ListingAlerts] Price check error:", error);
+  }
+}
+
+async function processNewListingAlerts(): Promise<void> {
+  console.log("[ListingAlerts] Checking for new listings matching alerts...");
 
   try {
     const alertsResult = await db.execute(sql`
@@ -166,14 +378,12 @@ async function processAlerts(): Promise<void> {
       }
     }
 
-    console.log(`[ListingAlerts] Grouped into ${searchGroups.size} unique search(es)`);
-
     let apiCallsUsed = 0;
-    const MAX_API_CALLS = 3;
+    const MAX_API_CALLS = 2;
 
-    for (const [key, group] of searchGroups) {
+    for (const [, group] of searchGroups) {
       if (apiCallsUsed >= MAX_API_CALLS) {
-        console.log(`[ListingAlerts] Reached max API calls (${MAX_API_CALLS}), skipping remaining groups`);
+        console.log(`[ListingAlerts] Reached max API calls (${MAX_API_CALLS})`);
         break;
       }
 
@@ -182,9 +392,7 @@ async function processAlerts(): Promise<void> {
 
       if (allListings.length === 0) {
         for (const alert of group.alerts) {
-          await db.execute(sql`
-            UPDATE listing_alerts SET last_checked_at = NOW(), last_match_count = 0 WHERE id = ${alert.id}
-          `);
+          await db.execute(sql`UPDATE listing_alerts SET last_checked_at = NOW(), last_match_count = 0 WHERE id = ${alert.id}`);
         }
         continue;
       }
@@ -194,23 +402,19 @@ async function processAlerts(): Promise<void> {
           const matchedListings = allListings.filter(l => listingMatchesAlert(l, alert));
 
           if (matchedListings.length === 0) {
-            await db.execute(sql`
-              UPDATE listing_alerts SET last_checked_at = NOW(), last_match_count = 0 WHERE id = ${alert.id}
-            `);
+            await db.execute(sql`UPDATE listing_alerts SET last_checked_at = NOW(), last_match_count = 0 WHERE id = ${alert.id}`);
             continue;
           }
 
           const existingResult = await db.execute(sql`
-            SELECT listing_id FROM listing_alert_results 
+            SELECT listing_id FROM listing_alert_results
             WHERE alert_id = ${alert.id} AND notified_at > NOW() - INTERVAL '7 days'
           `);
           const existingIds = new Set((existingResult.rows as any[]).map(r => r.listing_id));
           const newListings = matchedListings.filter(l => !existingIds.has(l.id));
 
           if (newListings.length === 0) {
-            await db.execute(sql`
-              UPDATE listing_alerts SET last_checked_at = NOW(), last_match_count = 0 WHERE id = ${alert.id}
-            `);
+            await db.execute(sql`UPDATE listing_alerts SET last_checked_at = NOW(), last_match_count = 0 WHERE id = ${alert.id}`);
             continue;
           }
 
@@ -223,61 +427,36 @@ async function processAlerts(): Promise<void> {
             `);
           }
 
-          const userResult = await db.execute(sql`
-            SELECT id, email, first_name, last_name, profile_phone FROM users WHERE id = ${alert.user_id}
-          `);
-          const user = userResult.rows[0] as unknown as UserRow;
-          if (!user) continue;
+          const summary = formatListingsSummary(newListings, alert.name);
+          const html = formatListingsHtml(newListings, alert.name);
+          await sendAlertNotifications(
+            alert.user_id,
+            alert,
+            `${newListings.length} new listing${newListings.length !== 1 ? "s" : ""} found`,
+            summary,
+            html,
+            `🏠 ${newListings.length} New Listing${newListings.length !== 1 ? "s" : ""} - ${alert.name}`,
+            "/listing-alerts"
+          );
 
-          if (alert.notify_in_app) {
-            await notify(
-              alert.user_id,
-              "listing_alert",
-              `${newListings.length} new listing${newListings.length !== 1 ? "s" : ""} found`,
-              formatListingsSummary(newListings, alert.name),
-              "/listing-alerts"
-            );
-          }
-
-          if (alert.notify_sms && user.profile_phone) {
-            try {
-              const smsText = formatListingsSummary(newListings, alert.name);
-              const truncated = smsText.length > 1500 ? smsText.substring(0, 1497) + "..." : smsText;
-              await sendSMS(user.profile_phone, truncated);
-              console.log(`[ListingAlerts] SMS sent to user ${alert.user_id}`);
-            } catch (err) {
-              console.error(`[ListingAlerts] SMS failed for user ${alert.user_id}:`, err);
-            }
-          }
-
-          if (alert.notify_email && user.email) {
-            try {
-              const html = formatListingsHtml(newListings, alert.name);
-              await sendGmailEmail(
-                alert.user_id,
-                user.email,
-                `🏠 ${newListings.length} New Listing${newListings.length !== 1 ? "s" : ""} - ${alert.name}`,
-                html
-              );
-              console.log(`[ListingAlerts] Email sent to user ${alert.user_id}`);
-            } catch (err) {
-              console.error(`[ListingAlerts] Email failed for user ${alert.user_id}:`, err);
-            }
-          }
-
-          await db.execute(sql`
-            UPDATE listing_alerts SET last_checked_at = NOW(), last_match_count = ${newListings.length} WHERE id = ${alert.id}
-          `);
+          await db.execute(sql`UPDATE listing_alerts SET last_checked_at = NOW(), last_match_count = ${newListings.length} WHERE id = ${alert.id}`);
         } catch (err) {
           console.error(`[ListingAlerts] Error processing alert ${alert.id}:`, err);
         }
       }
     }
 
-    console.log(`[ListingAlerts] Daily check complete. Used ${apiCallsUsed} API call(s).`);
+    console.log(`[ListingAlerts] New listing check complete. Used ${apiCallsUsed} API call(s).`);
   } catch (error) {
-    console.error("[ListingAlerts] Scheduler error:", error);
+    console.error("[ListingAlerts] New listing check error:", error);
   }
+}
+
+async function processAlerts(): Promise<void> {
+  console.log("[ListingAlerts] Starting daily listing alert check...");
+  await processNewListingAlerts();
+  await processPriceChanges();
+  console.log("[ListingAlerts] Daily check complete.");
 }
 
 let schedulerInterval: ReturnType<typeof setInterval> | null = null;

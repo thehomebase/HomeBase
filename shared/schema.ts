@@ -373,6 +373,9 @@ export const savedProperties = pgTable("saved_properties", {
   zipCode: text("zip_code"),
   notes: text("notes"),
   showingRequested: boolean("showing_requested").notNull().default(false),
+  lastKnownPrice: integer("last_known_price"),
+  listingId: text("listing_id"),
+  priceAlertEnabled: boolean("price_alert_enabled").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
