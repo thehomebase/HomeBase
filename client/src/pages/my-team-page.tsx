@@ -309,16 +309,24 @@ function TeamMemberCard({ member, onRemove, isRemoving }: { member: TeamMemberWi
   const name = c?.name || "Unknown";
   const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
+  const profileLink = c?.vendorUserId ? `/profile/${c.vendorUserId}` : null;
+
+  const photoEl = (
+    <div className={`relative w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-muted border-2 border-border overflow-hidden shadow-sm transition-shadow ${profileLink ? "hover:shadow-md cursor-pointer" : ""}`}>
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted-foreground/10">
+        <UserIcon className="h-12 w-12 text-muted-foreground/40" />
+      </div>
+    </div>
+  );
+
+  const nameEl = (
+    <h3 className={`font-semibold text-sm mt-3 leading-tight ${profileLink ? "hover:text-primary cursor-pointer transition-colors" : ""}`}>{name}</h3>
+  );
+
   return (
     <div className="flex flex-col items-center text-center group">
-      <Link href={c?.vendorUserId ? `/profile/${c.vendorUserId}` : "#"}>
-        <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-muted border-2 border-border overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted-foreground/10">
-            <UserIcon className="h-12 w-12 text-muted-foreground/40" />
-          </div>
-        </div>
-      </Link>
-      <h3 className="font-semibold text-sm mt-3 leading-tight">{name}</h3>
+      {profileLink ? <Link href={profileLink}>{photoEl}</Link> : photoEl}
+      {profileLink ? <Link href={profileLink}>{nameEl}</Link> : nameEl}
       <p className="text-xs text-primary/80 font-medium mt-0.5">
         {formatCategoryName(member.category || "other")}
       </p>
