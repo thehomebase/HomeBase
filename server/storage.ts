@@ -52,6 +52,7 @@ import {
   type LenderTransaction, type InsertLenderTransaction,
   type LenderChecklist, type InsertLenderChecklist,
   type LenderChecklistMapping, type InsertLenderChecklistMapping,
+  type LenderProfile, type InsertLenderProfile,
   type ClientInvitation, type InsertClientInvitation,
   type BrokerNotification, type InsertBrokerNotification,
   type BrokerNotificationRead,
@@ -399,6 +400,12 @@ export interface IStorage {
 
   getLenderChecklistMappings(lenderTransactionId: number): Promise<LenderChecklistMapping[]>;
   createLenderChecklistMapping(data: InsertLenderChecklistMapping): Promise<LenderChecklistMapping>;
+
+  getLenderProfiles(agentId: number): Promise<LenderProfile[]>;
+  getLenderProfile(id: number): Promise<LenderProfile | undefined>;
+  createLenderProfile(data: InsertLenderProfile): Promise<LenderProfile>;
+  updateLenderProfile(id: number, data: Partial<LenderProfile>): Promise<LenderProfile>;
+  deleteLenderProfile(id: number): Promise<void>;
 
   createClientInvitation(data: InsertClientInvitation): Promise<ClientInvitation>;
   getClientInvitationsByAgent(agentId: number): Promise<ClientInvitation[]>;
@@ -5430,6 +5437,47 @@ export class DatabaseStorage implements IStorage {
       RETURNING *
     `);
     return result.rows[0] as LenderChecklistMapping;
+  }
+
+  async getLenderProfiles(agentId: number): Promise<LenderProfile[]> {
+    const result = await db.execute(sql`SELECT * FROM lender_profiles WHERE agent_id = ${agentId} ORDER BY created_at DESC`);
+    return result.rows as LenderProfile[];
+  }
+
+  async getLenderProfile(id: number): Promise<LenderProfile | undefined> {
+    const result = await db.execute(sql`SELECT * FROM lender_profiles WHERE id = ${id}`);
+    return result.rows[0] as LenderProfile | undefined;
+  }
+
+  async createLenderProfile(data: InsertLenderProfile): Promise<LenderProfile> {
+    const result = await db.execute(sql`
+      INSERT INTO lender_profiles (agent_id, name, company, nmls, phone, email, photo_url, conventional_rate, fha_rate, va_rate, usda_rate, closing_costs_pct, min_credit_score, min_down_payment_pct, specialties, notes)
+      VALUES (${data.agentId}, ${data.name}, ${data.company}, ${data.nmls || null}, ${data.phone || null}, ${data.email || null}, ${data.photoUrl || null}, ${data.conventionalRate || null}, ${data.fhaRate || null}, ${data.vaRate || null}, ${data.usdaRate || null}, ${data.closingCostsPct || null}, ${data.minCreditScore || null}, ${data.minDownPaymentPct || null}, ${data.specialties || null}, ${data.notes || null})
+      RETURNING *
+    `);
+    return result.rows[0] as LenderProfile;
+  }
+
+  async updateLenderProfile(id: number, data: Partial<LenderProfile>): Promise<LenderProfile> {
+    const existing = await this.getLenderProfile(id);
+    if (!existing) throw new Error("Lender profile not found");
+    const merged = { ...existing, ...data };
+    const result = await db.execute(sql`
+      UPDATE lender_profiles SET
+        name = ${merged.name}, company = ${merged.company}, nmls = ${merged.nmls},
+        phone = ${merged.phone}, email = ${merged.email}, photo_url = ${merged.photoUrl},
+        conventional_rate = ${merged.conventionalRate}, fha_rate = ${merged.fhaRate},
+        va_rate = ${merged.vaRate}, usda_rate = ${merged.usdaRate},
+        closing_costs_pct = ${merged.closingCostsPct}, min_credit_score = ${merged.minCreditScore},
+        min_down_payment_pct = ${merged.minDownPaymentPct}, specialties = ${merged.specialties},
+        notes = ${merged.notes}
+      WHERE id = ${id} RETURNING *
+    `);
+    return result.rows[0] as LenderProfile;
+  }
+
+  async deleteLenderProfile(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM lender_profiles WHERE id = ${id}`);
   }
 
   async createClientInvitation(data: InsertClientInvitation): Promise<ClientInvitation> {

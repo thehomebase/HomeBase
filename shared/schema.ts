@@ -930,6 +930,35 @@ export type InsertLenderChecklist = z.infer<typeof insertLenderChecklistSchema>;
 export type LenderChecklistMapping = typeof lenderChecklistMappings.$inferSelect;
 export type InsertLenderChecklistMapping = z.infer<typeof insertLenderChecklistMappingSchema>;
 
+export const lenderProfiles = pgTable("lender_profiles", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  name: text("name").notNull(),
+  company: text("company").notNull(),
+  nmls: text("nmls"),
+  phone: text("phone"),
+  email: text("email"),
+  photoUrl: text("photo_url"),
+  conventionalRate: text("conventional_rate"),
+  fhaRate: text("fha_rate"),
+  vaRate: text("va_rate"),
+  usdaRate: text("usda_rate"),
+  closingCostsPct: text("closing_costs_pct"),
+  minCreditScore: text("min_credit_score"),
+  minDownPaymentPct: text("min_down_payment_pct"),
+  specialties: text("specialties"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLenderProfileSchema = createInsertSchema(lenderProfiles).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type LenderProfile = typeof lenderProfiles.$inferSelect;
+export type InsertLenderProfile = z.infer<typeof insertLenderProfileSchema>;
+
 export const clientInvitations = pgTable("client_invitations", {
   id: serial("id").primaryKey(),
   agentId: integer("agent_id").notNull(),

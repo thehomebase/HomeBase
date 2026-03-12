@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend, AreaChart, Area } from 'recharts';
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Calculator, Home, RefreshCw, DollarSign, TrendingUp, BookOpen, Mail, Check, X, ChevronDown, ChevronUp, Building2, Shield, Star, Landmark, Banknote, HelpCircle } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { Calculator, Home, RefreshCw, DollarSign, TrendingUp, BookOpen, Mail, Check, X, ChevronDown, ChevronUp, Building2, Shield, Star, Landmark, Banknote, HelpCircle, Users, Plus, Pencil, Trash2, Phone, AtSign, Camera, User } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/use-auth";
+import type { LenderProfile } from "@shared/schema";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
@@ -831,6 +836,423 @@ function FinancingGuide() {
   );
 }
 
+function LenderComparison() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [editingLender, setEditingLender] = useState<LenderProfile | null>(null);
+  const [loanAmount, setLoanAmount] = useState(300000);
+  const [loanTerm, setLoanTerm] = useState(30);
+  const [loanType, setLoanType] = useState<"conventional" | "fha" | "va" | "usda">("conventional");
+  const photoRef = useRef<HTMLInputElement>(null);
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<number | null>(null);
+
+  const [formData, setFormData] = useState({
+    name: "", company: "", nmls: "", phone: "", email: "",
+    conventionalRate: "", fhaRate: "", vaRate: "", usdaRate: "",
+    closingCostsPct: "", minCreditScore: "", minDownPaymentPct: "",
+    specialties: "", notes: "",
+  });
+
+  const { data: lenders = [], isLoading } = useQuery<LenderProfile[]>({
+    queryKey: ["/api/lender-profiles"],
+    enabled: !!user && (user.role === "agent" || user.role === "broker"),
+  });
+
+  const createMut = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/lender-profiles", data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/lender-profiles"] }); setShowForm(false); resetForm(); toast({ title: "Lender added" }); },
+    onError: () => { toast({ title: "Failed to add lender", variant: "destructive" }); },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => apiRequest("PATCH", `/api/lender-profiles/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/lender-profiles"] }); setShowForm(false); setEditingLender(null); resetForm(); toast({ title: "Lender updated" }); },
+    onError: () => { toast({ title: "Failed to update lender", variant: "destructive" }); },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/lender-profiles/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/lender-profiles"] }); toast({ title: "Lender removed" }); },
+    onError: () => { toast({ title: "Failed to remove lender", variant: "destructive" }); },
+  });
+
+  function resetForm() {
+    setFormData({ name: "", company: "", nmls: "", phone: "", email: "", conventionalRate: "", fhaRate: "", vaRate: "", usdaRate: "", closingCostsPct: "", minCreditScore: "", minDownPaymentPct: "", specialties: "", notes: "" });
+  }
+
+  function openEdit(l: LenderProfile) {
+    setEditingLender(l);
+    setFormData({
+      name: l.name, company: l.company, nmls: l.nmls || "", phone: l.phone || "", email: l.email || "",
+      conventionalRate: l.conventionalRate || "", fhaRate: l.fhaRate || "", vaRate: l.vaRate || "", usdaRate: l.usdaRate || "",
+      closingCostsPct: l.closingCostsPct || "", minCreditScore: l.minCreditScore || "", minDownPaymentPct: l.minDownPaymentPct || "",
+      specialties: l.specialties || "", notes: l.notes || "",
+    });
+    setShowForm(true);
+  }
+
+  function handleSubmit() {
+    if (!formData.name || !formData.company) { toast({ title: "Name and company are required", variant: "destructive" }); return; }
+    if (editingLender) {
+      updateMut.mutate({ id: editingLender.id, data: formData });
+    } else {
+      createMut.mutate(formData);
+    }
+  }
+
+  async function handlePhotoUpload(id: number, file: File) {
+    setUploadingPhotoId(id);
+    try {
+      const fd = new FormData();
+      fd.append("photo", file);
+      const res = await fetch(`/api/lender-profiles/${id}/photo`, { method: "POST", body: fd, credentials: "include" });
+      if (!res.ok) throw new Error("Upload failed");
+      queryClient.invalidateQueries({ queryKey: ["/api/lender-profiles"] });
+      toast({ title: "Photo uploaded" });
+    } catch {
+      toast({ title: "Failed to upload photo", variant: "destructive" });
+    }
+    setUploadingPhotoId(null);
+  }
+
+  function getRate(l: LenderProfile): string | null {
+    if (loanType === "conventional") return l.conventionalRate;
+    if (loanType === "fha") return l.fhaRate;
+    if (loanType === "va") return l.vaRate;
+    if (loanType === "usda") return l.usdaRate;
+    return null;
+  }
+
+  function calcPayment(rate: number, principal: number, years: number) {
+    const r = rate / 100 / 12;
+    const n = years * 12;
+    if (r === 0) return principal / n;
+    return principal * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+  }
+
+  const sortedLenders = useMemo(() => {
+    return [...lenders].sort((a, b) => {
+      const ra = parseFloat(getRate(a) || "999");
+      const rb = parseFloat(getRate(b) || "999");
+      return ra - rb;
+    });
+  }, [lenders, loanType]);
+
+  const rateKey = loanType === "conventional" ? "Conventional" : loanType === "fha" ? "FHA" : loanType === "va" ? "VA" : "USDA";
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-xl font-bold">Lender Comparison</h2>
+          <p className="text-sm text-muted-foreground">Compare mortgage rates from your preferred lenders</p>
+        </div>
+        <Button onClick={() => { resetForm(); setEditingLender(null); setShowForm(true); }} size="sm" className="gap-1.5">
+          <Plus className="h-4 w-4" /> Add Lender
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <Label className="text-xs text-muted-foreground">Loan Amount</Label>
+              <Input type="number" value={loanAmount} onChange={e => setLoanAmount(Number(e.target.value))} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Loan Term (years)</Label>
+              <div className="flex gap-2 mt-1">
+                {[15, 20, 30].map(t => (
+                  <Button key={t} size="sm" variant={loanTerm === t ? "default" : "outline"} onClick={() => setLoanTerm(t)} className="flex-1">{t}yr</Button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Loan Type</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {(["conventional", "fha", "va", "usda"] as const).map(t => (
+                  <Button key={t} size="sm" variant={loanType === t ? "default" : "outline"} onClick={() => setLoanType(t)} className="flex-1 text-xs capitalize">{t === "conventional" ? "Conv" : t.toUpperCase()}</Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <div className="text-center py-12 text-muted-foreground">Loading lenders...</div>
+      ) : lenders.length === 0 ? (
+        <Card>
+          <CardContent className="py-16 text-center">
+            <Users className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
+            <h3 className="font-semibold text-lg mb-2">No Lenders Yet</h3>
+            <p className="text-sm text-muted-foreground mb-4">Add your preferred lenders to compare their rates and help clients choose the best option.</p>
+            <Button onClick={() => { resetForm(); setEditingLender(null); setShowForm(true); }} className="gap-1.5">
+              <Plus className="h-4 w-4" /> Add Your First Lender
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {sortedLenders.map((l, idx) => {
+            const rate = getRate(l);
+            const rateNum = rate ? parseFloat(rate) : null;
+            const payment = rateNum ? calcPayment(rateNum, loanAmount, loanTerm) : null;
+            const closingCosts = l.closingCostsPct ? loanAmount * parseFloat(l.closingCostsPct) / 100 : null;
+            const isBest = idx === 0 && rateNum !== null && rateNum < 999;
+
+            return (
+              <Card key={l.id} className={`relative overflow-hidden transition-all ${isBest ? "ring-2 ring-primary border-primary" : ""}`}>
+                {isBest && (
+                  <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-bl-lg">Best Rate</div>
+                )}
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="relative group">
+                      {l.photoUrl ? (
+                        <img src={l.photoUrl} alt={l.name} className="h-14 w-14 rounded-full object-cover border-2 border-muted" />
+                      ) : (
+                        <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center border-2 border-muted">
+                          <User className="h-7 w-7 text-muted-foreground" />
+                        </div>
+                      )}
+                      <button
+                        className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                        onClick={() => { setUploadingPhotoId(l.id); photoRef.current?.click(); }}
+                      >
+                        <Camera className="h-4 w-4 text-white" />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-base truncate">{l.name}</h3>
+                      <p className="text-sm text-muted-foreground truncate">{l.company}</p>
+                      {l.nmls && <p className="text-xs text-muted-foreground">NMLS# {l.nmls}</p>}
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => { if (confirm("Remove this lender?")) deleteMut.mutate(l.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="rounded-lg bg-muted/50 p-3">
+                      <div className="text-xs text-muted-foreground mb-1">{rateKey} Rate</div>
+                      {rateNum ? (
+                        <div className="flex items-end gap-2">
+                          <span className="text-2xl font-bold">{rateNum.toFixed(3)}%</span>
+                          {payment && <span className="text-sm text-muted-foreground mb-0.5">{fmt(payment)}/mo</span>}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground italic">Not available</span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {l.minDownPaymentPct && (
+                        <div className="rounded-md bg-muted/30 p-2">
+                          <div className="text-xs text-muted-foreground">Min Down</div>
+                          <div className="font-medium">{l.minDownPaymentPct}%</div>
+                        </div>
+                      )}
+                      {l.minCreditScore && (
+                        <div className="rounded-md bg-muted/30 p-2">
+                          <div className="text-xs text-muted-foreground">Min Score</div>
+                          <div className="font-medium">{l.minCreditScore}</div>
+                        </div>
+                      )}
+                      {closingCosts !== null && (
+                        <div className="rounded-md bg-muted/30 p-2">
+                          <div className="text-xs text-muted-foreground">Est. Closing</div>
+                          <div className="font-medium">{fmt(closingCosts)}</div>
+                        </div>
+                      )}
+                      {rateNum && payment && (
+                        <div className="rounded-md bg-muted/30 p-2">
+                          <div className="text-xs text-muted-foreground">Total Interest</div>
+                          <div className="font-medium">{fmt(payment * loanTerm * 12 - loanAmount)}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {l.specialties && (
+                      <div className="flex flex-wrap gap-1">
+                        {l.specialties.split(",").map((s, i) => (
+                          <Badge key={i} variant="outline" className="text-xs">{s.trim()}</Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {(l.phone || l.email) && (
+                      <div className="flex gap-2 pt-1">
+                        {l.phone && (
+                          <a href={`tel:${l.phone}`} className="flex-1">
+                            <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs"><Phone className="h-3 w-3" /> Call</Button>
+                          </a>
+                        )}
+                        {l.email && (
+                          <a href={`mailto:${l.email}`} className="flex-1">
+                            <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs"><AtSign className="h-3 w-3" /> Email</Button>
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {l.notes && <p className="text-xs text-muted-foreground italic border-t pt-2">{l.notes}</p>}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {lenders.length >= 2 && (() => {
+        const withRate = sortedLenders.filter(l => getRate(l));
+        if (withRate.length < 2) return null;
+        const rates = withRate.map(l => ({ name: l.name, company: l.company, rate: parseFloat(getRate(l)!), payment: calcPayment(parseFloat(getRate(l)!), loanAmount, loanTerm) }));
+        const lowest = rates[0];
+        return (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Rate Comparison Summary</CardTitle></CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 pr-4 font-medium">Lender</th>
+                      <th className="text-right py-2 px-4 font-medium">{rateKey} Rate</th>
+                      <th className="text-right py-2 px-4 font-medium">Monthly Payment</th>
+                      <th className="text-right py-2 px-4 font-medium">Total Interest</th>
+                      <th className="text-right py-2 pl-4 font-medium">vs. Best</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rates.map((r, i) => {
+                      const totalInt = r.payment * loanTerm * 12 - loanAmount;
+                      const diff = r.payment - lowest.payment;
+                      return (
+                        <tr key={i} className="border-b last:border-0">
+                          <td className="py-2.5 pr-4">
+                            <div className="font-medium">{r.name}</div>
+                            <div className="text-xs text-muted-foreground">{r.company}</div>
+                          </td>
+                          <td className="text-right py-2.5 px-4 font-mono">{r.rate.toFixed(3)}%</td>
+                          <td className="text-right py-2.5 px-4 font-mono">{fmt(r.payment)}</td>
+                          <td className="text-right py-2.5 px-4 font-mono">{fmt(totalInt)}</td>
+                          <td className="text-right py-2.5 pl-4">
+                            {i === 0 ? (
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Best</Badge>
+                            ) : (
+                              <span className="text-red-600 dark:text-red-400 font-mono text-xs">+{fmt(diff)}/mo</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={e => {
+        const file = e.target.files?.[0];
+        if (file && uploadingPhotoId) handlePhotoUpload(uploadingPhotoId, file);
+        e.target.value = "";
+      }} />
+
+      <Dialog open={showForm} onOpenChange={v => { if (!v) { setShowForm(false); setEditingLender(null); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="text-left">
+            <DialogTitle>{editingLender ? "Edit Lender" : "Add Lender"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Name *</Label>
+                <Input value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} placeholder="John Smith" className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Company *</Label>
+                <Input value={formData.company} onChange={e => setFormData(p => ({ ...p, company: e.target.value }))} placeholder="First National Bank" className="mt-1" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label className="text-xs">NMLS#</Label>
+                <Input value={formData.nmls} onChange={e => setFormData(p => ({ ...p, nmls: e.target.value }))} placeholder="123456" className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Phone</Label>
+                <Input value={formData.phone} onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))} placeholder="(555) 123-4567" className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Email</Label>
+                <Input value={formData.email} onChange={e => setFormData(p => ({ ...p, email: e.target.value }))} placeholder="john@bank.com" className="mt-1" />
+              </div>
+            </div>
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-semibold mb-3">Interest Rates (%)</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Conventional</Label>
+                  <Input type="number" step="0.001" value={formData.conventionalRate} onChange={e => setFormData(p => ({ ...p, conventionalRate: e.target.value }))} placeholder="6.875" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs">FHA</Label>
+                  <Input type="number" step="0.001" value={formData.fhaRate} onChange={e => setFormData(p => ({ ...p, fhaRate: e.target.value }))} placeholder="6.500" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs">VA</Label>
+                  <Input type="number" step="0.001" value={formData.vaRate} onChange={e => setFormData(p => ({ ...p, vaRate: e.target.value }))} placeholder="6.250" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs">USDA</Label>
+                  <Input type="number" step="0.001" value={formData.usdaRate} onChange={e => setFormData(p => ({ ...p, usdaRate: e.target.value }))} placeholder="6.375" className="mt-1" />
+                </div>
+              </div>
+            </div>
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-semibold mb-3">Requirements</h4>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs">Closing Costs %</Label>
+                  <Input type="number" step="0.1" value={formData.closingCostsPct} onChange={e => setFormData(p => ({ ...p, closingCostsPct: e.target.value }))} placeholder="2.5" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs">Min Credit Score</Label>
+                  <Input type="number" value={formData.minCreditScore} onChange={e => setFormData(p => ({ ...p, minCreditScore: e.target.value }))} placeholder="620" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-xs">Min Down %</Label>
+                  <Input type="number" step="0.1" value={formData.minDownPaymentPct} onChange={e => setFormData(p => ({ ...p, minDownPaymentPct: e.target.value }))} placeholder="3" className="mt-1" />
+                </div>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Specialties (comma-separated)</Label>
+              <Input value={formData.specialties} onChange={e => setFormData(p => ({ ...p, specialties: e.target.value }))} placeholder="First-time buyers, Jumbo loans, Investment properties" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs">Notes</Label>
+              <Textarea value={formData.notes} onChange={e => setFormData(p => ({ ...p, notes: e.target.value }))} placeholder="Additional details..." className="mt-1" rows={2} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => { setShowForm(false); setEditingLender(null); }}>Cancel</Button>
+            <Button onClick={handleSubmit} disabled={createMut.isPending || updateMut.isPending}>
+              {(createMut.isPending || updateMut.isPending) ? "Saving..." : editingLender ? "Update" : "Add Lender"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function CalculatorsPage() {
   return (
     <div className="w-full px-4 sm:px-8 py-6">
@@ -859,6 +1281,9 @@ export default function CalculatorsPage() {
           <TabsTrigger value="guide" className="flex-1 min-w-fit gap-1.5 text-xs sm:text-sm h-9">
             <BookOpen className="h-3.5 w-3.5 hidden sm:inline" /> Financing Guide
           </TabsTrigger>
+          <TabsTrigger value="lenders" className="flex-1 min-w-fit gap-1.5 text-xs sm:text-sm h-9">
+            <Users className="h-3.5 w-3.5 hidden sm:inline" /> Lenders
+          </TabsTrigger>
         </TabsList>
 
         <div className="mt-6">
@@ -867,6 +1292,7 @@ export default function CalculatorsPage() {
           <TabsContent value="refinance"><RefinanceCalculator /></TabsContent>
           <TabsContent value="rent"><RentVsBuyCalculator /></TabsContent>
           <TabsContent value="guide"><FinancingGuide /></TabsContent>
+          <TabsContent value="lenders"><LenderComparison /></TabsContent>
         </div>
       </Tabs>
     </div>

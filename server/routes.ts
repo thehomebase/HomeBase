@@ -6201,6 +6201,108 @@ export function registerRoutes(app: Express): Server {
     { lenderItemId: "l-cl-1", agentItemId: "b-close-5", description: "Loan funded → Closing complete" },
   ];
 
+  const lenderProfileCreateSchema = z.object({
+    name: z.string().min(1).max(200),
+    company: z.string().min(1).max(200),
+    nmls: z.string().max(50).optional().nullable(),
+    phone: z.string().max(50).optional().nullable(),
+    email: z.string().max(200).optional().nullable(),
+    conventionalRate: z.string().max(20).optional().nullable(),
+    fhaRate: z.string().max(20).optional().nullable(),
+    vaRate: z.string().max(20).optional().nullable(),
+    usdaRate: z.string().max(20).optional().nullable(),
+    closingCostsPct: z.string().max(20).optional().nullable(),
+    minCreditScore: z.string().max(10).optional().nullable(),
+    minDownPaymentPct: z.string().max(10).optional().nullable(),
+    specialties: z.string().max(500).optional().nullable(),
+    notes: z.string().max(1000).optional().nullable(),
+  });
+  const lenderProfileUpdateSchema = lenderProfileCreateSchema.partial();
+
+  function parseIdParam(val: string): number | null {
+    const n = parseInt(val, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  app.get("/api/lender-profiles", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const role = req.user.role;
+    if (role !== 'agent' && role !== 'broker') return res.status(403).json({ error: "Forbidden" });
+    try {
+      const profiles = await storage.getLenderProfiles(req.user.id);
+      res.json(profiles);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch lender profiles" });
+    }
+  });
+
+  app.post("/api/lender-profiles", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const role = req.user.role;
+    if (role !== 'agent' && role !== 'broker') return res.status(403).json({ error: "Forbidden" });
+    const parsed = lenderProfileCreateSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid data", details: parsed.error.flatten() });
+    try {
+      const profile = await storage.createLenderProfile({ ...parsed.data, agentId: req.user.id });
+      res.status(201).json(profile);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create lender profile" });
+    }
+  });
+
+  app.patch("/api/lender-profiles/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const role = req.user.role;
+    if (role !== 'agent' && role !== 'broker') return res.status(403).json({ error: "Forbidden" });
+    const id = parseIdParam(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    const parsed = lenderProfileUpdateSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid data", details: parsed.error.flatten() });
+    try {
+      const existing = await storage.getLenderProfile(id);
+      if (!existing || existing.agentId !== req.user.id) return res.status(404).json({ error: "Not found" });
+      const updated = await storage.updateLenderProfile(id, parsed.data);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update lender profile" });
+    }
+  });
+
+  app.delete("/api/lender-profiles/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const role = req.user.role;
+    if (role !== 'agent' && role !== 'broker') return res.status(403).json({ error: "Forbidden" });
+    const id = parseIdParam(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    try {
+      const existing = await storage.getLenderProfile(id);
+      if (!existing || existing.agentId !== req.user.id) return res.status(404).json({ error: "Not found" });
+      await storage.deleteLenderProfile(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete lender profile" });
+    }
+  });
+
+  app.post("/api/lender-profiles/:id/photo", upload.single("photo"), async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const role = req.user.role;
+    if (role !== 'agent' && role !== 'broker') return res.status(403).json({ error: "Forbidden" });
+    const id = parseIdParam(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid ID" });
+    try {
+      const existing = await storage.getLenderProfile(id);
+      if (!existing || existing.agentId !== req.user.id) return res.status(404).json({ error: "Not found" });
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      if (!req.file.mimetype.startsWith("image/")) return res.status(400).json({ error: "File must be an image" });
+      const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+      const updated = await storage.updateLenderProfile(id, { photoUrl: base64 });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to upload photo" });
+    }
+  });
+
   app.get("/api/lender/transactions", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== 'lender') return res.status(403).json({ error: 'Forbidden' });
     try {
