@@ -352,14 +352,17 @@ function ProfileSection() {
 }
 
 function SecuritySection() {
-  const { user } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricChecked, setBiometricChecked] = useState(false);
@@ -406,6 +409,47 @@ function SecuritySection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/webauthn/credentials"] });
       toast({ title: "Credential removed" });
+    },
+  });
+
+  const supportAccessMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("POST", "/api/profile/support-access", { enabled });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      toast({ title: data.enabled ? "Support access granted" : "Support access revoked" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update support access", variant: "destructive" });
+    },
+  });
+
+  const logoutAllMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/profile/logout-all-devices", {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "All other sessions have been logged out" });
+    },
+    onError: () => {
+      toast({ title: "Failed to log out other devices", variant: "destructive" });
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/profile/account");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Account deleted" });
+      window.location.href = "/auth";
+    },
+    onError: () => {
+      toast({ title: "Failed to delete account", variant: "destructive" });
     },
   });
 
@@ -536,6 +580,110 @@ function SecuritySection() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Support Access</CardTitle>
+          <CardDescription>
+            Grant the HomeBase support team temporary access to your account for troubleshooting
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Support access</p>
+              <p className="text-sm text-muted-foreground">
+                {user?.supportAccessGranted
+                  ? `Access granted until ${user.supportAccessExpires ? new Date(user.supportAccessExpires).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : "indefinitely"}`
+                  : "Support team cannot access your account"}
+              </p>
+            </div>
+            <button
+              onClick={() => supportAccessMutation.mutate(!user?.supportAccessGranted)}
+              disabled={supportAccessMutation.isPending}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                user?.supportAccessGranted ? "bg-primary" : "bg-muted-foreground/30"
+              }`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                user?.supportAccessGranted ? "translate-x-6" : "translate-x-1"
+              }`} />
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Log out of all devices</p>
+              <p className="text-sm text-muted-foreground">
+                Log out of all other active sessions on other devices besides this one.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => logoutAllMutation.mutate()}
+              disabled={logoutAllMutation.isPending}
+            >
+              {logoutAllMutation.isPending ? "Logging out..." : "Log out"}
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-destructive">Delete my account</p>
+              <p className="text-sm text-muted-foreground">
+                Permanently delete the account and remove access from all workspaces.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              Delete Account
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={(open) => { setShowDeleteConfirm(open); setDeleteConfirmText(""); }}>
+        <DialogContent>
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-destructive">Delete Account</DialogTitle>
+            <DialogDescription>
+              This action is permanent and cannot be undone. All your data, transactions, and settings will be removed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Type "DELETE" to confirm</Label>
+              <Input
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={deleteConfirmText !== "DELETE" || deleteAccountMutation.isPending}
+                onClick={() => deleteAccountMutation.mutate()}
+              >
+                {deleteAccountMutation.isPending ? "Deleting..." : "Delete Account"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
         <DialogContent>

@@ -48,6 +48,8 @@ export const users = pgTable("users", {
   instagramUrl: text("instagram_url"),
   twitterUrl: text("twitter_url"),
   linkedinUrl: text("linkedin_url"),
+  supportAccessGranted: boolean("support_access_granted").default(false),
+  supportAccessExpires: timestamp("support_access_expires"),
 });
 
 export const licenseVerifications = pgTable("license_verifications", {

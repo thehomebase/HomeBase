@@ -3628,6 +3628,76 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/profile/support-access", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const schema = z.object({ enabled: z.boolean() });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid data" });
+    try {
+      const expires = parsed.data.enabled ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null;
+      await storage.updateUser(req.user.id, {
+        supportAccessGranted: parsed.data.enabled,
+        supportAccessExpires: expires,
+      });
+      res.json({ enabled: parsed.data.enabled, expires });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update support access" });
+    }
+  });
+
+  app.post("/api/profile/logout-all-devices", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const currentSessionId = req.sessionID;
+      const { pool } = await import("@db");
+      await pool.query(
+        `DELETE FROM session WHERE sess::jsonb -> 'passport' ->> 'user' = $1 AND sid != $2`,
+        [String(req.user.id), currentSessionId]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to log out other devices" });
+    }
+  });
+
+  app.delete("/api/profile/account", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const userId = req.user.id;
+      const { pool } = await import("@db");
+      const { hashPassword } = await import('./auth');
+      const { randomUUID } = await import("crypto");
+      await pool.query(`DELETE FROM session WHERE sess::jsonb -> 'passport' ->> 'user' = $1`, [String(userId)]);
+      const randomPass = await hashPassword(randomUUID());
+      await storage.updateUser(userId, {
+        email: `deleted_${userId}_${Date.now()}@deleted.homebase.com`,
+        firstName: "Deleted",
+        lastName: "User",
+        password: randomPass,
+        profilePhotoUrl: null,
+        profileBio: null,
+        profilePhone: null,
+        brokerageName: null,
+        licenseNumber: null,
+        licenseState: null,
+        nmlsNumber: null,
+        facebookUrl: null,
+        instagramUrl: null,
+        twitterUrl: null,
+        linkedinUrl: null,
+        stripeCardholderName: null,
+        supportAccessGranted: false,
+        supportAccessExpires: null,
+      });
+      req.logout((err) => {
+        if (err) return res.status(500).json({ error: "Failed to logout" });
+        res.json({ success: true });
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete account" });
+    }
+  });
+
   app.post("/api/profile/photo", upload.single("photo"), async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
     try {
