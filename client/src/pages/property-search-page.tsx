@@ -528,11 +528,13 @@ function ListingDetailDialog({
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-start gap-2">
-            <img
-              src="/homebase-icon.png"
-              alt="HomeBase"
-              className="h-8 w-8 shrink-0 mt-0.5 dark:invert"
-            />
+            <div className="h-7 w-7 shrink-0 mt-0.5 overflow-hidden">
+              <img
+                src="/homebase-icon.png"
+                alt="HomeBase"
+                className="h-[140%] w-[140%] object-contain -ml-[20%] -mt-[12%] dark:invert"
+              />
+            </div>
             <div className="min-w-0">
               <h2 className="text-lg font-bold">{listing.addressLine1}</h2>
               <p className="text-sm text-muted-foreground font-normal">
