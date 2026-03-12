@@ -158,11 +158,17 @@ function parseLocation(location: string): { city?: string; state?: string; zipCo
   return { city: trimmed };
 }
 
-function ListingCard({ listing, isSelected, onToggleSelect, onContactAgent }: { listing: RentCastListing; isSelected: boolean; onToggleSelect: (id: string) => void; onContactAgent?: (listing: RentCastListing, mode: "sms" | "email") => void }) {
+function ListingCard({ listing, isSelected, onToggleSelect, onContactAgent, onViewDetail }: { listing: RentCastListing; isSelected: boolean; onToggleSelect: (id: string) => void; onContactAgent?: (listing: RentCastListing, mode: "sms" | "email") => void; onViewDetail?: (listing: RentCastListing) => void }) {
   const zillowSearchUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, '').replace(/\s+/g, '-'))}_rb/`;
 
   return (
-    <div className={`border rounded-lg p-4 hover:bg-muted/30 transition-colors space-y-3 ${isSelected ? 'ring-2 ring-primary border-primary' : ''}`}>
+    <div
+      className={`border rounded-lg p-4 hover:bg-muted/30 transition-colors space-y-3 cursor-pointer ${isSelected ? 'ring-2 ring-primary border-primary' : ''}`}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("button, a, [role='checkbox'], input")) return;
+        onViewDetail?.(listing);
+      }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2 flex-1 min-w-0">
           <Checkbox
@@ -317,7 +323,7 @@ function SortIcon({ columnKey, sortKey, sortDir }: { columnKey: SortKey; sortKey
   return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 }
 
-function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll, onContactAgent }: { listings: RentCastListing[]; selectedIds: Set<string>; onToggleSelect: (id: string) => void; onToggleAll: () => void; onContactAgent?: (listing: RentCastListing, mode: "sms" | "email") => void }) {
+function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll, onContactAgent, onViewDetail }: { listings: RentCastListing[]; selectedIds: Set<string>; onToggleSelect: (id: string) => void; onToggleAll: () => void; onContactAgent?: (listing: RentCastListing, mode: "sms" | "email") => void; onViewDetail?: (listing: RentCastListing) => void }) {
   const allSelected = listings.length > 0 && listings.every(l => selectedIds.has(l.id));
   const someSelected = listings.some(l => selectedIds.has(l.id));
   const [sortKey, setSortKey] = useState<SortKey>(null);
@@ -383,7 +389,14 @@ function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll, onCo
           {sortedListings.map((listing, i) => {
             const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, '').replace(/\s+/g, '-'))}_rb/`;
             return (
-              <tr key={listing.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? '' : 'bg-muted/10'} ${selectedIds.has(listing.id) ? 'bg-primary/5' : ''}`}>
+              <tr
+                key={listing.id}
+                className={`border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer ${i % 2 === 0 ? '' : 'bg-muted/10'} ${selectedIds.has(listing.id) ? 'bg-primary/5' : ''}`}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("button, a, [role='checkbox'], input")) return;
+                  onViewDetail?.(listing);
+                }}
+              >
                 <td className="px-3 py-2.5">
                   <Checkbox
                     checked={selectedIds.has(listing.id)}
@@ -491,6 +504,180 @@ function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll, onCo
         </tbody>
       </table>
     </div>
+  );
+}
+
+function ListingDetailDialog({
+  listing,
+  onClose,
+  onContactAgent,
+}: {
+  listing: RentCastListing | null;
+  onClose: () => void;
+  onContactAgent?: (listing: RentCastListing, mode: "sms" | "email") => void;
+}) {
+  if (!listing) return null;
+  const zillowUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, "").replace(/\s+/g, "-"))}_rb/`;
+  const contactPhone = listing.listingAgent?.phone || listing.listingOffice?.phone;
+  const contactEmail = listing.listingAgent?.email || listing.listingOffice?.email;
+  const contactLabel = listing.listingAgent?.phone ? "Agent" : listing.listingOffice?.phone ? "Office" : "";
+  const pricePerSqft = listing.squareFootage > 0 ? Math.round(listing.price / listing.squareFootage) : null;
+
+  return (
+    <Dialog open={!!listing} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold">{listing.addressLine1}</h2>
+              <p className="text-sm text-muted-foreground font-normal">
+                {listing.city}, {listing.state} {listing.zipCode}
+                {listing.county && ` · ${listing.county}`}
+              </p>
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="text-2xl font-bold text-primary">{formatPrice(listing.price)}</div>
+            <Badge variant={listing.status === "Active" ? "default" : "secondary"} className="text-sm px-3 py-1">
+              {listing.status}
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
+              <BedDouble className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+              <div className="font-semibold">{listing.bedrooms || "—"}</div>
+              <div className="text-xs text-muted-foreground">Beds</div>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
+              <Bath className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+              <div className="font-semibold">{listing.bathrooms || "—"}</div>
+              <div className="text-xs text-muted-foreground">Baths</div>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
+              <Ruler className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+              <div className="font-semibold">{listing.squareFootage ? listing.squareFootage.toLocaleString() : "—"}</div>
+              <div className="text-xs text-muted-foreground">Sqft</div>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
+              <Building2 className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+              <div className="font-semibold">{listing.yearBuilt || "—"}</div>
+              <div className="text-xs text-muted-foreground">Built</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm border rounded-lg p-3">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Days on Market</span>
+              <span className="font-medium">{listing.daysOnMarket}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Listed</span>
+              <span className="font-medium">{formatDate(listing.listedDate)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Type</span>
+              <span className="font-medium">{listing.propertyType || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Listing Type</span>
+              <span className="font-medium">{listing.listingType || "—"}</span>
+            </div>
+            {pricePerSqft && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Price/Sqft</span>
+                <span className="font-medium">${pricePerSqft}</span>
+              </div>
+            )}
+            {listing.lotSize && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Lot Size</span>
+                <span className="font-medium">{listing.lotSize.toLocaleString()} sqft</span>
+              </div>
+            )}
+            {listing.hoa?.fee && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">HOA</span>
+                <span className="font-medium">${listing.hoa.fee}/mo</span>
+              </div>
+            )}
+            {listing.mlsNumber && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">MLS#</span>
+                <span className="font-medium">{listing.mlsNumber}</span>
+              </div>
+            )}
+            {listing.mlsName && (
+              <div className="flex justify-between col-span-2">
+                <span className="text-muted-foreground">MLS</span>
+                <span className="font-medium text-right truncate max-w-[200px]">{listing.mlsName}</span>
+              </div>
+            )}
+          </div>
+
+          {listing.features && listing.features.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">Features</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {listing.features.map((f, i) => (
+                  <Badge key={i} variant="outline" className="text-xs font-normal">{f}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(listing.listingAgent || listing.listingOffice) && (
+            <div className="border rounded-lg p-3 space-y-2">
+              <h4 className="text-sm font-medium">Listing Contact</h4>
+              <div className="text-sm text-muted-foreground">
+                {listing.listingAgent && (
+                  <div><span className="font-medium text-foreground">{listing.listingAgent.name}</span> (Agent)</div>
+                )}
+                {listing.listingOffice && (
+                  <div className="text-xs">{listing.listingOffice.name}</div>
+                )}
+                {(contactPhone || contactEmail) && (
+                  <div className="text-xs mt-1">
+                    {[contactPhone, contactEmail].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+              </div>
+              {(contactPhone || contactEmail) && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {contactPhone && (
+                    <>
+                      <Button variant="outline" size="sm" className="text-xs gap-1"
+                        onClick={() => window.open(`tel:${contactPhone}`, "_self")}>
+                        <Phone className="h-3 w-3" /> Call {contactLabel}
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-xs gap-1"
+                        onClick={() => onContactAgent?.(listing, "sms")}>
+                        <MessageSquare className="h-3 w-3" /> Text
+                      </Button>
+                    </>
+                  )}
+                  {contactEmail && (
+                    <Button variant="outline" size="sm" className="text-xs gap-1"
+                      onClick={() => onContactAgent?.(listing, "email")}>
+                      <Mail className="h-3 w-3" /> Email
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <Button className="flex-1 gap-2" onClick={() => window.open(zillowUrl, "_blank", "noopener,noreferrer")}>
+              <ExternalLink className="h-4 w-4" /> View on Zillow
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -701,6 +888,7 @@ export default function PropertySearchPage() {
   const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
   const refreshFlagRef = useRef(false);
   const [contactDialog, setContactDialog] = useState<ContactDialogState>(emptyContactState);
+  const [detailListing, setDetailListing] = useState<RentCastListing | null>(null);
 
   const { toast } = useToast();
 
@@ -1214,6 +1402,7 @@ export default function PropertySearchPage() {
                         isSelected={selectedListingIds.has(listing.id)}
                         onToggleSelect={toggleSelectListing}
                         onContactAgent={openContactDialog}
+                        onViewDetail={setDetailListing}
                       />
                     ))}
                   </div>
@@ -1224,6 +1413,7 @@ export default function PropertySearchPage() {
                     onToggleSelect={toggleSelectListing}
                     onToggleAll={toggleSelectAll}
                     onContactAgent={openContactDialog}
+                    onViewDetail={setDetailListing}
                   />
                 )}
               </CardContent>
@@ -1363,6 +1553,12 @@ export default function PropertySearchPage() {
       <div className="text-center text-xs text-muted-foreground pb-4">
         <p>Listing data provided by RentCast. Results are cached for 24 hours to conserve API usage.</p>
       </div>
+
+      <ListingDetailDialog
+        listing={detailListing}
+        onClose={() => setDetailListing(null)}
+        onContactAgent={openContactDialog}
+      />
 
       <ContactAgentDialog
         state={contactDialog}
