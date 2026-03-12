@@ -152,13 +152,16 @@ function ZipMetricsDialog({
   onClose,
   onClaim,
   claiming,
+  budgetOptions,
 }: {
   zipCode: string;
   open: boolean;
   onClose: () => void;
-  onClaim: (zip: string) => void;
+  onClaim: (zip: string, budget: number) => void;
   claiming: boolean;
+  budgetOptions: number[];
 }) {
+  const [dialogBudget, setDialogBudget] = useState(budgetOptions[0] || 2500);
   const { data: metrics, isLoading } = useQuery<ZipMetrics>({
     queryKey: ["/api/leads/zip-metrics", zipCode],
     queryFn: async () => {
@@ -168,6 +171,10 @@ function ZipMetricsDialog({
     },
     enabled: open && /^\d{5}$/.test(zipCode),
   });
+
+  useEffect(() => {
+    if (open) setDialogBudget(budgetOptions[0] || 2500);
+  }, [open, budgetOptions]);
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -179,7 +186,7 @@ function ZipMetricsDialog({
         ) : metrics ? (
           <>
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-2xl">
+              <DialogTitle className="flex items-center gap-2 text-2xl text-left">
                 <MapPin className="h-5 w-5" />
                 {metrics.zipCode}
               </DialogTitle>
@@ -239,29 +246,48 @@ function ZipMetricsDialog({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t">
-                <div>
-                  <p className="text-xs text-muted-foreground">Your Budget</p>
-                  <p className="text-2xl font-bold">
-                    {metrics.monthlyRateDisplay}/mo
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Spend-based share of voice
-                  </p>
-                </div>
-                {!metrics.alreadyClaimed && !metrics.isFull ? (
-                  <Button onClick={() => onClaim(metrics.zipCode)} disabled={claiming} className="gap-2">
+              {!metrics.alreadyClaimed && !metrics.isFull && (
+                <div className="pt-2 border-t space-y-3">
+                  <div>
+                    <p className="text-sm font-medium mb-2">Choose your monthly budget</p>
+                    <div className="flex flex-wrap gap-2">
+                      {budgetOptions.map((opt) => (
+                        <Button
+                          key={opt}
+                          size="sm"
+                          variant={dialogBudget === opt ? "default" : "outline"}
+                          onClick={() => setDialogBudget(opt)}
+                        >
+                          ${(opt / 100).toFixed(0)}
+                        </Button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Higher budget = larger share of voice = more leads routed to you
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => onClaim(metrics.zipCode, dialogBudget)}
+                    disabled={claiming}
+                    className="w-full gap-2"
+                  >
                     <Plus className="h-4 w-4" />
-                    Claim ZIP
+                    Claim for ${(dialogBudget / 100).toFixed(0)}/mo
                   </Button>
-                ) : metrics.alreadyClaimed ? (
+                </div>
+              )}
+              {metrics.alreadyClaimed && (
+                <div className="pt-2 border-t">
                   <Badge variant="secondary" className="text-sm py-1.5 px-3">Already Claimed</Badge>
-                ) : (
+                </div>
+              )}
+              {!metrics.alreadyClaimed && metrics.isFull && (
+                <div className="pt-2 border-t">
                   <Badge variant="destructive" className="text-sm py-1.5 px-3">
                     <Lock className="h-3 w-3 mr-1" /> Full
                   </Badge>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -319,12 +345,14 @@ function ZipMapView({
   onClaimZip,
   claiming,
   onPolygonClick,
+  clearSelectionRef,
 }: {
   claimedZips: ZipCodeData[];
   onSelectZip: (zip: string) => void;
   onClaimZip: (zip: string) => void;
   claiming: boolean;
   onPolygonClick?: (zip: string) => void;
+  clearSelectionRef?: React.MutableRefObject<(() => void) | null>;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -334,6 +362,16 @@ function ZipMapView({
   const [mapZipSearch, setMapZipSearch] = useState("");
   const [mapReady, setMapReady] = useState(false);
   const [selectedZips, setSelectedZips] = useState<MapSelectedZip[]>([]);
+
+  useEffect(() => {
+    if (clearSelectionRef) {
+      clearSelectionRef.current = () => {
+        highlightLayerRef.current?.clearLayers();
+        setSelectedZips([]);
+      };
+    }
+  }, [clearSelectionRef]);
+
   const [zoomLevel, setZoomLevel] = useState(4);
   const [loadingBoundaries, setLoadingBoundaries] = useState(false);
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -511,7 +549,7 @@ function ZipMapView({
 
   const handlePolygonClick = async (zipCode: string) => {
     const alreadySelected = selectedZips.some(z => z.zipCode === zipCode);
-    if (alreadySelected) {
+    if (alreadySelected && !onPolygonClick) {
       removeSelectedZip(zipCode);
       return;
     }
@@ -714,6 +752,7 @@ export default function LeadGenerationPage() {
   const [previewZip, setPreviewZip] = useState("");
   const [metricsZip, setMetricsZip] = useState("");
   const [metricsOpen, setMetricsOpen] = useState(false);
+  const clearMapSelectionRef = useRef<(() => void) | null>(null);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
@@ -787,8 +826,8 @@ export default function LeadGenerationPage() {
   });
 
   const claimZipMutation = useMutation({
-    mutationFn: async (zipCode: string) => {
-      const res = await apiRequest("POST", "/api/leads/zip-codes", { zipCode, monthlyBudget: selectedBudget });
+    mutationFn: async ({ zipCode, budget }: { zipCode: string; budget: number }) => {
+      const res = await apiRequest("POST", "/api/leads/zip-codes", { zipCode, monthlyBudget: budget });
       return await res.json();
     },
     onSuccess: () => {
@@ -798,6 +837,7 @@ export default function LeadGenerationPage() {
       setNewZipCode("");
       setPreviewZip("");
       setMetricsOpen(false);
+      clearMapSelectionRef.current?.();
       toast({ title: "Zip code claimed successfully" });
     },
     onError: (error: Error) => {
@@ -900,7 +940,7 @@ export default function LeadGenerationPage() {
       toast({ title: "Invalid zip code", description: "Please enter a valid 5-digit zip code", variant: "destructive" });
       return;
     }
-    claimZipMutation.mutate(trimmed);
+    claimZipMutation.mutate({ zipCode: trimmed, budget: selectedBudget });
   };
 
   const handleMapSelectZip = useCallback((zip: string) => {
@@ -1506,12 +1546,13 @@ export default function LeadGenerationPage() {
               <ZipMapView
                 claimedZips={zipCodes}
                 onSelectZip={handleMapSelectZip}
-                onClaimZip={(zip) => claimZipMutation.mutate(zip)}
+                onClaimZip={(zip) => claimZipMutation.mutate({ zipCode: zip, budget: selectedBudget })}
                 claiming={claimZipMutation.isPending}
                 onPolygonClick={(zip) => {
                   setMetricsZip(zip);
                   setMetricsOpen(true);
                 }}
+                clearSelectionRef={clearMapSelectionRef}
               />
             </CardContent>
           </Card>
@@ -1521,9 +1562,15 @@ export default function LeadGenerationPage() {
       <ZipMetricsDialog
         zipCode={metricsZip}
         open={metricsOpen}
-        onClose={() => setMetricsOpen(false)}
-        onClaim={(zip) => claimZipMutation.mutate(zip)}
+        onClose={() => {
+          setMetricsOpen(false);
+          clearMapSelectionRef.current?.();
+        }}
+        onClaim={(zip, budget) => {
+          claimZipMutation.mutate({ zipCode: zip, budget });
+        }}
         claiming={claimZipMutation.isPending}
+        budgetOptions={budgetOptions}
       />
 
       <Dialog open={contactPromptLeadId !== null} onOpenChange={(open) => !open && setContactPromptLeadId(null)}>
