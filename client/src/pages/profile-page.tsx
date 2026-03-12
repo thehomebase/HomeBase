@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useRoute } from "wouter";
+import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -11,10 +11,41 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Shield, ShieldCheck, CheckCircle2, MapPin, Phone, Mail, Pencil, Building2, FileText, User as UserIcon, Star } from "lucide-react";
+import {
+  Camera, Shield, ShieldCheck, CheckCircle2, MapPin, Phone, Mail, Pencil,
+  Building2, FileText, User as UserIcon, Star, ChevronLeft, ChevronRight,
+  Home, Plus, Trash2, ImagePlus, X
+} from "lucide-react";
 import type { User } from "@shared/schema";
 
 type PublicProfile = Omit<User, "password" | "emailVerificationToken" | "emailVerificationExpires" | "registrationIp">;
+
+type ListingPhoto = { id: number; photoUrl: string; caption: string | null; sortOrder: number };
+type ActiveListing = {
+  id: number;
+  street_name: string;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  status: string;
+  type: string;
+  contract_price: number | null;
+  mls_number: string | null;
+  photos: ListingPhoto[];
+};
+
+type ProfileReviewData = {
+  reviews: Array<{
+    id: number;
+    rating: number;
+    title: string | null;
+    comment: string;
+    createdAt: string | null;
+    reviewerName?: string;
+  }>;
+  avgRating: number;
+  reviewCount: number;
+};
 
 function VerificationBadge({ status }: { status: string | null | undefined }) {
   if (status === "admin_verified") {
@@ -45,6 +76,40 @@ function VerificationBadge({ status }: { status: string | null | undefined }) {
   );
 }
 
+function ConfirmedCheckItem({ label, confirmed }: { label: string; confirmed: boolean }) {
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
+        confirmed ? "bg-green-100 dark:bg-green-900" : "bg-muted"
+      }`}>
+        {confirmed ? (
+          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+        ) : (
+          <X className="h-4 w-4 text-muted-foreground" />
+        )}
+      </div>
+      <span className="text-xs text-muted-foreground">{label}</span>
+    </div>
+  );
+}
+
+function StarDisplay({ rating, size = 14 }: { rating: number; size?: number }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star
+          key={star}
+          className={`transition-colors`}
+          style={{ width: size, height: size }}
+          fill={star <= rating ? "#facc15" : "none"}
+          stroke={star <= rating ? "#facc15" : "currentColor"}
+          strokeWidth={1.5}
+        />
+      ))}
+    </div>
+  );
+}
+
 function ProfilePhotoCard({ profile, isOwn }: { profile: PublicProfile; isOwn: boolean }) {
   const photoRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -67,8 +132,8 @@ function ProfilePhotoCard({ profile, isOwn }: { profile: PublicProfile; isOwn: b
   }
 
   return (
-    <div className="relative w-full max-w-[280px] mx-auto">
-      <div className="relative rounded-xl overflow-hidden bg-[#ebebeb] dark:bg-neutral-800 aspect-[4/5]">
+    <div className="relative">
+      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-pink-100 to-pink-50 dark:from-neutral-800 dark:to-neutral-900 aspect-[4/5] shadow-lg">
         {profile.brokerageName && (
           <div className="absolute top-3 left-3 z-10">
             <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 bg-white/70 dark:bg-black/40 px-2 py-0.5 rounded">
@@ -89,9 +154,16 @@ function ProfilePhotoCard({ profile, isOwn }: { profile: PublicProfile; isOwn: b
           </div>
         )}
 
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent pt-12 pb-4 px-4">
+          <p className="text-white text-sm font-medium">
+            {profile.role === "broker" ? "Managing Broker" : profile.role === "agent" ? "Agent" : profile.role}
+          </p>
+          <p className="text-white text-lg font-bold">{profile.firstName} {profile.lastName}</p>
+        </div>
+
         {isOwn && (
           <button
-            className="absolute bottom-3 right-3 bg-black/60 hover:bg-black/80 text-white rounded-full p-2.5 transition-colors"
+            className="absolute top-3 right-3 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors z-10"
             onClick={() => photoRef.current?.click()}
             disabled={uploading}
           >
@@ -105,6 +177,303 @@ function ProfilePhotoCard({ profile, isOwn }: { profile: PublicProfile; isOwn: b
         if (file) handleUpload(file);
         e.target.value = "";
       }} />
+    </div>
+  );
+}
+
+function ReviewsSection({ profileId, profileName }: { profileId: number; profileName: string }) {
+  const [scrollIdx, setScrollIdx] = useState(0);
+  const { data } = useQuery<ProfileReviewData>({
+    queryKey: ["/api/profile", profileId, "reviews"],
+    queryFn: async () => {
+      const res = await fetch(`/api/profile/${profileId}/reviews`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch reviews");
+      return res.json();
+    },
+  });
+
+  if (!data || data.reviewCount === 0) return null;
+
+  const reviews = data.reviews;
+  const maxIdx = Math.max(0, reviews.length - 2);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold">{profileName} Reviews</h2>
+          <p className="text-sm text-muted-foreground">
+            {data.reviewCount} {data.reviewCount === 1 ? "review" : "reviews"} · {data.avgRating.toFixed(1)} avg
+          </p>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground mr-1">
+            {String(scrollIdx + 1).padStart(2, "0")}/{String(Math.min(reviews.length, 5)).padStart(2, "0")}
+          </span>
+          <button
+            onClick={() => setScrollIdx(Math.max(0, scrollIdx - 1))}
+            disabled={scrollIdx === 0}
+            className="p-1.5 rounded-full border bg-background hover:bg-muted disabled:opacity-30 transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setScrollIdx(Math.min(maxIdx, scrollIdx + 1))}
+            disabled={scrollIdx >= maxIdx}
+            className="p-1.5 rounded-full border bg-background hover:bg-muted disabled:opacity-30 transition-colors"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-hidden">
+        <div
+          className="flex gap-3 transition-transform duration-300"
+          style={{ transform: `translateX(-${scrollIdx * 50}%)` }}
+        >
+          {reviews.map((review) => (
+            <Card key={review.id} className="min-w-[48%] md:min-w-[48%] flex-shrink-0">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                    <UserIcon className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{review.reviewerName || "Anonymous"}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {review.createdAt ? new Date(review.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <StarDisplay rating={review.rating} size={12} />
+                    <span className="text-xs font-medium ml-0.5">{review.rating.toFixed(1)}</span>
+                  </div>
+                </div>
+                {review.title && <p className="text-sm font-medium mb-1">{review.title}</p>}
+                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4">
+                  "{review.comment}"
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      <Link href={`/agents/${profileId}/reviews`}>
+        <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">
+          View all reviews →
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
+function ListingsSection({ profileId, profileName, isOwn }: { profileId: number; profileName: string; isOwn: boolean }) {
+  const { toast } = useToast();
+  const photoRef = useRef<HTMLInputElement>(null);
+  const [uploadingFor, setUploadingFor] = useState<number | null>(null);
+
+  const { data: listings, isLoading } = useQuery<ActiveListing[]>({
+    queryKey: ["/api/profile", profileId, "listings"],
+    queryFn: async () => {
+      const res = await fetch(`/api/profile/${profileId}/listings`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch listings");
+      return res.json();
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (photoId: number) => apiRequest("DELETE", `/api/listing-photos/${photoId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/profile", profileId, "listings"] });
+      toast({ title: "Photo removed" });
+    },
+    onError: () => toast({ title: "Failed to remove photo", variant: "destructive" }),
+  });
+
+  async function handlePhotoUpload(transactionId: number, file: File) {
+    setUploadingFor(transactionId);
+    try {
+      const fd = new FormData();
+      fd.append("photo", file);
+      const res = await fetch(`/api/listing-photos/${transactionId}`, { method: "POST", body: fd, credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Upload failed" }));
+        throw new Error(err.error);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/profile", profileId, "listings"] });
+      toast({ title: "Listing photo added" });
+    } catch (e: any) {
+      toast({ title: e.message || "Failed to upload photo", variant: "destructive" });
+    }
+    setUploadingFor(null);
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        <h2 className="text-lg font-bold">{profileName} Listings</h2>
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          {[1, 2, 3].map(i => <div key={i} className="h-48 w-40 rounded-xl bg-muted animate-pulse flex-shrink-0" />)}
+        </div>
+      </div>
+    );
+  }
+
+  if (!listings || listings.length === 0) {
+    if (!isOwn) return null;
+    return (
+      <div className="space-y-3">
+        <h2 className="text-lg font-bold">My Listings</h2>
+        <Card>
+          <CardContent className="py-8 text-center">
+            <Home className="h-10 w-10 mx-auto mb-3 opacity-20" />
+            <p className="text-sm text-muted-foreground">
+              No active listings yet. Your transactions with addresses will appear here.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold">{profileName} Listings</h2>
+        <Badge variant="outline" className="text-xs">{listings.length} active</Badge>
+      </div>
+
+      <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide" style={{ WebkitOverflowScrolling: "touch" }}>
+        {listings.map((listing) => (
+          <div key={listing.id} className="min-w-[160px] max-w-[180px] flex-shrink-0 snap-start">
+            <div className="relative rounded-xl overflow-hidden bg-muted aspect-[4/5] group">
+              {listing.photos && listing.photos.length > 0 ? (
+                <img
+                  src={listing.photos[0].photoUrl}
+                  alt={listing.street_name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900">
+                  <Home className="h-10 w-10 text-emerald-300 dark:text-emerald-700" />
+                </div>
+              )}
+
+              <div className="absolute top-2 left-2">
+                <Badge className="text-[9px] px-1.5 py-0 bg-black/60 text-white border-0 capitalize">
+                  {listing.type === "sell" ? "Listing" : listing.type === "buy" ? "Buyer" : listing.type}
+                </Badge>
+              </div>
+
+              {listing.photos && listing.photos.length > 1 && (
+                <div className="absolute top-2 right-2">
+                  <Badge className="text-[9px] px-1.5 py-0 bg-primary text-primary-foreground border-0">
+                    {listing.photos.length}
+                  </Badge>
+                </div>
+              )}
+
+              {isOwn && (
+                <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                  <button
+                    className="bg-white/90 dark:bg-black/70 rounded-full p-1.5 hover:bg-white transition-colors"
+                    onClick={() => {
+                      setUploadingFor(listing.id);
+                      photoRef.current?.click();
+                    }}
+                  >
+                    <ImagePlus className="h-3.5 w-3.5 text-foreground" />
+                  </button>
+                </div>
+              )}
+
+              {isOwn && listing.photos && listing.photos.length > 0 && (
+                <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    className="bg-red-500/90 rounded-full p-1.5 hover:bg-red-600 transition-colors"
+                    onClick={() => deleteMut.mutate(listing.photos[0].id)}
+                  >
+                    <Trash2 className="h-3 w-3 text-white" />
+                  </button>
+                </div>
+              )}
+
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent pt-8 pb-2 px-2">
+                <p className="text-white text-xs font-medium truncate">{listing.street_name}</p>
+                {listing.city && (
+                  <p className="text-white/70 text-[10px] truncate">{listing.city}, {listing.state}</p>
+                )}
+              </div>
+            </div>
+
+            {listing.contract_price && (
+              <p className="text-xs font-semibold mt-1.5 px-0.5">
+                ${listing.contract_price.toLocaleString()}
+              </p>
+            )}
+          </div>
+        ))}
+
+        {isOwn && (
+          <div className="min-w-[60px] flex-shrink-0 snap-start flex items-center justify-center">
+            <Link href="/transactions">
+              <button className="h-10 w-10 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center hover:border-primary hover:text-primary transition-colors">
+                <Plus className="h-5 w-5" />
+              </button>
+            </Link>
+          </div>
+        )}
+      </div>
+
+      <input
+        ref={photoRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0];
+          if (file && uploadingFor) handlePhotoUpload(uploadingFor, file);
+          e.target.value = "";
+        }}
+      />
+    </div>
+  );
+}
+
+function ProfileFooter() {
+  return (
+    <div className="mt-12 rounded-2xl bg-zinc-900 dark:bg-zinc-950 p-8 md:p-12">
+      <div className="flex flex-col md:flex-row items-start justify-between gap-6">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-4">
+            <img
+              src="/homebaselogoicon_nobg.png"
+              alt="HomeBase"
+              className="h-6 w-6 invert"
+              style={{ objectFit: "contain" }}
+            />
+            <span className="text-white font-semibold text-sm">HomeBase</span>
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            <Link href="/" className="text-zinc-400 hover:text-white transition-colors">Home</Link>
+            <Link href="/marketplace" className="text-zinc-400 hover:text-white transition-colors">Pros</Link>
+            <Link href="/calculators" className="text-zinc-400 hover:text-white transition-colors">Calculators</Link>
+            <Link href="/top-agents" className="text-zinc-400 hover:text-white transition-colors">Find Agents</Link>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-zinc-500 text-xs">
+            &copy; {new Date().getFullYear()} HomeBase, Inc.
+          </p>
+        </div>
+      </div>
+      <div className="mt-8">
+        <span className="text-[4rem] md:text-[6rem] font-black leading-none tracking-tight text-zinc-800 dark:text-zinc-900 select-none">
+          HomeBase
+        </span>
+      </div>
     </div>
   );
 }
@@ -161,7 +530,7 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="w-full px-4 sm:px-8 py-6">
+      <div className="w-full px-4 sm:px-8 py-6 max-w-5xl mx-auto">
         <div className="animate-pulse space-y-4">
           <div className="h-8 w-48 bg-muted rounded" />
           <div className="h-64 bg-muted rounded-xl" />
@@ -180,120 +549,90 @@ export default function ProfilePage() {
   }
 
   const isAgentOrBroker = profile.role === "agent" || profile.role === "broker";
+  const profileName = `${profile.firstName} ${profile.lastName}`;
 
   return (
-    <div className="w-full px-4 sm:px-8 py-6 max-w-4xl mx-auto">
-      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
-        <div className="space-y-4">
-          <ProfilePhotoCard profile={profile} isOwn={isOwn} />
-        </div>
+    <div className="w-full px-4 sm:px-8 py-6 max-w-5xl mx-auto pb-24 md:pb-8">
+      <div className="grid grid-cols-1 md:grid-cols-[240px_1fr_1fr] gap-5 mb-8">
+        <ProfilePhotoCard profile={profile} isOwn={isOwn} />
 
-        <div className="space-y-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold">{profile.firstName} {profile.lastName}</h1>
-              <p className="text-muted-foreground capitalize">{profile.role === "broker" ? "Managing Broker" : profile.role === "agent" ? "Real Estate Agent" : profile.role}</p>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {isAgentOrBroker && <VerificationBadge status={profile.verificationStatus} />}
-              </div>
+        <Card className="h-fit">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-sm">Confirmed Information</h3>
+              {isOwn && (
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={openEdit}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
-            {isOwn && (
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={openEdit}>
-                <Pencil className="h-3.5 w-3.5" /> Edit
-              </Button>
+            <div className="flex items-center justify-around">
+              <ConfirmedCheckItem label="Identity" confirmed={!!profile.profilePhotoUrl} />
+              <ConfirmedCheckItem label="Email" confirmed={!!profile.emailVerified || !!profile.email} />
+              <ConfirmedCheckItem label="Phone" confirmed={!!profile.profilePhone} />
+              {isAgentOrBroker && (
+                <ConfirmedCheckItem label="License" confirmed={!!profile.licenseNumber} />
+              )}
+            </div>
+            {isAgentOrBroker && (
+              <div className="mt-4 pt-3 border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Verification</span>
+                  <VerificationBadge status={profile.verificationStatus} />
+                </div>
+              </div>
             )}
-          </div>
+          </CardContent>
+        </Card>
 
-          {profile.profileBio && (
-            <p className="text-sm text-muted-foreground leading-relaxed">{profile.profileBio}</p>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Card className="h-fit">
+          <CardContent className="p-5">
+            <h3 className="font-bold text-sm mb-3">About {profile.firstName}</h3>
             {isAgentOrBroker && profile.brokerageName && (
-              <Card>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="rounded-lg bg-muted p-2"><Building2 className="h-4 w-4" /></div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Brokerage</div>
-                    <div className="text-sm font-medium">{profile.brokerageName}</div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="flex items-center gap-1.5 mb-2 text-xs text-muted-foreground">
+                <Building2 className="h-3 w-3" />
+                <span>{profile.brokerageName}</span>
+              </div>
             )}
-
-            {isAgentOrBroker && profile.licenseNumber && (
-              <Card>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="rounded-lg bg-muted p-2"><FileText className="h-4 w-4" /></div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">License</div>
-                    <div className="text-sm font-medium">#{profile.licenseNumber} ({profile.licenseState})</div>
-                  </div>
-                </CardContent>
-              </Card>
+            {profile.licenseState && (
+              <div className="flex items-center gap-1.5 mb-3 text-xs text-muted-foreground">
+                <MapPin className="h-3 w-3" />
+                <span>{profile.licenseState}</span>
+              </div>
             )}
-
-            {profile.profilePhone && (
-              <Card>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="rounded-lg bg-muted p-2"><Phone className="h-4 w-4" /></div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Phone</div>
-                    <div className="text-sm font-medium">{profile.profilePhone}</div>
-                  </div>
-                </CardContent>
-              </Card>
+            {profile.profileBio ? (
+              <p className="text-sm text-muted-foreground leading-relaxed">{profile.profileBio}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                {isOwn ? "Add a bio to tell clients about yourself." : "No bio provided yet."}
+              </p>
             )}
-
-            <Card>
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="rounded-lg bg-muted p-2"><Mail className="h-4 w-4" /></div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Email</div>
-                  <div className="text-sm font-medium truncate">{profile.email}</div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {isAgentOrBroker && (
-            <Card>
-              <CardContent className="p-4">
-                <h3 className="font-semibold mb-3 flex items-center gap-2"><Star className="h-4 w-4" /> Verification Details</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status</span>
-                    <VerificationBadge status={profile.verificationStatus} />
-                  </div>
-                  {profile.licenseNumber && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">License Number</span>
-                      <span className="font-mono">{profile.licenseNumber}</span>
-                    </div>
-                  )}
-                  {profile.licenseState && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">State</span>
-                      <span>{profile.licenseState}</span>
-                    </div>
-                  )}
-                  <div className="pt-2 border-t">
-                    <p className="text-xs text-muted-foreground">
-                      {profile.verificationStatus === "admin_verified"
-                        ? "This user has been verified by the HomeBase platform."
-                        : profile.verificationStatus === "broker_verified"
-                        ? "This user has been verified by their managing broker on HomeBase."
-                        : profile.verificationStatus === "licensed"
-                        ? "This user has provided their license information. License can be verified through the state's real estate commission."
-                        : "This user has not yet provided license information."}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+            <div className="flex gap-2 mt-4">
+              {profile.profilePhone && (
+                <a href={`tel:${profile.profilePhone}`}>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                    <Phone className="h-3 w-3" /> Call
+                  </Button>
+                </a>
+              )}
+              <a href={`mailto:${profile.email}`}>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                  <Mail className="h-3 w-3" /> Email
+                </Button>
+              </a>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {isAgentOrBroker && (
+        <div className="space-y-8">
+          <ReviewsSection profileId={profile.id} profileName={profileName} />
+          <ListingsSection profileId={profile.id} profileName={profileName} isOwn={isOwn} />
+        </div>
+      )}
+
+      <ProfileFooter />
 
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
         <DialogContent className="max-w-md">

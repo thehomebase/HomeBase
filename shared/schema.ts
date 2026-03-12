@@ -1257,3 +1257,21 @@ export const insertWebhookSchema = createInsertSchema(webhooks).omit({
 
 export type Webhook = typeof webhooks.$inferSelect;
 export type InsertWebhook = z.infer<typeof insertWebhookSchema>;
+
+export const listingPhotos = pgTable("listing_photos", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  photoUrl: text("photo_url").notNull(),
+  caption: text("caption"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertListingPhotoSchema = createInsertSchema(listingPhotos).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ListingPhoto = typeof listingPhotos.$inferSelect;
+export type InsertListingPhoto = z.infer<typeof insertListingPhotoSchema>;

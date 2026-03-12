@@ -5,7 +5,7 @@ import { db } from "./db";
 import { sql } from "drizzle-orm/sql";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema, insertVendorRatingSchema } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema, insertVendorRatingSchema, listingPhotos } from "@shared/schema";
 import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -3630,6 +3630,118 @@ export function registerRoutes(app: Express): Server {
       res.json(result.rows);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch agents" });
+    }
+  });
+
+  // ============ Listing Photos & Active Listings ============
+
+  app.get("/api/profile/:id/listings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const agentId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(agentId) || agentId <= 0) return res.status(400).json({ error: "Invalid ID" });
+    try {
+      const result = await db.execute(sql`
+        SELECT t.id, t.street_name, t.city, t.state, t.zip_code, t.status, t.type,
+               t.contract_price, t.mls_number,
+               COALESCE(
+                 (SELECT json_agg(json_build_object('id', lp.id, 'photoUrl', lp.photo_url, 'caption', lp.caption, 'sortOrder', lp.sort_order) ORDER BY lp.sort_order)
+                  FROM listing_photos lp WHERE lp.transaction_id = t.id),
+                 '[]'::json
+               ) AS photos
+        FROM transactions t
+        WHERE t.agent_id = ${agentId}
+          AND LOWER(t.status) NOT IN ('closed', 'cancelled', 'withdrawn', 'expired')
+          AND t.type = 'sell'
+          AND t.street_name IS NOT NULL
+        ORDER BY t.updated_at DESC NULLS LAST
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching listings:", error);
+      res.status(500).json({ error: "Failed to fetch listings" });
+    }
+  });
+
+  app.post("/api/listing-photos/:transactionId", upload.single("photo"), async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.status(403).json({ error: "Agents/brokers only" });
+    const transactionId = parseInt(req.params.transactionId, 10);
+    if (!Number.isFinite(transactionId) || transactionId <= 0) return res.status(400).json({ error: "Invalid transaction ID" });
+    try {
+      const txn = await storage.getTransaction(transactionId);
+      if (!txn || txn.agentId !== req.user.id) return res.status(403).json({ error: "Not your transaction" });
+      const closedStatuses = ["closed", "cancelled", "withdrawn", "expired"];
+      if (closedStatuses.includes(txn.status.toLowerCase())) return res.status(400).json({ error: "Cannot add photos to closed listing" });
+      if (!req.file) return res.status(400).json({ error: "No photo provided" });
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+      if (!allowedTypes.includes(req.file.mimetype)) return res.status(400).json({ error: "Invalid file type. Upload an image (JPEG, PNG, or WebP)." });
+      if (req.file.size > 5 * 1024 * 1024) return res.status(400).json({ error: "Image too large. Maximum 5MB." });
+      const sharp = (await import("sharp")).default;
+      const processed = await sharp(req.file.buffer).resize(800, 600, { fit: "cover" }).jpeg({ quality: 80 }).toBuffer();
+      const base64 = `data:image/jpeg;base64,${processed.toString("base64")}`;
+      const caption = typeof req.body.caption === "string" ? req.body.caption : null;
+      const result = await db.execute(sql`
+        INSERT INTO listing_photos (transaction_id, agent_id, photo_url, caption, sort_order)
+        VALUES (${transactionId}, ${req.user.id}, ${base64}, ${caption},
+          COALESCE((SELECT MAX(sort_order) + 1 FROM listing_photos WHERE transaction_id = ${transactionId}), 0))
+        RETURNING *
+      `);
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error uploading listing photo:", error);
+      res.status(500).json({ error: "Failed to upload photo" });
+    }
+  });
+
+  app.delete("/api/listing-photos/:photoId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const photoId = parseInt(req.params.photoId, 10);
+    if (!Number.isFinite(photoId) || photoId <= 0) return res.status(400).json({ error: "Invalid photo ID" });
+    try {
+      const result = await db.execute(sql`
+        DELETE FROM listing_photos WHERE id = ${photoId} AND agent_id = ${req.user.id} RETURNING id
+      `);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Photo not found or not yours" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete photo" });
+    }
+  });
+
+  app.get("/api/profile/:id/reviews", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const agentId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(agentId) || agentId <= 0) return res.status(400).json({ error: "Invalid ID" });
+    try {
+      const reviewsResult = await db.execute(sql`
+        SELECT ar.id, ar.rating, ar.title, ar.comment, ar.created_at,
+               u.first_name || ' ' || LEFT(u.last_name, 1) || '.' AS reviewer_name
+        FROM agent_reviews ar
+        LEFT JOIN users u ON u.id = ar.reviewer_id
+        WHERE ar.agent_id = ${agentId} AND ar.is_public = true
+        ORDER BY ar.created_at DESC
+        LIMIT 5
+      `);
+      const avgResult = await db.execute(sql`
+        SELECT AVG(rating)::float as avg_rating, COUNT(*)::int as review_count
+        FROM agent_reviews WHERE agent_id = ${agentId} AND is_public = true
+      `);
+      const { avg_rating, review_count } = avgResult.rows[0] || { avg_rating: 0, review_count: 0 };
+      res.json({
+        reviews: reviewsResult.rows.map((r: any) => ({
+          id: r.id,
+          rating: Number(r.rating),
+          title: r.title,
+          comment: r.comment,
+          createdAt: r.created_at,
+          reviewerName: r.reviewer_name || "Anonymous",
+        })),
+        avgRating: avg_rating || 0,
+        reviewCount: review_count || 0,
+      });
+    } catch (error) {
+      console.error("Error fetching profile reviews:", error);
+      res.status(500).json({ error: "Failed to fetch reviews" });
     }
   });
 
