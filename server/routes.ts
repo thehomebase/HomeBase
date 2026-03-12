@@ -158,6 +158,14 @@ export function registerRoutes(app: Express): Server {
     '/api/resend-verification',
   ]);
 
+  app.use('/api', apiLimiter);
+  app.use('/api/login', authLimiter);
+  app.use('/api/register', authLimiter);
+  app.use('/api/rentcast', rentcastLimiter);
+  app.use('/api/census', sensitiveApiLimiter);
+  app.use('/api/twilio', sensitiveApiLimiter);
+  app.use('/api/gmail', sensitiveApiLimiter);
+
   app.use('/api', (req, res, next) => {
     if (verificationExemptPaths.has(req.path)) return next();
     if (!req.isAuthenticated()) return next();
