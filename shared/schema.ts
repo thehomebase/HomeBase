@@ -44,6 +44,10 @@ export const users = pgTable("users", {
   stripeCardholderName: text("stripe_cardholder_name"),
   licenseVerifiedAt: timestamp("license_verified_at"),
   licenseVerifiedBy: integer("license_verified_by"),
+  facebookUrl: text("facebook_url"),
+  instagramUrl: text("instagram_url"),
+  twitterUrl: text("twitter_url"),
+  linkedinUrl: text("linkedin_url"),
 });
 
 export const licenseVerifications = pgTable("license_verifications", {

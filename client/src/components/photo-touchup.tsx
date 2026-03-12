@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Eraser, Undo2, Save, ZoomIn, ZoomOut } from "lucide-react";
+import { Eraser, Undo2, Save, ZoomIn, ZoomOut, Hand } from "lucide-react";
 
 const BG_COLOR = "#ebebeb";
 
@@ -13,6 +13,8 @@ interface PhotoTouchupProps {
   onSave: (blob: Blob) => Promise<void>;
 }
 
+type Tool = "eraser" | "pan";
+
 export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -20,8 +22,11 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
   const [saving, setSaving] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [history, setHistory] = useState<ImageData[]>([]);
+  const [tool, setTool] = useState<Tool>("eraser");
   const isDrawing = useRef(false);
+  const isPanning = useRef(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
+  const panStart = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const naturalSize = useRef({ w: 400, h: 500 });
 
@@ -41,6 +46,7 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
       ctx.drawImage(img, 0, 0);
       setHistory([ctx.getImageData(0, 0, canvas.width, canvas.height)]);
       setZoom(1);
+      setTool("eraser");
     };
     img.src = photoUrl;
   }, [open, photoUrl]);
@@ -86,6 +92,13 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
     };
   }
 
+  function getClientPos(e: React.MouseEvent | React.TouchEvent) {
+    if ("touches" in e) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
   function drawAt(x: number, y: number) {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -118,6 +131,20 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
 
   function handleStart(e: React.MouseEvent | React.TouchEvent) {
     e.preventDefault();
+    if (tool === "pan") {
+      isPanning.current = true;
+      const pos = getClientPos(e);
+      const container = containerRef.current;
+      if (container) {
+        panStart.current = {
+          x: pos.x,
+          y: pos.y,
+          scrollLeft: container.scrollLeft,
+          scrollTop: container.scrollTop,
+        };
+      }
+      return;
+    }
     isDrawing.current = true;
     const pos = getCanvasPos(e);
     if (!pos) return;
@@ -127,6 +154,15 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
 
   function handleMove(e: React.MouseEvent | React.TouchEvent) {
     e.preventDefault();
+    if (tool === "pan" && isPanning.current) {
+      const pos = getClientPos(e);
+      const container = containerRef.current;
+      if (container && panStart.current) {
+        container.scrollLeft = panStart.current.scrollLeft - (pos.x - panStart.current.x);
+        container.scrollTop = panStart.current.scrollTop - (pos.y - panStart.current.y);
+      }
+      return;
+    }
     if (!isDrawing.current) return;
     const pos = getCanvasPos(e);
     if (!pos) return;
@@ -138,6 +174,11 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
 
   function handleEnd(e: React.MouseEvent | React.TouchEvent) {
     e.preventDefault();
+    if (tool === "pan") {
+      isPanning.current = false;
+      panStart.current = null;
+      return;
+    }
     if (isDrawing.current) {
       isDrawing.current = false;
       lastPos.current = null;
@@ -172,21 +213,48 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
             Touch Up Photo
           </DialogTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            Paint over any artifacts left from background removal
+            Paint over artifacts or use the hand tool to pan around when zoomed in
           </p>
         </DialogHeader>
 
         <div className="px-4 pb-2 flex items-center gap-3">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">Brush</span>
-          <Slider
-            value={[brushSize]}
-            onValueChange={v => setBrushSize(v[0])}
-            min={5}
-            max={60}
-            step={1}
-            className="flex-1"
-          />
-          <span className="text-xs font-mono w-6 text-right">{brushSize}</span>
+          <div className="flex gap-0.5 border rounded-md p-0.5">
+            <Button
+              variant={tool === "eraser" ? "default" : "ghost"}
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setTool("eraser")}
+              title="Eraser tool"
+            >
+              <Eraser className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant={tool === "pan" ? "default" : "ghost"}
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setTool("pan")}
+              title="Pan tool (drag to move around)"
+            >
+              <Hand className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          {tool === "eraser" && (
+            <>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Brush</span>
+              <Slider
+                value={[brushSize]}
+                onValueChange={v => setBrushSize(v[0])}
+                min={5}
+                max={60}
+                step={1}
+                className="flex-1"
+              />
+              <span className="text-xs font-mono w-6 text-right">{brushSize}</span>
+            </>
+          )}
+          {tool === "pan" && (
+            <span className="text-xs text-muted-foreground flex-1">Drag to pan around the image</span>
+          )}
           <div className="flex gap-1 ml-2">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.min(z + 0.25, 3))}>
               <ZoomIn className="h-3.5 w-3.5" />
@@ -211,7 +279,7 @@ export function PhotoTouchup({ open, onClose, photoUrl, onSave }: PhotoTouchupPr
             style={{
               width: displayW * zoom,
               height: displayH * zoom,
-              cursor: "crosshair",
+              cursor: tool === "pan" ? (isPanning.current ? "grabbing" : "grab") : "crosshair",
               touchAction: "none",
             }}
             onMouseDown={handleStart}

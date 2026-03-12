@@ -3550,6 +3550,10 @@ export function registerRoutes(app: Express): Server {
         profilePhotoUrl: user.profilePhotoUrl,
         profileBio: user.profileBio,
         profilePhone: user.profilePhone,
+        facebookUrl: user.facebookUrl,
+        instagramUrl: user.instagramUrl,
+        twitterUrl: user.twitterUrl,
+        linkedinUrl: user.linkedinUrl,
       };
       if (isOwn) {
         publicProfile.stripeCustomerId = user.stripeCustomerId;
@@ -3578,6 +3582,10 @@ export function registerRoutes(app: Express): Server {
       brokerageName: z.string().max(200).optional(),
       licenseNumber: z.string().max(50).optional(),
       licenseState: z.string().max(5).optional(),
+      facebookUrl: z.string().max(500).optional().refine(v => !v || /^https?:\/\//i.test(v), { message: "Must be a valid URL" }),
+      instagramUrl: z.string().max(500).optional().refine(v => !v || /^https?:\/\//i.test(v), { message: "Must be a valid URL" }),
+      twitterUrl: z.string().max(500).optional().refine(v => !v || /^https?:\/\//i.test(v), { message: "Must be a valid URL" }),
+      linkedinUrl: z.string().max(500).optional().refine(v => !v || /^https?:\/\//i.test(v), { message: "Must be a valid URL" }),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: "Invalid data" });

@@ -16,6 +16,7 @@ import {
   Building2, FileText, User as UserIcon, Star, ChevronLeft, ChevronRight,
   Home, Plus, Trash2, ImagePlus, X, Eraser, CreditCard, ExternalLink, Loader2
 } from "lucide-react";
+import { SiFacebook, SiInstagram, SiX, SiLinkedin } from "react-icons/si";
 import { PhotoTouchup } from "@/components/photo-touchup";
 import type { User } from "@shared/schema";
 
@@ -620,6 +621,10 @@ export default function ProfilePage() {
     brokerageName: "",
     licenseNumber: "",
     licenseState: "",
+    facebookUrl: "",
+    instagramUrl: "",
+    twitterUrl: "",
+    linkedinUrl: "",
   });
 
   const updateMut = useMutation({
@@ -641,6 +646,10 @@ export default function ProfilePage() {
       brokerageName: profile.brokerageName || "",
       licenseNumber: profile.licenseNumber || "",
       licenseState: profile.licenseState || "",
+      facebookUrl: profile.facebookUrl || "",
+      instagramUrl: profile.instagramUrl || "",
+      twitterUrl: profile.twitterUrl || "",
+      linkedinUrl: profile.linkedinUrl || "",
     });
     setShowEdit(true);
   }
@@ -771,6 +780,38 @@ export default function ProfilePage() {
                 </Button>
               </a>
             </div>
+            {(profile.facebookUrl || profile.instagramUrl || profile.twitterUrl || profile.linkedinUrl) && (
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                {profile.facebookUrl && (
+                  <a href={profile.facebookUrl} target="_blank" rel="noopener noreferrer" title="Facebook">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-[#1877F2]">
+                      <SiFacebook className="h-4 w-4" />
+                    </Button>
+                  </a>
+                )}
+                {profile.instagramUrl && (
+                  <a href={profile.instagramUrl} target="_blank" rel="noopener noreferrer" title="Instagram">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-[#E4405F]">
+                      <SiInstagram className="h-4 w-4" />
+                    </Button>
+                  </a>
+                )}
+                {profile.twitterUrl && (
+                  <a href={profile.twitterUrl} target="_blank" rel="noopener noreferrer" title="X / Twitter">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                      <SiX className="h-4 w-4" />
+                    </Button>
+                  </a>
+                )}
+                {profile.linkedinUrl && (
+                  <a href={profile.linkedinUrl} target="_blank" rel="noopener noreferrer" title="LinkedIn">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-[#0A66C2]">
+                      <SiLinkedin className="h-4 w-4" />
+                    </Button>
+                  </a>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -783,7 +824,7 @@ export default function ProfilePage() {
       )}
 
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader className="text-left">
             <DialogTitle>Edit Profile</DialogTitle>
           </DialogHeader>
@@ -832,6 +873,53 @@ export default function ProfilePage() {
                       value={editData.licenseState}
                       onChange={e => setEditData(p => ({ ...p, licenseState: e.target.value }))}
                       maxLength={2}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            {isLicensedRole && (
+              <>
+                <div className="pt-2 border-t">
+                  <Label className="text-xs font-medium text-muted-foreground">Social Media Links</Label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs flex items-center gap-1.5"><SiFacebook className="h-3 w-3" /> Facebook</Label>
+                    <Input
+                      value={editData.facebookUrl}
+                      onChange={e => setEditData(p => ({ ...p, facebookUrl: e.target.value }))}
+                      placeholder="https://facebook.com/..."
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs flex items-center gap-1.5"><SiInstagram className="h-3 w-3" /> Instagram</Label>
+                    <Input
+                      value={editData.instagramUrl}
+                      onChange={e => setEditData(p => ({ ...p, instagramUrl: e.target.value }))}
+                      placeholder="https://instagram.com/..."
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs flex items-center gap-1.5"><SiX className="h-3 w-3" /> X / Twitter</Label>
+                    <Input
+                      value={editData.twitterUrl}
+                      onChange={e => setEditData(p => ({ ...p, twitterUrl: e.target.value }))}
+                      placeholder="https://x.com/..."
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs flex items-center gap-1.5"><SiLinkedin className="h-3 w-3" /> LinkedIn</Label>
+                    <Input
+                      value={editData.linkedinUrl}
+                      onChange={e => setEditData(p => ({ ...p, linkedinUrl: e.target.value }))}
+                      placeholder="https://linkedin.com/in/..."
                       className="mt-1"
                     />
                   </div>

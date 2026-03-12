@@ -587,6 +587,10 @@ export class DatabaseStorage implements IStorage {
         stripeCardholderName: user.stripeCardholderName ?? null,
         licenseVerifiedAt: user.licenseVerifiedAt ?? null,
         licenseVerifiedBy: user.licenseVerifiedBy ? Number(user.licenseVerifiedBy) : null,
+        facebookUrl: user.facebookUrl ?? null,
+        instagramUrl: user.instagramUrl ?? null,
+        twitterUrl: user.twitterUrl ?? null,
+        linkedinUrl: user.linkedinUrl ?? null,
       };
     } catch (error) {
       console.error('Error in getUser:', error);
@@ -633,6 +637,10 @@ export class DatabaseStorage implements IStorage {
         stripeCardholderName: user.stripeCardholderName ?? null,
         licenseVerifiedAt: user.licenseVerifiedAt ?? null,
         licenseVerifiedBy: user.licenseVerifiedBy ? Number(user.licenseVerifiedBy) : null,
+        facebookUrl: user.facebookUrl ?? null,
+        instagramUrl: user.instagramUrl ?? null,
+        twitterUrl: user.twitterUrl ?? null,
+        linkedinUrl: user.linkedinUrl ?? null,
       };
     } catch (error) {
       console.error('Error in getUserByEmail:', error);
