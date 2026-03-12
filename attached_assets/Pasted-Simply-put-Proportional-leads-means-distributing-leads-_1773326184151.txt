@@ -1,0 +1,26 @@
+Simply put: “Proportional leads” means distributing leads to participants (realtors or lenders) roughly in line with how much they pay — but the way you do it determines if your platform stays RESPA-compliant or crosses into illegal “pay-to-play” territory.
+Here’s the breakdown for building a lead gen platform serving both realtors (agents) and lenders:
+For Realtors/Agents (Like Zillow Premier Agent Model)
+This is generally safer and more straightforward under RESPA.
+•  Agents buy advertising spend in specific zip codes (or areas).
+•  Their share of voice = their spend divided by total spend in that zip code (e.g., if total spend is $10k and Agent A pays $4k, they get ~40% share).
+•  Leads (consumer inquiries from listings) are routed proportionally — Agent A gets about 40% of the leads in that zip code.
+•  Why compliant? It’s treated as paid advertising/visibility (enhanced exposure next to listings), not steering consumers to “the best” agent via non-neutral rankings. No comparison-shopping pretense; consumers see agents based on paid share, but it’s not implying objective “best match.” Zillow openly uses this proportional model (share of voice determines connections), and it has held up without major RESPA shutdowns for the core setup.
+You can build something similar: Charge agents for geo-targeted ad/lead share, distribute incoming leads proportionally based on their budget/share. Keep it transparent as advertising, not a neutral comparison tool.
+For Lenders (Mortgage Side — Much Trickier)
+RESPA is stricter here because lenders provide settlement services (mortgage origination), and the CFPB’s 2023 advisory opinion (still the key guidance in 2026) cracks down hard on digital platforms that involve comparison-shopping or lead gen for mortgages.
+•  Proportional leads can be risky if it looks like steering.
+	•  If a lender pays more → gets more leads or better exposure (e.g., top placement, priority routing, featured spots), and your platform presents as helping consumers “compare” or find suitable lenders — that’s often non-neutral steering based on payment.
+	•  The CFPB says this violates Section 8: Higher payment buys referral-like influence (steering consumers toward the bigger spender), not just neutral advertising.
+	•  Evidence of illegality: Charging different/higher fees for better inclusion/placement, or skewing results (even proportionally) in a way that influences selection.
+•  Compliant ways to do proportional-ish distribution:
+	•  Neutral distribution only: Use fixed/equal fees for inclusion (everyone pays the same to participate). Then distribute leads equally (e.g., round-robin, random, or based purely on consumer inputs like location/credit — no payment influence on order/priority).
+	•  Separate pure ads: Offer neutral lead rotation for base participation (flat fee), then sell optional labeled ads/sponsored spots that don’t affect core results/rankings.
+	•  Avoid any “best match” or comparison framing: Don’t imply objective rankings; make it clear it’s ad-driven or purely lead gen without steering.
+	•  Many platforms (e.g., marketplaces like LendingTree) shifted post-2023 to neutral criteria (rates, consumer filters) for core presentation, with paid elements separate.
+Quick Rule of Thumb for Your Platform
+•  Safe for agents: Proportional to spend (share of voice) → OK as advertising in geo areas.
+•  Risky for lenders: Proportional to spend if it gives better/more priority → Often seen as pay-to-play steering, especially on comparison-ish sites.
+•  Safest overall: Charge flat fees for access → Distribute neutrally (equal chance per lead, no favoritism). Or keep proportional only for non-settlement side (agents), and neutral for lenders.
+•  Always: Document everything as fair-market-value services (ads/leads), avoid tying to closings/referrals, disclose clearly, and get a RESPA attorney to review your exact model — facts matter hugely, and enforcement looks at steering + payment link.
+Bottom line: Proportional works well when it’s pure advertising without manipulating consumer choice (common for agents). For lenders, stick to neutral to avoid CFPB red flags on pay-for-influence. If you mix both, separate the experiences clearly.
