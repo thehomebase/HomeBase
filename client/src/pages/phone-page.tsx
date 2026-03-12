@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Phone, MessageSquare, Send, Clock, PhoneCall, PhoneOff, Voicemail, Loader2 } from "lucide-react";
+import { Phone, MessageSquare, Send, Clock, PhoneCall, PhoneOff, Voicemail, Loader2, FileText, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
-import type { Client } from "@shared/schema";
+import type { Client, EmailSnippet } from "@shared/schema";
 
 export default function PhonePage() {
   const { user } = useAuth();
@@ -25,6 +25,8 @@ export default function PhonePage() {
   const [callDuration, setCallDuration] = useState("");
   const [callOutcome, setCallOutcome] = useState("connected");
   const [callNotes, setCallNotes] = useState("");
+  const [showSnippetPicker, setShowSnippetPicker] = useState(false);
+  const snippetPickerRef = useRef<HTMLDivElement>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -40,6 +42,21 @@ export default function PhonePage() {
     queryKey: ["/api/sms/limits"],
     enabled: !!user,
   });
+
+  const { data: snippets = [] } = useQuery<EmailSnippet[]>({
+    queryKey: ["/api/snippets"],
+    enabled: !!user,
+  });
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (snippetPickerRef.current && !snippetPickerRef.current.contains(e.target as Node)) {
+        setShowSnippetPicker(false);
+      }
+    }
+    if (showSnippetPicker) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showSnippetPicker]);
 
   const sendSmsMutation = useMutation({
     mutationFn: async (data: { clientId: number; message: string }) => {
@@ -175,7 +192,51 @@ export default function PhonePage() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label>Message</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Message</Label>
+                  <div className="relative" ref={snippetPickerRef}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => setShowSnippetPicker(!showSnippetPicker)}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      Snippets
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                    {showSnippetPicker && (
+                      <div className="absolute right-0 top-full mt-1 z-50 bg-background border rounded-lg shadow-lg w-72 max-h-[280px] overflow-auto">
+                        <div className="p-2 border-b">
+                          <p className="text-xs font-medium text-muted-foreground">Insert snippet into message</p>
+                        </div>
+                        {snippets.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-muted-foreground">
+                            No snippets yet. Create them on the Mail page under "Snippets".
+                          </div>
+                        ) : (
+                          snippets.map((s) => (
+                            <button
+                              key={s.id}
+                              className="w-full text-left px-3 py-2 hover:bg-muted border-b last:border-b-0 transition-colors"
+                              onClick={() => {
+                                const plainText = s.body.replace(/<[^>]*>/g, "");
+                                setSmsMessage(prev => prev ? prev + "\n" + plainText : plainText);
+                                setShowSnippetPicker(false);
+                              }}
+                            >
+                              <p className="text-sm font-medium truncate">{s.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {s.body.replace(/<[^>]*>/g, "").slice(0, 80)}
+                              </p>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <Textarea
                   placeholder="Type your message..."
                   value={smsMessage}
