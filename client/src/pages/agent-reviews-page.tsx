@@ -18,6 +18,14 @@ import {
   ArrowLeft,
   Send,
   StarHalf,
+  Shield,
+  ShieldCheck,
+  FileText,
+  Building2,
+  MapPin,
+  Phone,
+  Mail,
+  Search,
 } from "lucide-react";
 import type { AgentReview } from "@shared/schema";
 
@@ -39,6 +47,43 @@ type TopAgent = {
   avgRating: number;
   reviewCount: number;
 };
+
+type DirectoryAgent = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  role: string;
+  brokerage_name: string | null;
+  license_state: string | null;
+  verification_status: string | null;
+  profile_photo_url: string | null;
+  profile_bio: string | null;
+};
+
+function VerificationBadge({ status }: { status: string | null | undefined }) {
+  if (status === "admin_verified") {
+    return (
+      <Badge className="gap-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-300 dark:border-green-700 text-[10px] px-1.5 py-0">
+        <ShieldCheck className="h-3 w-3" /> Verified
+      </Badge>
+    );
+  }
+  if (status === "broker_verified") {
+    return (
+      <Badge className="gap-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-blue-300 dark:border-blue-700 text-[10px] px-1.5 py-0">
+        <Shield className="h-3 w-3" /> Broker Verified
+      </Badge>
+    );
+  }
+  if (status === "licensed") {
+    return (
+      <Badge className="gap-1 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700 text-[10px] px-1.5 py-0">
+        <FileText className="h-3 w-3" /> Licensed
+      </Badge>
+    );
+  }
+  return null;
+}
 
 function StarRating({ rating, size = "md", interactive = false, onChange }: {
   rating: number;
@@ -401,16 +446,151 @@ export function AgentReviewsPage() {
   );
 }
 
+function AgentDirectoryList() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const { data: agents, isLoading } = useQuery<DirectoryAgent[]>({
+    queryKey: ["/api/agents"],
+  });
+
+  const filtered = agents?.filter((a) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      a.first_name?.toLowerCase().includes(q) ||
+      a.last_name?.toLowerCase().includes(q) ||
+      a.brokerage_name?.toLowerCase().includes(q) ||
+      a.license_state?.toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by name, brokerage, or state..."
+          className="pl-9"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-48 w-full" />
+          ))}
+        </div>
+      ) : !filtered || filtered.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <User className="h-12 w-12 mx-auto mb-3 opacity-20" />
+            <p className="text-muted-foreground">
+              {searchQuery ? "No agents match your search." : "No agents registered yet."}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((agent) => (
+            <Card key={agent.id} className="hover:shadow-md transition-shadow overflow-hidden">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {agent.profile_photo_url ? (
+                      <img
+                        src={agent.profile_photo_url}
+                        alt={`${agent.first_name} ${agent.last_name}`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <User className="h-7 w-7 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold truncate">
+                        {agent.first_name} {agent.last_name}
+                      </h3>
+                      <VerificationBadge status={agent.verification_status} />
+                    </div>
+                    <Badge variant="outline" className="mt-1 text-[10px] px-1.5 py-0 capitalize">
+                      {agent.role}
+                    </Badge>
+                    {agent.brokerage_name && (
+                      <div className="flex items-center gap-1 mt-1.5 text-sm text-muted-foreground">
+                        <Building2 className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{agent.brokerage_name}</span>
+                      </div>
+                    )}
+                    {agent.license_state && (
+                      <div className="flex items-center gap-1 mt-0.5 text-sm text-muted-foreground">
+                        <MapPin className="h-3 w-3 flex-shrink-0" />
+                        <span>{agent.license_state}</span>
+                      </div>
+                    )}
+                    {agent.profile_bio && (
+                      <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{agent.profile_bio}</p>
+                    )}
+                    <div className="flex gap-2 mt-3">
+                      <Link href={`/profile/${agent.id}`}>
+                        <Button variant="outline" size="sm" className="text-xs">
+                          View Profile
+                        </Button>
+                      </Link>
+                      <Link href={`/agents/${agent.id}/reviews`}>
+                        <Button variant="ghost" size="sm" className="text-xs">
+                          <Star className="h-3 w-3 mr-1" /> Reviews
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TopAgentsPage() {
+  const [tab, setTab] = useState<"directory" | "top-rated">("directory");
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Find Agents</h1>
         <p className="text-muted-foreground mt-1">
-          Discover top-rated real estate agents based on client reviews
+          Browse agent profiles or discover top-rated agents by client reviews
         </p>
       </div>
-      <TopAgentsList />
+
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setTab("directory")}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tab === "directory"
+              ? "bg-background shadow-sm text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Agent Directory
+        </button>
+        <button
+          onClick={() => setTab("top-rated")}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tab === "top-rated"
+              ? "bg-background shadow-sm text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Top Rated
+        </button>
+      </div>
+
+      {tab === "directory" ? <AgentDirectoryList /> : <TopAgentsList />}
     </div>
   );
 }

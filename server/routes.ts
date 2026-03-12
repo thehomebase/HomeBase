@@ -3612,10 +3612,11 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/agents", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
     try {
       const result = await db.execute(sql`
-        SELECT id, first_name, last_name, email, role, brokerage_name, license_number, license_state, 
-               verification_status, profile_photo_url, profile_bio, profile_phone
+        SELECT id, first_name, last_name, role, brokerage_name, license_state, 
+               verification_status, profile_photo_url, profile_bio
         FROM users WHERE role IN ('agent', 'broker') AND email_verified = true
         ORDER BY 
           CASE verification_status 

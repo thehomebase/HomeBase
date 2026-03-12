@@ -34,6 +34,7 @@ import {
   Phone,
   Zap,
   Key,
+  User,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -327,6 +328,14 @@ export function MobileBottomNav() {
               ))}
             </div>
             <div className="p-3 border-t space-y-2">
+              <Link
+                href="/profile"
+                onClick={() => setShowMore(false)}
+                className="flex items-center gap-3 w-full p-3 rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-transform"
+              >
+                <User className="h-5 w-5" />
+                <span className="text-sm">My Profile</span>
+              </Link>
               <button
                 onClick={() => {
                   const nowDark = document.documentElement.classList.toggle("dark");
