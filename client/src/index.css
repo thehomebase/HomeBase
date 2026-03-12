@@ -149,6 +149,10 @@ html {
   padding: 0 2px;
 }
 
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }

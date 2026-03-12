@@ -564,7 +564,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         )}
         <main className="flex-1 min-h-screen min-w-0 overflow-x-clip relative">
           {user && !(isMobile && isMapPage) && (
-            <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+            <div className="sticky z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
               <div className="flex items-center justify-between px-4 py-2">
                 {isMobile && <Logo isCompact={false} />}
                 <div className={isMobile ? '' : 'ml-auto'}>

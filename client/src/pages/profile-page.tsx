@@ -717,7 +717,7 @@ export default function ProfilePage() {
 
   return (
     <div className="w-full px-4 sm:px-8 py-6 max-w-5xl mx-auto pb-24 md:pb-8">
-      <div className="grid grid-cols-1 md:grid-cols-[240px_1fr_1fr] gap-5 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_1fr] gap-5 mb-8">
         <ProfilePhotoCard profile={profile} isOwn={isOwn} />
 
         <Card className="h-fit">
