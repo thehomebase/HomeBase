@@ -133,7 +133,7 @@ function ProfilePhotoCard({ profile, isOwn }: { profile: PublicProfile; isOwn: b
 
   return (
     <div className="relative">
-      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-pink-100 to-pink-50 dark:from-neutral-800 dark:to-neutral-900 aspect-[4/5] shadow-lg">
+      <div className="relative rounded-2xl overflow-hidden bg-[#ebebeb] dark:bg-neutral-800 aspect-[4/5] shadow-lg">
         {profile.brokerageName && (
           <div className="absolute top-3 left-3 z-10">
             <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 bg-white/70 dark:bg-black/40 px-2 py-0.5 rounded">

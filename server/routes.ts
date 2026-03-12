@@ -3580,7 +3580,19 @@ export function registerRoutes(app: Express): Server {
         .png()
         .toBuffer();
 
-      const base64 = `data:image/png;base64,${resizedPhoto.toString("base64")}`;
+      const finalPhoto = await sharp({
+        create: {
+          width: photoWidth,
+          height: photoHeight,
+          channels: 4,
+          background: bgColor,
+        },
+      })
+        .composite([{ input: resizedPhoto, blend: "over" }])
+        .png()
+        .toBuffer();
+
+      const base64 = `data:image/png;base64,${finalPhoto.toString("base64")}`;
       const updated = await storage.updateUser(req.user.id, { profilePhotoUrl: base64 });
       const { password, emailVerificationToken, ...safe } = updated;
       res.json(safe);
