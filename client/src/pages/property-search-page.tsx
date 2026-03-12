@@ -1,20 +1,22 @@
-import { useState, useRef, lazy, Suspense } from "react";
+import { useState, useRef, lazy, Suspense, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Eye, Map, Droplets, Phone, Mail, MessageSquare, Clock } from "lucide-react";
-
+import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Eye, Map, Droplets, Phone, Mail, MessageSquare, Clock, FileText, ChevronDown, Send, Smartphone, Wifi, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useLocation } from "wouter";
 
 const MapDrawSearch = lazy(() => import("@/components/map-draw-search"));
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import type { SavedProperty } from "@shared/schema";
+import type { SavedProperty, EmailSnippet } from "@shared/schema";
 
 const RENTCAST_PROPERTY_TYPES = [
   { value: "any", label: "Any Type" },
@@ -156,7 +158,7 @@ function parseLocation(location: string): { city?: string; state?: string; zipCo
   return { city: trimmed };
 }
 
-function ListingCard({ listing, isSelected, onToggleSelect }: { listing: RentCastListing; isSelected: boolean; onToggleSelect: (id: string) => void }) {
+function ListingCard({ listing, isSelected, onToggleSelect, onContactAgent }: { listing: RentCastListing; isSelected: boolean; onToggleSelect: (id: string) => void; onContactAgent?: (listing: RentCastListing, mode: "sms" | "email") => void }) {
   const zillowSearchUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, '').replace(/\s+/g, '-'))}_rb/`;
 
   return (
@@ -260,7 +262,7 @@ function ListingCard({ listing, isSelected, onToggleSelect }: { listing: RentCas
                       variant="outline"
                       size="sm"
                       className="h-6 text-[11px] gap-1 px-2"
-                      onClick={() => window.open(`sms:${contactPhone}`, "_self")}
+                      onClick={() => onContactAgent?.(listing, "sms")}
                     >
                       <MessageSquare className="h-3 w-3" />
                       Text
@@ -272,7 +274,7 @@ function ListingCard({ listing, isSelected, onToggleSelect }: { listing: RentCas
                     variant="outline"
                     size="sm"
                     className="h-6 text-[11px] gap-1 px-2"
-                    onClick={() => window.open(`mailto:${contactEmail}?subject=${encodeURIComponent(`Inquiry about ${listing.formattedAddress}`)}`)}
+                    onClick={() => onContactAgent?.(listing, "email")}
                   >
                     <Mail className="h-3 w-3" />
                     Email
@@ -315,7 +317,7 @@ function SortIcon({ columnKey, sortKey, sortDir }: { columnKey: SortKey; sortKey
   return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 }
 
-function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll }: { listings: RentCastListing[]; selectedIds: Set<string>; onToggleSelect: (id: string) => void; onToggleAll: () => void }) {
+function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll, onContactAgent }: { listings: RentCastListing[]; selectedIds: Set<string>; onToggleSelect: (id: string) => void; onToggleAll: () => void; onContactAgent?: (listing: RentCastListing, mode: "sms" | "email") => void }) {
   const allSelected = listings.length > 0 && listings.every(l => selectedIds.has(l.id));
   const someSelected = listings.some(l => selectedIds.has(l.id));
   const [sortKey, setSortKey] = useState<SortKey>(null);
@@ -443,7 +445,7 @@ function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll }: { 
                                 size="icon"
                                 className="h-6 w-6"
                                 title={`Text ${tPhone}`}
-                                onClick={() => window.open(`sms:${tPhone}`, "_self")}
+                                onClick={() => onContactAgent?.(listing, "sms")}
                               >
                                 <MessageSquare className="h-3 w-3" />
                               </Button>
@@ -455,7 +457,7 @@ function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll }: { 
                               size="icon"
                               className="h-6 w-6"
                               title={`Email ${tEmail}`}
-                              onClick={() => window.open(`mailto:${tEmail}?subject=${encodeURIComponent(`Inquiry about ${listing.formattedAddress}`)}`)}
+                              onClick={() => onContactAgent?.(listing, "email")}
                             >
                               <Mail className="h-3 w-3" />
                             </Button>
@@ -492,6 +494,197 @@ function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll }: { 
   );
 }
 
+interface ContactDialogState {
+  open: boolean;
+  mode: "sms" | "email";
+  phone: string;
+  email: string;
+  address: string;
+  agentName: string;
+}
+
+const emptyContactState: ContactDialogState = {
+  open: false, mode: "sms", phone: "", email: "", address: "", agentName: "",
+};
+
+function ContactAgentDialog({
+  state,
+  onClose,
+  snippets,
+  commStatus,
+}: {
+  state: ContactDialogState;
+  onClose: () => void;
+  snippets: EmailSnippet[];
+  commStatus: { twilio: boolean; gmail: { connected: boolean } } | undefined;
+}) {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [smsMessage, setSmsMessage] = useState("");
+  const [showSnippets, setShowSnippets] = useState(false);
+  const snippetRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (state.open) setSmsMessage("");
+  }, [state.open]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (snippetRef.current && !snippetRef.current.contains(e.target as Node)) {
+        setShowSnippets(false);
+      }
+    }
+    if (showSnippets) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showSnippets]);
+
+  const sendSmsMutation = useMutation({
+    mutationFn: async (data: { phone: string; content: string }) => {
+      const res = await apiRequest("POST", "/api/communications/sms-direct", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "SMS sent successfully" });
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send SMS", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const snippetsWithAddress = snippets.map((s) => ({
+    ...s,
+    body: s.body.replace(/<[^>]*>/g, "") + (state.address ? `\n\nRe: ${state.address}` : ""),
+  }));
+
+  const gmailConnected = commStatus?.gmail?.connected;
+  const twilioAvailable = commStatus?.twilio;
+
+  useEffect(() => {
+    if (!state.open || state.mode !== "email") return;
+    const subject = `Inquiry about ${state.address}`;
+    if (gmailConnected) {
+      const params = new URLSearchParams({
+        composeTo: state.email,
+        composeSubject: subject,
+      });
+      navigate(`/mail?${params.toString()}`);
+    } else {
+      window.open(`mailto:${state.email}?subject=${encodeURIComponent(subject)}`);
+    }
+    onClose();
+  }, [state.open, state.mode]);
+
+  if (state.mode === "email") return null;
+
+  return (
+    <Dialog open={state.open} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            Text {state.agentName || "Listing Agent"}
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          {state.address} · {state.phone}
+        </p>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label>Message</Label>
+            <div className="relative" ref={snippetRef}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => setShowSnippets(!showSnippets)}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Snippets
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+              {showSnippets && (
+                <div className="absolute right-0 top-full mt-1 z-50 bg-background border rounded-lg shadow-lg w-72 max-h-[280px] overflow-auto">
+                  <div className="p-2 border-b">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Insert snippet (address auto-appended)
+                    </p>
+                  </div>
+                  {snippetsWithAddress.length === 0 ? (
+                    <div className="p-3 text-center text-xs text-muted-foreground">
+                      No snippets yet. Create them on the Mail page.
+                    </div>
+                  ) : (
+                    snippetsWithAddress.map((s) => (
+                      <button
+                        key={s.id}
+                        className="w-full text-left px-3 py-2 hover:bg-muted border-b last:border-b-0 transition-colors"
+                        onClick={() => {
+                          setSmsMessage(prev => prev ? prev + "\n" + s.body : s.body);
+                          setShowSnippets(false);
+                        }}
+                      >
+                        <p className="text-sm font-medium truncate">{s.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">{s.body.slice(0, 80)}</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Textarea
+            placeholder={`Hi${state.agentName ? ` ${state.agentName}` : ""}, I'm interested in ${state.address}...`}
+            value={smsMessage}
+            onChange={(e) => setSmsMessage(e.target.value)}
+            rows={4}
+            maxLength={1600}
+          />
+          <p className="text-xs text-muted-foreground text-right">{smsMessage.length} / 1600</p>
+
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={() => {
+                const body = encodeURIComponent(smsMessage);
+                window.open(`sms:${state.phone}${smsMessage ? `?body=${body}` : ""}`, "_self");
+                onClose();
+              }}
+            >
+              <Smartphone className="h-4 w-4" />
+              Send from my phone
+              <span className="text-xs text-muted-foreground ml-auto">Opens your messaging app</span>
+            </Button>
+
+            {twilioAvailable && (
+              <Button
+                className="w-full justify-start gap-2"
+                disabled={!smsMessage.trim() || sendSmsMutation.isPending}
+                onClick={() => {
+                  if (!smsMessage.trim()) return;
+                  sendSmsMutation.mutate({ phone: state.phone, content: smsMessage.trim() });
+                }}
+              >
+                {sendSmsMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Wifi className="h-4 w-4" />
+                )}
+                Send via HomeBase
+                <span className="text-xs text-muted-foreground ml-auto">Uses your platform number</span>
+              </Button>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function PropertySearchPage() {
   const [rcLocation, setRcLocation] = useState("");
   const [rcPropertyType, setRcPropertyType] = useState("any");
@@ -507,8 +700,30 @@ export default function PropertySearchPage() {
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [selectedListingIds, setSelectedListingIds] = useState<Set<string>>(new Set());
   const refreshFlagRef = useRef(false);
+  const [contactDialog, setContactDialog] = useState<ContactDialogState>(emptyContactState);
 
   const { toast } = useToast();
+
+  const { data: snippets = [] } = useQuery<EmailSnippet[]>({
+    queryKey: ["/api/snippets"],
+  });
+
+  const { data: commStatus } = useQuery<{ twilio: boolean; gmail: { connected: boolean } }>({
+    queryKey: ["/api/communications/status"],
+  });
+
+  function openContactDialog(listing: RentCastListing, mode: "sms" | "email") {
+    const contactPhone = listing.listingAgent?.phone || listing.listingOffice?.phone || "";
+    const contactEmail = listing.listingAgent?.email || listing.listingOffice?.email || "";
+    setContactDialog({
+      open: true,
+      mode,
+      phone: contactPhone,
+      email: contactEmail,
+      address: listing.formattedAddress,
+      agentName: listing.listingAgent?.name || "",
+    });
+  }
 
   const { data: savedProperties = [], isLoading: isLoadingSaved } = useQuery<SavedProperty[]>({
     queryKey: ["/api/saved-properties"],
@@ -998,6 +1213,7 @@ export default function PropertySearchPage() {
                         listing={listing}
                         isSelected={selectedListingIds.has(listing.id)}
                         onToggleSelect={toggleSelectListing}
+                        onContactAgent={openContactDialog}
                       />
                     ))}
                   </div>
@@ -1007,6 +1223,7 @@ export default function PropertySearchPage() {
                     selectedIds={selectedListingIds}
                     onToggleSelect={toggleSelectListing}
                     onToggleAll={toggleSelectAll}
+                    onContactAgent={openContactDialog}
                   />
                 )}
               </CardContent>
@@ -1146,6 +1363,13 @@ export default function PropertySearchPage() {
       <div className="text-center text-xs text-muted-foreground pb-4">
         <p>Listing data provided by RentCast. Results are cached for 24 hours to conserve API usage.</p>
       </div>
+
+      <ContactAgentDialog
+        state={contactDialog}
+        onClose={() => setContactDialog(emptyContactState)}
+        snippets={snippets}
+        commStatus={commStatus}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -407,6 +407,16 @@ export default function MailPage() {
     queryKey: ["/api/snippets"],
     enabled: !!gmailConnected,
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const composeTo = params.get("composeTo");
+    const composeSubject = params.get("composeSubject");
+    if (composeTo || composeSubject) {
+      openCompose({ to: composeTo || "", subject: composeSubject || "" });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   const trackingQuery = useQuery<EmailTrackingRecord[]>({
     queryKey: ["/api/email-tracking"],

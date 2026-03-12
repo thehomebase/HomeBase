@@ -3145,6 +3145,58 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/communications/sms-direct", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const schema = z.object({
+        phone: z.string().min(10).max(20),
+        content: z.string().min(1).max(1600),
+        context: z.string().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
+      }
+      const { phone, content } = parsed.data;
+
+      if (!isTwilioConfigured()) {
+        return res.status(400).json({ error: "SMS is not available. Please contact your platform administrator." });
+      }
+
+      const agentPhone = await storage.getAgentPhoneNumber(req.user.id);
+      if (!agentPhone && !process.env.TWILIO_PHONE_NUMBER) {
+        return res.status(400).json({ error: "No phone number available. Please request a phone number first." });
+      }
+
+      const normalizedPhone = normalizePhoneNumber(phone);
+      const isOptedOut = await storage.isPhoneOptedOut(normalizedPhone);
+      if (isOptedOut) {
+        return res.status(403).json({ error: "This number has opted out of SMS messages." });
+      }
+
+      const [dailyCount] = await Promise.all([
+        storage.getSmsSentCountToday(req.user.id),
+      ]);
+
+      if (dailyCount >= SMS_DAILY_LIMIT) {
+        return res.status(429).json({ error: `Daily SMS limit reached (${SMS_DAILY_LIMIT} messages per day).` });
+      }
+
+      const fromNumber = agentPhone?.phoneNumber || process.env.TWILIO_PHONE_NUMBER!;
+      const result = await sendSMSFromNumber(fromNumber, normalizedPhone, content);
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json({ success: true, message: "SMS sent successfully" });
+    } catch (error) {
+      console.error("Error sending direct SMS:", error);
+      res.status(500).json({ error: "Failed to send SMS" });
+    }
+  });
+
   app.post("/api/twilio/webhook", async (req, res) => {
     try {
       const { From, Body } = req.body;
