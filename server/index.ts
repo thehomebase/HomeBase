@@ -7,6 +7,7 @@ import WebSocket from 'ws';
 import { WebhookHandlers } from "./webhookHandlers";
 import { startDripScheduler } from "./drip-scheduler";
 import { startReminderScheduler } from "./reminder-scheduler";
+import { startListingAlertScheduler } from "./listing-alert-scheduler";
 import { setupWebSocket } from "./websocket";
 
 // Add startup message to verify nodemon restarts
@@ -194,6 +195,7 @@ async function initStripe() {
 
     startDripScheduler();
     startReminderScheduler();
+    startListingAlertScheduler();
 
     const shutdown = () => {
       log('Graceful shutdown initiated...');

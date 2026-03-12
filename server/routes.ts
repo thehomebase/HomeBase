@@ -3803,6 +3803,146 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/listing-alerts", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM listing_alerts WHERE user_id = ${req.user.id} ORDER BY created_at DESC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch listing alerts" });
+    }
+  });
+
+  app.post("/api/listing-alerts", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const schema = z.object({
+      name: z.string().min(1).max(100),
+      city: z.string().max(100).optional().nullable(),
+      state: z.string().max(5).optional().nullable(),
+      zipCode: z.string().max(10).optional().nullable(),
+      minPrice: z.number().int().positive().optional().nullable(),
+      maxPrice: z.number().int().positive().optional().nullable(),
+      bedroomsMin: z.number().int().min(0).optional().nullable(),
+      bathroomsMin: z.number().int().min(0).optional().nullable(),
+      propertyType: z.string().max(50).optional().nullable(),
+      notifyEmail: z.boolean().optional(),
+      notifySms: z.boolean().optional(),
+      notifyInApp: z.boolean().optional(),
+    }).refine(data => data.city || data.zipCode, {
+      message: "Either city or ZIP code is required",
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid data" });
+
+    try {
+      const d = parsed.data;
+      const result = await db.execute(sql`
+        INSERT INTO listing_alerts (user_id, name, city, state, zip_code, min_price, max_price, bedrooms_min, bathrooms_min, property_type, notify_email, notify_sms, notify_in_app)
+        VALUES (${req.user.id}, ${d.name}, ${d.city || null}, ${d.state || null}, ${d.zipCode || null}, ${d.minPrice || null}, ${d.maxPrice || null}, ${d.bedroomsMin || null}, ${d.bathroomsMin || null}, ${d.propertyType || null}, ${d.notifyEmail ?? true}, ${d.notifySms ?? false}, ${d.notifyInApp ?? true})
+        RETURNING *
+      `);
+      res.json(result.rows[0]);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create listing alert" });
+    }
+  });
+
+  app.patch("/api/listing-alerts/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const alertId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(alertId)) return res.status(400).json({ error: "Invalid ID" });
+
+    try {
+      const existing = await db.execute(sql`SELECT * FROM listing_alerts WHERE id = ${alertId} AND user_id = ${req.user.id}`);
+      if (existing.rows.length === 0) return res.status(404).json({ error: "Alert not found" });
+
+      const schema = z.object({
+        name: z.string().min(1).max(100).optional(),
+        city: z.string().max(100).optional().nullable(),
+        state: z.string().max(5).optional().nullable(),
+        zipCode: z.string().max(10).optional().nullable(),
+        minPrice: z.number().int().positive().optional().nullable(),
+        maxPrice: z.number().int().positive().optional().nullable(),
+        bedroomsMin: z.number().int().min(0).optional().nullable(),
+        bathroomsMin: z.number().int().min(0).optional().nullable(),
+        propertyType: z.string().max(50).optional().nullable(),
+        notifyEmail: z.boolean().optional(),
+        notifySms: z.boolean().optional(),
+        notifyInApp: z.boolean().optional(),
+        isActive: z.boolean().optional(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Invalid data" });
+
+      const d = parsed.data;
+      const cur = existing.rows[0] as any;
+      const newCity = d.city !== undefined ? (d.city || null) : cur.city;
+      const newZip = d.zipCode !== undefined ? (d.zipCode || null) : cur.zip_code;
+      if (!newCity && !newZip) {
+        return res.status(400).json({ error: "Either city or ZIP code is required" });
+      }
+
+      const result = await db.execute(sql`
+        UPDATE listing_alerts SET
+          name = ${d.name !== undefined ? d.name : cur.name},
+          city = ${d.city !== undefined ? (d.city || null) : cur.city},
+          state = ${d.state !== undefined ? (d.state || null) : cur.state},
+          zip_code = ${d.zipCode !== undefined ? (d.zipCode || null) : cur.zip_code},
+          min_price = ${d.minPrice !== undefined ? (d.minPrice || null) : cur.min_price},
+          max_price = ${d.maxPrice !== undefined ? (d.maxPrice || null) : cur.max_price},
+          bedrooms_min = ${d.bedroomsMin !== undefined ? d.bedroomsMin : cur.bedrooms_min},
+          bathrooms_min = ${d.bathroomsMin !== undefined ? d.bathroomsMin : cur.bathrooms_min},
+          property_type = ${d.propertyType !== undefined ? (d.propertyType || null) : cur.property_type},
+          notify_email = ${d.notifyEmail !== undefined ? d.notifyEmail : cur.notify_email},
+          notify_sms = ${d.notifySms !== undefined ? d.notifySms : cur.notify_sms},
+          notify_in_app = ${d.notifyInApp !== undefined ? d.notifyInApp : cur.notify_in_app},
+          is_active = ${d.isActive !== undefined ? d.isActive : cur.is_active}
+        WHERE id = ${alertId} AND user_id = ${req.user.id}
+        RETURNING *
+      `);
+      res.json(result.rows[0]);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update listing alert" });
+    }
+  });
+
+  app.delete("/api/listing-alerts/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const alertId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(alertId)) return res.status(400).json({ error: "Invalid ID" });
+
+    try {
+      const result = await db.execute(sql`DELETE FROM listing_alerts WHERE id = ${alertId} AND user_id = ${req.user.id} RETURNING id`);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Alert not found" });
+      await db.execute(sql`DELETE FROM listing_alert_results WHERE alert_id = ${alertId}`);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete listing alert" });
+    }
+  });
+
+  app.get("/api/listing-alerts/:id/results", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const alertId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(alertId)) return res.status(400).json({ error: "Invalid ID" });
+
+    try {
+      const alertCheck = await db.execute(sql`SELECT id FROM listing_alerts WHERE id = ${alertId} AND user_id = ${req.user.id}`);
+      if (alertCheck.rows.length === 0) return res.status(404).json({ error: "Alert not found" });
+
+      const result = await db.execute(sql`
+        SELECT * FROM listing_alert_results WHERE alert_id = ${alertId} ORDER BY notified_at DESC LIMIT 50
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch alert results" });
+    }
+  });
+
   app.get("/api/agents", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
     try {

@@ -78,6 +78,7 @@ import ClientPage from "@/pages/client-page";
 
 import MapPage from "@/pages/map-page";
 import PropertySearchPage from "@/pages/property-search-page";
+import ListingAlertsPage from "@/pages/listing-alerts-page";
 import MailPage from "@/pages/mail-page";
 import PhonePage from "@/pages/phone-page";
 import DocumentScannerPage from "@/pages/document-scanner-page";
@@ -446,6 +447,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Listing Alerts">
+                            <Link href="/listing-alerts" className="flex items-center gap-2">
+                              <Bell className="h-4 w-4" />
+                              <span>Listing Alerts</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
                         {isAgentOrBroker && (
                           <SidebarMenuItem>
                             <SidebarMenuButton asChild tooltip="Map">
@@ -614,6 +623,9 @@ function Router() {
       <Route path="/messages" component={MessagesPage} />
       <Route path="/property-search">
         <ProtectedRoute path="/property-search" component={PropertySearchPage} />
+      </Route>
+      <Route path="/listing-alerts">
+        <ProtectedRoute path="/listing-alerts" component={ListingAlertsPage} />
       </Route>
       {isClient && <Route path="/my-transaction" component={ClientTransactionPage} />}
       {isClient && <Route path="/glossary" component={GlossaryPage} />}

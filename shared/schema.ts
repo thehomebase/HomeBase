@@ -1300,3 +1300,49 @@ export const insertListingPhotoSchema = createInsertSchema(listingPhotos).omit({
 
 export type ListingPhoto = typeof listingPhotos.$inferSelect;
 export type InsertListingPhoto = z.infer<typeof insertListingPhotoSchema>;
+
+export const listingAlerts = pgTable("listing_alerts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  minPrice: integer("min_price"),
+  maxPrice: integer("max_price"),
+  bedroomsMin: integer("bedrooms_min"),
+  bathroomsMin: integer("bathrooms_min"),
+  propertyType: text("property_type"),
+  notifyEmail: boolean("notify_email").default(true),
+  notifySms: boolean("notify_sms").default(false),
+  notifyInApp: boolean("notify_in_app").default(true),
+  isActive: boolean("is_active").default(true),
+  lastCheckedAt: timestamp("last_checked_at"),
+  lastMatchCount: integer("last_match_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertListingAlertSchema = createInsertSchema(listingAlerts).omit({
+  id: true,
+  lastCheckedAt: true,
+  lastMatchCount: true,
+  createdAt: true,
+});
+
+export type ListingAlert = typeof listingAlerts.$inferSelect;
+export type InsertListingAlert = z.infer<typeof insertListingAlertSchema>;
+
+export const listingAlertResults = pgTable("listing_alert_results", {
+  id: serial("id").primaryKey(),
+  alertId: integer("alert_id").notNull(),
+  userId: integer("user_id").notNull(),
+  listingId: text("listing_id").notNull(),
+  listingAddress: text("listing_address").notNull(),
+  listingPrice: integer("listing_price"),
+  listingBedrooms: integer("listing_bedrooms"),
+  listingBathrooms: real("listing_bathrooms"),
+  listingData: json("listing_data"),
+  notifiedAt: timestamp("notified_at").defaultNow().notNull(),
+});
+
+export type ListingAlertResult = typeof listingAlertResults.$inferSelect;
