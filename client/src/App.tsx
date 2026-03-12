@@ -71,6 +71,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { OnboardingTutorial, useOnboardingTutorial, TutorialStartButton } from "@/components/onboarding-tutorial";
 import CalculatorsPage from "@/pages/calculators-page";
 import ProfilePage from "@/pages/profile-page";
+import { SiteFooter } from "@/components/site-footer";
 import GlossaryPage from "./pages/glossary-page";
 import MessagesPage from "./pages/messages-page";
 import ClientPage from "@/pages/client-page";
@@ -576,6 +577,7 @@ function Layout({ children }: { children: React.ReactNode }) {
           )}
           <div className={`w-full ${isMobile && user ? 'pb-20' : ''}`}>
             {children}
+            {user && <SiteFooter />}
           </div>
         </main>
         {isMobile && <MobileBottomNav />}

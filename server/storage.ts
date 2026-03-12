@@ -575,6 +575,13 @@ export class DatabaseStorage implements IStorage {
         emailVerificationExpires: user.emailVerificationExpires ?? null,
         registrationIp: user.registrationIp ?? null,
         brokerageId: user.brokerageId ? Number(user.brokerageId) : null,
+        licenseNumber: user.licenseNumber ?? null,
+        licenseState: user.licenseState ?? null,
+        brokerageName: user.brokerageName ?? null,
+        verificationStatus: user.verificationStatus ?? "unverified",
+        profilePhotoUrl: user.profilePhotoUrl ?? null,
+        profileBio: user.profileBio ?? null,
+        profilePhone: user.profilePhone ?? null,
       };
     } catch (error) {
       console.error('Error in getUser:', error);
@@ -609,6 +616,13 @@ export class DatabaseStorage implements IStorage {
         emailVerificationExpires: user.emailVerificationExpires ?? null,
         registrationIp: user.registrationIp ?? null,
         brokerageId: user.brokerageId ? Number(user.brokerageId) : null,
+        licenseNumber: user.licenseNumber ?? null,
+        licenseState: user.licenseState ?? null,
+        brokerageName: user.brokerageName ?? null,
+        verificationStatus: user.verificationStatus ?? "unverified",
+        profilePhotoUrl: user.profilePhotoUrl ?? null,
+        profileBio: user.profileBio ?? null,
+        profilePhone: user.profilePhone ?? null,
       };
     } catch (error) {
       console.error('Error in getUserByEmail:', error);
