@@ -528,8 +528,8 @@ function ListingDetailDialog({
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader className="text-left">
           <DialogTitle className="flex items-start gap-2">
-            <svg viewBox="0 0 100 90" className="h-7 w-7 shrink-0 mt-0.5 fill-current" aria-hidden="true">
-              <polygon points="50,2 2,45 2,88 98,88 98,45" />
+            <svg viewBox="0 0 100 100" className="h-7 w-7 shrink-0 mt-0.5 fill-current" aria-hidden="true">
+              <polygon points="50,0 0,50 0,100 100,100 100,50" />
             </svg>
             <div className="min-w-0">
               <h2 className="text-lg font-bold">{listing.addressLine1}</h2>
