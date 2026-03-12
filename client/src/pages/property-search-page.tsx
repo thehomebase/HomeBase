@@ -1,4 +1,4 @@
-import { useState, useRef, lazy, Suspense, useEffect } from "react";
+import { useState, useRef, lazy, Suspense, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -158,7 +158,25 @@ function parseLocation(location: string): { city?: string; state?: string; zipCo
   return { city: trimmed };
 }
 
-function ListingCard({ listing, isSelected, onToggleSelect, onContactAgent, onViewDetail }: { listing: RentCastListing; isSelected: boolean; onToggleSelect: (id: string) => void; onContactAgent?: (listing: RentCastListing, mode: "sms" | "email") => void; onViewDetail?: (listing: RentCastListing) => void }) {
+const VIEWED_STORAGE_KEY = "homebase_viewed_listings";
+
+function getViewedListings(): Set<string> {
+  try {
+    const raw = localStorage.getItem(VIEWED_STORAGE_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw));
+  } catch { return new Set(); }
+}
+
+function markListingViewed(id: string): void {
+  const viewed = getViewedListings();
+  viewed.add(id);
+  const arr = Array.from(viewed);
+  if (arr.length > 500) arr.splice(0, arr.length - 500);
+  localStorage.setItem(VIEWED_STORAGE_KEY, JSON.stringify(arr));
+}
+
+function ListingCard({ listing, isSelected, isViewed, onToggleSelect, onContactAgent, onViewDetail }: { listing: RentCastListing; isSelected: boolean; isViewed: boolean; onToggleSelect: (id: string) => void; onContactAgent?: (listing: RentCastListing, mode: "sms" | "email") => void; onViewDetail?: (listing: RentCastListing) => void }) {
   const zillowSearchUrl = `https://www.zillow.com/homes/${encodeURIComponent(listing.formattedAddress.replace(/[,#]/g, '').replace(/\s+/g, '-'))}_rb/`;
 
   return (
@@ -183,9 +201,16 @@ function ListingCard({ listing, isSelected, onToggleSelect, onContactAgent, onVi
         </div>
         <div className="text-right shrink-0">
           <div className="font-bold text-lg text-primary">{formatPrice(listing.price)}</div>
-          <Badge variant={listing.status === "Active" ? "default" : "secondary"} className="text-xs">
-            {listing.status}
-          </Badge>
+          <div className="flex items-center gap-1 justify-end">
+            <Badge variant={listing.status === "Active" ? "default" : "secondary"} className="text-xs">
+              {listing.status}
+            </Badge>
+            {isViewed && (
+              <Badge variant="outline" className="text-xs gap-0.5 text-muted-foreground">
+                <Eye className="h-2.5 w-2.5" /> Viewed
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 
@@ -323,7 +348,7 @@ function SortIcon({ columnKey, sortKey, sortDir }: { columnKey: SortKey; sortKey
   return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 }
 
-function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll, onContactAgent, onViewDetail }: { listings: RentCastListing[]; selectedIds: Set<string>; onToggleSelect: (id: string) => void; onToggleAll: () => void; onContactAgent?: (listing: RentCastListing, mode: "sms" | "email") => void; onViewDetail?: (listing: RentCastListing) => void }) {
+function ListingTable({ listings, selectedIds, viewedIds, onToggleSelect, onToggleAll, onContactAgent, onViewDetail }: { listings: RentCastListing[]; selectedIds: Set<string>; viewedIds: Set<string>; onToggleSelect: (id: string) => void; onToggleAll: () => void; onContactAgent?: (listing: RentCastListing, mode: "sms" | "email") => void; onViewDetail?: (listing: RentCastListing) => void }) {
   const allSelected = listings.length > 0 && listings.every(l => selectedIds.has(l.id));
   const someSelected = listings.some(l => selectedIds.has(l.id));
   const [sortKey, setSortKey] = useState<SortKey>(null);
@@ -484,9 +509,16 @@ function ListingTable({ listings, selectedIds, onToggleSelect, onToggleAll, onCo
                   );
                 })()}
                 <td className="px-3 py-2.5 text-center">
-                  <Badge variant={listing.status === "Active" ? "default" : "secondary"} className="text-xs">
-                    {listing.status}
-                  </Badge>
+                  <div className="flex items-center gap-1 justify-center flex-wrap">
+                    <Badge variant={listing.status === "Active" ? "default" : "secondary"} className="text-xs">
+                      {listing.status}
+                    </Badge>
+                    {viewedIds.has(listing.id) && (
+                      <Badge variant="outline" className="text-xs gap-0.5 text-muted-foreground">
+                        <Eye className="h-2.5 w-2.5" />
+                      </Badge>
+                    )}
+                  </div>
                 </td>
                 <td className="px-3 py-2.5">
                   <Button
@@ -892,6 +924,18 @@ export default function PropertySearchPage() {
   const refreshFlagRef = useRef(false);
   const [contactDialog, setContactDialog] = useState<ContactDialogState>(emptyContactState);
   const [detailListing, setDetailListing] = useState<RentCastListing | null>(null);
+  const [viewedIds, setViewedIds] = useState<Set<string>>(() => getViewedListings());
+
+  const handleViewDetail = useCallback((listing: RentCastListing) => {
+    try { markListingViewed(listing.id); } catch {}
+    setViewedIds(prev => {
+      if (prev.has(listing.id)) return prev;
+      const next = new Set(prev);
+      next.add(listing.id);
+      return next;
+    });
+    setDetailListing(listing);
+  }, []);
 
   const { toast } = useToast();
 
@@ -1403,9 +1447,10 @@ export default function PropertySearchPage() {
                         key={listing.id}
                         listing={listing}
                         isSelected={selectedListingIds.has(listing.id)}
+                        isViewed={viewedIds.has(listing.id)}
                         onToggleSelect={toggleSelectListing}
                         onContactAgent={openContactDialog}
-                        onViewDetail={setDetailListing}
+                        onViewDetail={handleViewDetail}
                       />
                     ))}
                   </div>
@@ -1413,10 +1458,11 @@ export default function PropertySearchPage() {
                   <ListingTable
                     listings={filteredListings}
                     selectedIds={selectedListingIds}
+                    viewedIds={viewedIds}
                     onToggleSelect={toggleSelectListing}
                     onToggleAll={toggleSelectAll}
                     onContactAgent={openContactDialog}
-                    onViewDetail={setDetailListing}
+                    onViewDetail={handleViewDetail}
                   />
                 )}
               </CardContent>
