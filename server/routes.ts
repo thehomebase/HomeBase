@@ -3575,7 +3575,19 @@ export function registerRoutes(app: Express): Server {
       const photoHeight = 500;
       const bgColor = { r: 235, g: 235, b: 235, alpha: 1 };
 
-      const resizedPhoto = await sharp(req.file.buffer)
+      let processedBuffer: Buffer;
+      try {
+        const { removeBackground } = await import("@imgly/background-removal-node");
+        const inputBlob = new Blob([req.file.buffer], { type: req.file.mimetype });
+        const resultBlob = await removeBackground(inputBlob, { output: { format: "image/png" } });
+        const arrayBuf = await resultBlob.arrayBuffer();
+        processedBuffer = Buffer.from(arrayBuf);
+      } catch (bgErr) {
+        console.error("Background removal failed, using original image:", bgErr);
+        processedBuffer = req.file.buffer;
+      }
+
+      const resizedPhoto = await sharp(processedBuffer)
         .resize(photoWidth, photoHeight, { fit: "cover", position: "top" })
         .png()
         .toBuffer();

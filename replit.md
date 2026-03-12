@@ -63,3 +63,4 @@ Preferred communication style: Simple, everyday language.
 - **pdf-parse**: PDF text extraction.
 - **Nominatim/OSM**: Geocoding services.
 - **Census Bureau ACS API**: Median home values by ZIP code (free, no key).
+- **@imgly/background-removal-node**: Free local AI-based background removal for profile photos (no API key needed). Used in `POST /api/profile/photo` — removes background, composites onto light gray (#ebebeb), resizes to 400×500.
