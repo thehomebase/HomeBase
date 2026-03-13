@@ -73,6 +73,9 @@ TWILIO_PHONE_NUMBER = "+18175183845"
 VAPID_PUBLIC_KEY = "BLFT-ann2VZM22sX1Run9LwKA9-o4SvIQreu-zDUphuOug7to6zumZhvPeU2-Z_fo1xPvBlh1GQ4mtvZHMs2v6Q"
 VAPID_PRIVATE_KEY = "DiLKwryNpdYx-tJTWktsG2eWSHZHTmVWHSOb-brCYtI"
 VAPID_SUBJECT = "mailto:admin@homebase.app"
+DOCUSIGN_USER_ID = "365bec07-5197-40ab-ac32-200f020d6507"
+DOCUSIGN_ACCOUNT_ID = "df17cc33-6028-4ea5-93e6-f518faa85ba9"
+DOCUSIGN_BASE_URL = "https://demo.docusign.net"
 
 [agent]
 integrations = ["stripe:1.0.0"]
