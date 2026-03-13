@@ -14,6 +14,7 @@ import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, i
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, type EmailAttachment } from "./gmail-service";
 import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured, logSignNowAction } from "./signnow-service";
 import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, createDraftEnvelope, createSenderView, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction, generatePKCE } from "./docusign-service";
+import { isDropboxConfigured, generateDropboxState, getDropboxAuthUrl, handleDropboxCallback, getDropboxConnectionStatus, disconnectDropbox, listDropboxFiles, downloadDropboxFile, searchDropboxFiles } from "./dropbox-service";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { notify } from "./notification-helper";
@@ -4782,6 +4783,155 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error("DocuSign download error:", error);
       res.status(500).json({ error: error.message || "Failed to download documents" });
+    }
+  });
+
+  // ============ Dropbox Integration ============
+  app.get("/api/dropbox/status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const configured = isDropboxConfigured();
+      if (!configured) return res.json({ configured: false, connected: false });
+      const status = await getDropboxConnectionStatus(req.user.id);
+      res.json({ configured: true, ...status });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to check Dropbox status" });
+    }
+  });
+
+  app.get("/api/dropbox/auth-url", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const state = generateDropboxState();
+      (req.session as any).dropboxState = state;
+      const domains = process.env.REPLIT_DOMAINS || "";
+      const domain = domains.split(",")[0];
+      const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+      const redirectUri = `${baseUrl}/api/dropbox/callback`;
+      const url = getDropboxAuthUrl(state, redirectUri);
+      res.json({ url });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to generate auth URL" });
+    }
+  });
+
+  app.get("/api/dropbox/callback", async (req, res) => {
+    const { code, state, error: oauthError } = req.query;
+    const domains = process.env.REPLIT_DOMAINS || "";
+    const domain = domains.split(",")[0];
+    const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+    const redirectUri = `${baseUrl}/api/dropbox/callback`;
+
+    if (oauthError || !code) {
+      return res.send(`<html><body><script>window.close();</script><p>Dropbox connection failed. You can close this window.</p></body></html>`);
+    }
+
+    if (!req.isAuthenticated() || !req.user) {
+      return res.send(`<html><body><script>window.close();</script><p>Session expired. Please try again.</p></body></html>`);
+    }
+
+    const sessionState = (req.session as any).dropboxState;
+    if (!sessionState || sessionState !== state) {
+      return res.send(`<html><body><script>window.close();</script><p>Invalid state. Please try again.</p></body></html>`);
+    }
+
+    try {
+      await handleDropboxCallback(code as string, redirectUri, req.user.id);
+      delete (req.session as any).dropboxState;
+      res.send(`<html><body><script>window.close();</script><p>Dropbox connected successfully! You can close this window.</p></body></html>`);
+    } catch (error: any) {
+      console.error("Dropbox callback error:", error);
+      res.send(`<html><body><script>window.close();</script><p>Failed to connect Dropbox. Please try again.</p></body></html>`);
+    }
+  });
+
+  app.post("/api/dropbox/disconnect", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      await disconnectDropbox(req.user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to disconnect Dropbox" });
+    }
+  });
+
+  app.post("/api/dropbox/files", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    const { path } = req.body;
+    try {
+      const result = await listDropboxFiles(req.user.id, path || "");
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to list files" });
+    }
+  });
+
+  app.post("/api/dropbox/search", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    const { query } = req.body;
+    if (!query) return res.status(400).json({ error: "Query required" });
+    try {
+      const results = await searchDropboxFiles(req.user.id, query);
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to search files" });
+    }
+  });
+
+  app.post("/api/dropbox/add-to-checklist", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+
+    const schema = z.object({
+      dropboxPath: z.string().min(1),
+      transactionId: z.number(),
+      documentName: z.string().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+
+    try {
+      const txn = await storage.getTransaction(parsed.data.transactionId);
+      if (!txn) return res.status(404).json({ error: "Transaction not found" });
+      if (txn.agentId !== req.user.id && req.user.role !== "broker") {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      const fileName = parsed.data.dropboxPath.split("/").pop() || "Dropbox Document";
+      const docName = parsed.data.documentName || fileName;
+
+      const document = await storage.createDocument({
+        name: docName,
+        status: "not_applicable",
+        transactionId: parsed.data.transactionId,
+      });
+
+      res.json({ document, fileName: docName });
+    } catch (error: any) {
+      console.error("Dropbox add-to-checklist error:", error);
+      res.status(500).json({ error: error.message || "Failed to add file from Dropbox" });
+    }
+  });
+
+  app.post("/api/dropbox/download-for-signing", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+
+    const schema = z.object({ dropboxPath: z.string().min(1) });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+
+    try {
+      const file = await downloadDropboxFile(req.user.id, parsed.data.dropboxPath);
+      res.setHeader("Content-Type", file.mimeType);
+      res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`);
+      res.send(file.buffer);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to download file" });
     }
   });
 

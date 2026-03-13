@@ -163,6 +163,9 @@ async function initStripe() {
 
     await initStripe();
 
+    const { initDropboxSchema } = await import("./dropbox-service");
+    await initDropboxSchema().catch(e => log(`Dropbox schema init: ${e.message}`));
+
     const server = registerRoutes(app);
 
     // Setup basic error handling middleware

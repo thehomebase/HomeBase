@@ -76,6 +76,8 @@ VAPID_SUBJECT = "mailto:admin@homebase.app"
 DOCUSIGN_USER_ID = "365bec07-5197-40ab-ac32-200f020d6507"
 DOCUSIGN_ACCOUNT_ID = "df17cc33-6028-4ea5-93e6-f518faa85ba9"
 DOCUSIGN_BASE_URL = "https://demo.docusign.net"
+DROPBOX_APP_KEY = "7khj7bsfopn6hwk"
+DROPBOX_APP_SECRET = "bxli0hpqyl790fa"
 
 [agent]
 integrations = ["stripe:1.0.0"]

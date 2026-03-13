@@ -82,6 +82,7 @@ import {
   Star,
   Users,
   Gift,
+  CloudUpload,
 } from "lucide-react";
 import {
   SiMailchimp,
@@ -1233,6 +1234,121 @@ function DocuSignIntegrationCard() {
   );
 }
 
+function DropboxIntegrationCard() {
+  const { toast } = useToast();
+
+  const { data: status, isLoading } = useQuery<{ configured: boolean; connected: boolean; email?: string; displayName?: string }>({
+    queryKey: ["/api/dropbox/status"],
+    refetchInterval: 5000,
+  });
+
+  const [wasConnecting, setWasConnecting] = useState(false);
+
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("GET", "/api/dropbox/auth-url");
+      const data = await res.json();
+      window.open(data.url, '_blank');
+      setWasConnecting(true);
+    },
+    onError: () => toast({ title: "Failed to connect Dropbox", variant: "destructive" }),
+  });
+
+  useEffect(() => {
+    if (wasConnecting && status?.connected) {
+      toast({ title: "Dropbox connected successfully" });
+      setWasConnecting(false);
+    }
+  }, [status?.connected, wasConnecting]);
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/dropbox/disconnect");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dropbox/status"] });
+      toast({ title: "Dropbox disconnected" });
+    },
+    onError: () => toast({ title: "Failed to disconnect", variant: "destructive" }),
+  });
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+              <CloudUpload className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="font-medium">Dropbox</p>
+              <p className="text-sm text-muted-foreground">Cloud file storage</p>
+            </div>
+          </div>
+          {status?.connected && (
+            <Badge variant="outline" className="text-green-600 border-green-300">
+              <CheckCircle2 className="h-3 w-3 mr-1" /> Connected
+            </Badge>
+          )}
+        </div>
+
+        {isLoading ? (
+          <Skeleton className="h-10 w-full" />
+        ) : !status?.configured ? (
+          <p className="text-sm text-muted-foreground">
+            Dropbox integration is not configured for this platform. Contact your administrator to set up Dropbox API credentials.
+          </p>
+        ) : status?.connected ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">{status.email || status.displayName || "Account connected"}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Browse and import files from your Dropbox directly into transaction document checklists.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full text-destructive hover:text-destructive"
+              onClick={() => disconnectMutation.mutate()}
+              disabled={disconnectMutation.isPending}
+            >
+              {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect Dropbox"}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Connect your Dropbox to browse and import files directly into your transaction document checklists. Pick files from Dropbox, then send them for e-signature through DocuSign.
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> File browser
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> Import to checklist
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> Search files
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> DocuSign ready
+              </div>
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => connectMutation.mutate()}
+              disabled={connectMutation.isPending}
+            >
+              {connectMutation.isPending ? "Connecting..." : "Connect Dropbox Account"}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function IntegrationsSection() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -1475,6 +1591,7 @@ function IntegrationsSection() {
 
       <SignNowIntegrationCard />
       <DocuSignIntegrationCard />
+      <DropboxIntegrationCard />
 
       <Dialog open={showKeyDialog} onOpenChange={setShowKeyDialog}>
         <DialogContent>
