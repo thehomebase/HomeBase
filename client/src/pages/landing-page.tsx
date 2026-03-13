@@ -45,7 +45,7 @@ export default function LandingPage() {
                 <Zap className="h-3 w-3" /> Built for real estate professionals
               </div>
               <h1 className={`font-bold tracking-tight leading-tight mb-6 ${isMobile ? "text-4xl" : "text-5xl lg:text-6xl"}`}>
-                The Command Center for Your Real Estate Empire.
+                The All-in-One Real Estate Platform
               </h1>
               <p className={`text-muted-foreground leading-relaxed mb-8 ${isMobile ? "text-base" : "text-lg"} max-w-lg ${isMobile ? "mx-auto" : ""}`}>
                 Manage leads, track closings, and automate your follow-ups without the clutter. HomeBase is the CRM built for the modern agent.
