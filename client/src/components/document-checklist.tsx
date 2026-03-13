@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, ExternalLink, Link2, Upload, Send, Loader2, PenLine, RefreshCw } from "lucide-react";
+import { Plus, FileText, ExternalLink, Link2, Upload, Send, Loader2, PenLine, RefreshCw, Trash2 } from "lucide-react";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
@@ -40,6 +40,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "./ui/alert-dialog";
 
 const statusColumns = [
   { key: 'not_applicable', label: 'Not Applicable', color: 'gray' },
@@ -411,12 +422,14 @@ function DocumentCard({
   document, 
   isDragging,
   onUpdateNotes,
-  onUpdateSigning
+  onUpdateSigning,
+  onDelete
 }: { 
   document: Document; 
   isDragging?: boolean;
   onUpdateNotes: (id: string, notes: string) => void;
   onUpdateSigning: (id: string, signingUrl: string, signingPlatform: string) => void;
+  onDelete: (id: string, name: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: document.id,
@@ -491,6 +504,33 @@ function DocumentCard({
               </Tooltip>
             </TooltipProvider>
           )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="p-1 rounded hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Document</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete "{document.name}"? This action cannot be undone and any associated signing links or notes will be permanently removed.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => onDelete(document.id, document.name)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -578,13 +618,15 @@ function DroppableColumn({
   documents,
   title,
   onUpdateNotes,
-  onUpdateSigning
+  onUpdateSigning,
+  onDelete
 }: { 
   status: typeof statusColumns[number]['key'];
   documents: Document[];
   title: string;
   onUpdateNotes: (id: string, notes: string) => void;
   onUpdateSigning: (id: string, signingUrl: string, signingPlatform: string) => void;
+  onDelete: (id: string, name: string) => void;
 }) {
   const { setNodeRef } = useDroppable({
     id: status,
@@ -612,6 +654,7 @@ function DroppableColumn({
               document={doc} 
               onUpdateNotes={onUpdateNotes}
               onUpdateSigning={onUpdateSigning}
+              onDelete={onDelete}
             />
           ))}
         </SortableContext>
@@ -773,6 +816,22 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     });
   };
 
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/documents/${transactionId}/${id}`);
+      if (!res.ok) throw new Error("Failed to delete document");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
+      toast({ title: "Document deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete document", variant: "destructive" }),
+  });
+
+  const handleDeleteDocument = (id: string, name: string) => {
+    deleteDocumentMutation.mutate(id);
+  };
+
   const syncDocuSignMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/docusign/sync-status", { transactionId });
@@ -851,6 +910,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                 documents={documents.filter(doc => doc.status === column.key)}
                 onUpdateNotes={handleUpdateNotes}
                 onUpdateSigning={handleUpdateSigning}
+                onDelete={handleDeleteDocument}
               />
             ))}
           </div>
