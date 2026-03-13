@@ -6071,7 +6071,12 @@ export function registerRoutes(app: Express): Server {
       const membersWithContractors = await Promise.all(
         members.map(async (member) => {
           const contractor = await storage.getContractor(member.contractorId);
-          return { ...member, contractor: contractor || null };
+          let vendorProfilePhoto: string | null = null;
+          if (contractor?.vendorUserId) {
+            const vendorUser = await storage.getUser(contractor.vendorUserId);
+            vendorProfilePhoto = vendorUser?.profilePhotoUrl || null;
+          }
+          return { ...member, contractor: contractor || null, vendorProfilePhoto };
         })
       );
       res.json(membersWithContractors);

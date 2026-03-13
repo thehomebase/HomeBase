@@ -53,6 +53,7 @@ import type { Contractor, HomeTeamMember } from "@shared/schema";
 
 type TeamMemberWithContractor = HomeTeamMember & {
   contractor: Contractor | null;
+  vendorProfilePhoto?: string | null;
 };
 
 const CATEGORY_ICONS: Record<string, any> = {
@@ -311,11 +312,20 @@ function TeamMemberCard({ member, onRemove, isRemoving }: { member: TeamMemberWi
 
   const profileLink = c?.vendorUserId ? `/profile/${c.vendorUserId}` : null;
 
+  const photo = member.vendorProfilePhoto;
   const photoEl = (
     <div className={`relative w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-muted border-2 border-border overflow-hidden shadow-sm transition-shadow ${profileLink ? "hover:shadow-md cursor-pointer" : ""}`}>
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted-foreground/10">
-        <UserIcon className="h-12 w-12 text-muted-foreground/40" />
-      </div>
+      {photo ? (
+        <img
+          src={photo.startsWith("data:") ? photo : `data:image/png;base64,${photo}`}
+          alt={name}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted-foreground/10">
+          <UserIcon className="h-12 w-12 text-muted-foreground/40" />
+        </div>
+      )}
     </div>
   );
 
