@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, ExternalLink, Link2, Upload, Send, Loader2, PenLine } from "lucide-react";
+import { Plus, FileText, ExternalLink, Link2, Upload, Send, Loader2, PenLine, RefreshCw } from "lucide-react";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
@@ -77,6 +77,7 @@ interface Document {
   notes?: string;
   signingUrl?: string | null;
   signingPlatform?: string | null;
+  docusignEnvelopeId?: string | null;
 }
 
 function getStatusColor(status: Document['status']) {
@@ -223,8 +224,9 @@ function SignNowActions({ documentName, onSigningUrlSet }: { documentName: strin
   );
 }
 
-function DocuSignActions({ documentName, onSigningUrlSet }: { documentName: string; onSigningUrlSet: (url: string) => void }) {
+function DocuSignActions({ documentName, documentId, transactionId, onSigningUrlSet }: { documentName: string; documentId: number; transactionId: number; onSigningUrlSet: (url: string) => void }) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [signerEmail, setSignerEmail] = useState('');
   const [signerName, setSignerName] = useState('');
   const [consentChecked, setConsentChecked] = useState(false);
@@ -242,6 +244,8 @@ function DocuSignActions({ documentName, onSigningUrlSet }: { documentName: stri
       formData.append("signerName", signerName);
       formData.append("emailSubject", `Please sign: ${documentName}`);
       formData.append("consentAcknowledged", consentChecked ? "true" : "false");
+      formData.append("documentId", String(documentId));
+      formData.append("transactionId", String(transactionId));
       const res = await fetch("/api/docusign/prepare", {
         method: "POST",
         body: formData,
@@ -261,6 +265,7 @@ function DocuSignActions({ documentName, onSigningUrlSet }: { documentName: stri
       if (data.envelopeId) {
         onSigningUrlSet(`https://app.docusign.com/documents/details/${data.envelopeId}`);
       }
+      queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
     },
     onError: (err: any) => toast({ title: err.message || "Failed to prepare", variant: "destructive" }),
   });
@@ -273,6 +278,8 @@ function DocuSignActions({ documentName, onSigningUrlSet }: { documentName: stri
       formData.append("signerName", signerName);
       formData.append("emailSubject", `Please sign: ${documentName}`);
       formData.append("consentAcknowledged", consentChecked ? "true" : "false");
+      formData.append("documentId", String(documentId));
+      formData.append("transactionId", String(transactionId));
       const res = await fetch("/api/docusign/send", {
         method: "POST",
         body: formData,
@@ -289,6 +296,7 @@ function DocuSignActions({ documentName, onSigningUrlSet }: { documentName: stri
       if (data.envelopeId) {
         onSigningUrlSet(`https://app.docusign.com/documents/details/${data.envelopeId}`);
       }
+      queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
     },
     onError: (err: any) => toast({ title: err.message || "Failed to send", variant: "destructive" }),
   });
@@ -542,7 +550,7 @@ function DocumentCard({
             }} />
           )}
           {signingPlatform === 'docusign' && (
-            <DocuSignActions documentName={document.name} onSigningUrlSet={(url: string) => {
+            <DocuSignActions documentName={document.name} documentId={parseInt(document.id)} transactionId={document.transactionId} onSigningUrlSet={(url: string) => {
               setSigningUrl(url);
               onUpdateSigning(document.id, url, 'docusign');
             }} />
@@ -765,6 +773,29 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     });
   };
 
+  const syncDocuSignMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/docusign/sync-status", { transactionId });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to sync");
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      const advanced = data.results?.filter((r: any) => r.advanced).length || 0;
+      if (advanced > 0) {
+        toast({ title: `${advanced} document${advanced > 1 ? 's' : ''} moved to Signed` });
+        queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
+      } else if (data.synced > 0) {
+        toast({ title: "All DocuSign envelopes checked — no status changes" });
+      } else {
+        toast({ title: "No DocuSign documents to sync" });
+      }
+    },
+    onError: (err: any) => toast({ title: err.message || "Failed to sync DocuSign statuses", variant: "destructive" }),
+  });
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -786,8 +817,23 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Documents</CardTitle>
+        {(user?.role === 'agent' || user?.role === 'broker') && documents.some(d => d.docusignEnvelopeId) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => syncDocuSignMutation.mutate()}
+            disabled={syncDocuSignMutation.isPending}
+          >
+            {syncDocuSignMutation.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            Sync DocuSign
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         <DndContext

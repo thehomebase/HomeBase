@@ -163,7 +163,8 @@ export const documents = pgTable("documents", {
   clientId: integer("client_id"),
   signingUrl: text("signing_url"),
   signingPlatform: text("signing_platform", { enum: ['docusign', 'zipforms', 'dotloop', 'signnow', 'other'] }),
-  signnowDocumentId: text("signnow_document_id")
+  signnowDocumentId: text("signnow_document_id"),
+  docusignEnvelopeId: text("docusign_envelope_id")
 });
 
 export const contractors = pgTable("contractors", {

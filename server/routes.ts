@@ -4557,6 +4557,8 @@ export function registerRoutes(app: Express): Server {
       signerName: z.string().min(1),
       emailSubject: z.string().optional(),
       consentAcknowledged: z.string().transform(v => v === "true"),
+      documentId: z.string().optional(),
+      transactionId: z.string().optional(),
     });
 
     const parsed = schema.safeParse(req.body);
@@ -4587,6 +4589,18 @@ export function registerRoutes(app: Express): Server {
         metadata: { fileName: req.file.originalname, fileSize: req.file.size, signerName: parsed.data.signerName },
       });
 
+      if (parsed.data.documentId && parsed.data.transactionId) {
+        const docId = parseInt(parsed.data.documentId);
+        const txnId = parseInt(parsed.data.transactionId);
+        if (!isNaN(docId) && !isNaN(txnId)) {
+          const txn = await storage.getTransaction(txnId);
+          if (txn && (txn.agentId === req.user.id || req.user.role === "broker")) {
+            const signingUrl = `https://app.docusign.com/documents/details/${result.envelopeId}`;
+            await db.execute(sql`UPDATE documents SET signing_url = ${signingUrl}, signing_platform = 'docusign', docusign_envelope_id = ${result.envelopeId}, status = 'waiting_signatures' WHERE id = ${docId} AND transaction_id = ${txnId}`);
+          }
+        }
+      }
+
       res.json(result);
     } catch (error: any) {
       console.error("DocuSign send error:", error);
@@ -4604,6 +4618,8 @@ export function registerRoutes(app: Express): Server {
       signerName: z.string().min(1),
       emailSubject: z.string().optional(),
       consentAcknowledged: z.string().transform(v => v === "true"),
+      documentId: z.string().optional(),
+      transactionId: z.string().optional(),
     });
 
     const parsed = schema.safeParse(req.body);
@@ -4640,6 +4656,18 @@ export function registerRoutes(app: Express): Server {
         userAgent: req.get("user-agent") || undefined,
         metadata: { fileName: req.file.originalname, fileSize: req.file.size, signerName: parsed.data.signerName, mode: "embedded_sending" },
       });
+
+      if (parsed.data.documentId && parsed.data.transactionId) {
+        const docId = parseInt(parsed.data.documentId);
+        const txnId = parseInt(parsed.data.transactionId);
+        if (!isNaN(docId) && !isNaN(txnId)) {
+          const txn = await storage.getTransaction(txnId);
+          if (txn && (txn.agentId === req.user.id || req.user.role === "broker")) {
+            const signingUrl = `https://app.docusign.com/documents/details/${draft.envelopeId}`;
+            await db.execute(sql`UPDATE documents SET signing_url = ${signingUrl}, signing_platform = 'docusign', docusign_envelope_id = ${draft.envelopeId}, status = 'waiting_signatures' WHERE id = ${docId} AND transaction_id = ${txnId}`);
+          }
+        }
+      }
 
       res.json({ envelopeId: draft.envelopeId, senderViewUrl: senderView.url });
     } catch (error: any) {
@@ -4686,6 +4714,55 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error("DocuSign envelope status error:", error);
       res.status(500).json({ error: error.message || "Failed to get envelope status" });
+    }
+  });
+
+  app.post("/api/docusign/sync-status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+
+    const schema = z.object({ transactionId: z.number() });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "transactionId required" });
+
+    try {
+      const txn = await storage.getTransaction(parsed.data.transactionId);
+      if (!txn) return res.status(404).json({ error: "Transaction not found" });
+      if (txn.agentId !== req.user.id && req.user.role !== "broker") {
+        return res.status(403).json({ error: "Not authorized for this transaction" });
+      }
+
+      const docs = await db.execute(sql`SELECT id, docusign_envelope_id, status FROM documents WHERE transaction_id = ${parsed.data.transactionId} AND docusign_envelope_id IS NOT NULL AND status != 'signed'`);
+      const results: Array<{ documentId: number; envelopeId: string; envelopeStatus: string; advanced: boolean }> = [];
+
+      for (const doc of docs.rows) {
+        try {
+          const envStatus = await getEnvelopeStatus(req.user.id, doc.docusign_envelope_id as string);
+          let advanced = false;
+          if (envStatus.status === "completed") {
+            await db.execute(sql`UPDATE documents SET status = 'signed' WHERE id = ${doc.id}`);
+            advanced = true;
+          }
+          results.push({
+            documentId: doc.id as number,
+            envelopeId: doc.docusign_envelope_id as string,
+            envelopeStatus: envStatus.status,
+            advanced,
+          });
+        } catch (e: any) {
+          results.push({
+            documentId: doc.id as number,
+            envelopeId: doc.docusign_envelope_id as string,
+            envelopeStatus: "error",
+            advanced: false,
+          });
+        }
+      }
+
+      res.json({ synced: results.length, results });
+    } catch (error: any) {
+      console.error("DocuSign sync-status error:", error);
+      res.status(500).json({ error: error.message || "Failed to sync envelope statuses" });
     }
   });
 
