@@ -767,7 +767,10 @@ function DroppableColumn({
   title,
   onUpdateNotes,
   onUpdateSigning,
-  onDelete
+  onDelete,
+  onAddDocument,
+  isAgentOrBroker,
+  dropboxConnected,
 }: { 
   status: typeof statusColumns[number]['key'];
   documents: Document[];
@@ -775,12 +778,40 @@ function DroppableColumn({
   onUpdateNotes: (id: string, notes: string) => void;
   onUpdateSigning: (id: string, signingUrl: string, signingPlatform: string) => void;
   onDelete: (id: string, name: string) => void;
+  onAddDocument?: (name: string) => void;
+  isAgentOrBroker?: boolean;
+  dropboxConnected?: boolean;
 }) {
   const { setNodeRef } = useDroppable({
     id: status,
   });
 
   const statusColor = getStatusColor(status);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [docName, setDocName] = useState("");
+  const [showDropboxInDialog, setShowDropboxInDialog] = useState(false);
+
+  const handleAddFromName = () => {
+    if (docName.trim() && onAddDocument) {
+      onAddDocument(docName.trim());
+      setDocName("");
+      setShowAddDialog(false);
+    }
+  };
+
+  const handleAddFromDevice = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg";
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file && onAddDocument) {
+        onAddDocument(file.name);
+        setShowAddDialog(false);
+      }
+    };
+    input.click();
+  };
 
   return (
     <div className="space-y-4">
@@ -806,6 +837,74 @@ function DroppableColumn({
             />
           ))}
         </SortableContext>
+        {status === "not_applicable" && isAgentOrBroker && onAddDocument && (
+          <>
+            <button
+              onClick={() => setShowAddDialog(true)}
+              className="w-full border-2 border-dashed border-muted-foreground/30 rounded-md p-3 text-sm text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Document
+            </button>
+            <Dialog open={showAddDialog} onOpenChange={(open) => { setShowAddDialog(open); if (!open) { setDocName(""); setShowDropboxInDialog(false); } }}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Add Document</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Document Name</label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Enter document name..."
+                        value={docName}
+                        onChange={(e) => setDocName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleAddFromName()}
+                        className="flex-1"
+                      />
+                      <Button size="sm" onClick={handleAddFromName} disabled={!docName.trim()}>
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">or add from</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Button variant="outline" onClick={handleAddFromDevice} className="w-full justify-start">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload from Device
+                    </Button>
+                    {dropboxConnected && (
+                      <Button variant="outline" onClick={() => setShowDropboxInDialog(true)} className="w-full justify-start">
+                        <CloudUpload className="h-4 w-4 mr-2 text-blue-600" />
+                        Import from Dropbox
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+            {showDropboxInDialog && (
+              <AddDocDropboxBrowser
+                open={showDropboxInDialog}
+                onOpenChange={setShowDropboxInDialog}
+                onFileSelected={(fileName) => {
+                  if (onAddDocument) {
+                    onAddDocument(fileName);
+                    setShowAddDialog(false);
+                    setShowDropboxInDialog(false);
+                  }
+                }}
+              />
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -1006,13 +1105,151 @@ function DropboxFileBrowser({ transactionId, open, onOpenChange }: { transaction
   );
 }
 
+function AddDocDropboxBrowser({ open, onOpenChange, onFileSelected }: { open: boolean; onOpenChange: (open: boolean) => void; onFileSelected: (fileName: string) => void }) {
+  const { toast } = useToast();
+  const [currentPath, setCurrentPath] = useState("");
+  const [pathHistory, setPathHistory] = useState<string[]>([""]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<DropboxEntry[] | null>(null);
+
+  const { data: filesData, isLoading: filesLoading } = useQuery<{ entries: DropboxEntry[]; hasMore: boolean }>({
+    queryKey: ["/api/dropbox/files", currentPath, "add-doc"],
+    queryFn: async () => {
+      const res = await apiRequest("POST", "/api/dropbox/files", { path: currentPath });
+      return res.json();
+    },
+    enabled: open && !searchResults,
+  });
+
+  const entries = searchResults || filesData?.entries || [];
+  const currentFolder = currentPath ? currentPath.split("/").pop() : "Dropbox";
+
+  const formatSize = (bytes?: number) => {
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setIsSearching(true);
+    try {
+      const res = await apiRequest("POST", "/api/dropbox/search", { query: searchQuery.trim() });
+      const results = await res.json();
+      setSearchResults(results);
+    } catch {
+      toast({ title: "Search failed", variant: "destructive" });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CloudUpload className="h-5 w-5 text-blue-600" />
+            Select from Dropbox
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex gap-2 mb-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search files..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              className="pl-8"
+            />
+          </div>
+          <Button size="sm" variant="outline" onClick={handleSearch} disabled={isSearching || !searchQuery.trim()}>
+            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+          </Button>
+        </div>
+        {searchResults ? (
+          <div className="flex items-center gap-2 mb-2">
+            <Badge variant="secondary" className="text-xs">Search results for "{searchQuery}"</Badge>
+            <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => { setSearchResults(null); setSearchQuery(""); }}>Clear</Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 mb-2">
+            {pathHistory.length > 1 && (
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { const h = [...pathHistory]; h.pop(); setPathHistory(h); setCurrentPath(h[h.length - 1]); setSearchResults(null); }}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <span className="text-sm font-medium text-muted-foreground truncate">{currentFolder}</span>
+          </div>
+        )}
+        <div className="flex-1 min-h-0 overflow-y-auto" style={{ maxHeight: "400px" }}>
+          {filesLoading || isSearching ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              {searchResults ? "No files found" : "This folder is empty"}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {entries
+                .sort((a, b) => {
+                  if (a.isFolder && !b.isFolder) return -1;
+                  if (!a.isFolder && b.isFolder) return 1;
+                  return a.name.localeCompare(b.name);
+                })
+                .map((entry, i) => (
+                  <div
+                    key={`${entry.path}-${i}`}
+                    className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 group cursor-pointer"
+                    onClick={() => {
+                      if (entry.isFolder) {
+                        setPathHistory(prev => [...prev, entry.path]);
+                        setCurrentPath(entry.path);
+                        setSearchResults(null);
+                        setSearchQuery("");
+                      } else {
+                        onFileSelected(entry.name);
+                      }
+                    }}
+                  >
+                    {entry.isFolder ? (
+                      <Folder className="h-5 w-5 text-blue-500 shrink-0" />
+                    ) : (
+                      <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm truncate">{entry.name}</p>
+                      {!entry.isFolder && entry.size != null && (
+                        <p className="text-xs text-muted-foreground">{formatSize(entry.size)}</p>
+                      )}
+                    </div>
+                    {entry.isFolder ? (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                    ) : (
+                      <Button size="sm" variant="outline" className="opacity-0 group-hover:opacity-100 shrink-0">
+                        <Plus className="h-3 w-3 mr-1" /> Select
+                      </Button>
+                    )}
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function DocumentChecklist({ transactionId }: { transactionId: number }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [newDocument, setNewDocument] = useState("");
-  const [showDropbox, setShowDropbox] = useState(false);
 
   const { data: dropboxStatus } = useQuery<{ configured: boolean; connected: boolean }>({
     queryKey: ["/api/dropbox/status"],
@@ -1259,6 +1496,9 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                 onUpdateNotes={handleUpdateNotes}
                 onUpdateSigning={handleUpdateSigning}
                 onDelete={handleDeleteDocument}
+                onAddDocument={(name: string) => addDocumentMutation.mutate(name)}
+                isAgentOrBroker={user?.role === 'agent' || user?.role === 'broker'}
+                dropboxConnected={dropboxStatus?.connected}
               />
             ))}
           </div>
@@ -1270,72 +1510,6 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
             )}
           </DragOverlay>
         </DndContext>
-        {(user?.role === 'agent' || user?.role === 'broker') && (
-          <div className="pt-6 mt-6 border-t space-y-3">
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (newDocument.trim()) {
-                addDocumentMutation.mutate(newDocument.trim());
-              }
-            }} className="flex flex-col sm:flex-row gap-2">
-              <Input
-                placeholder="New document name..."
-                value={newDocument}
-                onChange={(e) => setNewDocument(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                type="submit"
-                disabled={!newDocument.trim() || addDocumentMutation.isPending}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Document
-              </Button>
-            </form>
-            <div className="flex flex-wrap gap-2">
-              <div>
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                  id="checklist-device-upload"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      addDocumentMutation.mutate(file.name);
-                    }
-                    e.target.value = "";
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto"
-                  onClick={() => document.getElementById("checklist-device-upload")?.click()}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload from Device
-                </Button>
-              </div>
-              {dropboxStatus?.connected && (
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto"
-                  onClick={() => setShowDropbox(true)}
-                >
-                  <CloudUpload className="h-4 w-4 mr-2 text-blue-600" />
-                  Import from Dropbox
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-        {showDropbox && (
-          <DropboxFileBrowser
-            transactionId={transactionId}
-            open={showDropbox}
-            onOpenChange={setShowDropbox}
-          />
-        )}
       </CardContent>
     </Card>
   );
