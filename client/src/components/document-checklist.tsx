@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -1234,14 +1234,42 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       if (advanced > 0) {
         toast({ title: `${advanced} document${advanced > 1 ? 's' : ''} moved to Signed` });
         queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
-      } else if (data.synced > 0) {
+      } else if (data.synced > 0 && !autoSyncRef.current) {
         toast({ title: "All DocuSign envelopes checked — no status changes" });
-      } else {
-        toast({ title: "No DocuSign documents to sync" });
       }
+      autoSyncRef.current = false;
     },
-    onError: (err: any) => toast({ title: err.message || "Failed to sync DocuSign statuses", variant: "destructive" }),
+    onError: (err: any) => {
+      autoSyncRef.current = false;
+      toast({ title: err.message || "Failed to sync DocuSign statuses", variant: "destructive" });
+    },
   });
+
+  const autoSyncRef = useRef(false);
+  const hasSyncedOnLoad = useRef(false);
+
+  useEffect(() => {
+    const hasWaitingDocuSign = documents.some(d => d.docusignEnvelopeId && d.status !== 'signed' && d.status !== 'complete');
+    if (hasWaitingDocuSign && !hasSyncedOnLoad.current && !syncDocuSignMutation.isPending && (user?.role === 'agent' || user?.role === 'broker')) {
+      hasSyncedOnLoad.current = true;
+      autoSyncRef.current = true;
+      syncDocuSignMutation.mutate();
+    }
+  }, [documents]);
+
+  useEffect(() => {
+    const hasWaitingDocuSign = documents.some(d => d.docusignEnvelopeId && d.status !== 'signed' && d.status !== 'complete');
+    if (!hasWaitingDocuSign || user?.role !== 'agent' && user?.role !== 'broker') return;
+
+    const interval = setInterval(() => {
+      if (!syncDocuSignMutation.isPending) {
+        autoSyncRef.current = true;
+        syncDocuSignMutation.mutate();
+      }
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [documents, user?.role]);
 
   if (isLoading) {
     return <div>Loading...</div>;
