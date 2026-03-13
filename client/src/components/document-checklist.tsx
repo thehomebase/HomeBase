@@ -54,9 +54,11 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import { Label } from "./ui/label";
 import { ScrollArea } from "./ui/scroll-area";
 
 const statusColumns = [
@@ -1055,6 +1057,11 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
+  const [forwardDoc, setForwardDoc] = useState<Document | null>(null);
+  const [forwardEmail, setForwardEmail] = useState('');
+  const [forwardName, setForwardName] = useState('');
+  const [forwardMessage, setForwardMessage] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1183,6 +1190,15 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     const activeDocument = documents.find(doc => doc.id === documentId);
     if (!activeDocument || activeDocument.status === status) return;
 
+    if (activeDocument.status === 'signed' && status === 'waiting_others' && activeDocument.docusignEnvelopeId) {
+      setForwardDoc(activeDocument);
+      setForwardEmail('');
+      setForwardName('');
+      setForwardMessage('');
+      setForwardDialogOpen(true);
+      return;
+    }
+
     updateDocumentMutation.mutate({
       id: documentId,
       status
@@ -1243,6 +1259,27 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       autoSyncRef.current = false;
       toast({ title: err.message || "Failed to sync DocuSign statuses", variant: "destructive" });
     },
+  });
+
+  const forwardDocumentMutation = useMutation({
+    mutationFn: async (data: { recipientEmail: string; recipientName: string; message?: string; documentId: string }) => {
+      const res = await apiRequest("POST", "/api/docusign/forward-document", {
+        ...data,
+        transactionId,
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to forward document");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
+      toast({ title: "Document forwarded successfully" });
+      setForwardDialogOpen(false);
+      setForwardDoc(null);
+    },
+    onError: (err: any) => toast({ title: err.message || "Failed to forward document", variant: "destructive" }),
   });
 
   const autoSyncRef = useRef(false);
@@ -1341,6 +1378,92 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
             )}
           </DragOverlay>
         </DndContext>
+
+        <Dialog open={forwardDialogOpen} onOpenChange={(open) => {
+          if (!forwardDocumentMutation.isPending) {
+            setForwardDialogOpen(open);
+            if (!open) setForwardDoc(null);
+          }
+        }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Send className="h-4 w-4" />
+                Forward Document
+              </DialogTitle>
+              <DialogDescription>
+                Send "{forwardDoc?.name}" to the other agent via your Gmail. The signed document will be downloaded from DocuSign and attached to the email.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="forward-name">Recipient Name</Label>
+                <Input
+                  id="forward-name"
+                  placeholder="e.g. Jane Smith"
+                  value={forwardName}
+                  onChange={e => setForwardName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="forward-email">Recipient Email</Label>
+                <Input
+                  id="forward-email"
+                  type="email"
+                  placeholder="e.g. jane@realty.com"
+                  value={forwardEmail}
+                  onChange={e => setForwardEmail(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="forward-message">Message (optional)</Label>
+                <Textarea
+                  id="forward-message"
+                  placeholder="Please review and have your clients sign..."
+                  value={forwardMessage}
+                  onChange={e => setForwardMessage(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setForwardDialogOpen(false);
+                    setForwardDoc(null);
+                  }}
+                  disabled={forwardDocumentMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!forwardDoc?.docusignEnvelopeId || !forwardEmail || !forwardName) return;
+                    forwardDocumentMutation.mutate({
+                      recipientEmail: forwardEmail,
+                      recipientName: forwardName,
+                      message: forwardMessage || undefined,
+                      documentId: forwardDoc.id,
+                    });
+                  }}
+                  disabled={!forwardEmail || !forwardName || forwardDocumentMutation.isPending}
+                >
+                  {forwardDocumentMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Send via Gmail
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
