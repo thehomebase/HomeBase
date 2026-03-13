@@ -185,6 +185,8 @@ export async function listDropboxFiles(userId: number, path: string = ""): Promi
   const token = await getAccessToken(userId);
   if (!token) throw new Error("Dropbox not connected");
 
+  const allEntries: Array<{ name: string; path: string; isFolder: boolean; size?: number; modified?: string; id?: string }> = [];
+
   const res = await fetch("https://api.dropboxapi.com/2/files/list_folder", {
     method: "POST",
     headers: {
@@ -194,7 +196,7 @@ export async function listDropboxFiles(userId: number, path: string = ""): Promi
     body: JSON.stringify({
       path: path || "",
       include_non_downloadable_files: false,
-      limit: 100,
+      limit: 2000,
     }),
   });
 
@@ -204,19 +206,47 @@ export async function listDropboxFiles(userId: number, path: string = ""): Promi
     throw new Error("Failed to list Dropbox files");
   }
 
-  const data = await res.json();
+  let data = await res.json();
 
-  return {
-    entries: data.entries.map((entry: any) => ({
+  for (const entry of data.entries) {
+    allEntries.push({
       name: entry.name,
       path: entry.path_display || entry.path_lower,
       isFolder: entry[".tag"] === "folder",
       size: entry.size,
       modified: entry.server_modified,
       id: entry.id,
-    })),
-    hasMore: data.has_more,
-    cursor: data.cursor,
+    });
+  }
+
+  while (data.has_more && data.cursor) {
+    const continueRes = await fetch("https://api.dropboxapi.com/2/files/list_folder/continue", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ cursor: data.cursor }),
+    });
+
+    if (!continueRes.ok) break;
+
+    data = await continueRes.json();
+    for (const entry of data.entries) {
+      allEntries.push({
+        name: entry.name,
+        path: entry.path_display || entry.path_lower,
+        isFolder: entry[".tag"] === "folder",
+        size: entry.size,
+        modified: entry.server_modified,
+        id: entry.id,
+      });
+    }
+  }
+
+  return {
+    entries: allEntries,
+    hasMore: false,
   };
 }
 

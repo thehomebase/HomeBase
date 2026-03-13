@@ -945,7 +945,7 @@ function DropboxFileBrowser({ transactionId, open, onOpenChange }: { transaction
           </div>
         )}
 
-        <ScrollArea className="flex-1 min-h-0 max-h-[400px]">
+        <div className="flex-1 min-h-0 overflow-y-auto" style={{ maxHeight: "400px" }}>
           {filesLoading || isSearching ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -1000,7 +1000,7 @@ function DropboxFileBrowser({ transactionId, open, onOpenChange }: { transaction
                 ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
