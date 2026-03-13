@@ -158,13 +158,13 @@ export default function LandingPage() {
           <div className="text-center mb-12">
             <p className="text-sm text-primary font-medium uppercase tracking-wider mb-2">For Every Role</p>
             <h2 className={`font-bold tracking-tight mb-4 ${isMobile ? "text-3xl" : "text-4xl"}`}>
-              One platform, every perspective
+              Not just another CRM.
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Whether you're an agent, vendor, lender, or client — HomeBase has a tailored experience for you.
+              HomeBase is an entire ecosystem designed to bring everyone involved in a transaction onto a single, beautifully designed platform.
             </p>
           </div>
-          <div className={`grid gap-6 ${isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-4"}`}>
+          <div className={`grid gap-6 ${isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-5"}`}>
             {roles.map((role) => (
               <Card key={role.title} className="overflow-hidden hover:shadow-lg transition-shadow">
                 <div className={`h-1.5 ${role.gradient}`} />
@@ -446,6 +446,13 @@ const roles = [
   },
   {
     icon: Building2,
+    title: "Brokers",
+    color: "text-indigo-600",
+    gradient: "bg-gradient-to-r from-indigo-500 to-indigo-600",
+    perks: ["Agent oversight", "Sales competitions", "Lead routing", "Team performance"]
+  },
+  {
+    icon: Award,
     title: "Vendors",
     color: "text-green-600",
     gradient: "bg-gradient-to-r from-green-500 to-green-600",
