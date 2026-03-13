@@ -88,6 +88,7 @@ import {
   SiMailchimp,
   SiSlack,
   SiGooglesheets,
+  SiGmail,
 } from "react-icons/si";
 import { startRegistration } from "@simplewebauthn/browser";
 import type { ApiKey, Webhook as WebhookType, ReferralCredit } from "@shared/schema";
@@ -981,6 +982,151 @@ function BillingSection() {
   );
 }
 
+function GmailIntegrationCard() {
+  const { toast } = useToast();
+
+  const { data: commStatus, isLoading } = useQuery<{
+    twilio: boolean;
+    gmail: { connected: boolean; email?: string };
+  }>({
+    queryKey: ["/api/communications/status"],
+    refetchInterval: 5000,
+  });
+
+  const gmailConnected = commStatus?.gmail?.connected;
+  const gmailEmail = commStatus?.gmail?.email;
+
+  const [wasConnecting, setWasConnecting] = useState(false);
+
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("GET", "/api/gmail/auth-url?returnTo=/settings");
+      const data = await res.json();
+      window.open(data.url, '_blank');
+      setWasConnecting(true);
+    },
+    onError: () => toast({ title: "Failed to connect Gmail", variant: "destructive" }),
+  });
+
+  useEffect(() => {
+    if (wasConnecting && gmailConnected) {
+      toast({ title: "Gmail connected successfully" });
+      setWasConnecting(false);
+    }
+  }, [gmailConnected, wasConnecting]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("gmail") === "connected") {
+      toast({ title: "Gmail connected successfully" });
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("gmail") === "error") {
+      toast({ title: "Failed to connect Gmail", variant: "destructive" });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/gmail/disconnect");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/communications/status"] });
+      toast({ title: "Gmail disconnected" });
+    },
+    onError: () => toast({ title: "Failed to disconnect", variant: "destructive" }),
+  });
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center">
+              <SiGmail className="h-6 w-6 text-red-500" />
+            </div>
+            <div>
+              <p className="font-medium">Gmail</p>
+              <p className="text-sm text-muted-foreground">Send and receive emails</p>
+            </div>
+          </div>
+          {gmailConnected && (
+            <Badge variant="outline" className="text-green-600 border-green-300">
+              <CheckCircle2 className="h-3 w-3 mr-1" /> Connected
+            </Badge>
+          )}
+        </div>
+
+        {isLoading ? (
+          <Skeleton className="h-10 w-full" />
+        ) : gmailConnected ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">{gmailEmail || "Account connected"}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Your Gmail account is used for sending emails, client communication, and forwarding signed documents from the Mail page.
+            </p>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full text-destructive hover:text-destructive"
+                  disabled={disconnectMutation.isPending}
+                >
+                  {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect Gmail"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader className="text-left">
+                  <AlertDialogTitle>Disconnect Gmail?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Disconnecting will stop all email functionality including sending emails, forwarding documents, and email tracking. You can reconnect anytime.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => disconnectMutation.mutate()}>
+                    Disconnect
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Connect your Gmail account to send and receive emails, forward signed documents, and track email opens directly from HomeBase.
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> Send & receive email
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> Email tracking
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> Your signature
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> Forward documents
+              </div>
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => connectMutation.mutate()}
+              disabled={connectMutation.isPending}
+            >
+              {connectMutation.isPending ? "Connecting..." : "Connect Gmail Account"}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function SignNowIntegrationCard() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -1589,6 +1735,7 @@ function IntegrationsSection() {
         </CardContent>
       </Card>
 
+      <GmailIntegrationCard />
       <SignNowIntegrationCard />
       <DocuSignIntegrationCard />
       <DropboxIntegrationCard />

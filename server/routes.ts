@@ -2995,6 +2995,10 @@ export function registerRoutes(app: Express): Server {
       const nonce = crypto.randomBytes(32).toString("hex");
       (req.session as any).gmailOAuthState = nonce;
       (req.session as any).gmailOAuthUserId = req.user.id;
+      const returnTo = req.query.returnTo as string | undefined;
+      if (returnTo) {
+        (req.session as any).gmailOAuthReturnTo = returnTo;
+      }
       const url = getAuthUrl(nonce);
       res.json({ url });
     } catch (error: any) {
@@ -3022,15 +3026,20 @@ export function registerRoutes(app: Express): Server {
       return res.redirect(`${baseUrl}/clients?gmail=error`);
     }
 
+    const returnTo = (req.session as any).gmailOAuthReturnTo;
     delete (req.session as any).gmailOAuthState;
     delete (req.session as any).gmailOAuthUserId;
+    delete (req.session as any).gmailOAuthReturnTo;
+
+    const defaultReturn = "/clients";
+    const returnPath = returnTo === "/settings" ? "/settings" : defaultReturn;
 
     try {
       await handleCallback(code, userId);
-      res.redirect(`${baseUrl}/clients?gmail=connected`);
+      res.redirect(`${baseUrl}${returnPath}?gmail=connected`);
     } catch (error: any) {
       console.error("Gmail callback error:", error);
-      res.redirect(`${baseUrl}/clients?gmail=error`);
+      res.redirect(`${baseUrl}${returnPath}?gmail=error`);
     }
   });
 
