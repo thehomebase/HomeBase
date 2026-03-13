@@ -1292,16 +1292,41 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                 Add Document
               </Button>
             </form>
-            {dropboxStatus?.connected && (
-              <Button
-                variant="outline"
-                className="w-full sm:w-auto"
-                onClick={() => setShowDropbox(true)}
-              >
-                <CloudUpload className="h-4 w-4 mr-2 text-blue-600" />
-                Import from Dropbox
-              </Button>
-            )}
+            <div className="flex flex-wrap gap-2">
+              <div>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                  id="checklist-device-upload"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      addDocumentMutation.mutate(file.name);
+                    }
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => document.getElementById("checklist-device-upload")?.click()}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload from Device
+                </Button>
+              </div>
+              {dropboxStatus?.connected && (
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => setShowDropbox(true)}
+                >
+                  <CloudUpload className="h-4 w-4 mr-2 text-blue-600" />
+                  Import from Dropbox
+                </Button>
+              )}
+            </div>
           </div>
         )}
         {showDropbox && (
