@@ -4333,12 +4333,13 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/signnow/callback", async (req, res) => {
     const code = req.query.code as string;
     const state = req.query.state as string;
-    const domains = process.env.REPLIT_DOMAINS || "";
-    const domain = domains.split(",")[0];
-    const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+
+    const sendCallbackPage = (success: boolean, message: string) => {
+      res.send(`<!DOCTYPE html><html><head><title>SignNow Connection</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f9fafb;color:#111}div{text-align:center;padding:2rem;border-radius:12px;background:white;box-shadow:0 1px 3px rgba(0,0,0,.1);max-width:400px}h2{margin:0 0 .5rem}p{color:#6b7280;margin:.5rem 0}</style></head><body><div><h2>${success ? "Connected!" : "Connection Failed"}</h2><p>${message}</p><p style="font-size:14px;color:#9ca3af">You can close this tab and return to HomeBase.</p></div></body></html>`);
+    };
 
     if (!code || !state) {
-      return res.redirect(`${baseUrl}/settings?signnow=error`);
+      return sendCallbackPage(false, "Missing authorization code. Please try again from Settings.");
     }
 
     const sessionState = (req.session as any).signnowOAuthState;
@@ -4346,7 +4347,7 @@ export function registerRoutes(app: Express): Server {
 
     if (!sessionState || !userId || state !== sessionState) {
       console.error("SignNow OAuth state mismatch");
-      return res.redirect(`${baseUrl}/settings?signnow=error`);
+      return sendCallbackPage(false, "Session expired or state mismatch. Please try again from Settings.");
     }
 
     delete (req.session as any).signnowOAuthState;
@@ -4355,10 +4356,10 @@ export function registerRoutes(app: Express): Server {
     try {
       await handleSignNowCallback(code, userId);
       await logSignNowAction(userId, "account_connected", { ipAddress: req.ip, userAgent: req.get("user-agent") || undefined });
-      res.redirect(`${baseUrl}/settings?signnow=connected`);
+      sendCallbackPage(true, "Your SignNow account has been connected successfully.");
     } catch (error: any) {
       console.error("SignNow callback error:", error);
-      res.redirect(`${baseUrl}/settings?signnow=error`);
+      sendCallbackPage(false, "Something went wrong connecting your account. Please try again.");
     }
   });
 
@@ -4495,12 +4496,13 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/docusign/callback", async (req, res) => {
     const code = req.query.code as string;
     const state = req.query.state as string;
-    const domains = process.env.REPLIT_DOMAINS || "";
-    const domain = domains.split(",")[0];
-    const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+
+    const sendCallbackPage = (success: boolean, message: string) => {
+      res.send(`<!DOCTYPE html><html><head><title>DocuSign Connection</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f9fafb;color:#111}div{text-align:center;padding:2rem;border-radius:12px;background:white;box-shadow:0 1px 3px rgba(0,0,0,.1);max-width:400px}h2{margin:0 0 .5rem}p{color:#6b7280;margin:.5rem 0}</style></head><body><div><h2>${success ? "Connected!" : "Connection Failed"}</h2><p>${message}</p><p style="font-size:14px;color:#9ca3af">You can close this tab and return to HomeBase.</p></div></body></html>`);
+    };
 
     if (!code || !state) {
-      return res.redirect(`${baseUrl}/settings?docusign=error`);
+      return sendCallbackPage(false, "Missing authorization code. Please try again from Settings.");
     }
 
     const sessionState = (req.session as any).docusignOAuthState;
@@ -4508,7 +4510,7 @@ export function registerRoutes(app: Express): Server {
 
     if (!sessionState || !userId || state !== sessionState) {
       console.error("DocuSign OAuth state mismatch");
-      return res.redirect(`${baseUrl}/settings?docusign=error`);
+      return sendCallbackPage(false, "Session expired or state mismatch. Please try again from Settings.");
     }
 
     delete (req.session as any).docusignOAuthState;
@@ -4517,10 +4519,10 @@ export function registerRoutes(app: Express): Server {
     try {
       await handleDocuSignCallback(code, userId);
       await logDocuSignAction(userId, "account_connected", { ipAddress: req.ip, userAgent: req.get("user-agent") || undefined });
-      res.redirect(`${baseUrl}/settings?docusign=connected`);
+      sendCallbackPage(true, "Your DocuSign account has been connected successfully.");
     } catch (error: any) {
       console.error("DocuSign callback error:", error);
-      res.redirect(`${baseUrl}/settings?docusign=error`);
+      sendCallbackPage(false, "Something went wrong connecting your account. Please try again.");
     }
   });
 

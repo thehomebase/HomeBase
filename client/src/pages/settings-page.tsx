@@ -986,16 +986,27 @@ function SignNowIntegrationCard() {
 
   const { data: status, isLoading } = useQuery<{ configured: boolean; connected: boolean; email?: string }>({
     queryKey: ["/api/signnow/status"],
+    refetchInterval: 5000,
   });
+
+  const [wasConnecting, setWasConnecting] = useState(false);
 
   const connectMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("GET", "/api/signnow/auth-url");
       const data = await res.json();
-      window.location.href = data.url;
+      window.open(data.url, '_blank');
+      setWasConnecting(true);
     },
     onError: () => toast({ title: "Failed to connect SignNow", variant: "destructive" }),
   });
+
+  useEffect(() => {
+    if (wasConnecting && status?.connected) {
+      toast({ title: "SignNow connected successfully" });
+      setWasConnecting(false);
+    }
+  }, [status?.connected, wasConnecting]);
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
@@ -1007,18 +1018,6 @@ function SignNowIntegrationCard() {
     },
     onError: () => toast({ title: "Failed to disconnect", variant: "destructive" }),
   });
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("signnow") === "connected") {
-      toast({ title: "SignNow connected successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/signnow/status"] });
-      window.history.replaceState({}, "", window.location.pathname);
-    } else if (params.get("signnow") === "error") {
-      toast({ title: "Failed to connect SignNow", variant: "destructive" });
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, []);
 
   return (
     <Card>
@@ -1116,16 +1115,27 @@ function DocuSignIntegrationCard() {
 
   const { data: status, isLoading } = useQuery<{ configured: boolean; connected: boolean; email?: string }>({
     queryKey: ["/api/docusign/status"],
+    refetchInterval: 5000,
   });
+
+  const [wasConnecting, setWasConnecting] = useState(false);
 
   const connectMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("GET", "/api/docusign/auth-url");
       const data = await res.json();
-      window.location.href = data.url;
+      window.open(data.url, '_blank');
+      setWasConnecting(true);
     },
     onError: () => toast({ title: "Failed to connect DocuSign", variant: "destructive" }),
   });
+
+  useEffect(() => {
+    if (wasConnecting && status?.connected) {
+      toast({ title: "DocuSign connected successfully" });
+      setWasConnecting(false);
+    }
+  }, [status?.connected, wasConnecting]);
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
@@ -1137,18 +1147,6 @@ function DocuSignIntegrationCard() {
     },
     onError: () => toast({ title: "Failed to disconnect", variant: "destructive" }),
   });
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("docusign") === "connected") {
-      toast({ title: "DocuSign connected successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/docusign/status"] });
-      window.history.replaceState({}, "", window.location.pathname);
-    } else if (params.get("docusign") === "error") {
-      toast({ title: "Failed to connect DocuSign", variant: "destructive" });
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, []);
 
   return (
     <Card>
