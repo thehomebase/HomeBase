@@ -15,8 +15,278 @@ import {
   ShieldCheck,
   Zap,
   MapPin,
-  Clock
+  Clock,
+  Calendar,
+  Navigation,
+  Route,
+  MessageSquare,
+  Send,
+  Star,
+  ChevronRight,
+  GripVertical,
+  Plus,
+  Search,
+  MoreHorizontal,
+  CalendarDays
 } from "lucide-react";
+
+function KanbanMockup() {
+  const columns: { title: string; color: string; borderColor: string; docs: { name: string; badge: string; signing?: string }[] }[] = [
+    {
+      title: "Not Applicable",
+      color: "bg-gray-100 text-gray-700",
+      borderColor: "border-gray-200",
+      docs: [
+        { name: "IABS", badge: "gray" },
+        { name: "Lead Paint Disclosure", badge: "gray" },
+      ]
+    },
+    {
+      title: "Waiting Signatures",
+      color: "bg-orange-100 text-orange-700",
+      borderColor: "border-orange-200",
+      docs: [
+        { name: "Buyer Rep Agreement", badge: "orange", signing: "DocuSign" },
+        { name: "Third Party Financing", badge: "orange", signing: "SignNow" },
+      ]
+    },
+    {
+      title: "Signed",
+      color: "bg-blue-100 text-blue-700",
+      borderColor: "border-blue-200",
+      docs: [
+        { name: "1-4 Family Contract", badge: "blue" },
+        { name: "Listing Agreement", badge: "blue" },
+        { name: "T-47 Survey", badge: "blue" },
+      ]
+    },
+    {
+      title: "Waiting Others",
+      color: "bg-purple-100 text-purple-700",
+      borderColor: "border-purple-200",
+      docs: [
+        { name: "Option Fee Receipt", badge: "purple" },
+        { name: "Earnest Money Receipt", badge: "purple" },
+      ]
+    },
+    {
+      title: "Complete",
+      color: "bg-green-100 text-green-700",
+      borderColor: "border-green-200",
+      docs: [
+        { name: "MLS Data Sheet", badge: "green" },
+        { name: "Seller's Disclosure", badge: "green" },
+        { name: "HOA Docs", badge: "green" },
+        { name: "Title Commitment", badge: "green" },
+      ]
+    },
+  ];
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-slate-600" />
+          <span className="font-semibold text-sm text-slate-800">Document Checklist</span>
+          <span className="text-xs text-slate-400">• 1847 Oakwood Dr</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="text-xs bg-black text-white px-3 py-1 rounded-md flex items-center gap-1"><Plus className="w-3 h-3" /> Add</button>
+        </div>
+      </div>
+      <div className="flex gap-0 overflow-x-auto">
+        {columns.map((col) => (
+          <div key={col.title} className={`min-w-[160px] flex-1 border-r last:border-r-0 border-slate-100`}>
+            <div className="px-3 py-2 border-b border-slate-100">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${col.color}`}>{col.title}</span>
+              <span className="text-[10px] text-slate-400 ml-1">{col.docs.length}</span>
+            </div>
+            <div className="p-2 space-y-1.5 min-h-[120px]">
+              {col.docs.map((doc) => (
+                <div key={doc.name} className="bg-white border border-slate-150 rounded-md p-2 text-[11px] hover:shadow-sm transition-shadow cursor-move group">
+                  <div className="flex items-start gap-1">
+                    <GripVertical className="w-3 h-3 text-slate-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    <span className="font-medium text-slate-800 leading-tight">{doc.name}</span>
+                  </div>
+                  {doc.signing && (
+                    <span className="text-[9px] text-slate-400 ml-4 flex items-center gap-0.5 mt-0.5">
+                      <Send className="w-2.5 h-2.5" /> {doc.signing}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PhoneMockup() {
+  return (
+    <div className="relative mx-auto" style={{ width: 280 }}>
+      <div className="bg-slate-900 rounded-[40px] p-3 shadow-[0_25px_60px_rgba(0,0,0,0.3)]">
+        <div className="bg-white rounded-[28px] overflow-hidden" style={{ height: 560 }}>
+          <div className="bg-white px-4 pt-3 pb-2 border-b border-slate-100">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 bg-black rounded-md flex items-center justify-center">
+                  <Home className="w-3.5 h-3.5 text-white" />
+                </div>
+                <span className="font-bold text-xs">HomeBase</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Bell className="w-3.5 h-3.5 text-slate-400" />
+                <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold">JD</div>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-500">Good morning, James</p>
+          </div>
+          
+          <div className="px-3 py-2 space-y-2 overflow-hidden">
+            <div className="grid grid-cols-2 gap-1.5">
+              <div className="bg-blue-50 rounded-xl p-2.5">
+                <p className="text-[9px] text-blue-600 font-medium">Active Deals</p>
+                <p className="text-lg font-bold text-blue-900">12</p>
+                <p className="text-[8px] text-blue-500">+3 this week</p>
+              </div>
+              <div className="bg-green-50 rounded-xl p-2.5">
+                <p className="text-[9px] text-green-600 font-medium">Pipeline</p>
+                <p className="text-lg font-bold text-green-900">$2.4M</p>
+                <p className="text-[8px] text-green-500">↑ 18% MoM</p>
+              </div>
+              <div className="bg-orange-50 rounded-xl p-2.5">
+                <p className="text-[9px] text-orange-600 font-medium">New Leads</p>
+                <p className="text-lg font-bold text-orange-900">8</p>
+                <p className="text-[8px] text-orange-500">4 unclaimed</p>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-2.5">
+                <p className="text-[9px] text-purple-600 font-medium">Showings</p>
+                <p className="text-lg font-bold text-purple-900">5</p>
+                <p className="text-[8px] text-purple-500">2 today</p>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-100 rounded-xl p-2.5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold text-slate-800">Today's Schedule</span>
+                <CalendarDays className="w-3 h-3 text-slate-400" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-6 bg-blue-500 rounded-full shrink-0"></div>
+                  <div>
+                    <p className="text-[10px] font-medium text-slate-800">Showing — 1847 Oakwood Dr</p>
+                    <p className="text-[8px] text-slate-400">10:00 AM • with Sarah M.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-6 bg-green-500 rounded-full shrink-0"></div>
+                  <div>
+                    <p className="text-[10px] font-medium text-slate-800">Closing — 402 Elm St</p>
+                    <p className="text-[8px] text-slate-400">2:00 PM • Title Company</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-6 bg-orange-500 rounded-full shrink-0"></div>
+                  <div>
+                    <p className="text-[10px] font-medium text-slate-800">Inspection — 98 Pine Ln</p>
+                    <p className="text-[8px] text-slate-400">4:30 PM • Vendor: ProCheck</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-100 rounded-xl p-2.5">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-bold text-slate-800">Recent Messages</span>
+                <MessageSquare className="w-3 h-3 text-slate-400" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center text-[7px] font-bold text-blue-700 shrink-0">SM</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] font-medium text-slate-700 truncate">Sarah Martinez</p>
+                    <p className="text-[8px] text-slate-400 truncate">Can we reschedule the showing?</p>
+                  </div>
+                  <span className="text-[7px] text-slate-400">2m</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center text-[7px] font-bold text-green-700 shrink-0">TJ</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] font-medium text-slate-700 truncate">Tom Johnson</p>
+                    <p className="text-[8px] text-slate-400 truncate">Inspection report is ready</p>
+                  </div>
+                  <span className="text-[7px] text-slate-400">15m</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="absolute bottom-6 left-6 right-6 bg-white border border-slate-200 rounded-2xl px-2 py-1.5 flex items-center justify-around">
+            <div className="flex flex-col items-center"><Home className="w-4 h-4 text-black" /><span className="text-[7px] font-medium">Home</span></div>
+            <div className="flex flex-col items-center"><Search className="w-4 h-4 text-slate-400" /><span className="text-[7px] text-slate-400">Search</span></div>
+            <div className="flex flex-col items-center"><MessageSquare className="w-4 h-4 text-slate-400" /><span className="text-[7px] text-slate-400">Messages</span></div>
+            <div className="flex flex-col items-center"><Users className="w-4 h-4 text-slate-400" /><span className="text-[7px] text-slate-400">Clients</span></div>
+          </div>
+        </div>
+      </div>
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 w-24 h-5 bg-slate-900 rounded-b-2xl z-10"></div>
+    </div>
+  );
+}
+
+function MapRouteMockup() {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div className="flex items-center gap-2">
+          <Navigation className="w-4 h-4 text-slate-600" />
+          <span className="font-semibold text-sm text-slate-800">Route Optimizer</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-green-600 font-medium bg-green-50 px-2 py-0.5 rounded-full">Optimized</span>
+        </div>
+      </div>
+      <div className="relative h-[260px] bg-[#f0ede8] overflow-hidden">
+        <div className="absolute inset-0">
+          <div className="absolute top-[20%] left-[15%] w-[70%] h-[60%]">
+            <svg viewBox="0 0 300 150" className="w-full h-full" fill="none">
+              <path d="M30 120 Q80 20, 150 80 Q220 140, 270 40" stroke="#3b82f6" strokeWidth="3" strokeDasharray="8 4" fill="none" opacity="0.6"/>
+              <circle cx="30" cy="120" r="8" fill="#3b82f6" stroke="white" strokeWidth="2"/>
+              <circle cx="110" cy="55" r="8" fill="#f59e0b" stroke="white" strokeWidth="2"/>
+              <circle cx="190" cy="100" r="8" fill="#f59e0b" stroke="white" strokeWidth="2"/>
+              <circle cx="270" cy="40" r="8" fill="#10b981" stroke="white" strokeWidth="2"/>
+              <text x="30" y="118" textAnchor="middle" className="text-[8px] font-bold fill-white">1</text>
+              <text x="110" y="53" textAnchor="middle" className="text-[8px] font-bold fill-white">2</text>
+              <text x="190" y="98" textAnchor="middle" className="text-[8px] font-bold fill-white">3</text>
+              <text x="270" y="38" textAnchor="middle" className="text-[8px] font-bold fill-white">4</text>
+            </svg>
+          </div>
+          <div className="absolute top-3 right-3 bg-white rounded-lg shadow-md p-2 text-[10px]">
+            <p className="font-bold text-slate-800">4 stops</p>
+            <p className="text-slate-500">32 mi • ~48 min</p>
+          </div>
+        </div>
+      </div>
+      <div className="p-3 space-y-1.5">
+        {[
+          { num: "1", label: "Start: Office", time: "9:00 AM", color: "bg-blue-500" },
+          { num: "2", label: "1847 Oakwood Dr", time: "9:25 AM", color: "bg-amber-500" },
+          { num: "3", label: "402 Elm St", time: "10:10 AM", color: "bg-amber-500" },
+          { num: "4", label: "98 Pine Lane", time: "10:45 AM", color: "bg-green-500" },
+        ].map((stop) => (
+          <div key={stop.num} className="flex items-center gap-2 text-[11px]">
+            <div className={`w-5 h-5 ${stop.color} rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0`}>{stop.num}</div>
+            <span className="font-medium text-slate-700 flex-1">{stop.label}</span>
+            <span className="text-slate-400">{stop.time}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function MobileShowcase() {
   return (
@@ -79,69 +349,31 @@ export default function MobileShowcase() {
           </div>
 
           {/* Right Mobile Mockup */}
-          <div className="w-full lg:w-1/2 relative h-[600px] lg:h-[800px] flex justify-center items-center">
-            <div className="relative w-full max-w-[420px] z-20">
-              <img 
-                src="/__mockup/images/phone-hand-sleek.png" 
-                alt="HomeBase Mobile App" 
-                className="w-full h-auto drop-shadow-[0_25px_50px_rgba(0,0,0,0.15)] z-20 relative"
-              />
-
-              {/* Feature Cards - stacked and overlapping the phone like the reference */}
-              <div className="absolute top-[15%] -left-[30%] flex flex-col gap-3 z-30">
-                <div className="bg-white pl-4 pr-6 py-3.5 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] flex items-center gap-4 animate-[float_6s_ease-in-out_infinite] border border-slate-100/80">
-                  <div className="bg-slate-900 p-2.5 rounded-xl text-white shrink-0">
-                    <BarChart3 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="font-bold text-sm text-slate-900 block">Track Deals</span>
-                    <span className="text-xs text-slate-500">Visual pipeline</span>
-                  </div>
-                </div>
-
-                <div className="bg-white pl-4 pr-6 py-3.5 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] flex items-center gap-4 animate-[float_6s_ease-in-out_infinite_0.8s] border border-slate-100/80 ml-4">
-                  <div className="bg-slate-900 p-2.5 rounded-xl text-white shrink-0">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="font-bold text-sm text-slate-900 block">E-Signatures</span>
-                    <span className="text-xs text-slate-500">DocuSign & SignNow</span>
-                  </div>
-                </div>
-
-                <div className="bg-white pl-4 pr-6 py-3.5 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] flex items-center gap-4 animate-[float_6s_ease-in-out_infinite_1.6s] border border-slate-100/80">
-                  <div className="bg-slate-900 p-2.5 rounded-xl text-white shrink-0">
-                    <Target className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="font-bold text-sm text-slate-900 block">Manage Leads</span>
-                    <span className="text-xs text-slate-500">Zip code targeting</span>
-                  </div>
-                </div>
+          <div className="w-full lg:w-1/2 relative flex justify-center items-center py-8">
+            <div className="relative z-20">
+              <PhoneMockup />
+              
+              {/* Floating feature pills around the phone - hidden on small screens to prevent clipping */}
+              <div className="hidden lg:flex absolute top-[8%] -left-[55%] bg-white pl-4 pr-6 py-3 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] items-center gap-3 animate-[float_6s_ease-in-out_infinite] border border-slate-100/80">
+                <div className="bg-slate-900 p-2 rounded-xl text-white shrink-0"><BarChart3 className="w-4 h-4" /></div>
+                <div><span className="font-bold text-xs text-slate-900 block">Track Deals</span><span className="text-[10px] text-slate-500">Visual pipeline</span></div>
               </div>
-
-              <div className="absolute bottom-[20%] -right-[25%] flex flex-col gap-3 z-30">
-                <div className="bg-white pl-4 pr-6 py-3.5 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] flex items-center gap-4 animate-[float_6s_ease-in-out_infinite_2.4s] border border-slate-100/80">
-                  <div className="bg-slate-900 p-2.5 rounded-xl text-white shrink-0">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="font-bold text-sm text-slate-900 block">Client Portal</span>
-                    <span className="text-xs text-slate-500">Real-time updates</span>
-                  </div>
-                </div>
-
-                <div className="bg-white pl-4 pr-6 py-3.5 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] flex items-center gap-4 animate-[float_6s_ease-in-out_infinite_3.2s] border border-slate-100/80 mr-4">
-                  <div className="bg-slate-900 p-2.5 rounded-xl text-white shrink-0">
-                    <Bell className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="font-bold text-sm text-slate-900 block">Smart Alerts</span>
-                    <span className="text-xs text-slate-500">Never miss a deadline</span>
-                  </div>
-                </div>
+              <div className="hidden lg:flex absolute top-[30%] -right-[50%] bg-white pl-4 pr-6 py-3 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] items-center gap-3 animate-[float_6s_ease-in-out_infinite_1s] border border-slate-100/80">
+                <div className="bg-slate-900 p-2 rounded-xl text-white shrink-0"><FileText className="w-4 h-4" /></div>
+                <div><span className="font-bold text-xs text-slate-900 block">E-Signatures</span><span className="text-[10px] text-slate-500">DocuSign & SignNow</span></div>
               </div>
-
+              <div className="hidden lg:flex absolute top-[55%] -left-[48%] bg-white pl-4 pr-6 py-3 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] items-center gap-3 animate-[float_6s_ease-in-out_infinite_2s] border border-slate-100/80">
+                <div className="bg-slate-900 p-2 rounded-xl text-white shrink-0"><Target className="w-4 h-4" /></div>
+                <div><span className="font-bold text-xs text-slate-900 block">Manage Leads</span><span className="text-[10px] text-slate-500">Zip code targeting</span></div>
+              </div>
+              <div className="hidden lg:flex absolute bottom-[25%] -right-[45%] bg-white pl-4 pr-6 py-3 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] items-center gap-3 animate-[float_6s_ease-in-out_infinite_3s] border border-slate-100/80">
+                <div className="bg-slate-900 p-2 rounded-xl text-white shrink-0"><Navigation className="w-4 h-4" /></div>
+                <div><span className="font-bold text-xs text-slate-900 block">Route Optimizer</span><span className="text-[10px] text-slate-500">Plan your showings</span></div>
+              </div>
+              <div className="hidden lg:flex absolute bottom-[8%] -left-[42%] bg-white pl-4 pr-6 py-3 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] items-center gap-3 animate-[float_6s_ease-in-out_infinite_4s] border border-slate-100/80">
+                <div className="bg-slate-900 p-2 rounded-xl text-white shrink-0"><Calendar className="w-4 h-4" /></div>
+                <div><span className="font-bold text-xs text-slate-900 block">Calendar Sync</span><span className="text-[10px] text-slate-500">iCal & Google</span></div>
+              </div>
             </div>
           </div>
         </div>
@@ -223,8 +455,8 @@ export default function MobileShowcase() {
           {/* Feature 1: Transaction Management */}
           <div className="flex flex-col lg:flex-row items-center gap-16">
             <div className="w-full lg:w-1/2">
-              <div className="rounded-3xl overflow-hidden shadow-2xl border border-slate-200">
-                <img src="/__mockup/images/transaction-dashboard.png" alt="Transaction Management Dashboard" className="w-full object-cover" />
+              <div className="rounded-3xl overflow-hidden shadow-2xl">
+                <KanbanMockup />
               </div>
             </div>
             <div className="w-full lg:w-1/2">
@@ -324,6 +556,123 @@ export default function MobileShowcase() {
                 <li className="flex items-start gap-3">
                   <CheckCircle2 className="w-6 h-6 text-teal-500 shrink-0" />
                   <span className="text-slate-700"><strong>License Verification:</strong> Trust that every Pro on the platform is fully licensed and insured.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Feature 4: Route Optimization & Showings */}
+          <div className="flex flex-col lg:flex-row-reverse items-center gap-16">
+            <div className="w-full lg:w-1/2">
+              <div className="rounded-3xl overflow-hidden shadow-2xl">
+                <MapRouteMockup />
+              </div>
+            </div>
+            <div className="w-full lg:w-1/2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-100 text-sky-700 text-xs font-bold uppercase tracking-wider mb-6">
+                Showings & Route Optimization
+              </div>
+              <h2 className="text-3xl lg:text-5xl font-['Playfair_Display'] font-bold mb-6">Show smarter, not harder.</h2>
+              <p className="text-lg text-slate-600 mb-8">
+                Plan your day like a pro. Our intelligent route optimizer maps the fastest path between showings, while clients can request and schedule tours directly from their portal.
+              </p>
+              <ul className="space-y-4">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-6 h-6 text-sky-500 shrink-0" />
+                  <span className="text-slate-700"><strong>Route Optimization:</strong> Automatically plan the most efficient drive route between all your day's showings.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-6 h-6 text-sky-500 shrink-0" />
+                  <span className="text-slate-700"><strong>Showing Requests:</strong> Clients request tours on properties they like — approve, reschedule, or decline with one tap.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-6 h-6 text-sky-500 shrink-0" />
+                  <span className="text-slate-700"><strong>Interactive Map:</strong> See all your showings, clients, and listings pinned on one live map view.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Feature 5: Calendar Integration */}
+          <div className="flex flex-col lg:flex-row items-center gap-16">
+            <div className="w-full lg:w-1/2">
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xl">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-slate-600" />
+                    <span className="font-semibold text-sm text-slate-800">Calendar</span>
+                    <span className="text-xs text-slate-400">• March 2026</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">Google Synced</span>
+                    <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-medium">iCal</span>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <div className="grid grid-cols-7 gap-1 mb-2">
+                    {["S","M","T","W","T","F","S"].map((d, i) => (
+                      <div key={i} className="text-center text-[10px] font-bold text-slate-400 py-1">{d}</div>
+                    ))}
+                    {Array.from({length: 35}, (_, i) => {
+                      const day = i - 2;
+                      const isToday = day === 13;
+                      const hasEvent = [5, 8, 13, 14, 19, 22, 27].includes(day);
+                      const hasShowing = [8, 13, 19].includes(day);
+                      const hasClosing = [14, 27].includes(day);
+                      return (
+                        <div key={i} className={`text-center py-1.5 rounded-lg text-[11px] relative ${isToday ? 'bg-black text-white font-bold' : day < 1 || day > 31 ? 'text-slate-200' : 'text-slate-700'}`}>
+                          {day < 1 ? 31 + day : day > 31 ? day - 31 : day}
+                          {hasEvent && day >= 1 && day <= 31 && (
+                            <div className="flex gap-0.5 justify-center mt-0.5">
+                              {hasShowing && <div className="w-1 h-1 bg-blue-500 rounded-full"></div>}
+                              {hasClosing && <div className="w-1 h-1 bg-green-500 rounded-full"></div>}
+                              {!hasShowing && !hasClosing && <div className="w-1 h-1 bg-orange-400 rounded-full"></div>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="border-t border-slate-100 pt-3 space-y-2">
+                    <p className="text-[10px] font-bold text-slate-800 mb-2">Upcoming</p>
+                    {[
+                      { time: "10:00 AM", title: "Showing — 1847 Oakwood Dr", color: "bg-blue-500", type: "Buyer Tour" },
+                      { time: "1:00 PM", title: "Inspection — 98 Pine Ln", color: "bg-orange-500", type: "ProCheck Inc." },
+                      { time: "3:30 PM", title: "Closing — 402 Elm St", color: "bg-green-500", type: "Title Co." },
+                    ].map((event) => (
+                      <div key={event.title} className="flex items-center gap-2 group">
+                        <div className={`w-1 h-8 ${event.color} rounded-full shrink-0`}></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-slate-800">{event.title}</p>
+                          <p className="text-[9px] text-slate-400">{event.time} • {event.type}</p>
+                        </div>
+                        <ChevronRight className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="w-full lg:w-1/2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-100 text-violet-700 text-xs font-bold uppercase tracking-wider mb-6">
+                Calendar & Scheduling
+              </div>
+              <h2 className="text-3xl lg:text-5xl font-['Playfair_Display'] font-bold mb-6">Your entire day, at a glance.</h2>
+              <p className="text-lg text-slate-600 mb-8">
+                Sync your HomeBase calendar with Google Calendar, iCal, or Outlook. Every showing, inspection, and closing date auto-populates so you never double-book again.
+              </p>
+              <ul className="space-y-4">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-6 h-6 text-violet-500 shrink-0" />
+                  <span className="text-slate-700"><strong>Calendar Sync:</strong> Two-way sync with Google Calendar, Apple iCal, and Outlook — all your events in one place.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-6 h-6 text-violet-500 shrink-0" />
+                  <span className="text-slate-700"><strong>Auto-Populated Deadlines:</strong> AI-parsed contract dates automatically appear on your calendar with reminders.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-6 h-6 text-violet-500 shrink-0" />
+                  <span className="text-slate-700"><strong>Client Scheduling:</strong> Clients book showings directly from their portal — no more back-and-forth texts.</span>
                 </li>
               </ul>
             </div>
