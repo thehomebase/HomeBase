@@ -1101,18 +1101,20 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   });
 
   const updateDocumentMutation = useMutation({
-    mutationFn: async ({ id, status, notes, signingUrl, signingPlatform }: { 
+    mutationFn: async ({ id, status, notes, signingUrl, signingPlatform, manuallyMoved }: { 
       id: string; 
       status?: Document['status']; 
       notes?: string;
       signingUrl?: string;
       signingPlatform?: string;
+      manuallyMoved?: boolean;
     }) => {
       const body: Record<string, any> = {};
       if (status !== undefined) body.status = status;
       if (notes !== undefined) body.notes = notes || null;
       if (signingUrl !== undefined) body.signingUrl = signingUrl || null;
       if (signingPlatform !== undefined) body.signingPlatform = signingPlatform || null;
+      if (manuallyMoved !== undefined) body.manuallyMoved = manuallyMoved;
 
       const response = await apiRequest("PATCH", `/api/documents/${transactionId}/${id}`, body);
 
@@ -1184,7 +1186,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     setActiveId(null);
   };
 
-  const validStatuses: Document['status'][] = ['not_started', 'in_progress', 'waiting_signatures', 'signed', 'waiting_others'];
+  const validStatuses: Document['status'][] = ['not_applicable', 'waiting_signatures', 'signed', 'waiting_others', 'complete'];
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -1225,7 +1227,8 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
 
     updateDocumentMutation.mutate({
       id: documentId,
-      status
+      status,
+      manuallyMoved: true
     });
   };
 

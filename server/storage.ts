@@ -2248,6 +2248,7 @@ export class DatabaseStorage implements IStorage {
       if (data.clientId !== undefined) updateData.clientId = data.clientId ? Number(data.clientId) : null;
       if ((data as any).signingUrl !== undefined) updateData.signingUrl = (data as any).signingUrl || null;
       if ((data as any).signingPlatform !== undefined) updateData.signingPlatform = (data as any).signingPlatform || null;
+      if ((data as any).manuallyMoved !== undefined) updateData.manuallyMoved = Boolean((data as any).manuallyMoved);
       updateData.updatedAt = new Date();
 
       const [doc] = await db
@@ -2441,6 +2442,7 @@ export class DatabaseStorage implements IStorage {
       if (data.clientId !== undefined) updateData.clientId = data.clientId ? Number(data.clientId) : null;
       if ((data as any).signingUrl !== undefined) updateData.signingUrl = (data as any).signingUrl || null;
       if ((data as any).signingPlatform !== undefined) updateData.signingPlatform = (data as any).signingPlatform || null;
+      if ((data as any).manuallyMoved !== undefined) updateData.manuallyMoved = Boolean((data as any).manuallyMoved);
       updateData.updatedAt = new Date();
 
       const [doc] = await db
@@ -2819,6 +2821,7 @@ export class DatabaseStorage implements IStorage {
       if (data.clientId !== undefined) updateData.clientId = data.clientId ? Number(data.clientId) : null;
       if ((data as any).signingUrl !== undefined) updateData.signingUrl = (data as any).signingUrl || null;
       if ((data as any).signingPlatform !== undefined) updateData.signingPlatform = (data as any).signingPlatform || null;
+      if ((data as any).manuallyMoved !== undefined) updateData.manuallyMoved = Boolean((data as any).manuallyMoved);
       updateData.updatedAt = new Date();
 
       const [doc] = await db

@@ -4742,15 +4742,15 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: "Not authorized for this transaction" });
       }
 
-      const docs = await db.execute(sql`SELECT id, docusign_envelope_id, status FROM documents WHERE transaction_id = ${parsed.data.transactionId} AND docusign_envelope_id IS NOT NULL AND status != 'signed'`);
-      const results: Array<{ documentId: number; envelopeId: string; envelopeStatus: string; advanced: boolean }> = [];
+      const docs = await db.execute(sql`SELECT id, docusign_envelope_id, status, manually_moved FROM documents WHERE transaction_id = ${parsed.data.transactionId} AND docusign_envelope_id IS NOT NULL AND status != 'signed'`);
+      const results: Array<{ documentId: number; envelopeId: string; envelopeStatus: string; advanced: boolean; skipped?: boolean }> = [];
 
       for (const doc of docs.rows) {
         try {
           const envStatus = await getEnvelopeStatus(req.user.id, doc.docusign_envelope_id as string);
           let advanced = false;
-          if (envStatus.status === "completed") {
-            await db.execute(sql`UPDATE documents SET status = 'signed' WHERE id = ${doc.id}`);
+          if (envStatus.status === "completed" && !doc.manually_moved) {
+            await db.execute(sql`UPDATE documents SET status = 'signed', manually_moved = false WHERE id = ${doc.id}`);
             advanced = true;
           }
           results.push({
@@ -4758,6 +4758,7 @@ export function registerRoutes(app: Express): Server {
             envelopeId: doc.docusign_envelope_id as string,
             envelopeStatus: envStatus.status,
             advanced,
+            skipped: doc.manually_moved ? true : undefined,
           });
         } catch (e: any) {
           results.push({
