@@ -48,7 +48,7 @@ export default function LandingPage() {
                 The All-in-One Real Estate Platform
               </h1>
               <p className={`text-muted-foreground leading-relaxed mb-8 ${isMobile ? "text-base" : "text-lg"} max-w-lg ${isMobile ? "mx-auto" : ""}`}>
-                Manage leads, track closings, and automate your follow-ups without the clutter. HomeBase is the CRM built for the modern agent.
+                Manage leads, track closings, automate your follow-ups and collaborate with pros—all in one place. Everything you need to scale your real estate business, nothing you don't.
               </p>
               <div className={`flex gap-3 ${isMobile ? "justify-center flex-col" : ""}`}>
                 <Button size="lg" className="gap-2 text-base px-8" onClick={() => setLocation("/auth")}>
