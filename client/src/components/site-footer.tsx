@@ -19,6 +19,8 @@ export function SiteFooter() {
             <Link href="/marketplace" className="text-zinc-400 hover:text-white transition-colors">Pros</Link>
             <Link href="/calculators" className="text-zinc-400 hover:text-white transition-colors">Calculators</Link>
             <Link href="/top-agents" className="text-zinc-400 hover:text-white transition-colors">Find Agents</Link>
+            <Link href="/privacy-policy" className="text-zinc-400 hover:text-white transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="text-zinc-400 hover:text-white transition-colors">Terms & Conditions</Link>
           </div>
         </div>
         <div className="text-right">

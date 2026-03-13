@@ -7,7 +7,7 @@ export default function PrivacyPolicyPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-3xl mx-auto px-6 py-12">
+      <div className="max-w-3xl px-6 py-12">
         <Button variant="ghost" size="sm" className="mb-6" onClick={() => setLocation("/")}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
