@@ -34,7 +34,7 @@ Preferred communication style: Simple, everyday language.
 - **Client Management**: Client invitation, automated feedback, smart reminders (anniversaries/birthdays), client linking.
 - **HomeBase Pros (Unified Vendor/Contractor Hub)**: Centralized marketplace for vendors with search, team management, ratings, inspection bid system, and vendor self-registration with agent team request functionality.
 - **Communication Tools**: Encrypted private messaging (AES-256-GCM), SMS via Twilio, email integration via Google OAuth, call logging, communication metrics dashboard, and snippet management.
-- **e-Signatures**: SignNow integration via OAuth2 — agents/brokers connect their own SignNow accounts to upload documents and send signing invites from the document checklist. Settings page card for connect/disconnect. Routes role-gated to agent/broker.
+- **e-Signatures**: SignNow and DocuSign integrations via OAuth2 — agents/brokers connect their own accounts to upload documents and send signing invites from the document checklist. Settings page cards for connect/disconnect. Routes role-gated to agent/broker. Audit logging for all actions.
 - **Post-Close Engagement**: "MyHome" hub for homeowners.
 - **Growth & Lead Generation**: Affiliate referral system, drip campaigns, zip code-based lead generation with interactive map, Open House Manager, lead source tagging, connection rate tracking, timed exclusive lead routing, RESPA-compliant lead generation for agents (spend-based share of voice, min $25/mo) and lenders (occupancy-tiered pricing: 1-2 free, 3@$25, 4@$50, 5@$100 per zip). Lead activity preview (30/60/90 day counts) shown before claiming zip codes. "No Leads, No Charge" guarantee: agents, lenders, and vendors are not charged for billing cycles with zero leads.
 - **Listing & Price Alerts**: Saved search alerts with daily cron jobs checking for new listings and price changes from RentCast API, with multi-channel notifications.
@@ -60,3 +60,4 @@ Preferred communication style: Simple, everyday language.
 - **Census Bureau ACS API**: Median home values by ZIP code.
 - **@imgly/background-removal-node**: Local AI-based background removal for profile photos.
 - **SignNow API**: OAuth2-based e-signature integration (SIGNNOW_CLIENT_ID, SIGNNOW_CLIENT_SECRET env vars). Service: `server/signnow-service.ts`.
+- **DocuSign API**: OAuth2-based e-signature integration (DOCUSIGN_INTEGRATION_KEY, DOCUSIGN_SECRET_KEY env vars, plus DOCUSIGN_USER_ID, DOCUSIGN_ACCOUNT_ID, DOCUSIGN_BASE_URL). Service: `server/docusign-service.ts`. DB table: `docusign_tokens`. Audit reuses `signnow_audit_log` with `docusign_` action prefix.

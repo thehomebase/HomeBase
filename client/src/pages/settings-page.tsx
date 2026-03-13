@@ -1111,6 +1111,130 @@ function SignNowIntegrationCard() {
   );
 }
 
+function DocuSignIntegrationCard() {
+  const { toast } = useToast();
+
+  const { data: status, isLoading } = useQuery<{ configured: boolean; connected: boolean; email?: string }>({
+    queryKey: ["/api/docusign/status"],
+  });
+
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("GET", "/api/docusign/auth-url");
+      const data = await res.json();
+      window.location.href = data.url;
+    },
+    onError: () => toast({ title: "Failed to connect DocuSign", variant: "destructive" }),
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/docusign/disconnect");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/docusign/status"] });
+      toast({ title: "DocuSign disconnected" });
+    },
+    onError: () => toast({ title: "Failed to disconnect", variant: "destructive" }),
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("docusign") === "connected") {
+      toast({ title: "DocuSign connected successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/docusign/status"] });
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("docusign") === "error") {
+      toast({ title: "Failed to connect DocuSign", variant: "destructive" });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+              <FileText className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div>
+              <p className="font-medium">DocuSign e-Signatures</p>
+              <p className="text-sm text-muted-foreground">Industry-standard document signing</p>
+            </div>
+          </div>
+          {status?.connected && (
+            <Badge variant="outline" className="text-green-600 border-green-300">
+              <CheckCircle2 className="h-3 w-3 mr-1" /> Connected
+            </Badge>
+          )}
+        </div>
+
+        {isLoading ? (
+          <Skeleton className="h-10 w-full" />
+        ) : !status?.configured ? (
+          <p className="text-sm text-muted-foreground">
+            DocuSign integration is not configured for this platform. Please contact your administrator to set up DocuSign API credentials.
+          </p>
+        ) : status?.connected ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">{status.email || "Account connected"}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Documents are sent through your own DocuSign account. You can send for e-signature from any transaction's document checklist.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full text-destructive hover:text-destructive"
+              onClick={() => disconnectMutation.mutate()}
+              disabled={disconnectMutation.isPending}
+            >
+              {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect DocuSign"}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Connect your DocuSign account to send documents for e-signature directly from transactions. Documents stay in your own DocuSign account.
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> Industry standard
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> Full audit trail
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> TREC compliant
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> 200+ countries
+              </div>
+            </div>
+            <div className="p-2 rounded bg-muted/50 text-[10px] leading-tight text-muted-foreground space-y-1">
+              <p>By connecting, you agree that:</p>
+              <ul className="list-disc pl-3 space-y-0.5">
+                <li>HomeBase provides e-signature as a tool; you warrant document suitability and compliance with applicable laws.</li>
+                <li>You indemnify HomeBase against claims arising from your content, documents, or misuse of the e-signature feature.</li>
+                <li>All signing activity is logged for audit and compliance purposes.</li>
+              </ul>
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => connectMutation.mutate()}
+              disabled={connectMutation.isPending}
+            >
+              {connectMutation.isPending ? "Connecting..." : "Connect DocuSign Account"}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function IntegrationsSection() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -1352,6 +1476,7 @@ function IntegrationsSection() {
       </Card>
 
       <SignNowIntegrationCard />
+      <DocuSignIntegrationCard />
 
       <Dialog open={showKeyDialog} onOpenChange={setShowKeyDialog}>
         <DialogContent>

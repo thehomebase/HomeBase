@@ -223,6 +223,113 @@ function SignNowActions({ documentName, onSigningUrlSet }: { documentName: strin
   );
 }
 
+function DocuSignActions({ documentName, onSigningUrlSet }: { documentName: string; onSigningUrlSet: (url: string) => void }) {
+  const { toast } = useToast();
+  const [signerEmail, setSignerEmail] = useState('');
+  const [signerName, setSignerName] = useState('');
+  const [consentChecked, setConsentChecked] = useState(false);
+
+  const { data: dsStatus } = useQuery<{ configured: boolean; connected: boolean }>({
+    queryKey: ["/api/docusign/status"],
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("signerEmail", signerEmail);
+      formData.append("signerName", signerName);
+      formData.append("emailSubject", `Please sign: ${documentName}`);
+      formData.append("consentAcknowledged", consentChecked ? "true" : "false");
+      const res = await fetch("/api/docusign/send", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to send");
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: `DocuSign envelope sent to ${signerEmail}` });
+      if (data.envelopeId) {
+        onSigningUrlSet(`https://app.docusign.com/documents/details/${data.envelopeId}`);
+      }
+    },
+    onError: (err: any) => toast({ title: err.message || "Failed to send", variant: "destructive" }),
+  });
+
+  if (!dsStatus?.connected) {
+    return (
+      <div className="p-2 rounded border border-dashed border-muted-foreground/30 text-center">
+        <p className="text-xs text-muted-foreground">Connect DocuSign in Settings to send documents for signing</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 p-2 rounded border border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/20">
+      <p className="text-xs font-medium text-yellow-700 dark:text-yellow-400">DocuSign e-Signature</p>
+      <div className="space-y-1.5">
+        <Input
+          value={signerName}
+          onChange={(e) => setSignerName(e.target.value)}
+          className="text-xs h-7"
+          placeholder="Signer's full name..."
+        />
+        <div className="flex gap-1">
+          <Input
+            value={signerEmail}
+            onChange={(e) => setSignerEmail(e.target.value)}
+            className="text-xs h-7 flex-1"
+            placeholder="Signer's email..."
+            type="email"
+          />
+        </div>
+        <label className="flex items-start gap-1.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={consentChecked}
+            onChange={(e) => setConsentChecked(e.target.checked)}
+            className="mt-0.5 rounded border-gray-300"
+          />
+          <span className="text-[10px] leading-tight text-muted-foreground">
+            I confirm this document is suitable for e-signature, I have authority to send it, and I accept responsibility for its content and compliance with applicable laws.
+          </span>
+        </label>
+        <div>
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx"
+            id={`ds-upload-${documentName}`}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) sendMutation.mutate(file);
+            }}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="default"
+            className="w-full h-8 text-xs"
+            disabled={!signerEmail || !signerName || !consentChecked || sendMutation.isPending}
+            onClick={() => document.getElementById(`ds-upload-${documentName}`)?.click()}
+          >
+            {sendMutation.isPending ? (
+              <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Sending...</>
+            ) : (
+              <><Send className="h-3 w-3 mr-1" /> Upload & Send via DocuSign</>
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DocumentCard({ 
   document, 
   isDragging,
@@ -363,6 +470,12 @@ function DocumentCard({
             <SignNowActions documentName={document.name} onSigningUrlSet={(url: string) => {
               setSigningUrl(url);
               onUpdateSigning(document.id, url, 'signnow');
+            }} />
+          )}
+          {signingPlatform === 'docusign' && (
+            <DocuSignActions documentName={document.name} onSigningUrlSet={(url: string) => {
+              setSigningUrl(url);
+              onUpdateSigning(document.id, url, 'docusign');
             }} />
           )}
           <div className="space-y-1">

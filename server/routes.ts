@@ -13,6 +13,7 @@ import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, type EmailAttachment } from "./gmail-service";
 import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured, logSignNowAction } from "./signnow-service";
+import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction } from "./docusign-service";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { notify } from "./notification-helper";
@@ -164,6 +165,7 @@ export function registerRoutes(app: Express): Server {
   app.use('/api/register', authLimiter);
   app.use('/api/rentcast', rentcastLimiter);
   app.use('/api/signnow', sensitiveApiLimiter);
+  app.use('/api/docusign', sensitiveApiLimiter);
   app.use('/api/census', sensitiveApiLimiter);
   app.use('/api/twilio', sensitiveApiLimiter);
   app.use('/api/gmail', sensitiveApiLimiter);
@@ -4458,6 +4460,169 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error("SignNow download error:", error);
       res.status(500).json({ error: error.message || "Failed to download document" });
+    }
+  });
+
+  // ============ DocuSign e-Signature ============
+  app.get("/api/docusign/status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const configured = isDocuSignConfigured();
+      if (!configured) return res.json({ configured: false, connected: false });
+      const status = await getDocuSignStatus(req.user.id);
+      res.json({ configured: true, ...status });
+    } catch (error: any) {
+      res.json({ configured: false, connected: false });
+    }
+  });
+
+  app.get("/api/docusign/auth-url", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const crypto = await import("crypto");
+      const nonce = crypto.randomBytes(32).toString("hex");
+      (req.session as any).docusignOAuthState = nonce;
+      (req.session as any).docusignOAuthUserId = req.user.id;
+      const url = getDocuSignAuthUrl(nonce);
+      res.json({ url });
+    } catch (error: any) {
+      console.error("Error generating DocuSign auth URL:", error);
+      res.status(500).json({ error: error.message || "Failed to generate auth URL" });
+    }
+  });
+
+  app.get("/api/docusign/callback", async (req, res) => {
+    const code = req.query.code as string;
+    const state = req.query.state as string;
+    const domains = process.env.REPLIT_DOMAINS || "";
+    const domain = domains.split(",")[0];
+    const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+
+    if (!code || !state) {
+      return res.redirect(`${baseUrl}/settings?docusign=error`);
+    }
+
+    const sessionState = (req.session as any).docusignOAuthState;
+    const userId = (req.session as any).docusignOAuthUserId;
+
+    if (!sessionState || !userId || state !== sessionState) {
+      console.error("DocuSign OAuth state mismatch");
+      return res.redirect(`${baseUrl}/settings?docusign=error`);
+    }
+
+    delete (req.session as any).docusignOAuthState;
+    delete (req.session as any).docusignOAuthUserId;
+
+    try {
+      await handleDocuSignCallback(code, userId);
+      await logDocuSignAction(userId, "account_connected", { ipAddress: req.ip, userAgent: req.get("user-agent") || undefined });
+      res.redirect(`${baseUrl}/settings?docusign=connected`);
+    } catch (error: any) {
+      console.error("DocuSign callback error:", error);
+      res.redirect(`${baseUrl}/settings?docusign=error`);
+    }
+  });
+
+  app.post("/api/docusign/disconnect", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      await logDocuSignAction(req.user.id, "account_disconnected", { ipAddress: req.ip, userAgent: req.get("user-agent") || undefined });
+      await disconnectDocuSign(req.user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to disconnect DocuSign" });
+    }
+  });
+
+  app.post("/api/docusign/send", upload.single("file"), async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    if (!req.file) return res.status(400).json({ error: "No file provided" });
+
+    const schema = z.object({
+      signerEmail: z.string().email(),
+      signerName: z.string().min(1),
+      emailSubject: z.string().optional(),
+      consentAcknowledged: z.string().transform(v => v === "true"),
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+    if (!parsed.data.consentAcknowledged) return res.status(400).json({ error: "Consent acknowledgment required" });
+
+    try {
+      const allowedExts = ['pdf', 'doc', 'docx'];
+      const ext = req.file.originalname.toLowerCase().split('.').pop();
+      if (!ext || !allowedExts.includes(ext)) {
+        return res.status(400).json({ error: "Only PDF, DOC, and DOCX files are supported" });
+      }
+
+      const result = await createEnvelope(
+        req.user.id,
+        req.file.buffer,
+        req.file.originalname,
+        parsed.data.signerEmail,
+        parsed.data.signerName,
+        parsed.data.emailSubject
+      );
+
+      await logDocuSignAction(req.user.id, "envelope_sent", {
+        envelopeId: result.envelopeId,
+        signerEmail: parsed.data.signerEmail,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") || undefined,
+        metadata: { fileName: req.file.originalname, fileSize: req.file.size, signerName: parsed.data.signerName },
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("DocuSign send error:", error);
+      res.status(500).json({ error: error.message || "Failed to send envelope" });
+    }
+  });
+
+  app.get("/api/docusign/envelopes", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const envelopes = await listEnvelopes(req.user.id, req.query.from_date as string | undefined);
+      res.json(envelopes);
+    } catch (error: any) {
+      console.error("DocuSign list envelopes error:", error);
+      res.status(500).json({ error: error.message || "Failed to list envelopes" });
+    }
+  });
+
+  app.get("/api/docusign/envelope/:id/status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const status = await getEnvelopeStatus(req.user.id, req.params.id);
+      res.json(status);
+    } catch (error: any) {
+      console.error("DocuSign envelope status error:", error);
+      res.status(500).json({ error: error.message || "Failed to get envelope status" });
+    }
+  });
+
+  app.get("/api/docusign/envelope/:id/download", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const pdfBuffer = await downloadEnvelopeDocuments(req.user.id, req.params.id);
+      await logDocuSignAction(req.user.id, "document_downloaded", {
+        envelopeId: req.params.id,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") || undefined,
+      });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="envelope.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("DocuSign download error:", error);
+      res.status(500).json({ error: error.message || "Failed to download documents" });
     }
   });
 
