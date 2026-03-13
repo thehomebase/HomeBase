@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, ExternalLink, Link2, Upload, Send, Loader2 } from "lucide-react";
+import { Plus, FileText, ExternalLink, Link2, Upload, Send, Loader2, PenLine } from "lucide-react";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
@@ -228,12 +228,44 @@ function DocuSignActions({ documentName, onSigningUrlSet }: { documentName: stri
   const [signerEmail, setSignerEmail] = useState('');
   const [signerName, setSignerName] = useState('');
   const [consentChecked, setConsentChecked] = useState(false);
+  const [sendMode, setSendMode] = useState<'prepare' | 'quick'>('prepare');
 
   const { data: dsStatus } = useQuery<{ configured: boolean; connected: boolean }>({
     queryKey: ["/api/docusign/status"],
   });
 
-  const sendMutation = useMutation({
+  const prepareMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("signerEmail", signerEmail);
+      formData.append("signerName", signerName);
+      formData.append("emailSubject", `Please sign: ${documentName}`);
+      formData.append("consentAcknowledged", consentChecked ? "true" : "false");
+      const res = await fetch("/api/docusign/prepare", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to prepare");
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.senderViewUrl) {
+        window.open(data.senderViewUrl, '_blank');
+        toast({ title: "DocuSign editor opened — place signature fields and send from there" });
+      }
+      if (data.envelopeId) {
+        onSigningUrlSet(`https://app.docusign.com/documents/details/${data.envelopeId}`);
+      }
+    },
+    onError: (err: any) => toast({ title: err.message || "Failed to prepare", variant: "destructive" }),
+  });
+
+  const quickSendMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
@@ -261,6 +293,8 @@ function DocuSignActions({ documentName, onSigningUrlSet }: { documentName: stri
     onError: (err: any) => toast({ title: err.message || "Failed to send", variant: "destructive" }),
   });
 
+  const isPending = prepareMutation.isPending || quickSendMutation.isPending;
+
   if (!dsStatus?.connected) {
     return (
       <div className="p-2 rounded border border-dashed border-muted-foreground/30 text-center">
@@ -279,15 +313,13 @@ function DocuSignActions({ documentName, onSigningUrlSet }: { documentName: stri
           className="text-xs h-7"
           placeholder="Signer's full name..."
         />
-        <div className="flex gap-1">
-          <Input
-            value={signerEmail}
-            onChange={(e) => setSignerEmail(e.target.value)}
-            className="text-xs h-7 flex-1"
-            placeholder="Signer's email..."
-            type="email"
-          />
-        </div>
+        <Input
+          value={signerEmail}
+          onChange={(e) => setSignerEmail(e.target.value)}
+          className="text-xs h-7"
+          placeholder="Signer's email..."
+          type="email"
+        />
         <label className="flex items-start gap-1.5 cursor-pointer">
           <input
             type="checkbox"
@@ -299,6 +331,35 @@ function DocuSignActions({ documentName, onSigningUrlSet }: { documentName: stri
             I confirm this document is suitable for e-signature, I have authority to send it, and I accept responsibility for its content and compliance with applicable laws.
           </span>
         </label>
+
+        <div className="flex gap-1 text-[10px]">
+          <button
+            type="button"
+            className={`flex-1 py-1 px-2 rounded border text-center transition-colors ${sendMode === 'prepare' ? 'bg-yellow-100 dark:bg-yellow-900/40 border-yellow-300 dark:border-yellow-700 font-medium' : 'border-muted hover:bg-muted/50'}`}
+            onClick={() => setSendMode('prepare')}
+          >
+            Prepare & Edit
+          </button>
+          <button
+            type="button"
+            className={`flex-1 py-1 px-2 rounded border text-center transition-colors ${sendMode === 'quick' ? 'bg-yellow-100 dark:bg-yellow-900/40 border-yellow-300 dark:border-yellow-700 font-medium' : 'border-muted hover:bg-muted/50'}`}
+            onClick={() => setSendMode('quick')}
+          >
+            Quick Send
+          </button>
+        </div>
+
+        {sendMode === 'prepare' && (
+          <p className="text-[10px] text-muted-foreground leading-tight">
+            Opens DocuSign's editor where you can drag & drop signature, initial, and date fields onto your document before sending.
+          </p>
+        )}
+        {sendMode === 'quick' && (
+          <p className="text-[10px] text-muted-foreground leading-tight">
+            Sends immediately with a signature field placed at the bottom of the first page — best for simple documents.
+          </p>
+        )}
+
         <div>
           <input
             type="file"
@@ -307,7 +368,13 @@ function DocuSignActions({ documentName, onSigningUrlSet }: { documentName: stri
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) sendMutation.mutate(file);
+              if (file) {
+                if (sendMode === 'prepare') {
+                  prepareMutation.mutate(file);
+                } else {
+                  quickSendMutation.mutate(file);
+                }
+              }
             }}
           />
           <Button
@@ -315,11 +382,13 @@ function DocuSignActions({ documentName, onSigningUrlSet }: { documentName: stri
             size="sm"
             variant="default"
             className="w-full h-8 text-xs"
-            disabled={!signerEmail || !signerName || !consentChecked || sendMutation.isPending}
+            disabled={!signerEmail || !signerName || !consentChecked || isPending}
             onClick={() => document.getElementById(`ds-upload-${documentName}`)?.click()}
           >
-            {sendMutation.isPending ? (
-              <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Sending...</>
+            {isPending ? (
+              <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> {sendMode === 'prepare' ? 'Preparing...' : 'Sending...'}</>
+            ) : sendMode === 'prepare' ? (
+              <><PenLine className="h-3 w-3 mr-1" /> Upload & Prepare in DocuSign</>
             ) : (
               <><Send className="h-3 w-3 mr-1" /> Upload & Send via DocuSign</>
             )}

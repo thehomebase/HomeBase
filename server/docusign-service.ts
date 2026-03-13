@@ -234,6 +234,92 @@ export async function createEnvelope(
   return { envelopeId: data.envelopeId, status: data.status };
 }
 
+export async function createDraftEnvelope(
+  userId: number,
+  fileBuffer: Buffer,
+  fileName: string,
+  signerEmail: string,
+  signerName: string,
+  emailSubject?: string
+): Promise<{ envelopeId: string; status: string }> {
+  const auth = await getAccessToken(userId);
+  if (!auth) throw new Error("DocuSign not connected");
+
+  const fileBase64 = fileBuffer.toString("base64");
+  const ext = fileName.toLowerCase().split('.').pop();
+  const fileExtension = ext || 'pdf';
+
+  const envelope = {
+    emailSubject: emailSubject || `Please sign: ${fileName}`,
+    documents: [{
+      documentBase64: fileBase64,
+      name: fileName,
+      fileExtension,
+      documentId: "1",
+    }],
+    recipients: {
+      signers: [{
+        email: signerEmail,
+        name: signerName,
+        recipientId: "1",
+        routingOrder: "1",
+      }],
+    },
+    status: "created",
+  };
+
+  const res = await fetch(`${auth.baseUri}/restapi/v2.1/accounts/${auth.accountId}/envelopes`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${auth.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(envelope),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("DocuSign draft envelope creation error:", err);
+    throw new Error("Failed to create draft envelope");
+  }
+
+  const data = await res.json();
+  return { envelopeId: data.envelopeId, status: data.status };
+}
+
+export async function createSenderView(
+  userId: number,
+  envelopeId: string,
+  returnUrl: string
+): Promise<{ url: string }> {
+  const auth = await getAccessToken(userId);
+  if (!auth) throw new Error("DocuSign not connected");
+
+  const res = await fetch(
+    `${auth.baseUri}/restapi/v2.1/accounts/${auth.accountId}/envelopes/${envelopeId}/views/sender`,
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${auth.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        returnUrl,
+        viewAccess: "envelope",
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("DocuSign sender view error:", err);
+    throw new Error("Failed to create sender view");
+  }
+
+  const data = await res.json();
+  return { url: data.url };
+}
+
 export async function getEnvelopeStatus(userId: number, envelopeId: string): Promise<{
   status: string;
   sentDateTime?: string;

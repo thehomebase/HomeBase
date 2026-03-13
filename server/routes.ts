@@ -13,7 +13,7 @@ import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, type EmailAttachment } from "./gmail-service";
 import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured, logSignNowAction } from "./signnow-service";
-import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction } from "./docusign-service";
+import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, createDraftEnvelope, createSenderView, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction } from "./docusign-service";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { notify } from "./notification-helper";
@@ -4581,6 +4581,77 @@ export function registerRoutes(app: Express): Server {
       console.error("DocuSign send error:", error);
       res.status(500).json({ error: error.message || "Failed to send envelope" });
     }
+  });
+
+  app.post("/api/docusign/prepare", upload.single("file"), async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    if (!req.file) return res.status(400).json({ error: "No file provided" });
+
+    const schema = z.object({
+      signerEmail: z.string().email(),
+      signerName: z.string().min(1),
+      emailSubject: z.string().optional(),
+      consentAcknowledged: z.string().transform(v => v === "true"),
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+    if (!parsed.data.consentAcknowledged) return res.status(400).json({ error: "Consent acknowledgment required" });
+
+    try {
+      const allowedExts = ['pdf', 'doc', 'docx'];
+      const ext = req.file.originalname.toLowerCase().split('.').pop();
+      if (!ext || !allowedExts.includes(ext)) {
+        return res.status(400).json({ error: "Only PDF, DOC, and DOCX files are supported" });
+      }
+
+      const domains = process.env.REPLIT_DOMAINS || "";
+      const domain = domains.split(",")[0];
+      const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+      const returnUrl = `${baseUrl}/api/docusign/sender-return`;
+
+      const draft = await createDraftEnvelope(
+        req.user.id,
+        req.file.buffer,
+        req.file.originalname,
+        parsed.data.signerEmail,
+        parsed.data.signerName,
+        parsed.data.emailSubject
+      );
+
+      const senderView = await createSenderView(req.user.id, draft.envelopeId, returnUrl);
+
+      await logDocuSignAction(req.user.id, "envelope_prepared", {
+        envelopeId: draft.envelopeId,
+        signerEmail: parsed.data.signerEmail,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") || undefined,
+        metadata: { fileName: req.file.originalname, fileSize: req.file.size, signerName: parsed.data.signerName, mode: "embedded_sending" },
+      });
+
+      res.json({ envelopeId: draft.envelopeId, senderViewUrl: senderView.url });
+    } catch (error: any) {
+      console.error("DocuSign prepare error:", error);
+      res.status(500).json({ error: error.message || "Failed to prepare envelope" });
+    }
+  });
+
+  app.get("/api/docusign/sender-return", async (req, res) => {
+    const event = req.query.event as string || "unknown";
+    const domains = process.env.REPLIT_DOMAINS || "";
+    const domain = domains.split(",")[0];
+    const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+
+    if (req.isAuthenticated() && req.user) {
+      await logDocuSignAction(req.user.id, "sender_view_completed", {
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") || undefined,
+        metadata: { event },
+      });
+    }
+
+    res.redirect(`${baseUrl}/transactions?docusign_event=${encodeURIComponent(event)}`);
   });
 
   app.get("/api/docusign/envelopes", async (req, res) => {
