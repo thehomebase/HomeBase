@@ -2165,7 +2165,9 @@ export class DatabaseStorage implements IStorage {
           notes,
           client_id as "clientId",
           signing_url as "signingUrl",
-          signing_platform as "signingPlatform"
+          signing_platform as "signingPlatform",
+          docusign_envelope_id as "docusignEnvelopeId",
+          signnow_document_id as "signnowDocumentId"
         FROM documents 
         WHERE transaction_id = ${transactionId}
         ORDER BY created_at ASC
@@ -2183,7 +2185,9 @@ export class DatabaseStorage implements IStorage {
         notes: doc.notes ? String(doc.notes) : null,
         clientId: doc.clientId ? Number(doc.clientId) : null,
         signingUrl: doc.signingUrl ? String(doc.signingUrl) : null,
-        signingPlatform: doc.signingPlatform ? String(doc.signingPlatform) : null
+        signingPlatform: doc.signingPlatform ? String(doc.signingPlatform) : null,
+        docusignEnvelopeId: doc.docusignEnvelopeId ? String(doc.docusignEnvelopeId) : null,
+        signnowDocumentId: doc.signnowDocumentId ? String(doc.signnowDocumentId) : null
       }));
     } catch (error) {
       console.error('Error in getDocumentsByTransaction:', error);
@@ -2368,7 +2372,11 @@ export class DatabaseStorage implements IStorage {
         createdAt: doc.created_at ? new Date(doc.created_at) : null,
         updatedAt: doc.updated_at ? new Date(doc.updated_at) : null,
         notes: doc.notes ? String(doc.notes) : null,
-        clientId: doc.client_id ? Number(doc.client_id) : null
+        clientId: doc.client_id ? Number(doc.client_id) : null,
+        signingUrl: doc.signing_url ? String(doc.signing_url) : null,
+        signingPlatform: doc.signing_platform ? String(doc.signing_platform) : null,
+        docusignEnvelopeId: doc.docusign_envelope_id ? String(doc.docusign_envelope_id) : null,
+        signnowDocumentId: doc.signnow_document_id ? String(doc.signnow_document_id) : null
       }));
     } catch (error) {
       console.error('Error in getDocumentsByTransaction:', error);
@@ -2724,7 +2732,9 @@ export class DatabaseStorage implements IStorage {
           notes,
           client_id as "clientId",
           signing_url as "signingUrl",
-          signing_platform as "signingPlatform"
+          signing_platform as "signingPlatform",
+          docusign_envelope_id as "docusignEnvelopeId",
+          signnow_document_id as "signnowDocumentId"
         FROM documents 
         WHERE transaction_id = ${transactionId}
         ORDER BY created_at ASC
@@ -2742,7 +2752,9 @@ export class DatabaseStorage implements IStorage {
         notes: doc.notes ? String(doc.notes) : null,
         clientId: doc.clientId ? Number(doc.clientId) : null,
         signingUrl: doc.signingUrl ? String(doc.signingUrl) : null,
-        signingPlatform: doc.signingPlatform ? String(doc.signingPlatform) : null
+        signingPlatform: doc.signingPlatform ? String(doc.signingPlatform) : null,
+        docusignEnvelopeId: doc.docusignEnvelopeId ? String(doc.docusignEnvelopeId) : null,
+        signnowDocumentId: doc.signnowDocumentId ? String(doc.signnowDocumentId) : null
       }));
     } catch (error) {
       console.error('Error in getDocumentsByTransaction:', error);
