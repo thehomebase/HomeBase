@@ -10,7 +10,7 @@ import {
   Lock, BarChart2, ChevronDown, MapPin, Gift, DollarSign, Bell, Search,
   Wrench, Hammer
 } from "lucide-react";
-import { SiSlack, SiMailchimp, SiGooglesheets, SiCalendly, SiTrello, SiHubspot, SiSalesforce, SiZapier, SiAirtable, SiNotion, SiTwilio, SiGmail } from "react-icons/si";
+import { SiSlack, SiMailchimp, SiGooglesheets, SiCalendly, SiTrello, SiHubspot, SiSalesforce, SiZapier, SiAirtable, SiNotion, SiTwilio, SiGmail, SiDropbox } from "react-icons/si";
 import heroImage from "@/assets/landing-hero.png";
 import myTeamDesktopImage from "@/assets/image_1773430206672.png";
 import zipCodeMapImage from "@/assets/image_1773428370460.png";
@@ -159,6 +159,102 @@ function MessagingPhoneMockup() {
         </div>
       </div>
     </div>
+  );
+}
+
+function AnimatedSignature() {
+  const { ref, inView } = useInView(0.4);
+  return (
+    <div ref={ref} className="relative">
+      <svg viewBox="0 0 300 100" className="w-full h-auto" style={{ maxWidth: 280 }}>
+        <path
+          d="M 20 70 C 30 20, 50 20, 55 50 C 60 80, 65 80, 70 50 C 75 20, 85 20, 90 45 C 95 70, 100 70, 110 40 L 115 35 M 125 30 C 120 50, 130 70, 145 45 C 150 35, 148 25, 138 30 M 155 30 L 155 65 M 155 45 C 160 35, 175 35, 175 45 C 175 55, 160 60, 155 65 M 185 30 L 185 65 M 185 30 C 195 30, 205 35, 205 45 C 205 55, 195 55, 185 50 M 215 35 C 210 35, 208 45, 215 50 C 222 55, 225 50, 222 42 C 219 35, 210 35, 210 45 M 240 65 C 242 30, 255 25, 260 40 C 265 55, 250 65, 240 55"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-neutral-800 dark:text-neutral-200"
+          strokeDasharray="600"
+          strokeDashoffset={inView ? "0" : "600"}
+          style={{
+            transition: "stroke-dashoffset 2.5s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+        />
+      </svg>
+    </div>
+  );
+}
+
+function DocuSignIntegrationCard() {
+  return (
+    <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-2 hover:border-[#4C2B8A]/30">
+      <CardContent className="p-0">
+        <div className="bg-gradient-to-br from-[#4C2B8A] to-[#6B3FA0] p-6 text-white">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
+                <path d="M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10zM8.5 8.5v7h2v-2.5h1.5c1.933 0 3.5-1.12 3.5-2.25S13.933 8.5 12 8.5H8.5zm2 1.5H12c.828 0 1.5.448 1.5 1s-.672 1-1.5 1h-1.5V10z"/>
+              </svg>
+            </div>
+            <div>
+              <h4 className="font-bold text-lg">DocuSign</h4>
+              <p className="text-white/70 text-xs">e-Signature Integration</p>
+            </div>
+          </div>
+          <p className="text-sm text-white/80 leading-relaxed">Send documents for signing directly from your transaction checklist. Embedded sending with auto-placed signature fields.</p>
+        </div>
+        <div className="p-5 space-y-3">
+          <div className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+            <span>Embedded draft + sender view</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+            <span>Auto-placed signature fields</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+            <span>Status sync & audit logging</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DropboxIntegrationCard() {
+  return (
+    <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-2 hover:border-[#0061FF]/30">
+      <CardContent className="p-0">
+        <div className="bg-gradient-to-br from-[#0061FF] to-[#0044B3] p-6 text-white">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
+              <SiDropbox className="h-6 w-6" />
+            </div>
+            <div>
+              <h4 className="font-bold text-lg">Dropbox</h4>
+              <p className="text-white/70 text-xs">Cloud File Integration</p>
+            </div>
+          </div>
+          <p className="text-sm text-white/80 leading-relaxed">Browse, search, and import files from your Dropbox directly into transaction document checklists. No more switching apps.</p>
+        </div>
+        <div className="p-5 space-y-3">
+          <div className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+            <span>Browse & search your Dropbox</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+            <span>Import into document checklists</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+            <span>OAuth2 per-user connection</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -393,6 +489,48 @@ export default function LandingPage() {
       </section>
 
       <section className={`${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <p className="text-sm text-primary font-medium uppercase tracking-wider mb-2">Document & e-Signature</p>
+            <h2 className={`font-bold tracking-tight mb-4 ${isMobile ? "text-3xl" : "text-4xl"}`}>
+              Sign, store, and manage — all built in
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Send documents for e-signature via DocuSign and import files from Dropbox — without ever leaving HomeBase. Everything syncs back to your transaction checklist automatically.
+            </p>
+          </div>
+
+          <div className={`grid gap-8 items-start ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
+            <DocuSignIntegrationCard />
+
+            <div className="flex flex-col items-center justify-center gap-6 py-8">
+              <div className="relative bg-card border-2 rounded-2xl shadow-lg p-6 w-full max-w-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground font-medium">TREC 1-4 Residential Contract</span>
+                </div>
+                <div className="border-b-2 border-dashed border-neutral-300 dark:border-neutral-600 pb-2 mb-2">
+                  <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Buyer Signature</p>
+                  <AnimatedSignature />
+                </div>
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-[10px] text-muted-foreground">Signed 3/13/2026 at 2:14 PM</span>
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 flex items-center gap-1">
+                    <CheckCircle2 className="h-2.5 w-2.5" /> Completed
+                  </span>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground text-center max-w-xs">
+                Documents automatically advance from <strong>uploaded</strong> to <strong>waiting signatures</strong> to <strong>signed</strong> as envelopes complete.
+              </p>
+            </div>
+
+            <DropboxIntegrationCard />
+          </div>
+        </div>
+      </section>
+
+      <section className={`bg-muted/30 ${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10">
             <p className="text-sm text-primary font-medium uppercase tracking-wider mb-2">HomeBase Pros</p>
