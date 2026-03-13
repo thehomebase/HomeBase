@@ -771,6 +771,7 @@ function DroppableColumn({
   onAddDocument,
   isAgentOrBroker,
   dropboxConnected,
+  docusignConnected,
 }: { 
   status: typeof statusColumns[number]['key'];
   documents: Document[];
@@ -778,26 +779,20 @@ function DroppableColumn({
   onUpdateNotes: (id: string, notes: string) => void;
   onUpdateSigning: (id: string, signingUrl: string, signingPlatform: string) => void;
   onDelete: (id: string, name: string) => void;
-  onAddDocument?: (name: string) => void;
+  onAddDocument?: (name: string, signingPlatform?: string) => void;
   isAgentOrBroker?: boolean;
   dropboxConnected?: boolean;
+  docusignConnected?: boolean;
 }) {
   const { setNodeRef } = useDroppable({
     id: status,
   });
 
   const statusColor = getStatusColor(status);
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [docName, setDocName] = useState("");
-  const [showDropboxInDialog, setShowDropboxInDialog] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [showDropboxBrowser, setShowDropboxBrowser] = useState(false);
 
-  const handleAddFromName = () => {
-    if (docName.trim() && onAddDocument) {
-      onAddDocument(docName.trim());
-      setDocName("");
-      setShowAddDialog(false);
-    }
-  };
+  const defaultPlatform = docusignConnected ? 'docusign' : undefined;
 
   const handleAddFromDevice = () => {
     const input = document.createElement("input");
@@ -806,8 +801,8 @@ function DroppableColumn({
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file && onAddDocument) {
-        onAddDocument(file.name);
-        setShowAddDialog(false);
+        onAddDocument(file.name, defaultPlatform);
+        setExpanded(false);
       }
     };
     input.click();
@@ -838,72 +833,42 @@ function DroppableColumn({
           ))}
         </SortableContext>
         {status === "not_applicable" && isAgentOrBroker && onAddDocument && (
-          <>
+          <div className={`border-2 border-dashed rounded-md transition-colors ${expanded ? 'border-primary/50 bg-background p-3' : 'border-muted-foreground/30'}`}>
             <button
-              onClick={() => setShowAddDialog(true)}
-              className="w-full border-2 border-dashed border-muted-foreground/30 rounded-md p-3 text-sm text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors flex items-center justify-center gap-2"
+              onClick={() => setExpanded(!expanded)}
+              className={`w-full text-sm transition-colors flex items-center justify-center gap-2 ${expanded ? 'text-primary font-medium pb-2' : 'text-muted-foreground hover:border-primary/50 hover:text-primary p-3'}`}
             >
               <Plus className="h-4 w-4" />
               Add Document
             </button>
-            <Dialog open={showAddDialog} onOpenChange={(open) => { setShowAddDialog(open); if (!open) { setDocName(""); setShowDropboxInDialog(false); } }}>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Add Document</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Document Name</label>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Enter document name..."
-                        value={docName}
-                        onChange={(e) => setDocName(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleAddFromName()}
-                        className="flex-1"
-                      />
-                      <Button size="sm" onClick={handleAddFromName} disabled={!docName.trim()}>
-                        Add
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">or add from</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button variant="outline" onClick={handleAddFromDevice} className="w-full justify-start">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload from Device
-                    </Button>
-                    {dropboxConnected && (
-                      <Button variant="outline" onClick={() => setShowDropboxInDialog(true)} className="w-full justify-start">
-                        <CloudUpload className="h-4 w-4 mr-2 text-blue-600" />
-                        Import from Dropbox
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-            {showDropboxInDialog && (
+            {expanded && (
+              <div className="flex flex-col gap-2">
+                <Button variant="outline" size="sm" onClick={handleAddFromDevice} className="w-full justify-start">
+                  <Upload className="h-4 w-4 mr-2" />
+                  From Device
+                </Button>
+                {dropboxConnected && (
+                  <Button variant="outline" size="sm" onClick={() => setShowDropboxBrowser(true)} className="w-full justify-start">
+                    <CloudUpload className="h-4 w-4 mr-2 text-blue-600" />
+                    From Dropbox
+                  </Button>
+                )}
+              </div>
+            )}
+            {showDropboxBrowser && (
               <AddDocDropboxBrowser
-                open={showDropboxInDialog}
-                onOpenChange={setShowDropboxInDialog}
+                open={showDropboxBrowser}
+                onOpenChange={setShowDropboxBrowser}
                 onFileSelected={(fileName) => {
                   if (onAddDocument) {
-                    onAddDocument(fileName);
-                    setShowAddDialog(false);
-                    setShowDropboxInDialog(false);
+                    onAddDocument(fileName, defaultPlatform);
+                    setExpanded(false);
+                    setShowDropboxBrowser(false);
                   }
                 }}
               />
             )}
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -1339,12 +1304,15 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     }
   });
 
+  const { data: docusignStatus } = useQuery<{ configured: boolean; connected: boolean }>({
+    queryKey: ["/api/docusign/status"],
+  });
+
   const addDocumentMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const response = await apiRequest("POST", `/api/documents/${transactionId}`, {
-        name,
-        status: 'not_applicable' as const
-      });
+    mutationFn: async ({ name, signingPlatform }: { name: string; signingPlatform?: string }) => {
+      const body: any = { name, status: 'not_applicable' as const };
+      if (signingPlatform) body.signingPlatform = signingPlatform;
+      const response = await apiRequest("POST", `/api/documents/${transactionId}`, body);
       if (!response.ok) {
         throw new Error("Failed to add document");
       }
@@ -1354,7 +1322,6 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
       queryClient.setQueryData(["/api/documents", transactionId], (oldData: Document[] = []) => 
         [...oldData, newDoc]
       );
-      setNewDocument("");
       toast({
         title: "Success",
         description: "Document added successfully",
@@ -1496,9 +1463,10 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                 onUpdateNotes={handleUpdateNotes}
                 onUpdateSigning={handleUpdateSigning}
                 onDelete={handleDeleteDocument}
-                onAddDocument={(name: string) => addDocumentMutation.mutate(name)}
+                onAddDocument={(name: string, signingPlatform?: string) => addDocumentMutation.mutate({ name, signingPlatform })}
                 isAgentOrBroker={user?.role === 'agent' || user?.role === 'broker'}
                 dropboxConnected={dropboxStatus?.connected}
+                docusignConnected={docusignStatus?.connected}
               />
             ))}
           </div>
