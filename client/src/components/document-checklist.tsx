@@ -770,7 +770,6 @@ function DroppableColumn({
   onDelete,
   onAddDocument,
   isAgentOrBroker,
-  dropboxConnected,
   docusignConnected,
 }: { 
   status: typeof statusColumns[number]['key'];
@@ -781,7 +780,6 @@ function DroppableColumn({
   onDelete: (id: string, name: string) => void;
   onAddDocument?: (name: string, signingPlatform?: string) => void;
   isAgentOrBroker?: boolean;
-  dropboxConnected?: boolean;
   docusignConnected?: boolean;
 }) {
   const { setNodeRef } = useDroppable({
@@ -790,22 +788,16 @@ function DroppableColumn({
 
   const statusColor = getStatusColor(status);
   const [expanded, setExpanded] = useState(false);
-  const [showDropboxBrowser, setShowDropboxBrowser] = useState(false);
+  const [docName, setDocName] = useState("");
 
   const defaultPlatform = docusignConnected ? 'docusign' : undefined;
 
-  const handleAddFromDevice = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg";
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file && onAddDocument) {
-        onAddDocument(file.name, defaultPlatform);
-        setExpanded(false);
-      }
-    };
-    input.click();
+  const handleAdd = () => {
+    if (docName.trim() && onAddDocument) {
+      onAddDocument(docName.trim(), defaultPlatform);
+      setDocName("");
+      setExpanded(false);
+    }
   };
 
   return (
@@ -842,31 +834,19 @@ function DroppableColumn({
               Add Document
             </button>
             {expanded && (
-              <div className="flex flex-col gap-2">
-                <Button variant="outline" size="sm" onClick={handleAddFromDevice} className="w-full justify-start">
-                  <Upload className="h-4 w-4 mr-2" />
-                  From Device
+              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                <Input
+                  placeholder="Document name..."
+                  value={docName}
+                  onChange={(e) => setDocName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                  className="text-sm h-8 flex-1"
+                  autoFocus
+                />
+                <Button size="sm" className="h-8" onClick={handleAdd} disabled={!docName.trim()}>
+                  Add
                 </Button>
-                {dropboxConnected && (
-                  <Button variant="outline" size="sm" onClick={() => setShowDropboxBrowser(true)} className="w-full justify-start">
-                    <CloudUpload className="h-4 w-4 mr-2 text-blue-600" />
-                    From Dropbox
-                  </Button>
-                )}
               </div>
-            )}
-            {showDropboxBrowser && (
-              <AddDocDropboxBrowser
-                open={showDropboxBrowser}
-                onOpenChange={setShowDropboxBrowser}
-                onFileSelected={(fileName) => {
-                  if (onAddDocument) {
-                    onAddDocument(fileName, defaultPlatform);
-                    setExpanded(false);
-                    setShowDropboxBrowser(false);
-                  }
-                }}
-              />
             )}
           </div>
         )}
@@ -1070,155 +1050,11 @@ function DropboxFileBrowser({ transactionId, open, onOpenChange }: { transaction
   );
 }
 
-function AddDocDropboxBrowser({ open, onOpenChange, onFileSelected }: { open: boolean; onOpenChange: (open: boolean) => void; onFileSelected: (fileName: string) => void }) {
-  const { toast } = useToast();
-  const [currentPath, setCurrentPath] = useState("");
-  const [pathHistory, setPathHistory] = useState<string[]>([""]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<DropboxEntry[] | null>(null);
-
-  const { data: filesData, isLoading: filesLoading } = useQuery<{ entries: DropboxEntry[]; hasMore: boolean }>({
-    queryKey: ["/api/dropbox/files", currentPath, "add-doc"],
-    queryFn: async () => {
-      const res = await apiRequest("POST", "/api/dropbox/files", { path: currentPath });
-      return res.json();
-    },
-    enabled: open && !searchResults,
-  });
-
-  const entries = searchResults || filesData?.entries || [];
-  const currentFolder = currentPath ? currentPath.split("/").pop() : "Dropbox";
-
-  const formatSize = (bytes?: number) => {
-    if (!bytes) return "";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    setIsSearching(true);
-    try {
-      const res = await apiRequest("POST", "/api/dropbox/search", { query: searchQuery.trim() });
-      const results = await res.json();
-      setSearchResults(results);
-    } catch {
-      toast({ title: "Search failed", variant: "destructive" });
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CloudUpload className="h-5 w-5 text-blue-600" />
-            Select from Dropbox
-          </DialogTitle>
-        </DialogHeader>
-        <div className="flex gap-2 mb-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search files..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="pl-8"
-            />
-          </div>
-          <Button size="sm" variant="outline" onClick={handleSearch} disabled={isSearching || !searchQuery.trim()}>
-            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
-          </Button>
-        </div>
-        {searchResults ? (
-          <div className="flex items-center gap-2 mb-2">
-            <Badge variant="secondary" className="text-xs">Search results for "{searchQuery}"</Badge>
-            <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => { setSearchResults(null); setSearchQuery(""); }}>Clear</Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 mb-2">
-            {pathHistory.length > 1 && (
-              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { const h = [...pathHistory]; h.pop(); setPathHistory(h); setCurrentPath(h[h.length - 1]); setSearchResults(null); }}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            )}
-            <span className="text-sm font-medium text-muted-foreground truncate">{currentFolder}</span>
-          </div>
-        )}
-        <div className="flex-1 min-h-0 overflow-y-auto" style={{ maxHeight: "400px" }}>
-          {filesLoading || isSearching ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : entries.length === 0 ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">
-              {searchResults ? "No files found" : "This folder is empty"}
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {entries
-                .sort((a, b) => {
-                  if (a.isFolder && !b.isFolder) return -1;
-                  if (!a.isFolder && b.isFolder) return 1;
-                  return a.name.localeCompare(b.name);
-                })
-                .map((entry, i) => (
-                  <div
-                    key={`${entry.path}-${i}`}
-                    className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 group cursor-pointer"
-                    onClick={() => {
-                      if (entry.isFolder) {
-                        setPathHistory(prev => [...prev, entry.path]);
-                        setCurrentPath(entry.path);
-                        setSearchResults(null);
-                        setSearchQuery("");
-                      } else {
-                        onFileSelected(entry.name);
-                      }
-                    }}
-                  >
-                    {entry.isFolder ? (
-                      <Folder className="h-5 w-5 text-blue-500 shrink-0" />
-                    ) : (
-                      <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate">{entry.name}</p>
-                      {!entry.isFolder && entry.size != null && (
-                        <p className="text-xs text-muted-foreground">{formatSize(entry.size)}</p>
-                      )}
-                    </div>
-                    {entry.isFolder ? (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                    ) : (
-                      <Button size="sm" variant="outline" className="opacity-0 group-hover:opacity-100 shrink-0">
-                        <Plus className="h-3 w-3 mr-1" /> Select
-                      </Button>
-                    )}
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function DocumentChecklist({ transactionId }: { transactionId: number }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeId, setActiveId] = useState<string | null>(null);
-
-  const { data: dropboxStatus } = useQuery<{ configured: boolean; connected: boolean }>({
-    queryKey: ["/api/dropbox/status"],
-  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1465,7 +1301,6 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                 onDelete={handleDeleteDocument}
                 onAddDocument={(name: string, signingPlatform?: string) => addDocumentMutation.mutate({ name, signingPlatform })}
                 isAgentOrBroker={user?.role === 'agent' || user?.role === 'broker'}
-                dropboxConnected={dropboxStatus?.connected}
                 docusignConnected={docusignStatus?.connected}
               />
             ))}
