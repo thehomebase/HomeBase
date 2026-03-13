@@ -11,6 +11,9 @@ import {
 } from "lucide-react";
 import { SiSlack, SiMailchimp, SiGooglesheets, SiCalendly, SiTrello, SiHubspot, SiSalesforce, SiZapier, SiAirtable, SiNotion, SiTwilio, SiGmail } from "react-icons/si";
 import heroImage from "@/assets/landing-hero.png";
+import myTeamMobileImage from "@/assets/IMG_3261_1773428013291.png";
+import zipCodeMapImage from "@/assets/image_1773428370460.png";
+import referralImage from "@/assets/image_1773428743920.png";
 
 function useCountUp(end: number, duration: number = 2000, startTrigger: boolean = false) {
   const [count, setCount] = useState(0);
