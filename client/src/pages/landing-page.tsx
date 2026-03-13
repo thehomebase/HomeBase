@@ -165,23 +165,20 @@ function MessagingPhoneMockup() {
 function AnimatedSignature() {
   const { ref, inView } = useInView(0.4);
   return (
-    <div ref={ref} className="relative">
-      <svg viewBox="0 0 300 100" className="w-full h-auto" style={{ maxWidth: 280 }}>
-        <path
-          d="M 20 70 C 30 20, 50 20, 55 50 C 60 80, 65 80, 70 50 C 75 20, 85 20, 90 45 C 95 70, 100 70, 110 40 L 115 35 M 125 30 C 120 50, 130 70, 145 45 C 150 35, 148 25, 138 30 M 155 30 L 155 65 M 155 45 C 160 35, 175 35, 175 45 C 175 55, 160 60, 155 65 M 185 30 L 185 65 M 185 30 C 195 30, 205 35, 205 45 C 205 55, 195 55, 185 50 M 215 35 C 210 35, 208 45, 215 50 C 222 55, 225 50, 222 42 C 219 35, 210 35, 210 45 M 240 65 C 242 30, 255 25, 260 40 C 265 55, 250 65, 240 55"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="text-neutral-800 dark:text-neutral-200"
-          strokeDasharray="600"
-          strokeDashoffset={inView ? "0" : "600"}
-          style={{
-            transition: "stroke-dashoffset 2.5s cubic-bezier(0.4, 0, 0.2, 1)",
-          }}
-        />
-      </svg>
+    <div ref={ref} className="relative overflow-hidden py-1">
+      <div
+        className="whitespace-nowrap"
+        style={{
+          fontFamily: "'Brush Script MT', 'Segoe Script', 'Apple Chancery', cursive",
+          fontSize: 38,
+          color: "var(--foreground, #1a1a1a)",
+          opacity: inView ? 1 : 0,
+          clipPath: inView ? "inset(0 0% 0 0)" : "inset(0 100% 0 0)",
+          transition: "clip-path 2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
+        }}
+      >
+        James Donovan
+      </div>
     </div>
   );
 }
