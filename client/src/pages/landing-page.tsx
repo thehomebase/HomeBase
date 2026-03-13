@@ -7,11 +7,12 @@ import {
   ArrowRight, BarChart3, FileText, Users, MessageSquare, Map, Shield,
   Zap, Phone, Mail, Home, Star, ChevronRight, CheckCircle2, Briefcase,
   Building2, TrendingUp, Clock, Target, Award, ExternalLink, ArrowRightLeft,
-  Lock, BarChart2, ChevronDown
+  Lock, BarChart2, ChevronDown, MapPin, Gift, DollarSign, Bell, Search,
+  Wrench, Hammer
 } from "lucide-react";
 import { SiSlack, SiMailchimp, SiGooglesheets, SiCalendly, SiTrello, SiHubspot, SiSalesforce, SiZapier, SiAirtable, SiNotion, SiTwilio, SiGmail } from "react-icons/si";
 import heroImage from "@/assets/landing-hero.png";
-import myTeamMobileImage from "@/assets/IMG_3261_1773428013291.png";
+import myTeamDesktopImage from "@/assets/image_1773430206672.png";
 import zipCodeMapImage from "@/assets/image_1773428370460.png";
 import referralImage from "@/assets/image_1773428743920.png";
 
@@ -385,6 +386,171 @@ export default function LandingPage() {
               </ul>
               <Button size="lg" className="gap-2" onClick={() => setLocation("/auth")}>
                 Try It Free <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={`${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10">
+            <p className="text-sm text-primary font-medium uppercase tracking-wider mb-2">HomeBase Pros</p>
+            <h2 className={`font-bold tracking-tight mb-4 ${isMobile ? "text-3xl" : "text-4xl"}`}>
+              Your trusted team, always at your fingertips
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Build and manage your go-to team of inspectors, lenders, contractors, and more. Every pro is verified, rated, and just a tap away.
+            </p>
+          </div>
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl border mb-10">
+            <img
+              src={myTeamDesktopImage}
+              alt="HomeBase Pros — your trusted team of verified vendors and service providers"
+              className="w-full h-auto"
+            />
+          </div>
+          <div className={`grid gap-6 ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="h-10 w-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                </div>
+                <h4 className="font-semibold mb-1">Verified Professionals</h4>
+                <p className="text-sm text-muted-foreground">Every vendor is verified with ratings, reviews, and specialties so you always know who you're working with.</p>
+              </CardContent>
+            </Card>
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-3">
+                  <Search className="h-5 w-5 text-blue-600" />
+                </div>
+                <h4 className="font-semibold mb-1">Filter by Category</h4>
+                <p className="text-sm text-muted-foreground">Find the right pro instantly — filter by specialty, location, and availability across 10+ categories.</p>
+              </CardContent>
+            </Card>
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="h-10 w-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-3">
+                  <MessageSquare className="h-5 w-5 text-purple-600" />
+                </div>
+                <h4 className="font-semibold mb-1">Direct Communication</h4>
+                <p className="text-sm text-muted-foreground">Call, message, or email your pros directly from their card. Coordinate repairs and bids seamlessly.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      <section className={`bg-muted/30 ${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
+        <div className="max-w-6xl mx-auto">
+          <div className={`grid gap-12 items-center ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+            <div>
+              <p className="text-sm text-primary font-medium uppercase tracking-wider mb-2">Lead Generation</p>
+              <h2 className={`font-bold tracking-tight mb-4 ${isMobile ? "text-3xl" : "text-4xl"}`}>
+                Claim your territory, own your leads
+              </h2>
+              <p className="text-muted-foreground mb-6 leading-relaxed">
+                Select zip codes on an interactive map and get exclusive leads delivered to you. The more you invest, the higher your share of voice — and if there are no leads, you don't pay.
+              </p>
+              <ul className="space-y-3 mb-8">
+                <li className={`flex items-center gap-3 text-sm`}>
+                  <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                    <MapPin className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <span>Interactive zip code territory map</span>
+                </li>
+                <li className={`flex items-center gap-3 text-sm`}>
+                  <div className="h-8 w-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                  </div>
+                  <span>Share of Voice — spend more, get more leads</span>
+                </li>
+                <li className={`flex items-center gap-3 text-sm`}>
+                  <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                    <Shield className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <span>No Leads, No Charge guarantee</span>
+                </li>
+                <li className={`flex items-center gap-3 text-sm`}>
+                  <div className="h-8 w-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                    <Bell className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <span>Push + SMS alerts for new leads</span>
+                </li>
+                <li className={`flex items-center gap-3 text-sm`}>
+                  <div className="h-8 w-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+                    <Target className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <span>RESPA-compliant for agents & lenders</span>
+                </li>
+              </ul>
+              <Button size="lg" className="gap-2" onClick={() => setLocation("/auth")}>
+                Start Generating Leads <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl border">
+              <img
+                src={zipCodeMapImage}
+                alt="Interactive zip code map for lead generation territory claiming"
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={`${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
+        <div className="max-w-6xl mx-auto">
+          <div className={`grid gap-12 items-center ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+            <div className={`relative ${isMobile ? "order-2" : ""}`}>
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl border bg-card mx-auto" style={{ maxWidth: 380 }}>
+                <img
+                  src={referralImage}
+                  alt="Referral program with credits tracking — 4 applied, 3 pending"
+                  className="w-full h-auto"
+                />
+              </div>
+              <div className="absolute -bottom-4 -right-4 bg-card border rounded-xl shadow-lg p-3 hidden lg:flex items-center gap-2">
+                <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                  <Gift className="h-4 w-4 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold">4 Free Months Earned</p>
+                  <p className="text-[10px] text-muted-foreground">$196 saved so far</p>
+                </div>
+              </div>
+            </div>
+            <div className={isMobile ? "order-1" : ""}>
+              <p className="text-sm text-primary font-medium uppercase tracking-wider mb-2">Referral Program</p>
+              <h2 className={`font-bold tracking-tight mb-4 ${isMobile ? "text-3xl" : "text-4xl"}`}>
+                Share the love, earn free months
+              </h2>
+              <p className="text-muted-foreground mb-6 leading-relaxed">
+                Invite agents and vendors to HomeBase. When they sign up and add a payment method, you both get a free month. Track your referrals, see pending and applied credits, and share your unique code with one tap.
+              </p>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center gap-3 text-sm">
+                  <div className="h-8 w-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+                    <Gift className="h-4 w-4 text-green-600" />
+                  </div>
+                  <span>Both you and your referral get a free month</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm">
+                  <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                    <Users className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <span>Refer agents, vendors, or lenders</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm">
+                  <div className="h-8 w-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                    <BarChart2 className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <span>Track applied & pending credits in real time</span>
+                </li>
+              </ul>
+              <Button size="lg" variant="outline" className="gap-2" onClick={() => setLocation("/auth")}>
+                Start Referring <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
