@@ -242,6 +242,112 @@ function SignNowActions({ documentName, onSigningUrlSet }: { documentName: strin
   );
 }
 
+function DropboxDocuSignPicker({ open, onOpenChange, onSelectFile, isPending }: { open: boolean; onOpenChange: (open: boolean) => void; onSelectFile: (path: string) => void; isPending: boolean }) {
+  const [currentPath, setCurrentPath] = useState("");
+  const [pathHistory, setPathHistory] = useState<string[]>([""]);
+
+  const { data: filesData, isLoading } = useQuery<{ entries: DropboxEntry[]; hasMore: boolean }>({
+    queryKey: ["/api/dropbox/files", currentPath],
+    queryFn: async () => {
+      const res = await apiRequest("POST", "/api/dropbox/files", { path: currentPath });
+      return res.json();
+    },
+    enabled: open,
+  });
+
+  const handleNavigate = (entry: DropboxEntry) => {
+    if (entry.isFolder) {
+      setPathHistory(prev => [...prev, entry.path]);
+      setCurrentPath(entry.path);
+    }
+  };
+
+  const handleBack = () => {
+    if (pathHistory.length > 1) {
+      const newHistory = [...pathHistory];
+      newHistory.pop();
+      setPathHistory(newHistory);
+      setCurrentPath(newHistory[newHistory.length - 1]);
+    }
+  };
+
+  const entries = filesData?.entries || [];
+  const currentFolder = currentPath ? currentPath.split("/").pop() : "Dropbox";
+  const docEntries = entries.filter(e => {
+    if (e.isFolder) return true;
+    const ext = e.name.split('.').pop()?.toLowerCase();
+    return ext && ['pdf', 'doc', 'docx'].includes(ext);
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md max-h-[70vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-sm">
+            <CloudUpload className="h-4 w-4 text-blue-600" />
+            Pick file from Dropbox for DocuSign
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex items-center gap-2 mb-1">
+          {pathHistory.length > 1 && (
+            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={handleBack}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <span className="text-xs font-medium text-muted-foreground truncate">{currentFolder}</span>
+          <span className="text-[10px] text-muted-foreground ml-auto">PDF, DOC, DOCX only</span>
+        </div>
+
+        <ScrollArea className="flex-1 min-h-0 max-h-[350px]">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : docEntries.length === 0 ? (
+            <div className="text-center py-8 text-xs text-muted-foreground">No signable documents found</div>
+          ) : (
+            <div className="space-y-0.5">
+              {docEntries
+                .sort((a, b) => {
+                  if (a.isFolder && !b.isFolder) return -1;
+                  if (!a.isFolder && b.isFolder) return 1;
+                  return a.name.localeCompare(b.name);
+                })
+                .map((entry, i) => (
+                  <div
+                    key={`${entry.path}-${i}`}
+                    className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 group cursor-pointer"
+                    onClick={() => entry.isFolder ? handleNavigate(entry) : onSelectFile(entry.path)}
+                  >
+                    {entry.isFolder ? (
+                      <Folder className="h-4 w-4 text-blue-500 shrink-0" />
+                    ) : (
+                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                    )}
+                    <span className="text-xs truncate flex-1">{entry.name}</span>
+                    {entry.isFolder ? (
+                      <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100">Select</span>
+                    )}
+                  </div>
+                ))}
+            </div>
+          )}
+        </ScrollArea>
+
+        {isPending && (
+          <div className="flex items-center gap-2 p-2 rounded bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800">
+            <Loader2 className="h-4 w-4 animate-spin text-yellow-600" />
+            <span className="text-xs text-yellow-700 dark:text-yellow-400">Sending to DocuSign...</span>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DocuSignActions({ documentName, documentId, transactionId, onSigningUrlSet }: { documentName: string; documentId: number; transactionId: number; onSigningUrlSet: (url: string) => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -249,10 +355,28 @@ function DocuSignActions({ documentName, documentId, transactionId, onSigningUrl
   const [signerName, setSignerName] = useState('');
   const [consentChecked, setConsentChecked] = useState(false);
   const [sendMode, setSendMode] = useState<'prepare' | 'quick'>('prepare');
+  const [showDropboxPicker, setShowDropboxPicker] = useState(false);
 
   const { data: dsStatus } = useQuery<{ configured: boolean; connected: boolean }>({
     queryKey: ["/api/docusign/status"],
   });
+
+  const { data: dropboxStatus } = useQuery<{ configured: boolean; connected: boolean }>({
+    queryKey: ["/api/dropbox/status"],
+  });
+
+  const handleDocuSignSuccess = (data: any, mode: 'prepare' | 'quick') => {
+    if (mode === 'prepare' && data.senderViewUrl) {
+      window.open(data.senderViewUrl, '_blank');
+      toast({ title: "DocuSign editor opened — place signature fields and send from there" });
+    } else if (mode === 'quick') {
+      toast({ title: `DocuSign envelope sent to ${signerEmail}` });
+    }
+    if (data.envelopeId) {
+      onSigningUrlSet(`https://app.docusign.com/documents/details/${data.envelopeId}`);
+    }
+    queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
+  };
 
   const prepareMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -264,27 +388,11 @@ function DocuSignActions({ documentName, documentId, transactionId, onSigningUrl
       formData.append("consentAcknowledged", consentChecked ? "true" : "false");
       formData.append("documentId", String(documentId));
       formData.append("transactionId", String(transactionId));
-      const res = await fetch("/api/docusign/prepare", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to prepare");
-      }
+      const res = await fetch("/api/docusign/prepare", { method: "POST", body: formData, credentials: "include" });
+      if (!res.ok) { const errData = await res.json().catch(() => ({})); throw new Error(errData.error || "Failed to prepare"); }
       return res.json();
     },
-    onSuccess: (data: any) => {
-      if (data.senderViewUrl) {
-        window.open(data.senderViewUrl, '_blank');
-        toast({ title: "DocuSign editor opened — place signature fields and send from there" });
-      }
-      if (data.envelopeId) {
-        onSigningUrlSet(`https://app.docusign.com/documents/details/${data.envelopeId}`);
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
-    },
+    onSuccess: (data: any) => handleDocuSignSuccess(data, 'prepare'),
     onError: (err: any) => toast({ title: err.message || "Failed to prepare", variant: "destructive" }),
   });
 
@@ -298,28 +406,37 @@ function DocuSignActions({ documentName, documentId, transactionId, onSigningUrl
       formData.append("consentAcknowledged", consentChecked ? "true" : "false");
       formData.append("documentId", String(documentId));
       formData.append("transactionId", String(transactionId));
-      const res = await fetch("/api/docusign/send", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to send");
-      }
+      const res = await fetch("/api/docusign/send", { method: "POST", body: formData, credentials: "include" });
+      if (!res.ok) { const errData = await res.json().catch(() => ({})); throw new Error(errData.error || "Failed to send"); }
       return res.json();
     },
-    onSuccess: (data: any) => {
-      toast({ title: `DocuSign envelope sent to ${signerEmail}` });
-      if (data.envelopeId) {
-        onSigningUrlSet(`https://app.docusign.com/documents/details/${data.envelopeId}`);
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/documents", transactionId] });
-    },
+    onSuccess: (data: any) => handleDocuSignSuccess(data, 'quick'),
     onError: (err: any) => toast({ title: err.message || "Failed to send", variant: "destructive" }),
   });
 
-  const isPending = prepareMutation.isPending || quickSendMutation.isPending;
+  const dropboxToDocuSignMutation = useMutation({
+    mutationFn: async (dropboxPath: string) => {
+      const res = await apiRequest("POST", "/api/dropbox/send-to-docusign", {
+        dropboxPath,
+        signerEmail,
+        signerName,
+        emailSubject: `Please sign: ${documentName}`,
+        mode: sendMode === 'quick' ? 'send' : 'prepare',
+        documentId,
+        transactionId,
+      });
+      if (!res.ok) { const errData = await res.json().catch(() => ({})); throw new Error(errData.error || "Failed to send"); }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      handleDocuSignSuccess(data, sendMode);
+      setShowDropboxPicker(false);
+    },
+    onError: (err: any) => toast({ title: err.message || "Failed to send from Dropbox to DocuSign", variant: "destructive" }),
+  });
+
+  const isPending = prepareMutation.isPending || quickSendMutation.isPending || dropboxToDocuSignMutation.isPending;
+  const isFormReady = signerEmail && signerName && consentChecked && !isPending;
 
   if (!dsStatus?.connected) {
     return (
@@ -386,11 +503,11 @@ function DocuSignActions({ documentName, documentId, transactionId, onSigningUrl
           </p>
         )}
 
-        <div>
+        <div className="space-y-1.5">
           <input
             type="file"
             accept=".pdf,.doc,.docx"
-            id={`ds-upload-${documentName}`}
+            id={`ds-upload-${documentId}`}
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -408,18 +525,42 @@ function DocuSignActions({ documentName, documentId, transactionId, onSigningUrl
             size="sm"
             variant="default"
             className="w-full h-8 text-xs"
-            disabled={!signerEmail || !signerName || !consentChecked || isPending}
-            onClick={() => document.getElementById(`ds-upload-${documentName}`)?.click()}
+            disabled={!isFormReady}
+            onClick={() => document.getElementById(`ds-upload-${documentId}`)?.click()}
           >
-            {isPending ? (
+            {(prepareMutation.isPending || quickSendMutation.isPending) ? (
               <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> {sendMode === 'prepare' ? 'Preparing...' : 'Sending...'}</>
-            ) : sendMode === 'prepare' ? (
-              <><PenLine className="h-3 w-3 mr-1" /> Upload & Prepare in DocuSign</>
             ) : (
-              <><Send className="h-3 w-3 mr-1" /> Upload & Send via DocuSign</>
+              <><Upload className="h-3 w-3 mr-1" /> From Device</>
             )}
           </Button>
+
+          {dropboxStatus?.connected && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-full h-8 text-xs"
+              disabled={!isFormReady}
+              onClick={() => setShowDropboxPicker(true)}
+            >
+              {dropboxToDocuSignMutation.isPending ? (
+                <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Sending from Dropbox...</>
+              ) : (
+                <><CloudUpload className="h-3 w-3 mr-1 text-blue-600" /> From Dropbox</>
+              )}
+            </Button>
+          )}
         </div>
+
+        {showDropboxPicker && (
+          <DropboxDocuSignPicker
+            open={showDropboxPicker}
+            onOpenChange={setShowDropboxPicker}
+            onSelectFile={(path) => dropboxToDocuSignMutation.mutate(path)}
+            isPending={dropboxToDocuSignMutation.isPending}
+          />
+        )}
       </div>
     </div>
   );

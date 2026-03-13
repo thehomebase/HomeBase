@@ -4935,6 +4935,84 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/dropbox/send-to-docusign", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+
+    const schema = z.object({
+      dropboxPath: z.string().min(1),
+      signerEmail: z.string().email(),
+      signerName: z.string().min(1),
+      emailSubject: z.string().optional(),
+      mode: z.enum(["send", "prepare"]).default("prepare"),
+      documentId: z.number().optional(),
+      transactionId: z.number().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+
+    try {
+      const ext = parsed.data.dropboxPath.split('.').pop()?.toLowerCase();
+      if (!ext || !['pdf', 'doc', 'docx'].includes(ext)) {
+        return res.status(400).json({ error: "Only PDF, DOC, and DOCX files are supported" });
+      }
+
+      const file = await downloadDropboxFile(req.user.id, parsed.data.dropboxPath);
+
+      let result: any;
+      if (parsed.data.mode === "prepare") {
+        const domains = process.env.REPLIT_DOMAINS || "";
+        const domain = domains.split(",")[0];
+        const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+        const returnUrl = `${baseUrl}/api/docusign/sender-return`;
+
+        const draft = await createDraftEnvelope(
+          req.user.id, file.buffer, file.name,
+          parsed.data.signerEmail, parsed.data.signerName, parsed.data.emailSubject
+        );
+        const senderView = await createSenderView(req.user.id, draft.envelopeId, returnUrl);
+
+        await logDocuSignAction(req.user.id, "envelope_prepared", {
+          envelopeId: draft.envelopeId,
+          signerEmail: parsed.data.signerEmail,
+          ipAddress: req.ip,
+          userAgent: req.get("user-agent") || undefined,
+          metadata: { fileName: file.name, source: "dropbox", mode: "embedded_sending" },
+        });
+
+        result = { envelopeId: draft.envelopeId, senderViewUrl: senderView.url };
+      } else {
+        const envelope = await createEnvelope(
+          req.user.id, file.buffer, file.name,
+          parsed.data.signerEmail, parsed.data.signerName, parsed.data.emailSubject
+        );
+
+        await logDocuSignAction(req.user.id, "envelope_sent", {
+          envelopeId: envelope.envelopeId,
+          signerEmail: parsed.data.signerEmail,
+          ipAddress: req.ip,
+          userAgent: req.get("user-agent") || undefined,
+          metadata: { fileName: file.name, source: "dropbox" },
+        });
+
+        result = envelope;
+      }
+
+      if (parsed.data.documentId && parsed.data.transactionId) {
+        const txn = await storage.getTransaction(parsed.data.transactionId);
+        if (txn && (txn.agentId === req.user.id || req.user.role === "broker")) {
+          const signingUrl = `https://app.docusign.com/documents/details/${result.envelopeId}`;
+          await db.execute(sql`UPDATE documents SET signing_url = ${signingUrl}, signing_platform = 'docusign', docusign_envelope_id = ${result.envelopeId}, status = 'waiting_signatures' WHERE id = ${parsed.data.documentId} AND transaction_id = ${parsed.data.transactionId}`);
+        }
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Dropbox-to-DocuSign error:", error);
+      res.status(500).json({ error: error.message || "Failed to send file from Dropbox to DocuSign" });
+    }
+  });
+
   // ============ Email Snippets ============
   app.get("/api/snippets", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
