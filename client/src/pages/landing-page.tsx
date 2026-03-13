@@ -9,7 +9,7 @@ import {
   Building2, TrendingUp, Clock, Target, Award, ExternalLink, ArrowRightLeft,
   Lock, BarChart2, ChevronDown
 } from "lucide-react";
-import { SiSlack, SiMailchimp, SiGooglesheets, SiCalendly, SiTrello, SiHubspot, SiSalesforce, SiZapier, SiAirtable, SiNotion } from "react-icons/si";
+import { SiSlack, SiMailchimp, SiGooglesheets, SiCalendly, SiTrello, SiHubspot, SiSalesforce, SiZapier, SiAirtable, SiNotion, SiTwilio, SiGmail } from "react-icons/si";
 import heroImage from "@/assets/landing-hero.png";
 
 function useCountUp(end: number, duration: number = 2000, startTrigger: boolean = false) {
@@ -349,20 +349,36 @@ export default function LandingPage() {
                 SMS, email, and encrypted in-app messaging — all tracked with real-time metrics. Know exactly how you're connecting with clients, vendors, and lenders.
               </p>
               <ul className="space-y-3 mb-8">
-                {[
-                  { icon: Lock, text: "End-to-end encrypted messaging" },
-                  { icon: Phone, text: "SMS via Twilio integration" },
-                  { icon: Mail, text: "Gmail & email sync" },
-                  { icon: BarChart2, text: "Communication metrics dashboard" },
-                  { icon: Users, text: "Role-tagged conversations" },
-                ].map((item, i) => (
-                  <li key={i} className={`flex items-center gap-3 text-sm ${isMobile ? "justify-center" : ""}`}>
-                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <item.icon className="h-4 w-4 text-primary" />
-                    </div>
-                    <span>{item.text}</span>
-                  </li>
-                ))}
+                <li className={`flex items-center gap-3 text-sm ${isMobile ? "justify-center" : ""}`}>
+                  <div className="h-8 w-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+                    <Lock className="h-4 w-4 text-green-600" />
+                  </div>
+                  <span>End-to-end encrypted messaging</span>
+                </li>
+                <li className={`flex items-center gap-3 text-sm ${isMobile ? "justify-center" : ""}`}>
+                  <div className="h-8 w-8 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
+                    <SiTwilio className="h-4 w-4 text-[#F22F46]" />
+                  </div>
+                  <span>SMS powered by Twilio</span>
+                </li>
+                <li className={`flex items-center gap-3 text-sm ${isMobile ? "justify-center" : ""}`}>
+                  <div className="h-8 w-8 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
+                    <SiGmail className="h-4 w-4 text-[#EA4335]" />
+                  </div>
+                  <span>Gmail & email sync</span>
+                </li>
+                <li className={`flex items-center gap-3 text-sm ${isMobile ? "justify-center" : ""}`}>
+                  <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                    <BarChart2 className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <span>Communication metrics dashboard</span>
+                </li>
+                <li className={`flex items-center gap-3 text-sm ${isMobile ? "justify-center" : ""}`}>
+                  <div className="h-8 w-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+                    <Users className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <span>Role-tagged conversations</span>
+                </li>
               </ul>
               <Button size="lg" className="gap-2" onClick={() => setLocation("/auth")}>
                 Try It Free <ArrowRight className="h-4 w-4" />
