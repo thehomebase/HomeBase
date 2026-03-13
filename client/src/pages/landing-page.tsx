@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -5,10 +6,157 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import {
   ArrowRight, BarChart3, FileText, Users, MessageSquare, Map, Shield,
   Zap, Phone, Mail, Home, Star, ChevronRight, CheckCircle2, Briefcase,
-  Building2, TrendingUp, Clock, Target, Award, ExternalLink, ArrowRightLeft
+  Building2, TrendingUp, Clock, Target, Award, ExternalLink, ArrowRightLeft,
+  Lock, BarChart2, ChevronDown
 } from "lucide-react";
 import { SiSlack, SiMailchimp, SiGooglesheets, SiCalendly, SiTrello, SiHubspot, SiSalesforce, SiZapier, SiAirtable, SiNotion } from "react-icons/si";
 import heroImage from "@/assets/landing-hero.png";
+
+function useCountUp(end: number, duration: number = 2000, startTrigger: boolean = false) {
+  const [count, setCount] = useState(0);
+  const frameRef = useRef<number>();
+
+  useEffect(() => {
+    if (!startTrigger) { setCount(0); return; }
+    const startTime = performance.now();
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(eased * end));
+      if (progress < 1) frameRef.current = requestAnimationFrame(animate);
+    };
+    frameRef.current = requestAnimationFrame(animate);
+    return () => { if (frameRef.current) cancelAnimationFrame(frameRef.current); };
+  }, [end, duration, startTrigger]);
+
+  return count;
+}
+
+function useInView(threshold = 0.3) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setInView(true); obs.disconnect(); } }, { threshold });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return { ref, inView };
+}
+
+function MessagingPhoneMockup() {
+  const { ref, inView } = useInView(0.3);
+  const messages = useCountUp(1284, 2200, inView);
+  const sms = useCountUp(847, 2000, inView);
+  const emails = useCountUp(2156, 2400, inView);
+  const allTime = useCountUp(4287, 2600, inView);
+
+  const conversations = [
+    { initials: "SJ", name: "Sarah Johnson", role: "client", time: "2:14 PM", msg: "Thank you! The inspection report looks great.", unread: true, color: "bg-blue-500" },
+    { initials: "MR", name: "Mike Rivera", role: "vendor", time: "1:48 PM", msg: "Roof repair estimate attached — $3,200.", unread: true, color: "bg-green-600" },
+    { initials: "KO", name: "Katie O'Brien", role: "vendor", time: "12:30 PM", msg: "Hi Kate! I am just following up on the repairs.", unread: false, color: "bg-neutral-800" },
+    { initials: "TW", name: "Tom Williams", role: "lender", time: "11:15 AM", msg: "Pre-approval letter is ready for your buyer.", unread: false, color: "bg-purple-600" },
+    { initials: "LP", name: "Lisa Park", role: "client", time: "Yesterday", msg: "Can we schedule the final walkthrough?", unread: false, color: "bg-rose-500" },
+  ];
+
+  return (
+    <div ref={ref} className="relative mx-auto" style={{ maxWidth: 340 }}>
+      <div className="rounded-[2.5rem] border-[6px] border-neutral-800 dark:border-neutral-600 bg-white dark:bg-neutral-900 shadow-2xl overflow-hidden">
+        <div className="bg-neutral-800 dark:bg-neutral-700 h-6 flex items-center justify-center">
+          <div className="w-20 h-4 bg-neutral-900 dark:bg-neutral-800 rounded-b-xl" />
+        </div>
+
+        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-neutral-700 dark:text-neutral-300" />
+            <span className="font-semibold text-base text-neutral-900 dark:text-white">Messages</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 flex items-center gap-1">
+              <Lock className="h-2.5 w-2.5" /> Encrypted
+            </span>
+            <div className="h-6 w-6 rounded-md bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+              <BarChart2 className="h-3 w-3 text-neutral-600 dark:text-neutral-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-1 text-[10px] text-neutral-500 mb-1.5">
+            <span>All Contacts (Total)</span>
+            <ChevronDown className="h-2.5 w-2.5" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 px-3 pb-3">
+          <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-2.5">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <MessageSquare className="h-3 w-3 text-neutral-500" />
+              <span className="text-[10px] text-neutral-500">Messages</span>
+            </div>
+            <p className="text-xl font-bold text-neutral-900 dark:text-white tabular-nums">{messages.toLocaleString()}</p>
+            <p className="text-[9px] text-neutral-400">Today: 12 &middot; Week: 84</p>
+          </div>
+          <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-2.5">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Phone className="h-3 w-3 text-neutral-500" />
+              <span className="text-[10px] text-neutral-500">SMS Sent</span>
+            </div>
+            <p className="text-xl font-bold text-neutral-900 dark:text-white tabular-nums">{sms.toLocaleString()}</p>
+            <p className="text-[9px] text-neutral-400">Today: 5 &middot; Week: 38</p>
+          </div>
+          <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-2.5">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Mail className="h-3 w-3 text-neutral-500" />
+              <span className="text-[10px] text-neutral-500">Emails</span>
+            </div>
+            <p className="text-xl font-bold text-neutral-900 dark:text-white tabular-nums">{emails.toLocaleString()}</p>
+            <p className="text-[9px] text-neutral-400">Today: 8 &middot; Week: 52</p>
+          </div>
+          <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 p-2.5">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <TrendingUp className="h-3 w-3 text-neutral-500" />
+              <span className="text-[10px] text-neutral-500">All-Time</span>
+            </div>
+            <p className="text-xl font-bold text-neutral-900 dark:text-white tabular-nums">{allTime.toLocaleString()}</p>
+            <p className="text-[9px] text-neutral-400">Msgs: {messages.toLocaleString()} &middot; SMS: {sms.toLocaleString()}</p>
+          </div>
+        </div>
+
+        <div className="border-t border-neutral-200 dark:border-neutral-700">
+          {conversations.map((c, i) => (
+            <div key={i} className={`flex items-center gap-3 px-3 py-2.5 border-b border-neutral-100 dark:border-neutral-800 ${c.unread ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}`}>
+              <div className={`h-9 w-9 rounded-full ${c.color} flex items-center justify-center text-white text-xs font-semibold shrink-0`}>
+                {c.initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-neutral-900 dark:text-white">{c.name}</span>
+                    <span className={`text-[8px] px-1 py-0.5 rounded font-medium ${
+                      c.role === "client" ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" :
+                      c.role === "vendor" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" :
+                      "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
+                    }`}>{c.role}</span>
+                  </div>
+                  <span className="text-[9px] text-neutral-400">{c.time}</span>
+                </div>
+                <p className="text-[10px] text-neutral-500 truncate">{c.msg}</p>
+              </div>
+              {c.unread && <div className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />}
+            </div>
+          ))}
+        </div>
+
+        <div className="h-5 bg-white dark:bg-neutral-900 flex items-center justify-center">
+          <div className="w-24 h-1 bg-neutral-300 dark:bg-neutral-600 rounded-full" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
@@ -182,6 +330,44 @@ export default function LandingPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className={`bg-muted/30 ${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
+        <div className="max-w-6xl mx-auto">
+          <div className={`grid gap-12 items-center ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+            <div className={isMobile ? "order-2" : ""}>
+              <MessagingPhoneMockup />
+            </div>
+            <div className={isMobile ? "order-1 text-center" : ""}>
+              <p className="text-sm text-primary font-medium uppercase tracking-wider mb-2">Unified Communications</p>
+              <h2 className={`font-bold tracking-tight mb-4 ${isMobile ? "text-3xl" : "text-4xl"}`}>
+                Every conversation, one place
+              </h2>
+              <p className="text-muted-foreground mb-6 leading-relaxed">
+                SMS, email, and encrypted in-app messaging — all tracked with real-time metrics. Know exactly how you're connecting with clients, vendors, and lenders.
+              </p>
+              <ul className="space-y-3 mb-8">
+                {[
+                  { icon: Lock, text: "End-to-end encrypted messaging" },
+                  { icon: Phone, text: "SMS via Twilio integration" },
+                  { icon: Mail, text: "Gmail & email sync" },
+                  { icon: BarChart2, text: "Communication metrics dashboard" },
+                  { icon: Users, text: "Role-tagged conversations" },
+                ].map((item, i) => (
+                  <li key={i} className={`flex items-center gap-3 text-sm ${isMobile ? "justify-center" : ""}`}>
+                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <item.icon className="h-4 w-4 text-primary" />
+                    </div>
+                    <span>{item.text}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button size="lg" className="gap-2" onClick={() => setLocation("/auth")}>
+                Try It Free <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </section>
