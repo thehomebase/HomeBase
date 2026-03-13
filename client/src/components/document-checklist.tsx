@@ -1064,13 +1064,13 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 12,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200,
-        tolerance: 5,
+        delay: 350,
+        tolerance: 10,
       },
     }),
     useSensor(KeyboardSensor)
@@ -1180,6 +1180,12 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     setActiveId(event.active.id as string);
   };
 
+  const handleDragCancel = () => {
+    setActiveId(null);
+  };
+
+  const validStatuses: Document['status'][] = ['not_started', 'in_progress', 'waiting_signatures', 'signed', 'waiting_others'];
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
@@ -1190,6 +1196,8 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     const documentId = active.id as string;
 
     if (!status || !documentId) return;
+
+    if (!validStatuses.includes(status)) return;
 
     const activeDocument = documents.find(doc => doc.id === documentId);
     if (!activeDocument || activeDocument.status === status) return;
@@ -1349,6 +1357,7 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         >
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {statusColumns.map(column => (
