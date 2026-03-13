@@ -421,7 +421,7 @@ export default function TransactionsPage() {
 
   const handleDeleteTransaction = (id: number) => {
     if (user?.role === "agent" || user?.role === "broker") {
-      deleteTransactionMutation.mutate(id);
+      setDeleteId(id);
     }
   };
 
@@ -964,8 +964,7 @@ export default function TransactionsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this transaction? This action
-              cannot be undone.
+              Are you sure you want to delete this transaction? This action cannot be undone and all associated documents, signing links, notes, and checklist data will be permanently removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
