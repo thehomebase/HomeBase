@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import crypto from "crypto";
 
 const DOCUSIGN_AUTH_SERVER = process.env.DOCUSIGN_BASE_URL?.includes("demo")
   ? "https://account-d.docusign.com"
@@ -27,18 +28,27 @@ function getBasicAuth(): string {
   return Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 }
 
+export function generatePKCE(): { codeVerifier: string; codeChallenge: string } {
+  const codeVerifier = crypto.randomBytes(32).toString("base64url");
+  const codeChallenge = crypto
+    .createHash("sha256")
+    .update(codeVerifier)
+    .digest("base64url");
+  return { codeVerifier, codeChallenge };
+}
+
 export function isDocuSignConfigured(): boolean {
   return !!(process.env.DOCUSIGN_INTEGRATION_KEY && process.env.DOCUSIGN_SECRET_KEY);
 }
 
-export function getDocuSignAuthUrl(state: string): string {
+export function getDocuSignAuthUrl(state: string, codeChallenge: string): string {
   const { clientId } = getClientCredentials();
   const redirectUri = encodeURIComponent(getRedirectUri());
   const scopes = encodeURIComponent("signature");
-  return `${DOCUSIGN_AUTH_SERVER}/oauth/auth?response_type=code&scope=${scopes}&client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}`;
+  return `${DOCUSIGN_AUTH_SERVER}/oauth/auth?response_type=code&scope=${scopes}&client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 }
 
-export async function handleDocuSignCallback(code: string, userId: number): Promise<{ email: string | null }> {
+export async function handleDocuSignCallback(code: string, userId: number, codeVerifier: string): Promise<{ email: string | null }> {
   const res = await fetch(`${DOCUSIGN_AUTH_SERVER}/oauth/token`, {
     method: "POST",
     headers: {
@@ -49,6 +59,7 @@ export async function handleDocuSignCallback(code: string, userId: number): Prom
       grant_type: "authorization_code",
       code,
       redirect_uri: getRedirectUri(),
+      code_verifier: codeVerifier,
     }),
   });
 

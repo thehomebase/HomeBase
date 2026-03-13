@@ -13,7 +13,7 @@ import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, type EmailAttachment } from "./gmail-service";
 import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured, logSignNowAction } from "./signnow-service";
-import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, createDraftEnvelope, createSenderView, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction } from "./docusign-service";
+import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, createDraftEnvelope, createSenderView, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction, generatePKCE } from "./docusign-service";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { notify } from "./notification-helper";
@@ -4483,9 +4483,11 @@ export function registerRoutes(app: Express): Server {
     try {
       const crypto = await import("crypto");
       const nonce = crypto.randomBytes(32).toString("hex");
+      const { codeVerifier, codeChallenge } = generatePKCE();
       (req.session as any).docusignOAuthState = nonce;
       (req.session as any).docusignOAuthUserId = req.user.id;
-      const url = getDocuSignAuthUrl(nonce);
+      (req.session as any).docusignCodeVerifier = codeVerifier;
+      const url = getDocuSignAuthUrl(nonce, codeChallenge);
       res.json({ url });
     } catch (error: any) {
       console.error("Error generating DocuSign auth URL:", error);
@@ -4513,11 +4515,18 @@ export function registerRoutes(app: Express): Server {
       return sendCallbackPage(false, "Session expired or state mismatch. Please try again from Settings.");
     }
 
+    const codeVerifier = (req.session as any).docusignCodeVerifier;
     delete (req.session as any).docusignOAuthState;
     delete (req.session as any).docusignOAuthUserId;
+    delete (req.session as any).docusignCodeVerifier;
+
+    if (!codeVerifier) {
+      console.error("DocuSign PKCE code verifier missing from session");
+      return sendCallbackPage(false, "Session expired. Please try again from Settings.");
+    }
 
     try {
-      await handleDocuSignCallback(code, userId);
+      await handleDocuSignCallback(code, userId, codeVerifier);
       await logDocuSignAction(userId, "account_connected", { ipAddress: req.ip, userAgent: req.get("user-agent") || undefined });
       sendCallbackPage(true, "Your DocuSign account has been connected successfully.");
     } catch (error: any) {
