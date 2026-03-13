@@ -10,6 +10,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -23,7 +24,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, ExternalLink, Link2, Upload, Send, Loader2, PenLine, RefreshCw, Trash2, CloudUpload, Folder, ArrowLeft, Search, ChevronRight } from "lucide-react";
+import { Plus, FileText, ExternalLink, Link2, Upload, Send, Loader2, PenLine, RefreshCw, Trash2, CloudUpload, Folder, ArrowLeft, Search, ChevronRight, GripVertical } from "lucide-react";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
@@ -589,10 +590,11 @@ function DocumentCard({
   const [signingUrl, setSigningUrl] = useState(document.signingUrl || '');
   const [signingPlatform, setSigningPlatform] = useState(document.signingPlatform || '');
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : undefined,
+    touchAction: 'none',
   };
 
   const statusColor = getStatusColor(document.status);
@@ -607,6 +609,7 @@ function DocumentCard({
       onClick={() => setIsEditing(!isEditing)}
     >
       <div className="flex items-start justify-between gap-2">
+        <GripVertical className="h-4 w-4 text-muted-foreground/50 flex-shrink-0 mt-0.5 md:hidden" />
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm mb-1 truncate" title={document.name}>{document.name}</div>
           <div className="flex items-center gap-1 flex-wrap">
@@ -1062,6 +1065,12 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor)
