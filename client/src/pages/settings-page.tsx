@@ -1045,11 +1045,11 @@ function SignNowIntegrationCard() {
         ) : !status?.configured ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              To enable e-signatures, add your SignNow API credentials (SIGNNOW_CLIENT_ID and SIGNNOW_CLIENT_SECRET) to your environment.
+              e-Signatures are not yet enabled on this platform. Contact your administrator to set up the SignNow integration.
             </p>
-            <Button variant="outline" className="w-full" onClick={() => window.open("https://www.signnow.com/developers", "_blank")}>
+            <Button variant="outline" className="w-full" onClick={() => window.open("https://www.signnow.com/pricing", "_blank")}>
               <ExternalLink className="h-4 w-4 mr-2" />
-              Get SignNow API Credentials
+              Learn About SignNow
             </Button>
           </div>
         ) : status.connected ? (
@@ -1059,7 +1059,7 @@ function SignNowIntegrationCard() {
               <span className="text-sm">{status.email || "Account connected"}</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              You can now send documents for e-signature from any transaction's document checklist.
+              Documents are sent through your own SignNow account. You can send for e-signature from any transaction's document checklist.
             </p>
             <Button
               variant="outline"
@@ -1073,7 +1073,7 @@ function SignNowIntegrationCard() {
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Connect your SignNow account to send documents for e-signature directly from transactions. Your documents and signatures are managed in your own SignNow account.
+              Connect your SignNow account to send documents for e-signature directly from transactions. Documents stay in your own SignNow account — signing costs and billing are managed through your SignNow subscription.
             </p>
             <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5 p-2 rounded border">
