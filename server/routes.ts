@@ -4786,26 +4786,17 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/docusign/forward-document", async (req, res) => {
+  app.get("/api/docusign/document-pdf/:transactionId/:documentId", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
-    const schema = z.object({
-      recipientEmail: z.string().email(),
-      recipientName: z.string().min(1).max(200),
-      message: z.string().max(2000).optional(),
-      transactionId: z.number(),
-      documentId: z.string(),
-    });
-
-    const parsed = schema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid request data" });
-
-    const { recipientEmail, recipientName, message, transactionId, documentId } = parsed.data;
+    const transactionId = parseInt(req.params.transactionId);
+    const documentId = req.params.documentId;
+    if (isNaN(transactionId)) return res.status(400).json({ error: "Invalid transaction ID" });
 
     try {
       const transaction = await storage.getTransaction(transactionId);
-      if (!transaction || transaction.agentId !== req.user.id) {
+      if (!transaction || (transaction.agentId !== req.user.id && req.user.role !== "broker")) {
         return res.status(403).json({ error: "Not authorized for this transaction" });
       }
 
@@ -4813,63 +4804,26 @@ export function registerRoutes(app: Express): Server {
       if (!document || document.transactionId !== transactionId) {
         return res.status(404).json({ error: "Document not found" });
       }
-      if (document.status !== 'signed') {
-        return res.status(400).json({ error: "Document must be in 'signed' status to forward" });
-      }
       if (!document.docusignEnvelopeId) {
         return res.status(400).json({ error: "Document has no DocuSign envelope" });
       }
 
-      const gmailStatus = await getGmailStatus(req.user.id);
-      if (!gmailStatus.connected) {
-        return res.status(400).json({ error: "Gmail not connected. Please connect your Gmail account in Settings to forward documents." });
-      }
-
       const pdfBuffer = await downloadEnvelopeDocuments(req.user.id, document.docusignEnvelopeId);
-
-      const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-      const safeName = escHtml(recipientName);
-      const safeDocName = escHtml(document.name);
       const safeFileName = document.name.replace(/[^\w\s.-]/g, '_');
-      const senderName = escHtml(`${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'Your Agent');
-      const subject = `Document for Review: ${safeDocName}`;
-      const body = message
-        ? `<p>Hi ${safeName},</p><p>${escHtml(message).replace(/\n/g, '<br>')}</p><p>Please find the signed document attached for your review.</p><p>Best regards,<br>${senderName}</p>`
-        : `<p>Hi ${safeName},</p><p>Please find the signed document &ldquo;<strong>${safeDocName}</strong>&rdquo; attached for your review. Please review with your clients and proceed with signatures on your end.</p><p>Best regards,<br>${senderName}</p>`;
 
-      const emailResult = await sendGmailEmail(req.user.id, recipientEmail, subject, body, undefined, [
-        { name: `${safeFileName}.pdf`, mimeType: "application/pdf", content: pdfBuffer }
-      ]);
+      await logDocuSignAction(req.user.id, "document_downloaded", {
+        envelopeId: document.docusignEnvelopeId,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") || undefined,
+        metadata: { documentName: document.name, transactionId, documentId },
+      });
 
-      if (!emailResult.success) {
-        return res.status(500).json({ error: emailResult.error || "Failed to send email" });
-      }
-
-      try {
-        await storage.updateDocument(documentId, {
-          status: "waiting_others",
-          notes: `Forwarded to ${recipientName} (${recipientEmail}) on ${new Date().toLocaleDateString()}`
-        });
-      } catch (updateErr) {
-        console.error("Document status update failed after email sent:", updateErr);
-      }
-
-      try {
-        await logDocuSignAction(req.user.id, "document_forwarded", {
-          envelopeId: document.docusignEnvelopeId,
-          signerEmail: recipientEmail,
-          ipAddress: req.ip,
-          userAgent: req.get("user-agent") || undefined,
-          metadata: { recipientName, documentName: document.name, transactionId, documentId },
-        });
-      } catch (logErr) {
-        console.error("Audit log failed after forward:", logErr);
-      }
-
-      res.json({ success: true, messageId: emailResult.messageId });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeFileName}.pdf"`);
+      res.send(pdfBuffer);
     } catch (error: any) {
-      console.error("DocuSign forward error:", error);
-      res.status(500).json({ error: error.message || "Failed to forward document" });
+      console.error("DocuSign document-pdf error:", error);
+      res.status(500).json({ error: error.message || "Failed to download document PDF" });
     }
   });
 

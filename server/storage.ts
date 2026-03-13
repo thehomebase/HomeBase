@@ -2321,7 +2321,11 @@ export class DatabaseStorage implements IStorage {
         createdAt: doc.created_at ? new Date(doc.created_at) : null,
         updatedAt: doc.updated_at ? new Date(doc.updated_at) : null,
         notes: doc.notes ? String(doc.notes) : null,
-        clientId: doc.client_id ? Number(doc.client_id) : null
+        clientId: doc.client_id ? Number(doc.client_id) : null,
+        signingUrl: doc.signing_url ? String(doc.signing_url) : null,
+        signingPlatform: doc.signing_platform ? String(doc.signing_platform) as Document['signingPlatform'] : null,
+        signnowDocumentId: doc.signnow_document_id ? String(doc.signnow_document_id) : null,
+        docusignEnvelopeId: doc.docusign_envelope_id ? String(doc.docusign_envelope_id) : null,
       };
     } catch (error) {
       console.error('Error in getDocument:', error);

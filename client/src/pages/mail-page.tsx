@@ -412,9 +412,28 @@ export default function MailPage() {
     const params = new URLSearchParams(window.location.search);
     const composeTo = params.get("composeTo");
     const composeSubject = params.get("composeSubject");
-    if (composeTo || composeSubject) {
+    const dsTransactionId = params.get("docusignTransactionId");
+    const dsDocumentId = params.get("docusignDocumentId");
+    const dsDocName = params.get("docusignDocName");
+    if (composeTo || composeSubject || dsTransactionId) {
       openCompose({ to: composeTo || "", subject: composeSubject || "" });
       window.history.replaceState({}, "", window.location.pathname);
+
+      if (dsTransactionId && dsDocumentId) {
+        (async () => {
+          try {
+            const res = await fetch(`/api/docusign/document-pdf/${dsTransactionId}/${dsDocumentId}`, { credentials: "include" });
+            if (!res.ok) throw new Error("Failed to download document");
+            const blob = await res.blob();
+            const safeName = (dsDocName || "document").replace(/[^\w\s.-]/g, '_');
+            const file = new File([blob], `${safeName}.pdf`, { type: "application/pdf" });
+            setAttachments([{ file, id: `docusign-${dsDocumentId}` }]);
+          } catch (err) {
+            console.error("Failed to attach DocuSign PDF:", err);
+            toast({ title: "Could not attach the signed document. You can still compose your email and attach it manually.", variant: "destructive" });
+          }
+        })();
+      }
     }
   }, []);
 
