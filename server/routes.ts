@@ -12,7 +12,7 @@ import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, type EmailAttachment } from "./gmail-service";
-import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured } from "./signnow-service";
+import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured, logSignNowAction } from "./signnow-service";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { notify } from "./notification-helper";
@@ -4352,6 +4352,7 @@ export function registerRoutes(app: Express): Server {
 
     try {
       await handleSignNowCallback(code, userId);
+      await logSignNowAction(userId, "account_connected", { ipAddress: req.ip, userAgent: req.get("user-agent") || undefined });
       res.redirect(`${baseUrl}/settings?signnow=connected`);
     } catch (error: any) {
       console.error("SignNow callback error:", error);
@@ -4363,6 +4364,7 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
+      await logSignNowAction(req.user.id, "account_disconnected", { ipAddress: req.ip, userAgent: req.get("user-agent") || undefined });
       await disconnectSignNow(req.user.id);
       res.json({ success: true });
     } catch (error: any) {
@@ -4376,6 +4378,12 @@ export function registerRoutes(app: Express): Server {
     if (!req.file) return res.status(400).json({ error: "No file provided" });
     try {
       const result = await snUploadDocument(req.user.id, req.file.buffer, req.file.originalname);
+      await logSignNowAction(req.user.id, "document_uploaded", {
+        documentId: result.id,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") || undefined,
+        metadata: { fileName: req.file.originalname, fileSize: req.file.size },
+      });
       res.json(result);
     } catch (error: any) {
       console.error("SignNow upload error:", error);
@@ -4390,11 +4398,19 @@ export function registerRoutes(app: Express): Server {
       documentId: z.string().min(1),
       signerEmail: z.string().email(),
       signerRole: z.string().optional(),
+      consentAcknowledged: z.literal(true, { errorMap: () => ({ message: "You must acknowledge the e-signature consent to proceed" }) }),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
     try {
       const result = await sendSigningInvite(req.user.id, parsed.data.documentId, parsed.data.signerEmail, parsed.data.signerRole);
+      await logSignNowAction(req.user.id, "signing_invite_sent", {
+        documentId: parsed.data.documentId,
+        signerEmail: parsed.data.signerEmail,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") || undefined,
+        metadata: { consentAcknowledged: true, signerRole: parsed.data.signerRole },
+      });
       res.json(result);
     } catch (error: any) {
       console.error("SignNow invite error:", error);
@@ -4431,6 +4447,11 @@ export function registerRoutes(app: Express): Server {
     if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const pdfBuffer = await snDownloadDocument(req.user.id, req.params.id);
+      await logSignNowAction(req.user.id, "document_downloaded", {
+        documentId: req.params.id,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") || undefined,
+      });
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="document.pdf"`);
       res.send(pdfBuffer);

@@ -99,6 +99,7 @@ function SignNowActions({ documentName, onSigningUrlSet }: { documentName: strin
   const { toast } = useToast();
   const [signerEmail, setSignerEmail] = useState('');
   const [uploadedDocId, setUploadedDocId] = useState('');
+  const [consentChecked, setConsentChecked] = useState(false);
 
   const { data: snStatus } = useQuery<{ configured: boolean; connected: boolean }>({
     queryKey: ["/api/signnow/status"],
@@ -113,7 +114,10 @@ function SignNowActions({ documentName, onSigningUrlSet }: { documentName: strin
         body: formData,
         credentials: "include",
       });
-      if (!res.ok) throw new Error((await res.json()).error || "Upload failed");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Upload failed");
+      }
       return res.json();
     },
     onSuccess: (data: any) => {
@@ -128,6 +132,7 @@ function SignNowActions({ documentName, onSigningUrlSet }: { documentName: strin
       const res = await apiRequest("POST", "/api/signnow/invite", {
         documentId: uploadedDocId,
         signerEmail,
+        consentAcknowledged: true,
       });
       return res.json();
     },
@@ -191,7 +196,7 @@ function SignNowActions({ documentName, onSigningUrlSet }: { documentName: strin
               size="sm"
               variant="default"
               className="h-7 px-2 text-xs"
-              disabled={!signerEmail || inviteMutation.isPending}
+              disabled={!signerEmail || !consentChecked || inviteMutation.isPending}
               onClick={() => inviteMutation.mutate()}
             >
               {inviteMutation.isPending ? (
@@ -201,6 +206,17 @@ function SignNowActions({ documentName, onSigningUrlSet }: { documentName: strin
               )}
             </Button>
           </div>
+          <label className="flex items-start gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={consentChecked}
+              onChange={(e) => setConsentChecked(e.target.checked)}
+              className="mt-0.5 rounded border-gray-300"
+            />
+            <span className="text-[10px] leading-tight text-muted-foreground">
+              I confirm this document is suitable for e-signature, I have authority to send it, and I accept responsibility for its content and compliance with applicable laws. HomeBase provides this tool as-is; I indemnify HomeBase against claims arising from my use.
+            </span>
+          </label>
         </div>
       )}
     </div>

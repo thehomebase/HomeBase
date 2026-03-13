@@ -333,3 +333,26 @@ export async function downloadDocument(userId: number, documentId: string): Prom
 export function isSignNowConfigured(): boolean {
   return !!(process.env.SIGNNOW_CLIENT_ID && process.env.SIGNNOW_CLIENT_SECRET);
 }
+
+export async function logSignNowAction(
+  userId: number,
+  action: string,
+  details: {
+    documentId?: string;
+    signerEmail?: string;
+    ipAddress?: string;
+    userAgent?: string;
+    metadata?: Record<string, any>;
+  } = {}
+): Promise<void> {
+  try {
+    await db.execute(sql`
+      INSERT INTO signnow_audit_log (user_id, action, document_id, signer_email, ip_address, user_agent, metadata)
+      VALUES (${userId}, ${action}, ${details.documentId || null}, ${details.signerEmail || null}, 
+              ${details.ipAddress || null}, ${details.userAgent || null}, 
+              ${JSON.stringify(details.metadata || {})}::jsonb)
+    `);
+  } catch (e) {
+    console.error("Failed to log SignNow action:", e);
+  }
+}

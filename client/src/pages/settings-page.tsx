@@ -1089,6 +1089,14 @@ function SignNowIntegrationCard() {
                 <CheckCircle2 className="h-3 w-3 text-green-500" /> Bank-level security
               </div>
             </div>
+            <div className="p-2 rounded bg-muted/50 text-[10px] leading-tight text-muted-foreground space-y-1">
+              <p>By connecting, you agree that:</p>
+              <ul className="list-disc pl-3 space-y-0.5">
+                <li>HomeBase provides e-signature as a tool; you warrant document suitability and compliance with applicable laws.</li>
+                <li>You indemnify HomeBase against claims arising from your content, documents, or misuse of the e-signature feature.</li>
+                <li>All signing activity is logged for audit and compliance purposes.</li>
+              </ul>
+            </div>
             <Button
               className="w-full"
               onClick={() => connectMutation.mutate()}
