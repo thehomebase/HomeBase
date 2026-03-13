@@ -12,6 +12,7 @@ import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, type EmailAttachment } from "./gmail-service";
+import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured } from "./signnow-service";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { notify } from "./notification-helper";
@@ -162,6 +163,7 @@ export function registerRoutes(app: Express): Server {
   app.use('/api/login', authLimiter);
   app.use('/api/register', authLimiter);
   app.use('/api/rentcast', rentcastLimiter);
+  app.use('/api/signnow', sensitiveApiLimiter);
   app.use('/api/census', sensitiveApiLimiter);
   app.use('/api/twilio', sensitiveApiLimiter);
   app.use('/api/gmail', sensitiveApiLimiter);
@@ -4295,6 +4297,147 @@ export function registerRoutes(app: Express): Server {
     const result = await getGmailLabels(req.user.id);
     if (result.error) return res.status(400).json({ error: result.error });
     res.json(result.labels);
+  });
+
+  // ============ SignNow e-Signature ============
+  app.get("/api/signnow/status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const configured = isSignNowConfigured();
+      if (!configured) return res.json({ configured: false, connected: false });
+      const status = await getSignNowStatus(req.user.id);
+      res.json({ configured: true, ...status });
+    } catch (error: any) {
+      res.json({ configured: false, connected: false });
+    }
+  });
+
+  app.get("/api/signnow/auth-url", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const crypto = await import("crypto");
+      const nonce = crypto.randomBytes(32).toString("hex");
+      (req.session as any).signnowOAuthState = nonce;
+      (req.session as any).signnowOAuthUserId = req.user.id;
+      const url = getSignNowAuthUrl(nonce);
+      res.json({ url });
+    } catch (error: any) {
+      console.error("Error generating SignNow auth URL:", error);
+      res.status(500).json({ error: error.message || "Failed to generate auth URL" });
+    }
+  });
+
+  app.get("/api/signnow/callback", async (req, res) => {
+    const code = req.query.code as string;
+    const state = req.query.state as string;
+    const domains = process.env.REPLIT_DOMAINS || "";
+    const domain = domains.split(",")[0];
+    const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+
+    if (!code || !state) {
+      return res.redirect(`${baseUrl}/settings?signnow=error`);
+    }
+
+    const sessionState = (req.session as any).signnowOAuthState;
+    const userId = (req.session as any).signnowOAuthUserId;
+
+    if (!sessionState || !userId || state !== sessionState) {
+      console.error("SignNow OAuth state mismatch");
+      return res.redirect(`${baseUrl}/settings?signnow=error`);
+    }
+
+    delete (req.session as any).signnowOAuthState;
+    delete (req.session as any).signnowOAuthUserId;
+
+    try {
+      await handleSignNowCallback(code, userId);
+      res.redirect(`${baseUrl}/settings?signnow=connected`);
+    } catch (error: any) {
+      console.error("SignNow callback error:", error);
+      res.redirect(`${baseUrl}/settings?signnow=error`);
+    }
+  });
+
+  app.post("/api/signnow/disconnect", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      await disconnectSignNow(req.user.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to disconnect SignNow" });
+    }
+  });
+
+  app.post("/api/signnow/upload", upload.single("file"), async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    if (!req.file) return res.status(400).json({ error: "No file provided" });
+    try {
+      const result = await snUploadDocument(req.user.id, req.file.buffer, req.file.originalname);
+      res.json(result);
+    } catch (error: any) {
+      console.error("SignNow upload error:", error);
+      res.status(500).json({ error: error.message || "Failed to upload document" });
+    }
+  });
+
+  app.post("/api/signnow/invite", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    const schema = z.object({
+      documentId: z.string().min(1),
+      signerEmail: z.string().email(),
+      signerRole: z.string().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message });
+    try {
+      const result = await sendSigningInvite(req.user.id, parsed.data.documentId, parsed.data.signerEmail, parsed.data.signerRole);
+      res.json(result);
+    } catch (error: any) {
+      console.error("SignNow invite error:", error);
+      res.status(500).json({ error: error.message || "Failed to send invite" });
+    }
+  });
+
+  app.get("/api/signnow/documents", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const docs = await snGetDocuments(req.user.id);
+      res.json(docs);
+    } catch (error: any) {
+      console.error("SignNow list docs error:", error);
+      res.status(500).json({ error: error.message || "Failed to list documents" });
+    }
+  });
+
+  app.get("/api/signnow/document/:id/status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const status = await snGetDocumentStatus(req.user.id, req.params.id);
+      res.json(status);
+    } catch (error: any) {
+      console.error("SignNow doc status error:", error);
+      res.status(500).json({ error: error.message || "Failed to get document status" });
+    }
+  });
+
+  app.get("/api/signnow/document/:id/download", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const pdfBuffer = await snDownloadDocument(req.user.id, req.params.id);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="document.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("SignNow download error:", error);
+      res.status(500).json({ error: error.message || "Failed to download document" });
+    }
   });
 
   // ============ Email Snippets ============

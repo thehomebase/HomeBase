@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, ExternalLink, Link2 } from "lucide-react";
+import { Plus, FileText, ExternalLink, Link2, Upload, Send, Loader2 } from "lucide-react";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
@@ -50,6 +50,7 @@ const statusColumns = [
 ] as const;
 
 const signingPlatforms = [
+  { key: 'signnow', label: 'SignNow' },
   { key: 'docusign', label: 'DocuSign' },
   { key: 'zipforms', label: 'zipForms' },
   { key: 'dotloop', label: 'Dotloop' },
@@ -92,6 +93,118 @@ function getPlatformLabel(platform: string | null | undefined): string {
   if (!platform) return '';
   const found = signingPlatforms.find(p => p.key === platform);
   return found ? found.label : 'Signing Link';
+}
+
+function SignNowActions({ documentName, onSigningUrlSet }: { documentName: string; onSigningUrlSet: (url: string) => void }) {
+  const { toast } = useToast();
+  const [signerEmail, setSignerEmail] = useState('');
+  const [uploadedDocId, setUploadedDocId] = useState('');
+
+  const { data: snStatus } = useQuery<{ configured: boolean; connected: boolean }>({
+    queryKey: ["/api/signnow/status"],
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/signnow/upload", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Upload failed");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setUploadedDocId(data.id);
+      toast({ title: "Document uploaded to SignNow" });
+    },
+    onError: (err: any) => toast({ title: err.message || "Upload failed", variant: "destructive" }),
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/signnow/invite", {
+        documentId: uploadedDocId,
+        signerEmail,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: `Signing invite sent to ${signerEmail}` });
+      if (data.signingUrl) onSigningUrlSet(data.signingUrl);
+    },
+    onError: (err: any) => toast({ title: err.message || "Failed to send invite", variant: "destructive" }),
+  });
+
+  if (!snStatus?.connected) {
+    return (
+      <div className="p-2 rounded border border-dashed border-muted-foreground/30 text-center">
+        <p className="text-xs text-muted-foreground">Connect SignNow in Settings to upload & send for signing</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+      <p className="text-xs font-medium text-blue-700 dark:text-blue-400">SignNow e-Signature</p>
+      {!uploadedDocId ? (
+        <div>
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx"
+            id={`sn-upload-${documentName}`}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) uploadMutation.mutate(file);
+            }}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full h-8 text-xs"
+            disabled={uploadMutation.isPending}
+            onClick={() => document.getElementById(`sn-upload-${documentName}`)?.click()}
+          >
+            {uploadMutation.isPending ? (
+              <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Uploading...</>
+            ) : (
+              <><Upload className="h-3 w-3 mr-1" /> Upload to SignNow</>
+            )}
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex gap-1">
+            <Input
+              value={signerEmail}
+              onChange={(e) => setSignerEmail(e.target.value)}
+              className="text-xs h-7 flex-1"
+              placeholder="Signer's email..."
+              type="email"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="default"
+              className="h-7 px-2 text-xs"
+              disabled={!signerEmail || inviteMutation.isPending}
+              onClick={() => inviteMutation.mutate()}
+            >
+              {inviteMutation.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <><Send className="h-3 w-3 mr-1" /> Send</>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function DocumentCard({ 
@@ -230,6 +343,12 @@ function DocumentCard({
               This link is visible to anyone with access to this transaction. Only the signing platform (DocuSign, ZipForms, etc.) controls who can view or sign the document.
             </p>
           </div>
+          {signingPlatform === 'signnow' && (
+            <SignNowActions documentName={document.name} onSigningUrlSet={(url: string) => {
+              setSigningUrl(url);
+              onUpdateSigning(document.id, url, 'signnow');
+            }} />
+          )}
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Notes</label>
             <Textarea

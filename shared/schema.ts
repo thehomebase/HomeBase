@@ -162,7 +162,8 @@ export const documents = pgTable("documents", {
   notes: text("notes"),
   clientId: integer("client_id"),
   signingUrl: text("signing_url"),
-  signingPlatform: text("signing_platform", { enum: ['docusign', 'zipforms', 'dotloop', 'other'] })
+  signingPlatform: text("signing_platform", { enum: ['docusign', 'zipforms', 'dotloop', 'signnow', 'other'] }),
+  signnowDocumentId: text("signnow_document_id")
 });
 
 export const contractors = pgTable("contractors", {
@@ -463,6 +464,26 @@ export const insertGoogleTokenSchema = createInsertSchema(googleTokens).omit({
 
 export type GoogleToken = typeof googleTokens.$inferSelect;
 export type InsertGoogleToken = z.infer<typeof insertGoogleTokenSchema>;
+
+export const signnowTokens = pgTable("signnow_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  tokenExpiry: timestamp("token_expiry").notNull(),
+  email: text("email"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSignnowTokenSchema = createInsertSchema(signnowTokens).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type SignnowToken = typeof signnowTokens.$inferSelect;
+export type InsertSignnowToken = z.infer<typeof insertSignnowTokenSchema>;
 
 export const emailSnippets = pgTable("email_snippets", {
   id: serial("id").primaryKey(),

@@ -980,6 +980,129 @@ function BillingSection() {
   );
 }
 
+function SignNowIntegrationCard() {
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  const { data: status, isLoading } = useQuery<{ configured: boolean; connected: boolean; email?: string }>({
+    queryKey: ["/api/signnow/status"],
+  });
+
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("GET", "/api/signnow/auth-url");
+      const data = await res.json();
+      window.location.href = data.url;
+    },
+    onError: () => toast({ title: "Failed to connect SignNow", variant: "destructive" }),
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/signnow/disconnect");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/signnow/status"] });
+      toast({ title: "SignNow disconnected" });
+    },
+    onError: () => toast({ title: "Failed to disconnect", variant: "destructive" }),
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("signnow") === "connected") {
+      toast({ title: "SignNow connected successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/signnow/status"] });
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("signnow") === "error") {
+      toast({ title: "Failed to connect SignNow", variant: "destructive" });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+              <FileText className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="font-medium">SignNow e-Signatures</p>
+              <p className="text-sm text-muted-foreground">Send documents for digital signing</p>
+            </div>
+          </div>
+          {status?.connected && (
+            <Badge variant="outline" className="text-green-600 border-green-300">
+              <CheckCircle2 className="h-3 w-3 mr-1" /> Connected
+            </Badge>
+          )}
+        </div>
+
+        {isLoading ? (
+          <Skeleton className="h-10 w-full" />
+        ) : !status?.configured ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              To enable e-signatures, add your SignNow API credentials (SIGNNOW_CLIENT_ID and SIGNNOW_CLIENT_SECRET) to your environment.
+            </p>
+            <Button variant="outline" className="w-full" onClick={() => window.open("https://www.signnow.com/developers", "_blank")}>
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Get SignNow API Credentials
+            </Button>
+          </div>
+        ) : status.connected ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">{status.email || "Account connected"}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              You can now send documents for e-signature from any transaction's document checklist.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full text-destructive hover:text-destructive"
+              onClick={() => disconnectMutation.mutate()}
+              disabled={disconnectMutation.isPending}
+            >
+              {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect SignNow"}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Connect your SignNow account to send documents for e-signature directly from transactions. Your documents and signatures are managed in your own SignNow account.
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> Legally binding
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> Full audit trail
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> TREC forms
+              </div>
+              <div className="flex items-center gap-1.5 p-2 rounded border">
+                <CheckCircle2 className="h-3 w-3 text-green-500" /> Bank-level security
+              </div>
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => connectMutation.mutate()}
+              disabled={connectMutation.isPending}
+            >
+              {connectMutation.isPending ? "Connecting..." : "Connect SignNow Account"}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function IntegrationsSection() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -1219,6 +1342,8 @@ function IntegrationsSection() {
           </Button>
         </CardContent>
       </Card>
+
+      <SignNowIntegrationCard />
 
       <Dialog open={showKeyDialog} onOpenChange={setShowKeyDialog}>
         <DialogContent>
