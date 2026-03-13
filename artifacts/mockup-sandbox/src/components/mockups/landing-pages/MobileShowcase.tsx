@@ -80,51 +80,66 @@ export default function MobileShowcase() {
 
           {/* Right Mobile Mockup */}
           <div className="w-full lg:w-1/2 relative h-[600px] lg:h-[800px] flex justify-center items-center">
-            {/* Abstract Background blobs */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] bg-blue-100/40 rounded-full blur-3xl -z-10"></div>
-            <div className="absolute top-1/4 left-1/4 w-[60%] h-[60%] bg-orange-100/40 rounded-full blur-3xl -z-10"></div>
-
-            <div className="relative w-full max-w-[340px] z-20">
+            <div className="relative w-full max-w-[420px] z-20">
               <img 
-                src="/__mockup/images/phone-mockup.png" 
+                src="/__mockup/images/phone-hand-sleek.png" 
                 alt="HomeBase Mobile App" 
-                className="w-full h-auto drop-shadow-2xl z-20 relative"
+                className="w-full h-auto drop-shadow-[0_25px_50px_rgba(0,0,0,0.15)] z-20 relative"
               />
 
-              {/* Floating Pills */}
-              <div className="absolute top-12 -left-16 bg-white px-4 py-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex items-center gap-3 animate-[float_4s_ease-in-out_infinite] z-30">
-                <div className="bg-blue-50 p-2 rounded-xl text-blue-600">
-                  <BarChart3 className="w-5 h-5" />
+              {/* Feature Cards - stacked and overlapping the phone like the reference */}
+              <div className="absolute top-[15%] -left-[30%] flex flex-col gap-3 z-30">
+                <div className="bg-white pl-4 pr-6 py-3.5 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] flex items-center gap-4 animate-[float_6s_ease-in-out_infinite] border border-slate-100/80">
+                  <div className="bg-slate-900 p-2.5 rounded-xl text-white shrink-0">
+                    <BarChart3 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-sm text-slate-900 block">Track Deals</span>
+                    <span className="text-xs text-slate-500">Visual pipeline</span>
+                  </div>
                 </div>
-                <span className="font-semibold text-sm">Track Deals</span>
+
+                <div className="bg-white pl-4 pr-6 py-3.5 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] flex items-center gap-4 animate-[float_6s_ease-in-out_infinite_0.8s] border border-slate-100/80 ml-4">
+                  <div className="bg-slate-900 p-2.5 rounded-xl text-white shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-sm text-slate-900 block">E-Signatures</span>
+                    <span className="text-xs text-slate-500">DocuSign & SignNow</span>
+                  </div>
+                </div>
+
+                <div className="bg-white pl-4 pr-6 py-3.5 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] flex items-center gap-4 animate-[float_6s_ease-in-out_infinite_1.6s] border border-slate-100/80">
+                  <div className="bg-slate-900 p-2.5 rounded-xl text-white shrink-0">
+                    <Target className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-sm text-slate-900 block">Manage Leads</span>
+                    <span className="text-xs text-slate-500">Zip code targeting</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="absolute top-1/4 -right-20 bg-white px-4 py-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex items-center gap-3 animate-[float_5s_ease-in-out_infinite_0.5s] z-30">
-                <div className="bg-orange-50 p-2 rounded-xl text-orange-600">
-                  <Target className="w-5 h-5" />
+              <div className="absolute bottom-[20%] -right-[25%] flex flex-col gap-3 z-30">
+                <div className="bg-white pl-4 pr-6 py-3.5 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] flex items-center gap-4 animate-[float_6s_ease-in-out_infinite_2.4s] border border-slate-100/80">
+                  <div className="bg-slate-900 p-2.5 rounded-xl text-white shrink-0">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-sm text-slate-900 block">Client Portal</span>
+                    <span className="text-xs text-slate-500">Real-time updates</span>
+                  </div>
                 </div>
-                <span className="font-semibold text-sm">Manage Leads</span>
-              </div>
 
-              <div className="absolute top-1/2 -left-24 bg-white px-4 py-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex items-center gap-3 animate-[float_4.5s_ease-in-out_infinite_1s] z-30">
-                <div className="bg-purple-50 p-2 rounded-xl text-purple-600">
-                  <FileText className="w-5 h-5" />
+                <div className="bg-white pl-4 pr-6 py-3.5 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] flex items-center gap-4 animate-[float_6s_ease-in-out_infinite_3.2s] border border-slate-100/80 mr-4">
+                  <div className="bg-slate-900 p-2.5 rounded-xl text-white shrink-0">
+                    <Bell className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-sm text-slate-900 block">Smart Alerts</span>
+                    <span className="text-xs text-slate-500">Never miss a deadline</span>
+                  </div>
                 </div>
-                <span className="font-semibold text-sm">Send Documents</span>
-              </div>
-
-              <div className="absolute bottom-1/3 -right-16 bg-white px-4 py-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex items-center gap-3 animate-[float_5.5s_ease-in-out_infinite_1.5s] z-30">
-                <div className="bg-green-50 p-2 rounded-xl text-green-600">
-                  <Users className="w-5 h-5" />
-                </div>
-                <span className="font-semibold text-sm">Client Portal</span>
-              </div>
-
-              <div className="absolute bottom-12 -left-12 bg-white px-4 py-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex items-center gap-3 animate-[float_4.2s_ease-in-out_infinite_0.2s] z-30">
-                <div className="bg-red-50 p-2 rounded-xl text-red-600">
-                  <Bell className="w-5 h-5" />
-                </div>
-                <span className="font-semibold text-sm">Smart Alerts</span>
               </div>
 
             </div>
@@ -209,7 +224,7 @@ export default function MobileShowcase() {
           <div className="flex flex-col lg:flex-row items-center gap-16">
             <div className="w-full lg:w-1/2">
               <div className="rounded-3xl overflow-hidden shadow-2xl border border-slate-200">
-                <img src="/__mockup/images/dashboard-mockup.png" alt="Transaction Management Dashboard" className="w-full object-cover" />
+                <img src="/__mockup/images/transaction-dashboard.png" alt="Transaction Management Dashboard" className="w-full object-cover" />
               </div>
             </div>
             <div className="w-full lg:w-1/2">
