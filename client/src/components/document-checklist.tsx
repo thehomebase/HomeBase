@@ -605,8 +605,8 @@ function DocumentCard({
       onClick={() => setIsEditing(!isEditing)}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex-1">
-          <div className="font-medium text-sm mb-1">{document.name}</div>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm mb-1 truncate" title={document.name}>{document.name}</div>
           <div className="flex items-center gap-1 flex-wrap">
             <Badge variant="secondary" className={`${statusColor} text-xs`}>
               {statusColumns.find(col => col.key === document.status)?.label}
