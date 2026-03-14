@@ -163,6 +163,10 @@ html {
   }
 }
 
+.leaflet-container {
+  z-index: 0 !important;
+}
+
 @media (display-mode: standalone) {
   body {
     overscroll-behavior-y: contain;
