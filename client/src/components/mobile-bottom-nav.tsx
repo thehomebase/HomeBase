@@ -36,6 +36,7 @@ import {
   Key,
   User,
   Settings,
+  Target,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -101,6 +102,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Gift, label: "Referrals", href: "/referrals", id: "referrals" },
       { icon: Bell, label: "Drip Campaigns", href: "/drip", id: "drip" },
       { icon: MapPin, label: "Lead Gen", href: "/lead-gen", id: "lead-gen" },
+      { icon: Target, label: "Lead Metrics", href: "/lead-metrics", id: "lead-metrics" },
       { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
       { icon: ScanLine, label: "Scanner", href: "/scanner", id: "scanner" },
       { icon: Phone, label: "Phone & SMS", href: "/phone", id: "phone" },
@@ -140,6 +142,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
     { icon: Gift, label: "Referrals", href: "/referrals", id: "referrals" },
     { icon: Bell, label: "Drip Campaigns", href: "/drip", id: "drip" },
     { icon: MapPin, label: "Lead Gen", href: "/lead-gen", id: "lead-gen" },
+    { icon: Target, label: "Lead Metrics", href: "/lead-metrics", id: "lead-metrics" },
     { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
     { icon: ScanLine, label: "Scanner", href: "/scanner", id: "scanner" },
     { icon: Phone, label: "Phone & SMS", href: "/phone", id: "phone" },
