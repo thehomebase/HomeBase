@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,8 +14,12 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, ShieldCheck, MapPin, Phone, Mail, Bed, Bath, Maximize,
   Home, Play, Box, FileText, ImagePlus, Trash2, Pencil, Flag, ChevronLeft,
-  ChevronRight, Loader2, X, ExternalLink, User as UserIcon
+  ChevronRight, Loader2, X, ExternalLink, User as UserIcon,
+  AlertTriangle, GraduationCap, Droplets
 } from "lucide-react";
+import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 type ListingDetail = {
   id: number;
@@ -55,6 +59,224 @@ type ListingDetail = {
     verificationStatus: string;
   } | null;
 };
+
+const propertyMarkerIcon = L.divIcon({
+  html: `<div style="background:#059669;width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  </div>`,
+  className: '',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+});
+
+function FloodLayer() {
+  const map = useMap();
+
+  useEffect(() => {
+    const floodOverlay = L.tileLayer(
+      "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/tile/{z}/{y}/{x}",
+      { opacity: 0.45, attribution: "FEMA NFHL" }
+    );
+    floodOverlay.addTo(map);
+    return () => { map.removeLayer(floodOverlay); };
+  }, [map]);
+
+  return null;
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function SchoolLayer({ lat, lng }: { lat: number; lng: number }) {
+  const map = useMap();
+  const markersRef = useRef<L.Marker[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const radius = 3000;
+    const query = `[out:json][timeout:10];(node["amenity"="school"](around:${radius},${lat},${lng});way["amenity"="school"](around:${radius},${lat},${lng}););out center 20;`;
+    fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, { signal: controller.signal })
+      .then(r => r.json())
+      .then(data => {
+        if (controller.signal.aborted) return;
+        const results = (data.elements || []).map((el: any) => ({
+          lat: el.lat || el.center?.lat,
+          lon: el.lon || el.center?.lon,
+          name: el.tags?.name || "School",
+        })).filter((s: any) => s.lat && s.lon);
+
+        results.forEach((school: any) => {
+          const icon = L.divIcon({
+            html: `<div style="background:#3b82f6;width:22px;height:22px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+            </div>`,
+            className: '',
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
+          });
+          const m = L.marker([school.lat, school.lon], { icon })
+            .bindPopup(`<strong>${escapeHtml(school.name)}</strong>`)
+            .addTo(map);
+          markersRef.current.push(m);
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      controller.abort();
+      markersRef.current.forEach(m => map.removeLayer(m));
+      markersRef.current = [];
+    };
+  }, [map, lat, lng]);
+
+  return null;
+}
+
+function SafetyLayer({ lat, lng }: { lat: number; lng: number }) {
+  const map = useMap();
+  const markersRef = useRef<L.Marker[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const radius = 3000;
+    const query = `[out:json][timeout:10];(node["amenity"="police"](around:${radius},${lat},${lng});way["amenity"="police"](around:${radius},${lat},${lng});node["amenity"="fire_station"](around:${radius},${lat},${lng});way["amenity"="fire_station"](around:${radius},${lat},${lng}););out center 20;`;
+    fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, { signal: controller.signal })
+      .then(r => r.json())
+      .then(data => {
+        if (controller.signal.aborted) return;
+        (data.elements || []).forEach((el: any) => {
+          const elLat = el.lat || el.center?.lat;
+          const elLon = el.lon || el.center?.lon;
+          if (!elLat || !elLon) return;
+          const isPolice = el.tags?.amenity === "police";
+          const rawName = el.tags?.name || (isPolice ? "Police Station" : "Fire Station");
+          const color = isPolice ? "#ef4444" : "#f97316";
+          const icon = L.divIcon({
+            html: `<div style="background:${color};width:22px;height:22px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">${isPolice
+                ? '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
+                : '<path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>'
+              }</svg>
+            </div>`,
+            className: '',
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
+          });
+          const m = L.marker([elLat, elLon], { icon })
+            .bindPopup(`<strong>${escapeHtml(rawName)}</strong>`)
+            .addTo(map);
+          markersRef.current.push(m);
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      controller.abort();
+      markersRef.current.forEach(m => map.removeLayer(m));
+      markersRef.current = [];
+    };
+  }, [map, lat, lng]);
+
+  return null;
+}
+
+function PropertyMap({ lat, lng, address }: { lat: number; lng: number; address: string }) {
+  const [activeLayers, setActiveLayers] = useState<Set<string>>(new Set());
+
+  const toggleLayer = (layer: string) => {
+    setActiveLayers(prev => {
+      const next = new Set(prev);
+      if (next.has(layer)) next.delete(layer);
+      else next.add(layer);
+      return next;
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-emerald-500" /> Location
+          </CardTitle>
+          <div className="flex items-center gap-1">
+            <Button
+              variant={activeLayers.has('safety') ? "default" : "outline"}
+              size="sm"
+              className="h-7 text-[10px] px-2 gap-1"
+              onClick={() => toggleLayer('safety')}
+            >
+              <AlertTriangle className="h-3 w-3" />
+              Safety
+            </Button>
+            <Button
+              variant={activeLayers.has('schools') ? "default" : "outline"}
+              size="sm"
+              className="h-7 text-[10px] px-2 gap-1"
+              onClick={() => toggleLayer('schools')}
+            >
+              <GraduationCap className="h-3 w-3" />
+              Schools
+            </Button>
+            <Button
+              variant={activeLayers.has('flood') ? "default" : "outline"}
+              size="sm"
+              className="h-7 text-[10px] px-2 gap-1"
+              onClick={() => toggleLayer('flood')}
+            >
+              <Droplets className="h-3 w-3" />
+              Flood
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="rounded-lg overflow-hidden border h-64 sm:h-80">
+          <MapContainer
+            center={[lat, lng]}
+            zoom={15}
+            className="h-full w-full"
+            zoomControl={false}
+            attributionControl={false}
+          >
+            <TileLayer
+              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+              attribution='&copy; <a href="https://carto.com">CARTO</a>'
+            />
+            <Marker position={[lat, lng]} icon={propertyMarkerIcon} />
+            {activeLayers.has('flood') && <FloodLayer />}
+            {activeLayers.has('schools') && <SchoolLayer lat={lat} lng={lng} />}
+            {activeLayers.has('safety') && <SafetyLayer lat={lat} lng={lng} />}
+          </MapContainer>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">{address}</p>
+        {activeLayers.size > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {activeLayers.has('safety') && (
+              <Badge variant="outline" className="text-[10px] gap-1">
+                <AlertTriangle className="h-2.5 w-2.5 text-red-500" />
+                Police & fire stations nearby
+              </Badge>
+            )}
+            {activeLayers.has('schools') && (
+              <Badge variant="outline" className="text-[10px] gap-1">
+                <GraduationCap className="h-2.5 w-2.5 text-blue-500" />
+                Nearby schools shown on map
+              </Badge>
+            )}
+            {activeLayers.has('flood') && (
+              <Badge variant="outline" className="text-[10px] gap-1">
+                <Droplets className="h-2.5 w-2.5 text-cyan-500" />
+                FEMA flood zones overlay
+              </Badge>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function getYoutubeEmbedUrl(url: string): string | null {
   try {
@@ -446,6 +668,16 @@ export default function ListingDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {(() => {
+            const rc = listing.rentcast_data as any;
+            const lat = rc?.latitude || rc?.lat;
+            const lng = rc?.longitude || rc?.lng || rc?.lon;
+            if (lat && lng) {
+              return <PropertyMap lat={lat} lng={lng} address={`${listing.address}${listing.city ? `, ${listing.city}` : ''}${listing.state ? `, ${listing.state}` : ''} ${listing.zip_code || ''}`} />;
+            }
+            return null;
+          })()}
 
           {listing.agent && (
             <Card>
