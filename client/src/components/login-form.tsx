@@ -7,10 +7,11 @@ import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Fingerprint } from "lucide-react";
+import { Fingerprint, ShieldCheck } from "lucide-react";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getRecaptchaToken } from "@/lib/recaptcha";
 
 export function LoginForm({
   className,
@@ -23,6 +24,10 @@ export function LoginForm({
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState("client");
   const { toast } = useToast();
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaToken, setMfaToken] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaLoading, setMfaLoading] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -42,10 +47,46 @@ export function LoginForm({
   const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    loginMutation.mutate({
-      email: formData.get("email") as string,
-      password: formData.get("password") as string,
-    });
+    loginMutation.mutate(
+      {
+        email: formData.get("email") as string,
+        password: formData.get("password") as string,
+      },
+      {
+        onSuccess: (data) => {
+          if ("mfaRequired" in data && data.mfaRequired) {
+            setMfaRequired(true);
+            setMfaToken(data.mfaToken);
+          }
+        },
+      }
+    );
+  };
+
+  const handleMfaVerify = async () => {
+    if (mfaCode.length !== 6) return;
+    setMfaLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/mfa/verify", {
+        mfaToken,
+        code: mfaCode,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Verification failed");
+      }
+      const user = await res.json();
+      queryClient.setQueryData(["/api/user"], user);
+      toast({ title: "Welcome back!" });
+    } catch (error: any) {
+      toast({
+        title: "Verification failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setMfaLoading(false);
+    }
   };
 
   const handleBiometricLogin = async () => {
@@ -99,6 +140,57 @@ export function LoginForm({
     } as any);
     setShowRegister(false);
   };
+
+  if (mfaRequired) {
+    return (
+      <div className={cn("w-full max-w-sm mx-auto rounded-lg p-6", className)} {...props}>
+        <div className="space-y-6">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <ShieldCheck className="h-6 w-6 text-primary" />
+            </div>
+            <h1 className="text-xl font-bold">Two-Factor Authentication</h1>
+            <p className="text-sm text-muted-foreground text-center">
+              Enter the 6-digit code from your authenticator app
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="mfa-code">Verification Code</Label>
+            <Input
+              id="mfa-code"
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+              className="text-center text-2xl tracking-[0.5em] font-mono"
+              maxLength={6}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && mfaCode.length === 6) handleMfaVerify();
+              }}
+            />
+          </div>
+          <Button
+            onClick={handleMfaVerify}
+            className="w-full dark:bg-white dark:text-black"
+            disabled={mfaCode.length !== 6 || mfaLoading}
+          >
+            {mfaLoading ? "Verifying..." : "Verify"}
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full"
+            onClick={() => {
+              setMfaRequired(false);
+              setMfaToken("");
+              setMfaCode("");
+            }}
+          >
+            Back to login
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("w-full max-w-sm mx-auto  rounded-lg p-6", className)} {...props}>

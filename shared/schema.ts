@@ -50,6 +50,8 @@ export const users = pgTable("users", {
   linkedinUrl: text("linkedin_url"),
   supportAccessGranted: boolean("support_access_granted").default(false),
   supportAccessExpires: timestamp("support_access_expires"),
+  totpSecret: text("totp_secret"),
+  totpEnabled: boolean("totp_enabled").default(false),
 });
 
 export const licenseVerifications = pgTable("license_verifications", {

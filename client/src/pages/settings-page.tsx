@@ -431,6 +431,189 @@ function ProfileSection() {
   );
 }
 
+function MfaCard() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [setupStep, setSetupStep] = useState<"idle" | "qr" | "verify">("idle");
+  const [qrCode, setQrCode] = useState("");
+  const [secret, setSecret] = useState("");
+  const [verifyCode, setVerifyCode] = useState("");
+  const [showDisable, setShowDisable] = useState(false);
+  const [disablePassword, setDisablePassword] = useState("");
+
+  const setupMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/mfa/setup", {});
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Setup failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data: { secret: string; qrCode: string }) => {
+      setQrCode(data.qrCode);
+      setSecret(data.secret);
+      setSetupStep("qr");
+    },
+    onError: (err: Error) => {
+      toast({ title: err.message, variant: "destructive" });
+    },
+  });
+
+  const verifySetupMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const res = await apiRequest("POST", "/api/mfa/verify-setup", { code });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Verification failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Two-factor authentication enabled" });
+      setSetupStep("idle");
+      setQrCode("");
+      setSecret("");
+      setVerifyCode("");
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: err.message, variant: "destructive" });
+    },
+  });
+
+  const disableMutation = useMutation({
+    mutationFn: async (password: string) => {
+      const res = await apiRequest("POST", "/api/mfa/disable", { password });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to disable");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Two-factor authentication disabled" });
+      setShowDisable(false);
+      setDisablePassword("");
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: err.message, variant: "destructive" });
+    },
+  });
+
+  const isEnabled = user?.totpEnabled;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ShieldCheck className="h-5 w-5" />
+          Two-Factor Authentication
+        </CardTitle>
+        <CardDescription>
+          Add an extra layer of security with an authenticator app
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isEnabled ? (
+          <>
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
+              <ShieldCheck className="h-5 w-5 text-green-600" />
+              <div>
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">Enabled</p>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  Your account is protected with an authenticator app
+                </p>
+              </div>
+            </div>
+            {showDisable ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Enter your password to disable two-factor authentication.</p>
+                <Input
+                  type="password"
+                  placeholder="Current password"
+                  value={disablePassword}
+                  onChange={(e) => setDisablePassword(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => disableMutation.mutate(disablePassword)}
+                    disabled={!disablePassword || disableMutation.isPending}
+                  >
+                    {disableMutation.isPending ? "Disabling..." : "Disable MFA"}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => { setShowDisable(false); setDisablePassword(""); }}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setShowDisable(true)}>
+                Disable Two-Factor
+              </Button>
+            )}
+          </>
+        ) : setupStep === "idle" ? (
+          <div className="text-center py-2">
+            <ShieldCheck className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            <p className="text-sm text-muted-foreground mb-4">
+              Use an authenticator app like Google Authenticator or Authy to generate verification codes.
+            </p>
+            <Button onClick={() => setupMutation.mutate()} disabled={setupMutation.isPending} className="gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              {setupMutation.isPending ? "Setting up..." : "Set Up Two-Factor"}
+            </Button>
+          </div>
+        ) : setupStep === "qr" ? (
+          <div className="space-y-4">
+            <p className="text-sm">Scan this QR code with your authenticator app:</p>
+            <div className="flex justify-center">
+              <img src={qrCode} alt="QR Code" className="w-48 h-48 rounded-lg border" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Or enter this key manually:</p>
+              <code className="block text-xs bg-muted p-2 rounded font-mono break-all select-all">{secret}</code>
+            </div>
+            <Button onClick={() => setSetupStep("verify")} className="w-full">
+              Next
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm">Enter the 6-digit code from your authenticator app to confirm setup:</p>
+            <Input
+              value={verifyCode}
+              onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+              className="text-center text-2xl tracking-[0.5em] font-mono"
+              maxLength={6}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && verifyCode.length === 6) verifySetupMutation.mutate(verifyCode);
+              }}
+            />
+            <div className="flex gap-2">
+              <Button
+                onClick={() => verifySetupMutation.mutate(verifyCode)}
+                disabled={verifyCode.length !== 6 || verifySetupMutation.isPending}
+                className="flex-1"
+              >
+                {verifySetupMutation.isPending ? "Verifying..." : "Verify & Enable"}
+              </Button>
+              <Button variant="outline" onClick={() => { setSetupStep("idle"); setVerifyCode(""); }}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function SecuritySection() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
@@ -660,6 +843,8 @@ function SecuritySection() {
           )}
         </CardContent>
       </Card>
+
+      <MfaCard />
 
       <Card>
         <CardHeader>

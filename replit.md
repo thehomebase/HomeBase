@@ -21,7 +21,7 @@ Preferred communication style: Simple, everyday language.
 - **Runtime**: Node.js with Express (TypeScript)
 - **API Design**: RESTful for CRUD operations
 - **Authentication**: Passport.js (local strategy, session-based)
-- **Security**: Tiered IP-based rate limiting (general API: 120/min, auth: 15/15min, RentCast: 5/min, sensitive APIs: 30/min), email verification, ownership checks, scrypt password hashing.
+- **Security**: Tiered IP-based rate limiting (general API: 120/min, auth: 15/15min, RentCast: 5/min, sensitive APIs: 30/min), email verification, ownership checks, scrypt password hashing, reCAPTCHA v3 on login/register (action-bound, fail-closed, `RECAPTCHA_SECRET_KEY` + `VITE_RECAPTCHA_SITE_KEY`), optional TOTP MFA via authenticator app (`otplib`/`qrcode` — setup/verify/disable routes at `/api/mfa/*`, 5-attempt brute-force limit per MFA token).
 - **Session Storage**: PostgreSQL-backed sessions.
 
 ### Data Storage

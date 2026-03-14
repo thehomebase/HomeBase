@@ -7,17 +7,19 @@ import {
 import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getRecaptchaToken } from "@/lib/recaptcha";
 
 type AuthContextType = {
   user: SelectUser | null;
   isLoading: boolean;
   error: Error | null;
-  loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
+  loginMutation: UseMutationResult<LoginResponse, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
 };
 
-type LoginData = Pick<InsertUser, "email" | "password">;
+type LoginData = Pick<InsertUser, "email" | "password"> & { recaptchaToken?: string | null };
+type LoginResponse = SelectUser | { mfaRequired: true; mfaToken: string };
 
 export const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -35,24 +37,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       try {
-        const res = await apiRequest("POST", "/api/login", credentials);
+        const recaptchaToken = await getRecaptchaToken("login");
+        const res = await apiRequest("POST", "/api/login", { ...credentials, recaptchaToken });
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
           throw new Error(errorData.error || 'Login failed');
         }
         const data = await res.json();
+        if (data.mfaRequired) {
+          return data as LoginResponse;
+        }
         if (!data.role) {
           throw new Error('Invalid user role received from server');
         }
-        return data;
+        return data as LoginResponse;
       } catch (error) {
         console.error('Login error:', error);
         throw error;
       }
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
-      console.log('Login successful, user role:', user.role);
+    onSuccess: (data: LoginResponse) => {
+      if ('mfaRequired' in data && data.mfaRequired) {
+        return;
+      }
+      queryClient.setQueryData(["/api/user"], data);
+      console.log('Login successful, user role:', (data as SelectUser).role);
     },
     onError: (error: Error) => {
       console.error('Login error:', error);
@@ -66,7 +75,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
-      const res = await apiRequest("POST", "/api/register", credentials);
+      const recaptchaToken = await getRecaptchaToken("register");
+      const res = await apiRequest("POST", "/api/register", { ...credentials, recaptchaToken });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || 'Registration failed');

@@ -6,6 +6,9 @@ import { scrypt, randomBytes, timingSafeEqual, createHash } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
+import { verifyRecaptcha, verifyRecaptchaRegister } from "./recaptcha";
+import { generateSecret, generateSync, verifySync, generateURI } from "otplib";
+import * as QRCode from "qrcode";
 
 declare global {
   namespace Express {
@@ -18,6 +21,9 @@ const scryptAsync = promisify(scrypt);
 const registrationAttempts = new Map<string, { count: number; firstAttempt: number }>();
 const MAX_REGISTRATIONS_PER_IP = 3;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+const mfaPendingLogins = new Map<string, { userId: number; createdAt: number; attempts: number }>();
+const MFA_MAX_ATTEMPTS = 5;
 
 function getClientIp(req: import('express').Request): string {
   const forwarded = req.headers['x-forwarded-for'];
@@ -138,15 +144,27 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    if (req.user) {
-      console.log('Login successful, sending user data');
-      const { password, ...userWithoutPassword } = req.user;
-      res.status(200).json(userWithoutPassword);
-    } else {
-      console.log('Login failed, no user in request');
-      res.status(401).json({ error: "Authentication failed" });
-    }
+  app.post("/api/login", verifyRecaptcha, (req, res, next) => {
+    passport.authenticate("local", (err: any, user: SelectUser | false) => {
+      if (err) return next(err);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      if (user.totpEnabled && user.totpSecret) {
+        const pendingToken = randomBytes(32).toString("hex");
+        mfaPendingLogins.set(pendingToken, { userId: user.id, createdAt: Date.now(), attempts: 0 });
+        setTimeout(() => mfaPendingLogins.delete(pendingToken), 5 * 60 * 1000);
+        return res.status(200).json({ mfaRequired: true, mfaToken: pendingToken });
+      }
+
+      req.login(user, (err) => {
+        if (err) return next(err);
+        console.log('Login successful, sending user data');
+        const { password, totpSecret, ...userWithoutSensitive } = user;
+        res.status(200).json(userWithoutSensitive);
+      });
+    })(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {
@@ -175,12 +193,11 @@ export function setupAuth(app: Express) {
       return res.sendStatus(401);
     }
     console.log('Authenticated user request:', req.user?.id);
-    const { password, ...userWithoutPassword } = req.user;
-    res.json(userWithoutPassword);
+    const { password, totpSecret, ...userWithoutSensitive } = req.user;
+    res.json(userWithoutSensitive);
   });
 
-  // Moving the register route inside setupAuth function
-  app.post("/api/register", async (req, res, next) => {
+  app.post("/api/register", verifyRecaptchaRegister, async (req, res, next) => {
     try {
       console.log('Registration request body:', req.body);
 
@@ -378,6 +395,128 @@ export function setupAuth(app: Express) {
     } catch (error) {
       console.error("Resend verification error:", error);
       res.status(500).json({ error: "Failed to resend verification code" });
+    }
+  });
+
+  app.post("/api/mfa/setup", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      if (user.totpEnabled) {
+        return res.status(400).json({ error: "MFA is already enabled" });
+      }
+
+      const secret = generateSecret();
+      await storage.updateUser(user.id, { totpSecret: secret });
+
+      const otpauthUrl = generateURI({ type: "totp", issuer: "HomeBase", label: user.email, secret });
+      const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+
+      res.json({ secret, qrCode: qrCodeDataUrl });
+    } catch (error) {
+      console.error("MFA setup error:", error);
+      res.status(500).json({ error: "Failed to set up MFA" });
+    }
+  });
+
+  app.post("/api/mfa/verify-setup", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { code } = req.body;
+      if (!code || typeof code !== "string") {
+        return res.status(400).json({ error: "Verification code is required" });
+      }
+
+      const user = await storage.getUser(req.user.id);
+      if (!user || !user.totpSecret) {
+        return res.status(400).json({ error: "MFA setup not initiated" });
+      }
+
+      const result = verifySync({ token: code, secret: user.totpSecret });
+      if (!result.valid) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+
+      await storage.updateUser(user.id, { totpEnabled: true });
+      const { password, totpSecret, ...userWithoutSensitive } = await storage.getUser(user.id) as SelectUser;
+      res.json({ success: true, user: { ...userWithoutSensitive, totpEnabled: true } });
+    } catch (error) {
+      console.error("MFA verify-setup error:", error);
+      res.status(500).json({ error: "Failed to verify MFA setup" });
+    }
+  });
+
+  app.post("/api/mfa/verify", async (req, res, next) => {
+    try {
+      const { mfaToken, code } = req.body;
+      if (!mfaToken || !code) {
+        return res.status(400).json({ error: "MFA token and code are required" });
+      }
+
+      const pending = mfaPendingLogins.get(mfaToken);
+      if (!pending) {
+        return res.status(401).json({ error: "MFA session expired. Please log in again." });
+      }
+
+      if (Date.now() - pending.createdAt > 5 * 60 * 1000) {
+        mfaPendingLogins.delete(mfaToken);
+        return res.status(401).json({ error: "MFA session expired. Please log in again." });
+      }
+
+      if (pending.attempts >= MFA_MAX_ATTEMPTS) {
+        mfaPendingLogins.delete(mfaToken);
+        return res.status(429).json({ error: "Too many attempts. Please log in again." });
+      }
+
+      const user = await storage.getUser(pending.userId);
+      if (!user || !user.totpSecret) {
+        mfaPendingLogins.delete(mfaToken);
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const result = verifySync({ token: code, secret: user.totpSecret });
+      if (!result.valid) {
+        pending.attempts++;
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+
+      mfaPendingLogins.delete(mfaToken);
+
+      req.login(user, (err) => {
+        if (err) return next(err);
+        const { password, totpSecret, ...userWithoutSensitive } = user;
+        res.status(200).json(userWithoutSensitive);
+      });
+    } catch (error) {
+      console.error("MFA verify error:", error);
+      res.status(500).json({ error: "Failed to verify MFA code" });
+    }
+  });
+
+  app.post("/api/mfa/disable", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { password } = req.body;
+      if (!password) {
+        return res.status(400).json({ error: "Password is required to disable MFA" });
+      }
+
+      const user = await storage.getUser(req.user.id);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const passwordValid = await comparePasswords(password, user.password);
+      if (!passwordValid) {
+        return res.status(401).json({ error: "Incorrect password" });
+      }
+
+      await storage.updateUser(user.id, { totpEnabled: false, totpSecret: null });
+      const { password: _, totpSecret, ...userWithoutSensitive } = await storage.getUser(user.id) as SelectUser;
+      res.json({ success: true, user: userWithoutSensitive });
+    } catch (error) {
+      console.error("MFA disable error:", error);
+      res.status(500).json({ error: "Failed to disable MFA" });
     }
   });
 }
