@@ -15,8 +15,10 @@ import {
   ArrowLeft, ShieldCheck, MapPin, Phone, Mail, Bed, Bath, Maximize,
   Home, Play, Box, FileText, ImagePlus, Trash2, Pencil, Flag, ChevronLeft,
   ChevronRight, Loader2, X, ExternalLink, User as UserIcon,
-  AlertTriangle, GraduationCap, Droplets
+  AlertTriangle, GraduationCap, Droplets, Heart, Share2, Clock,
+  Calendar, Copy, Check, TrendingUp, TrendingDown, Minus
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MapContainer, TileLayer, Marker, useMap, Circle } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -403,11 +405,21 @@ export default function ListingDetailPage() {
   const [reportReason, setReportReason] = useState("");
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [showFloorplan, setShowFloorplan] = useState(false);
+  const [showShowing, setShowShowing] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
   const [editForm, setEditForm] = useState({
     youtubeUrl: "",
     matterportUrl: "",
     description: "",
+  });
+  const [showingForm, setShowingForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    message: "",
   });
 
   const { data: listing, isLoading, isError } = useQuery<ListingDetail>({
@@ -421,6 +433,96 @@ export default function ListingDetailPage() {
   });
 
   const isOwner = user?.id === listing?.agent_id;
+
+  const { data: savedProperties } = useQuery<Array<{ id: number; url: string }>>({
+    queryKey: ["/api/saved-properties"],
+    enabled: !!user,
+  });
+
+  const listingUrl = `/listing/${listingId}`;
+  const matchesSavedUrl = (url: string | undefined) => {
+    if (!url) return false;
+    try {
+      const path = url.startsWith('http') ? new URL(url).pathname : url;
+      return path === listingUrl;
+    } catch { return url === listingUrl; }
+  };
+  const isSaved = savedProperties?.some(sp => matchesSavedUrl(sp.url));
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/saved-properties", {
+        url: listingUrl,
+        source: "verified_listing",
+        streetAddress: listing?.address,
+        city: listing?.city,
+        state: listing?.state,
+        zipCode: listing?.zip_code,
+        notes: `${listing?.bedrooms || '?'} bed, ${listing?.bathrooms || '?'} bath — $${listing?.price?.toLocaleString() || 'N/A'}`,
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-properties"] });
+      toast({ title: "Property saved to favorites" });
+    },
+    onError: () => toast({ title: "Failed to save property", variant: "destructive" }),
+  });
+
+  const unsaveMut = useMutation({
+    mutationFn: async () => {
+      const saved = savedProperties?.find(sp => matchesSavedUrl(sp.url));
+      if (!saved) throw new Error("Not saved");
+      const res = await apiRequest("DELETE", `/api/saved-properties/${saved.id}`);
+      if (!res.ok) throw new Error("Failed to remove");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-properties"] });
+      toast({ title: "Removed from favorites" });
+    },
+    onError: () => toast({ title: "Failed to remove", variant: "destructive" }),
+  });
+
+  const showingMut = useMutation({
+    mutationFn: async (data: typeof showingForm) => {
+      const res = await apiRequest("POST", "/api/leads/submit", {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone || null,
+        zipCode: listing?.zip_code || "",
+        type: "buyer" as const,
+        message: `Showing request for ${listing?.address}, ${listing?.city}, ${listing?.state} ${listing?.zip_code}${data.message ? ` — ${data.message}` : ''}`,
+        source: "listing_showing_request",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to submit");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setShowShowing(false);
+      setShowingForm({ firstName: "", lastName: "", email: "", phone: "", message: "" });
+      toast({ title: "Showing request submitted! An agent in this area will contact you shortly." });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(`${window.location.origin}/listing/${listingId}`);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+    toast({ title: "Link copied to clipboard" });
+  };
+
+  const handleEmailShare = () => {
+    const subject = encodeURIComponent(`Check out this property: ${listing?.address}`);
+    const body = encodeURIComponent(`I found this property on HomeBase:\n\n${listing?.address}, ${listing?.city}, ${listing?.state} ${listing?.zip_code}\n${listing?.bedrooms || '?'} bed, ${listing?.bathrooms || '?'} bath — $${listing?.price?.toLocaleString() || 'N/A'}\n\nView it here: ${window.location.origin}/listing/${listingId}`);
+    window.open(`mailto:?subject=${subject}&body=${body}`);
+    setShowShareMenu(false);
+  };
 
   const updateMarketingMut = useMutation({
     mutationFn: async (data: { youtubeUrl?: string | null; matterportUrl?: string | null; description?: string | null }) => {
@@ -677,7 +779,136 @@ export default function ListingDetailPage() {
             {listing.mls_number && (
               <p className="text-xs text-muted-foreground mt-2">MLS# {listing.mls_number}</p>
             )}
+
+            {(() => {
+              const rc = listing.rentcast_data as any;
+              const dom = rc?.daysOnMarket;
+              const listedDate = rc?.listedDate;
+              if (dom != null || listedDate) {
+                const computed = listedDate ? Math.floor((Date.now() - new Date(listedDate).getTime()) / 86400000) : null;
+                const days = typeof dom === 'number' ? dom : computed;
+                if (days == null || isNaN(days)) return null;
+                const color = days <= 7 ? "text-emerald-600" : days <= 21 ? "text-amber-600" : days <= 60 ? "text-orange-600" : "text-red-600";
+                const bgColor = days <= 7 ? "bg-emerald-50 dark:bg-emerald-950" : days <= 21 ? "bg-amber-50 dark:bg-amber-950" : days <= 60 ? "bg-orange-50 dark:bg-orange-950" : "bg-red-50 dark:bg-red-950";
+                const label = days <= 7 ? "New listing" : days <= 14 ? "Recently listed" : days <= 30 ? "On the market" : days <= 60 ? "Getting stale" : "Long time on market";
+                return (
+                  <div className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md ${bgColor}`}>
+                    <Clock className={`h-3.5 w-3.5 ${color}`} />
+                    <span className={`text-xs font-medium ${color}`}>{days} days on market</span>
+                    <span className="text-xs text-muted-foreground">· {label}</span>
+                    {listedDate && <span className="text-xs text-muted-foreground">· Listed {new Date(listedDate).toLocaleDateString()}</span>}
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              className="flex-1 gap-2"
+              onClick={() => setShowShowing(true)}
+            >
+              <Calendar className="h-4 w-4" />
+              Schedule a Showing
+            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isSaved ? "default" : "outline"}
+                    size="icon"
+                    className={isSaved ? "bg-red-500 hover:bg-red-600" : ""}
+                    onClick={() => isSaved ? unsaveMut.mutate() : saveMut.mutate()}
+                    disabled={saveMut.isPending || unsaveMut.isPending}
+                  >
+                    <Heart className={`h-4 w-4 ${isSaved ? "fill-white text-white" : ""}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isSaved ? "Remove from favorites" : "Save to favorites"}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <div className="relative">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" onClick={() => setShowShareMenu(p => !p)}>
+                      <Share2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Share listing</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              {showShareMenu && (
+                <div className="absolute right-0 top-full mt-1 z-30 bg-popover border rounded-lg shadow-lg p-1 min-w-[160px]">
+                  <button
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors"
+                    onClick={handleCopyLink}
+                  >
+                    {linkCopied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                    {linkCopied ? "Copied!" : "Copy link"}
+                  </button>
+                  <button
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors"
+                    onClick={handleEmailShare}
+                  >
+                    <Mail className="h-4 w-4" />
+                    Email listing
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {(() => {
+            const rc = listing.rentcast_data as any;
+            const rawHistory = rc?.priceHistory || rc?.price_history;
+            if (!rawHistory || !Array.isArray(rawHistory) || rawHistory.length < 2) return null;
+            const validHistory = rawHistory.filter((p: any) => p && typeof p.price === 'number' && !isNaN(p.price) && p.date && !isNaN(new Date(p.date).getTime()));
+            if (validHistory.length < 2) return null;
+            const sorted = [...validHistory].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            const maxPrice = Math.max(...sorted.map((p: any) => p.price || 0));
+            const minPrice = Math.min(...sorted.map((p: any) => p.price || Infinity));
+            const latest = sorted[sorted.length - 1];
+            const previous = sorted[sorted.length - 2];
+            const priceChange = latest && previous ? latest.price - previous.price : 0;
+            const pctChange = previous?.price ? ((priceChange / previous.price) * 100).toFixed(1) : "0";
+            return (
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-emerald-500" /> Price History
+                    </CardTitle>
+                    {priceChange !== 0 && (
+                      <Badge variant={priceChange > 0 ? "destructive" : "default"} className="text-[10px] gap-1">
+                        {priceChange > 0 ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+                        {priceChange > 0 ? '+' : ''}{Number(pctChange)}% ({priceChange > 0 ? '+' : ''}${Math.abs(priceChange).toLocaleString()})
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-1.5">
+                    {sorted.map((entry: any, i: number) => {
+                      const barWidth = maxPrice > minPrice ? ((entry.price - minPrice) / (maxPrice - minPrice)) * 100 : 100;
+                      return (
+                        <div key={i} className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground w-20 flex-shrink-0">{new Date(entry.date).toLocaleDateString()}</span>
+                          <div className="flex-1 h-5 bg-muted rounded-sm overflow-hidden">
+                            <div className="h-full bg-emerald-500/20 rounded-sm flex items-center" style={{ width: `${Math.max(barWidth, 10)}%` }}>
+                              <span className="text-[10px] font-medium px-1.5 truncate">${entry.price?.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {listing.marketing?.description && (
             <Card>
@@ -932,6 +1163,77 @@ export default function ListingDetailPage() {
               title="Floor Plan"
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showShowing} onOpenChange={setShowShowing}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-emerald-500" />
+              Schedule a Showing
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Submit your info and an agent covering <span className="font-medium text-foreground">{listing.zip_code || 'this area'}</span> will contact you to schedule a tour of <span className="font-medium text-foreground">{listing.address}</span>.
+          </p>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">First Name *</Label>
+                <Input
+                  value={showingForm.firstName}
+                  onChange={e => setShowingForm(p => ({ ...p, firstName: e.target.value }))}
+                  placeholder="Jane"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Last Name *</Label>
+                <Input
+                  value={showingForm.lastName}
+                  onChange={e => setShowingForm(p => ({ ...p, lastName: e.target.value }))}
+                  placeholder="Smith"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Email *</Label>
+              <Input
+                type="email"
+                value={showingForm.email}
+                onChange={e => setShowingForm(p => ({ ...p, email: e.target.value }))}
+                placeholder="jane@email.com"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Phone</Label>
+              <Input
+                type="tel"
+                value={showingForm.phone}
+                onChange={e => setShowingForm(p => ({ ...p, phone: e.target.value }))}
+                placeholder="(555) 123-4567"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Message (optional)</Label>
+              <Textarea
+                value={showingForm.message}
+                onChange={e => setShowingForm(p => ({ ...p, message: e.target.value }))}
+                placeholder="I'm interested in seeing this property..."
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowShowing(false)}>Cancel</Button>
+            <Button
+              onClick={() => showingMut.mutate(showingForm)}
+              disabled={!showingForm.firstName || !showingForm.lastName || !showingForm.email || !listing.zip_code || showingMut.isPending}
+            >
+              {showingMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Calendar className="h-4 w-4 mr-2" />}
+              Request Showing
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
