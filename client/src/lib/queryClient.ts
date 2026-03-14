@@ -1,5 +1,27 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+export function getCsrfToken(): string {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+const originalFetch = window.fetch.bind(window);
+const CSRF_SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+window.fetch = function(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const method = (init?.method || "GET").toUpperCase();
+  if (!CSRF_SAFE_METHODS.has(method)) {
+    const token = getCsrfToken();
+    if (token) {
+      const headers = new Headers(init?.headers || {});
+      if (!headers.has("X-CSRF-Token")) {
+        headers.set("X-CSRF-Token", token);
+      }
+      init = { ...init, headers };
+    }
+  }
+  return originalFetch(input, init);
+};
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     if (res.status === 401) {

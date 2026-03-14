@@ -5,7 +5,10 @@ const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 
 function getEncryptionKey(): Buffer {
-  const secret = process.env.SESSION_SECRET || process.env.DATABASE_URL || "homebase-default-encryption-key";
+  const secret = process.env.SESSION_SECRET || process.env.DATABASE_URL;
+  if (!secret) {
+    throw new Error("SESSION_SECRET or DATABASE_URL must be set for message encryption");
+  }
   return scryptSync(secret, "homebase-messages-salt", 32);
 }
 

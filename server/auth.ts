@@ -1,6 +1,6 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Express } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual, createHash } from "crypto";
 import { promisify } from "util";
@@ -77,7 +77,7 @@ function hashVerificationCode(code: string): string {
 
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.REPL_ID!, // Using REPL_ID as secret in Replit environment
+    secret: process.env.SESSION_SECRET || process.env.REPL_ID!,
     resave: true, // Changed to true to ensure session is saved
     saveUninitialized: true, // Changed to true to create session for all users
     store: storage.sessionStore,
@@ -100,6 +100,36 @@ export function setupAuth(app: Express) {
   app.use(session(sessionSettings));
   app.use(passport.initialize());
   app.use(passport.session());
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (!req.cookies?.csrf_token) {
+      const token = randomBytes(32).toString("hex");
+      res.cookie("csrf_token", token, {
+        httpOnly: false,
+        sameSite: "strict",
+        secure: app.get("env") === "production",
+        path: "/",
+      });
+    }
+    next();
+  });
+
+  const csrfSafeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
+  const csrfExemptPaths = ["/api/webhooks/", "/api/zapier/"];
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (csrfSafeMethods.has(req.method)) return next();
+    if (csrfExemptPaths.some(p => req.path.startsWith(p))) return next();
+    if (!req.isAuthenticated()) return next();
+
+    const cookieToken = req.cookies?.csrf_token;
+    const headerToken = req.headers["x-csrf-token"];
+
+    if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+      return res.status(403).json({ error: "Invalid CSRF token" });
+    }
+    next();
+  });
 
   passport.use(
     new LocalStrategy(
@@ -277,7 +307,6 @@ export function setupAuth(app: Express) {
       recordRegistrationAttempt(clientIp);
 
       console.log('User created successfully:', { id: user.id, email: user.email });
-      console.log('Verification code for user', user.email, ':', verificationCode);
 
       if (referralCodeRecord && user.role !== 'lender') {
         try {
@@ -305,16 +334,15 @@ export function setupAuth(app: Express) {
           console.error('Login error after registration:', err);
           return next(err);
         }
-        const { password, ...userWithoutPassword } = user;
-        res.status(201).json({ ...userWithoutPassword, verificationCode });
+        const { password, totpSecret, ...userWithoutSensitive } = user;
+          res.status(201).json(userWithoutSensitive);
       });
     } catch (error) {
       console.error('Registration error:', error);
-      if (error instanceof Error) {
-        res.status(500).json({ error: error.message });
-      } else {
-        res.status(500).json({ error: 'Error during registration' });
-      }
+      const msg = error instanceof Error && error.message.includes("already exists")
+        ? error.message
+        : "Error during registration";
+      res.status(500).json({ error: msg });
     }
   });
 
@@ -357,8 +385,8 @@ export function setupAuth(app: Express) {
         emailVerificationExpires: null,
       });
 
-      const { password, ...userWithoutPassword } = updatedUser;
-      res.json(userWithoutPassword);
+      const { password, totpSecret, emailVerificationToken, emailVerificationExpires, ...safeUser } = updatedUser;
+      res.json(safeUser);
     } catch (error) {
       console.error("Email verification error:", error);
       res.status(500).json({ error: "Verification failed" });
@@ -389,9 +417,9 @@ export function setupAuth(app: Express) {
         emailVerificationExpires: verificationExpires,
       });
 
-      console.log('New verification code for user', user.email, ':', verificationCode);
+      console.log('Verification code resent for user', user.email);
 
-      res.json({ message: "Verification code sent", verificationCode });
+      res.json({ message: "Verification code sent" });
     } catch (error) {
       console.error("Resend verification error:", error);
       res.status(500).json({ error: "Failed to resend verification code" });

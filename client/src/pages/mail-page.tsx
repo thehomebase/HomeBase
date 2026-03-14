@@ -957,7 +957,9 @@ export default function MailPage() {
                           __html: DOMPurify.sanitize(signature, {
                             USE_PROFILES: { html: true },
                             ADD_TAGS: ["img"],
-                            ADD_ATTR: ["src", "alt", "width", "height", "style", "target", "href"],
+                            ADD_ATTR: ["src", "alt", "width", "height", "target", "href"],
+                            FORBID_ATTR: ["onerror", "onload", "onclick"],
+                            ALLOW_UNKNOWN_PROTOCOLS: false,
                           }),
                         }}
                       />
@@ -973,7 +975,9 @@ export default function MailPage() {
                         __html: DOMPurify.sanitize(quotedHtml, {
                           USE_PROFILES: { html: true },
                           ADD_TAGS: ["img"],
-                          ADD_ATTR: ["src", "alt", "width", "height", "style", "target", "href"],
+                          ADD_ATTR: ["src", "alt", "width", "height", "target", "href"],
+                          FORBID_ATTR: ["onerror", "onload", "onclick"],
+                          ALLOW_UNKNOWN_PROTOCOLS: false,
                         }),
                       }}
                     />
@@ -1262,7 +1266,11 @@ export default function MailPage() {
               <div
                 className="prose prose-sm dark:prose-invert max-w-none overflow-auto"
                 dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(msg.body, { USE_PROFILES: { html: true } }),
+                  __html: DOMPurify.sanitize(msg.body, {
+                    USE_PROFILES: { html: true },
+                    FORBID_ATTR: ["onerror", "onload", "onclick"],
+                    ALLOW_UNKNOWN_PROTOCOLS: false,
+                  }),
                 }}
               />
             </CardContent>

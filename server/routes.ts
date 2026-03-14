@@ -37,10 +37,64 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024, files: 10 },
 });
 
+const IMAGE_MAGIC_BYTES: { mime: string; bytes: number[] }[] = [
+  { mime: "image/png", bytes: [0x89, 0x50, 0x4E, 0x47] },
+  { mime: "image/jpeg", bytes: [0xFF, 0xD8, 0xFF] },
+  { mime: "image/gif", bytes: [0x47, 0x49, 0x46] },
+];
+
+function isValidImage(buffer: Buffer, mimetype: string): boolean {
+  if (!mimetype.startsWith("image/")) return false;
+  if (buffer.length < 12) return false;
+  if (IMAGE_MAGIC_BYTES.some(sig => sig.bytes.every((byte, i) => buffer[i] === byte))) return true;
+  if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+      buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) return true;
+  return false;
+}
+
+const EXCEL_MAGIC_BYTES = [
+  [0x50, 0x4B, 0x03, 0x04],
+  [0xD0, 0xCF, 0x11, 0xE0],
+];
+
+function isValidExcel(buffer: Buffer, mimetype: string): boolean {
+  const validMimes = [
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+    "text/csv",
+  ];
+  if (!validMimes.includes(mimetype) && !mimetype.includes("excel") && !mimetype.includes("csv")) return false;
+  if (mimetype.includes("csv")) return true;
+  if (buffer.length < 4) return false;
+  return EXCEL_MAGIC_BYTES.some(sig =>
+    sig.every((byte, i) => buffer[i] === byte)
+  );
+}
+
 function getClientIp(req: import('express').Request): string {
   const forwarded = req.headers['x-forwarded-for'];
   if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
   return req.ip || req.socket.remoteAddress || 'unknown';
+}
+
+async function verifyTransactionAccess(transactionId: number, userId: number, userRole: string): Promise<{ allowed: boolean; transaction?: any }> {
+  const transaction = await storage.getTransaction(transactionId);
+  if (!transaction) return { allowed: false };
+  if (transaction.agentId === userId) return { allowed: true, transaction };
+  if (userRole === "broker") return { allowed: true, transaction };
+  if (transaction.clientId) {
+    const client = await storage.getClient(transaction.clientId);
+    if (client?.linkedClientId === userId) {
+      return { allowed: true, transaction };
+    }
+  }
+  if (transaction.secondaryClientId) {
+    const secondaryClient = await storage.getClient(transaction.secondaryClientId);
+    if (secondaryClient?.linkedClientId === userId) {
+      return { allowed: true, transaction };
+    }
+  }
+  return { allowed: false, transaction };
 }
 
 function createRateLimiter(windowMs: number, maxRequests: number) {
@@ -451,10 +505,7 @@ export function registerRoutes(app: Express): Server {
       res.status(201).json(client);
     } catch (error) {
       console.error('Error creating client:', error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : 'Failed to create client',
-        details: error instanceof Error ? error.stack : undefined
-      });
+      res.status(500).json({ error: "Failed to create client" });
     }
   });
 
@@ -492,18 +543,16 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: 'Not authorized to update this client' });
       }
 
-      const { linkedClientId, agentId, id, ...safeBody } = req.body;
+      const allowedFields = ['firstName', 'lastName', 'email', 'phone', 'address', 'notes', 'type', 'status', 'preApprovalAmount', 'lenderId', 'preferredContactMethod', 'birthday', 'anniversary', 'moveInDate'];
+      const safeBody: Record<string, any> = {};
+      for (const key of allowedFields) {
+        if (req.body[key] !== undefined) safeBody[key] = req.body[key];
+      }
       const client = await storage.updateClient(clientId, safeBody);
-
-      console.log('Client updated successfully:', client);
       res.json(client);
     } catch (error) {
       console.error('Error updating client:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      res.status(500).json({ 
-        error: 'Failed to update client',
-        details: errorMessage
-      });
+      res.status(500).json({ error: 'Failed to update client' });
     }
   });
 
@@ -564,6 +613,10 @@ export function registerRoutes(app: Express): Server {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      if (!isValidExcel(req.file.buffer, req.file.mimetype)) {
+        return res.status(400).json({ error: 'File must be a valid Excel (.xlsx, .xls) or CSV file' });
       }
 
       const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
@@ -723,9 +776,11 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const id = Number(req.params.id);
-      const data = { ...req.body };
-      delete data.id;
-      delete data.agentId;
+      const allowedTxFields = ['status', 'type', 'streetName', 'city', 'state', 'zipCode', 'price', 'closingDate', 'contractExecutionDate', 'optionPeriodExpiration', 'notes', 'buyerName', 'sellerName', 'titleCompany', 'escrowOfficer', 'lenderName', 'propertyType', 'mlsNumber', 'earnestMoney', 'optionMoney', 'commission', 'clientId'];
+      const data: Record<string, any> = {};
+      for (const key of allowedTxFields) {
+        if (req.body[key] !== undefined) data[key] = req.body[key];
+      }
 
       const oldTransaction = await storage.getTransaction(id);
       if (!oldTransaction || (oldTransaction.agentId !== req.user.id && req.user.role !== "broker")) {
@@ -934,22 +989,19 @@ export function registerRoutes(app: Express): Server {
       res.status(201).json(transaction);
     } catch (error) {
       console.error('Error creating transaction:', error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : 'Error creating transaction',
-        details: error instanceof Error ? error.stack : undefined
-      });
+      res.status(500).json({ error: "Failed to create transaction" });
     }
   });
 
   // Checklists
   app.get("/api/checklists/:transactionId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
     const transactionId = parseInt(req.params.transactionId, 10);
 
     try {
-      const transaction = await storage.getTransaction(transactionId);
-
-      if (!transaction) {
-        return res.status(404).json({ error: "Transaction not found" });
+      const { allowed, transaction } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+      if (!allowed || !transaction) {
+        return res.status(403).json({ error: "Not authorized to access this transaction" });
       }
 
       const checklist = await storage.getChecklist(transactionId, transaction.type);
@@ -997,9 +1049,9 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const transactionId = Number(req.params.id);
-      const transaction = await storage.getTransaction(transactionId);
-      if (!transaction) {
-        return res.status(404).json({ error: "Transaction not found" });
+      const { allowed, transaction } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+      if (!allowed || !transaction) {
+        return res.status(403).json({ error: "Not authorized to modify this checklist" });
       }
 
       let checklist = await storage.getChecklist(transactionId, transaction.type);
@@ -1067,6 +1119,10 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const transactionId = req.query.transactionId ? Number(req.query.transactionId) : undefined;
+      if (transactionId) {
+        const { allowed } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+        if (!allowed) return res.status(403).json({ error: "Not authorized" });
+      }
       const messages = await storage.getMessages(transactionId);
       res.json(messages);
     } catch (error) {
@@ -1253,11 +1309,16 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      const contactData = {
-        ...req.body,
-        transactionId: Number(req.body.transactionId)
-      };
-      console.log("Creating contact with data:", JSON.stringify(contactData));
+      const txId = Number(req.body.transactionId);
+      if (txId) {
+        const { allowed } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
+        if (!allowed) return res.status(403).json({ error: "Not authorized" });
+      }
+      const allowedContactFields = ['name', 'role', 'email', 'phone', 'company', 'notes', 'transactionId'];
+      const contactData: Record<string, any> = {};
+      for (const key of allowedContactFields) {
+        if (req.body[key] !== undefined) contactData[key] = key === 'transactionId' ? Number(req.body[key]) : req.body[key];
+      }
 
       const contact = await storage.createContact(contactData);
       if (!contact) {
@@ -1266,15 +1327,17 @@ export function registerRoutes(app: Express): Server {
       res.json(contact);
     } catch (error) {
       console.error('Error creating contact:', error);
-      const message = error instanceof Error ? error.message : 'Failed to create contact';
-      res.status(500).json({ error: message });
+      res.status(500).json({ error: 'Failed to create contact' });
     }
   });
 
   app.get("/api/contacts/:transactionId", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      const contacts = await storage.getContactsByTransaction(Number(req.params.transactionId));
+      const txId = Number(req.params.transactionId);
+      const { allowed } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
+      if (!allowed) return res.status(403).json({ error: "Not authorized" });
+      const contacts = await storage.getContactsByTransaction(txId);
       res.json(contacts);
     } catch (error) {
       console.error('Error fetching contacts:', error);
@@ -1283,11 +1346,24 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/contacts/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) {
       return res.sendStatus(401);
     }
     try {
-      const contact = await storage.updateContact(Number(req.params.id), req.body);
+      const contactId = Number(req.params.id);
+      const existingContacts = await db.execute(sql`SELECT transaction_id FROM contacts WHERE id = ${contactId} LIMIT 1`);
+      if (existingContacts.rows.length === 0) return res.status(404).json({ error: "Contact not found" });
+      const txId = existingContacts.rows[0].transaction_id as number;
+      if (txId) {
+        const { allowed } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
+        if (!allowed) return res.status(403).json({ error: "Not authorized" });
+      }
+      const allowedContactFields = ['name', 'role', 'email', 'phone', 'company', 'notes'];
+      const safeContactBody: Record<string, any> = {};
+      for (const key of allowedContactFields) {
+        if (req.body[key] !== undefined) safeContactBody[key] = req.body[key];
+      }
+      const contact = await storage.updateContact(contactId, safeContactBody);
       res.json(contact);
     } catch (error) {
       console.error('Error updating contact:', error);
@@ -1296,9 +1372,19 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/contacts/:id", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) {
+      return res.sendStatus(401);
+    }
     try {
-      await storage.deleteContact(Number(req.params.id));
+      const contactId = Number(req.params.id);
+      const existingContacts = await db.execute(sql`SELECT transaction_id FROM contacts WHERE id = ${contactId} LIMIT 1`);
+      if (existingContacts.rows.length === 0) return res.status(404).json({ error: "Contact not found" });
+      const txId = existingContacts.rows[0].transaction_id as number;
+      if (txId) {
+        const { allowed } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
+        if (!allowed) return res.status(403).json({ error: "Not authorized" });
+      }
+      await storage.deleteContact(contactId);
       res.sendStatus(200);
     } catch (error) {
       console.error('Error deleting contact:', error);
@@ -1310,7 +1396,10 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/documents/:transactionId", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      const documents = await storage.getDocumentsByTransaction(Number(req.params.transactionId));
+      const txId = Number(req.params.transactionId);
+      const { allowed } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
+      if (!allowed) return res.status(403).json({ error: "Not authorized" });
+      const documents = await storage.getDocumentsByTransaction(txId);
       res.json(documents);
     } catch (error) {
       console.error('Error fetching documents:', error);
@@ -1321,9 +1410,12 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/documents/:transactionId", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
+      const txId = Number(req.params.transactionId);
+      const { allowed } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
+      if (!allowed) return res.status(403).json({ error: "Not authorized" });
       const document = await storage.createDocument({
         ...req.body,
-        transactionId: Number(req.params.transactionId)
+        transactionId: txId
       });
       res.status(201).json(document);
     } catch (error) {
@@ -1379,6 +1471,8 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const transactionId = Number(req.params.transactionId);
+      const { allowed } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+      if (!allowed) return res.status(403).json({ error: "Not authorized" });
       const { documents } = req.body;
 
       if (!Array.isArray(documents)) {
@@ -1413,13 +1507,15 @@ export function registerRoutes(app: Express): Server {
       // Create a combined date-time string
       const combinedDateTime = new Date(`${date}T${time}`);
 
-      // Get the document to verify it exists and belongs to this transaction
       const document = await storage.getDocument(documentId);
       if (!document) {
         return res.status(404).json({ error: "Document not found" });
       }
+      if (document.transactionId) {
+        const { allowed } = await verifyTransactionAccess(document.transactionId, req.user.id, req.user.role);
+        if (!allowed) return res.status(403).json({ error: "Not authorized" });
+      }
 
-      // Update the document with the deadline
       await storage.updateDocument(documentId, {
         deadline: date,
         deadlineTime: time
@@ -3046,7 +3142,7 @@ export function registerRoutes(app: Express): Server {
       res.json({ url });
     } catch (error: any) {
       console.error("Error generating Gmail auth URL:", error);
-      res.status(500).json({ error: error.message || "Failed to generate auth URL" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to generate auth URL" });
     }
   });
 
@@ -3093,7 +3189,7 @@ export function registerRoutes(app: Express): Server {
       const result = await getSignature(req.user.id);
       res.json(result);
     } catch (error: any) {
-      res.status(500).json({ signature: "", error: error.message });
+      res.status(500).json({ signature: "", error: "Failed to fetch signature" });
     }
   });
 
@@ -3125,7 +3221,7 @@ export function registerRoutes(app: Express): Server {
       res.json(result);
     } catch (error: any) {
       console.error("Error fetching Gmail messages:", error);
-      res.status(500).json({ error: error.message || "Failed to fetch messages" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to fetch messages" });
     }
   });
 
@@ -3144,7 +3240,7 @@ export function registerRoutes(app: Express): Server {
       res.json(result);
     } catch (error: any) {
       console.error("Error fetching Gmail inbox:", error);
-      res.status(500).json({ error: error.message || "Failed to fetch inbox" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to fetch inbox" });
     }
   });
 
@@ -3159,7 +3255,7 @@ export function registerRoutes(app: Express): Server {
       res.json(result);
     } catch (error: any) {
       console.error("Error fetching Gmail message detail:", error);
-      res.status(500).json({ error: error.message || "Failed to fetch message" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to fetch message" });
     }
   });
 
@@ -3526,7 +3622,7 @@ export function registerRoutes(app: Express): Server {
       res.json({ success: true, messageId: result.messageId });
     } catch (error: any) {
       console.error("Error sending email via Gmail:", error);
-      res.status(500).json({ error: error.message || "Failed to send email" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to send email" });
     }
   });
 
@@ -3628,7 +3724,7 @@ export function registerRoutes(app: Express): Server {
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error sending calculator results email:", error);
-      res.status(500).json({ error: error.message || "Failed to send email" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to send email" });
     }
   });
 
@@ -3808,7 +3904,7 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      if (!req.file.mimetype.startsWith("image/")) return res.status(400).json({ error: "File must be an image" });
+      if (!isValidImage(req.file.buffer, req.file.mimetype)) return res.status(400).json({ error: "File must be a valid image (PNG, JPEG, GIF, or WebP)" });
 
       const photoWidth = 400;
       const photoHeight = 500;
@@ -3857,7 +3953,7 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      if (!req.file.mimetype.startsWith("image/")) return res.status(400).json({ error: "File must be an image" });
+      if (!isValidImage(req.file.buffer, req.file.mimetype)) return res.status(400).json({ error: "File must be a valid image (PNG, JPEG, GIF, or WebP)" });
 
       const resized = await sharp(req.file.buffer)
         .resize(400, 500, { fit: "cover", position: "top" })
@@ -4877,7 +4973,7 @@ export function registerRoutes(app: Express): Server {
       res.json({ url });
     } catch (error: any) {
       console.error("Error generating SignNow auth URL:", error);
-      res.status(500).json({ error: error.message || "Failed to generate auth URL" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to generate auth URL" });
     }
   });
 
@@ -4941,7 +5037,7 @@ export function registerRoutes(app: Express): Server {
       res.json(result);
     } catch (error: any) {
       console.error("SignNow upload error:", error);
-      res.status(500).json({ error: error.message || "Failed to upload document" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to upload document" });
     }
   });
 
@@ -4968,7 +5064,7 @@ export function registerRoutes(app: Express): Server {
       res.json(result);
     } catch (error: any) {
       console.error("SignNow invite error:", error);
-      res.status(500).json({ error: error.message || "Failed to send invite" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to send invite" });
     }
   });
 
@@ -4980,7 +5076,7 @@ export function registerRoutes(app: Express): Server {
       res.json(docs);
     } catch (error: any) {
       console.error("SignNow list docs error:", error);
-      res.status(500).json({ error: error.message || "Failed to list documents" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to list documents" });
     }
   });
 
@@ -4992,7 +5088,7 @@ export function registerRoutes(app: Express): Server {
       res.json(status);
     } catch (error: any) {
       console.error("SignNow doc status error:", error);
-      res.status(500).json({ error: error.message || "Failed to get document status" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to get document status" });
     }
   });
 
@@ -5011,7 +5107,7 @@ export function registerRoutes(app: Express): Server {
       res.send(pdfBuffer);
     } catch (error: any) {
       console.error("SignNow download error:", error);
-      res.status(500).json({ error: error.message || "Failed to download document" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to download document" });
     }
   });
 
@@ -5042,7 +5138,7 @@ export function registerRoutes(app: Express): Server {
       res.json({ url });
     } catch (error: any) {
       console.error("Error generating DocuSign auth URL:", error);
-      res.status(500).json({ error: error.message || "Failed to generate auth URL" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to generate auth URL" });
     }
   });
 
@@ -5155,7 +5251,7 @@ export function registerRoutes(app: Express): Server {
       res.json(result);
     } catch (error: any) {
       console.error("DocuSign send error:", error);
-      res.status(500).json({ error: error.message || "Failed to send envelope" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to send envelope" });
     }
   });
 
@@ -5223,7 +5319,7 @@ export function registerRoutes(app: Express): Server {
       res.json({ envelopeId: draft.envelopeId, senderViewUrl: senderView.url });
     } catch (error: any) {
       console.error("DocuSign prepare error:", error);
-      res.status(500).json({ error: error.message || "Failed to prepare envelope" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to prepare envelope" });
     }
   });
 
@@ -5252,7 +5348,7 @@ export function registerRoutes(app: Express): Server {
       res.json(envelopes);
     } catch (error: any) {
       console.error("DocuSign list envelopes error:", error);
-      res.status(500).json({ error: error.message || "Failed to list envelopes" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to list envelopes" });
     }
   });
 
@@ -5264,7 +5360,7 @@ export function registerRoutes(app: Express): Server {
       res.json(status);
     } catch (error: any) {
       console.error("DocuSign envelope status error:", error);
-      res.status(500).json({ error: error.message || "Failed to get envelope status" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to get envelope status" });
     }
   });
 
@@ -5314,7 +5410,7 @@ export function registerRoutes(app: Express): Server {
       res.json({ synced: results.length, results });
     } catch (error: any) {
       console.error("DocuSign sync-status error:", error);
-      res.status(500).json({ error: error.message || "Failed to sync envelope statuses" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to sync envelope statuses" });
     }
   });
 
@@ -5333,7 +5429,7 @@ export function registerRoutes(app: Express): Server {
       res.send(pdfBuffer);
     } catch (error: any) {
       console.error("DocuSign download error:", error);
-      res.status(500).json({ error: error.message || "Failed to download documents" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to download documents" });
     }
   });
 
@@ -5374,7 +5470,7 @@ export function registerRoutes(app: Express): Server {
       res.send(pdfBuffer);
     } catch (error: any) {
       console.error("DocuSign document-pdf error:", error);
-      res.status(500).json({ error: error.message || "Failed to download document PDF" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to download document PDF" });
     }
   });
 
@@ -5457,7 +5553,7 @@ export function registerRoutes(app: Express): Server {
       const result = await listDropboxFiles(req.user.id, path || "");
       res.json(result);
     } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to list files" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to list files" });
     }
   });
 
@@ -5470,7 +5566,7 @@ export function registerRoutes(app: Express): Server {
       const results = await searchDropboxFiles(req.user.id, query);
       res.json(results);
     } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to search files" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to search files" });
     }
   });
 
@@ -5505,7 +5601,7 @@ export function registerRoutes(app: Express): Server {
       res.json({ document, fileName: docName });
     } catch (error: any) {
       console.error("Dropbox add-to-checklist error:", error);
-      res.status(500).json({ error: error.message || "Failed to add file from Dropbox" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to add file from Dropbox" });
     }
   });
 
@@ -5523,7 +5619,7 @@ export function registerRoutes(app: Express): Server {
       res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`);
       res.send(file.buffer);
     } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to download file" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to download file" });
     }
   });
 
@@ -5601,7 +5697,7 @@ export function registerRoutes(app: Express): Server {
       res.json(result);
     } catch (error: any) {
       console.error("Dropbox-to-DocuSign error:", error);
-      res.status(500).json({ error: error.message || "Failed to send file from Dropbox to DocuSign" });
+      console.error("Server error:", error); res.status(500).json({ error: "Failed to send file from Dropbox to DocuSign" });
     }
   });
 
@@ -5694,7 +5790,8 @@ export function registerRoutes(app: Express): Server {
       const timeline = await generateTransactionTimeline(transactionId);
       res.json(timeline);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("Timeline error:", error);
+      res.status(500).json({ error: "Failed to generate timeline" });
     }
   });
 
@@ -5706,7 +5803,8 @@ export function registerRoutes(app: Express): Server {
       const alerts = await generateAgentAlerts(req.user.id);
       res.json(alerts);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("Alerts error:", error);
+      res.status(500).json({ error: "Failed to generate alerts" });
     }
   });
 
@@ -5739,7 +5837,8 @@ export function registerRoutes(app: Express): Server {
       } catch (e) {}
       res.json({ transaction, documents, checklist, timeline });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("Client portal error:", error);
+      res.status(500).json({ error: "Failed to load transaction data" });
     }
   });
 
@@ -8800,7 +8899,7 @@ export function registerRoutes(app: Express): Server {
       const existing = await storage.getLenderProfile(id);
       if (!existing || existing.agentId !== req.user.id) return res.status(404).json({ error: "Not found" });
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      if (!req.file.mimetype.startsWith("image/")) return res.status(400).json({ error: "File must be an image" });
+      if (!isValidImage(req.file.buffer, req.file.mimetype)) return res.status(400).json({ error: "File must be a valid image (PNG, JPEG, GIF, or WebP)" });
       const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
       const updated = await storage.updateLenderProfile(id, { photoUrl: base64 });
       res.json(updated);

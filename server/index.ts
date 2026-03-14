@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { Server as HttpServer } from "http";
@@ -44,6 +45,7 @@ app.post(
   }
 );
 
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -171,9 +173,8 @@ async function initStripe() {
     // Setup basic error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      log(`Error in request: ${message}`);
-      res.status(status).json({ error: message });
+      log(`Error in request: ${err.message || "Unknown error"}`);
+      res.status(status).json({ error: status < 500 ? (err.message || "Bad request") : "Internal Server Error" });
     });
 
     // Start with minimal configuration first

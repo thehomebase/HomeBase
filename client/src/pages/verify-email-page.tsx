@@ -65,13 +65,10 @@ export default function VerifyEmailPage() {
       if (!res.ok) throw new Error(data.error || "Failed to resend code");
       return data;
     },
-    onSuccess: (data) => {
-      if (data.verificationCode) {
-        setDisplayCode(data.verificationCode);
-      }
+    onSuccess: () => {
       toast({
         title: "Code sent",
-        description: "A new verification code has been generated.",
+        description: "A new verification code has been sent to your email.",
       });
     },
     onError: (error: Error) => {
