@@ -17,9 +17,10 @@ import {
   ChevronRight, Loader2, X, ExternalLink, User as UserIcon,
   AlertTriangle, GraduationCap, Droplets
 } from "lucide-react";
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap, Circle } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet.heat";
 
 type ListingDetail = {
   id: number;
@@ -88,6 +89,20 @@ function escapeHtml(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+function getSchoolColor(tags: any): { bg: string; label: string } {
+  const gradeStr = (tags?.["grades"] || tags?.["isced:level"] || tags?.["school:type"] || "").toLowerCase();
+  const name = (tags?.name || "").toLowerCase();
+  if (gradeStr.includes("1") || gradeStr.includes("primary") || name.includes("elementary") || name.includes("primary"))
+    return { bg: "#22c55e", label: "Elementary" };
+  if (gradeStr.includes("2") || gradeStr.includes("secondary") || name.includes("middle") || name.includes("junior"))
+    return { bg: "#f59e0b", label: "Middle" };
+  if (gradeStr.includes("3") || name.includes("high school") || name.includes("senior"))
+    return { bg: "#8b5cf6", label: "High" };
+  if (name.includes("montessori") || name.includes("academy") || name.includes("prep"))
+    return { bg: "#ec4899", label: "Private" };
+  return { bg: "#3b82f6", label: "School" };
+}
+
 function SchoolLayer({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
   const markersRef = useRef<L.Marker[]>([]);
@@ -95,7 +110,7 @@ function SchoolLayer({ lat, lng }: { lat: number; lng: number }) {
   useEffect(() => {
     const controller = new AbortController();
     const radius = 3000;
-    const query = `[out:json][timeout:10];(node["amenity"="school"](around:${radius},${lat},${lng});way["amenity"="school"](around:${radius},${lat},${lng}););out center 20;`;
+    const query = `[out:json][timeout:10];(node["amenity"="school"](around:${radius},${lat},${lng});way["amenity"="school"](around:${radius},${lat},${lng}););out center 30;`;
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, { signal: controller.signal })
       .then(r => r.json())
       .then(data => {
@@ -104,19 +119,31 @@ function SchoolLayer({ lat, lng }: { lat: number; lng: number }) {
           lat: el.lat || el.center?.lat,
           lon: el.lon || el.center?.lon,
           name: el.tags?.name || "School",
+          tags: el.tags || {},
         })).filter((s: any) => s.lat && s.lon);
 
         results.forEach((school: any) => {
+          const { bg, label } = getSchoolColor(school.tags);
           const icon = L.divIcon({
-            html: `<div style="background:#3b82f6;width:22px;height:22px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+            html: `<div style="background:${bg};width:26px;height:26px;border-radius:50%;border:2.5px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
             </div>`,
             className: '',
-            iconSize: [22, 22],
-            iconAnchor: [11, 11],
+            iconSize: [26, 26],
+            iconAnchor: [13, 13],
           });
+          const safeName = escapeHtml(school.name);
+          const gsLink = `https://www.greatschools.org/search/search.page?q=${encodeURIComponent(school.name)}&lat=${school.lat}&lon=${school.lon}`;
+          const popupHtml = `
+            <div style="min-width:160px">
+              <div style="font-weight:600;font-size:13px;margin-bottom:4px">${safeName}</div>
+              <span style="display:inline-block;background:${bg};color:white;font-size:10px;padding:2px 8px;border-radius:10px;margin-bottom:6px">${label}</span>
+              <div style="margin-top:6px">
+                <a href="${gsLink}" target="_blank" rel="noopener" style="color:#3b82f6;font-size:11px;text-decoration:underline">View ratings on GreatSchools →</a>
+              </div>
+            </div>`;
           const m = L.marker([school.lat, school.lon], { icon })
-            .bindPopup(`<strong>${escapeHtml(school.name)}</strong>`)
+            .bindPopup(popupHtml, { maxWidth: 220 })
             .addTo(map);
           markersRef.current.push(m);
         });
@@ -135,36 +162,65 @@ function SchoolLayer({ lat, lng }: { lat: number; lng: number }) {
 
 function SafetyLayer({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
+  const heatLayerRef = useRef<any>(null);
   const markersRef = useRef<L.Marker[]>([]);
 
   useEffect(() => {
     const controller = new AbortController();
-    const radius = 3000;
-    const query = `[out:json][timeout:10];(node["amenity"="police"](around:${radius},${lat},${lng});way["amenity"="police"](around:${radius},${lat},${lng});node["amenity"="fire_station"](around:${radius},${lat},${lng});way["amenity"="fire_station"](around:${radius},${lat},${lng}););out center 20;`;
+    const radius = 4000;
+    const query = `[out:json][timeout:15];(node["amenity"="bar"](around:${radius},${lat},${lng});node["amenity"="nightclub"](around:${radius},${lat},${lng});node["shop"="alcohol"](around:${radius},${lat},${lng});node["amenity"="casino"](around:${radius},${lat},${lng});node["amenity"="police"](around:${radius},${lat},${lng});way["amenity"="police"](around:${radius},${lat},${lng});node["amenity"="fire_station"](around:${radius},${lat},${lng});way["amenity"="fire_station"](around:${radius},${lat},${lng}););out center 80;`;
     fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, { signal: controller.signal })
       .then(r => r.json())
       .then(data => {
         if (controller.signal.aborted) return;
+        const heatPoints: [number, number, number][] = [];
+        const safetyMarkers: Array<{ lat: number; lon: number; name: string; type: string; amenity: string }> = [];
+
         (data.elements || []).forEach((el: any) => {
           const elLat = el.lat || el.center?.lat;
           const elLon = el.lon || el.center?.lon;
           if (!elLat || !elLon) return;
-          const isPolice = el.tags?.amenity === "police";
-          const rawName = el.tags?.name || (isPolice ? "Police Station" : "Fire Station");
-          const color = isPolice ? "#ef4444" : "#f97316";
+          const amenity = el.tags?.amenity || el.tags?.shop || "";
+          if (["bar", "nightclub", "casino"].includes(amenity) || el.tags?.shop === "alcohol") {
+            heatPoints.push([elLat, elLon, 0.6]);
+          }
+          if (amenity === "police" || amenity === "fire_station") {
+            safetyMarkers.push({
+              lat: elLat, lon: elLon,
+              name: el.tags?.name || (amenity === "police" ? "Police Station" : "Fire Station"),
+              type: amenity === "police" ? "police" : "fire",
+              amenity,
+            });
+          }
+        });
+
+        if (heatPoints.length > 0) {
+          heatLayerRef.current = (L as any).heatLayer(heatPoints, {
+            radius: 35,
+            blur: 25,
+            maxZoom: 17,
+            max: 1.0,
+            gradient: { 0.2: '#22c55e', 0.4: '#84cc16', 0.6: '#eab308', 0.8: '#f97316', 1.0: '#ef4444' },
+          });
+          heatLayerRef.current.addTo(map);
+        }
+
+        safetyMarkers.forEach((sm) => {
+          const isPolice = sm.type === "police";
+          const color = isPolice ? "#1d4ed8" : "#dc2626";
+          const svgPath = isPolice
+            ? '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
+            : '<path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>';
           const icon = L.divIcon({
-            html: `<div style="background:${color};width:22px;height:22px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">${isPolice
-                ? '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
-                : '<path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>'
-              }</svg>
+            html: `<div style="background:${color};width:24px;height:24px;border-radius:50%;border:2.5px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">${svgPath}</svg>
             </div>`,
             className: '',
-            iconSize: [22, 22],
-            iconAnchor: [11, 11],
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
           });
-          const m = L.marker([elLat, elLon], { icon })
-            .bindPopup(`<strong>${escapeHtml(rawName)}</strong>`)
+          const m = L.marker([sm.lat, sm.lon], { icon })
+            .bindPopup(`<div style="min-width:120px"><strong>${escapeHtml(sm.name)}</strong><br/><span style="font-size:11px;color:#666">${isPolice ? "🛡️ Police Station" : "🚒 Fire Station"}</span></div>`, { maxWidth: 200 })
             .addTo(map);
           markersRef.current.push(m);
         });
@@ -173,6 +229,7 @@ function SafetyLayer({ lat, lng }: { lat: number; lng: number }) {
 
     return () => {
       controller.abort();
+      if (heatLayerRef.current) { map.removeLayer(heatLayerRef.current); heatLayerRef.current = null; }
       markersRef.current.forEach(m => map.removeLayer(m));
       markersRef.current = [];
     };
@@ -256,14 +313,22 @@ function PropertyMap({ lat, lng, address }: { lat: number; lng: number; address:
             {activeLayers.has('safety') && (
               <Badge variant="outline" className="text-[10px] gap-1">
                 <AlertTriangle className="h-2.5 w-2.5 text-red-500" />
-                Police & fire stations nearby
+                Heat map: green = low activity, red = high activity
               </Badge>
             )}
             {activeLayers.has('schools') && (
-              <Badge variant="outline" className="text-[10px] gap-1">
-                <GraduationCap className="h-2.5 w-2.5 text-blue-500" />
-                Nearby schools shown on map
-              </Badge>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant="outline" className="text-[10px] gap-1">
+                  <GraduationCap className="h-2.5 w-2.5 text-blue-500" />
+                  Click schools for ratings
+                </Badge>
+                <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                  <span className="inline-block w-2 h-2 rounded-full bg-green-500" />Elem
+                  <span className="inline-block w-2 h-2 rounded-full bg-amber-500 ml-1" />Middle
+                  <span className="inline-block w-2 h-2 rounded-full bg-violet-500 ml-1" />High
+                  <span className="inline-block w-2 h-2 rounded-full bg-pink-500 ml-1" />Private
+                </span>
+              </div>
             )}
             {activeLayers.has('flood') && (
               <Badge variant="outline" className="text-[10px] gap-1">
