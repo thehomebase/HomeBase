@@ -1,0 +1,16 @@
+Zillow includes this specific disclaimer (and similar variations) on pages displaying real estate listings because it is required under the National Association of Realtors (NAR) Internet Data Exchange (IDX) policy and the rules of various Multiple Listing Services (MLSs) across the U.S.
+IDX is the system that allows real estate professionals (and platforms like Zillow) to display active property listings from MLS databases on public websites. Without IDX feeds, sites like Zillow couldn’t show comprehensive, up-to-date MLS-sourced listing data (photos, prices, descriptions, etc.) from cooperating brokers.
+Why This Exact Wording?
+NAR’s IDX policy (as outlined in their Handbook on Multiple Listing Policy, Policy Statement 7.58) mandates that any website or display using IDX data must include a notice stating:
+	•	The information is for consumers’ personal, non-commercial use only.
+	•	It may not be used for any purpose other than to identify prospective properties consumers may be interested in purchasing.
+This is explicitly required to protect the MLS ecosystem:
+	•	Prevent commercial misuse — e.g., no scraping the data for lead generation services, data resale, bulk marketing, competitive analysis by non-participants, app development without permission, or other business purposes that could undermine the cooperative nature of MLSs.
+	•	Maintain control and fairness — MLS data is contributed by member brokers (who own the intellectual property rights to their listings). The restriction ensures the data stays focused on helping individual homebuyers/sellers find properties, rather than being repurposed commercially by third parties.
+	•	Limit liability — It reinforces that the data is for informational purposes only, with the added “deemed reliable but not guaranteed” clause to shield Zillow, the MLS, and brokers from errors or omissions in the data.
+Zillow has a dedicated MLS Disclaimers page listing variations by MLS/board (e.g., Aberdeen MLS, Realcomp, etc.), and this language appears consistently because each MLS requires it as a condition of granting IDX access. Zillow pulls listings via IDX agreements (or as a participating brokerage in some cases), so they must comply to keep displaying that data legally.
+Additional Context
+	•	The “non-commercial use” rule prevents scenarios like using IDX data to build a competing commercial database, automated valuation tools without proper licensing, or mass solicitation.
+	•	Similar disclaimers appear on other IDX-powered sites (Realtor.com, individual agent sites, etc.).
+	•	If someone violates this (e.g., by scraping for commercial gain), MLSs can revoke access, and legal action is possible under copyright or contract terms.
+In essence, it’s not Zillow’s invention—it’s a protective requirement from NAR and the MLSs to safeguard the shared listing data while allowing public access for genuine home searchers. This has been standard for years to balance transparency with professional control over real estate information.
