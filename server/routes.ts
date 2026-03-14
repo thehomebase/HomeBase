@@ -4604,6 +4604,73 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  const SOCRATA_CRIME_SOURCES: Record<string, { domain: string; dataset: string; latField: string; lngField: string; typeField: string; locationField: string; dateField: string }> = {
+    "chicago": { domain: "data.cityofchicago.org", dataset: "crimes", latField: "latitude", lngField: "longitude", typeField: "primary_type", locationField: "location", dateField: "date" },
+    "san francisco": { domain: "data.sfgov.org", dataset: "wg3w-h783", latField: "latitude", lngField: "longitude", typeField: "incident_category", locationField: "point", dateField: "incident_date" },
+    "los angeles": { domain: "data.lacity.org", dataset: "2nrs-mtv8", latField: "lat", lngField: "lon", typeField: "crm_cd_desc", locationField: "location", dateField: "date_occ" },
+    "new york": { domain: "data.cityofnewyork.us", dataset: "5uac-w243", latField: "latitude", lngField: "longitude", typeField: "ofns_desc", locationField: "loc_of_occur_desc", dateField: "cmplnt_fr_dt" },
+    "seattle": { domain: "data.seattle.gov", dataset: "tazs-3rd5", latField: "latitude", lngField: "longitude", typeField: "offense", locationField: "_100_block_address", dateField: "offense_start_datetime" },
+    "denver": { domain: "data.denvergov.org", dataset: "j6g8-fkyh", latField: "geo_lat", lngField: "geo_lon", typeField: "offense_category_id", locationField: "geo_x", dateField: "first_occurrence_date" },
+    "portland": { domain: "data.portland.gov", dataset: "9pha-t5dv", latField: "openlat", lngField: "openlon", typeField: "offensecategory", locationField: "openlat", dateField: "reportdatetime" },
+    "philadelphia": { domain: "phl.carto.com", dataset: "incidents_part1_part2", latField: "lat", lngField: "lng", typeField: "text_general_code", locationField: "shape", dateField: "dispatch_date" },
+    "dallas": { domain: "www.dallasopendata.com", dataset: "qv6i-rri7", latField: "geocoded_column.latitude", lngField: "geocoded_column.longitude", typeField: "nibrs_crime_category", locationField: "geocoded_column", dateField: "date1" },
+    "houston": { domain: "data.houstontx.gov", dataset: "2acm-fvke", latField: "maplatitude", lngField: "maplongitude", typeField: "offensecount", locationField: "maplatitude", dateField: "date" },
+    "austin": { domain: "data.austintexas.gov", dataset: "fdj4-gpfu", latField: "", lngField: "", typeField: "crime_type", locationField: "", dateField: "occ_date" },
+  };
+
+  function findCrimeSource(city: string, state: string): typeof SOCRATA_CRIME_SOURCES[string] | null {
+    const cityLower = city.toLowerCase().trim();
+    const stateUpper = (state || "").toUpperCase().trim();
+    if (SOCRATA_CRIME_SOURCES[cityLower] && SOCRATA_CRIME_SOURCES[cityLower].latField) {
+      return SOCRATA_CRIME_SOURCES[cityLower];
+    }
+    if (cityLower.includes("new york") || cityLower.includes("manhattan") || cityLower.includes("brooklyn") || cityLower.includes("queens") || cityLower.includes("bronx")) {
+      return SOCRATA_CRIME_SOURCES["new york"];
+    }
+    if (cityLower.includes("los angeles") || cityLower === "la") return SOCRATA_CRIME_SOURCES["los angeles"];
+    if (cityLower.includes("san francisco") || cityLower === "sf") return SOCRATA_CRIME_SOURCES["san francisco"];
+    return null;
+  }
+
+  app.get("/api/crime-data", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const lat = parseFloat(req.query.lat as string);
+    const lng = parseFloat(req.query.lng as string);
+    const city = (req.query.city as string) || "";
+    const state = (req.query.state as string) || "";
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ error: "Invalid coordinates" });
+
+    const source = findCrimeSource(city, state);
+    if (!source) {
+      return res.json({ available: false, city, message: "Crime data not available for this area yet" });
+    }
+
+    try {
+      const radius = 1500;
+      const url = `https://${source.domain}/resource/${source.dataset}.json?$limit=500&$select=${source.typeField},${source.latField},${source.lngField}&$where=within_circle(${source.locationField},${lat},${lng},${radius}) AND ${source.latField} IS NOT NULL&$order=${source.dateField} DESC`;
+      const response = await fetch(url, { headers: { "Accept": "application/json" }, signal: AbortSignal.timeout(10000) });
+      if (!response.ok) throw new Error(`Socrata API returned ${response.status}`);
+      const data = await response.json();
+
+      const incidents = (data as any[]).map((item: any) => ({
+        lat: parseFloat(item[source.latField]),
+        lng: parseFloat(item[source.lngField]),
+        type: item[source.typeField] || "Unknown",
+      })).filter((i: any) => Number.isFinite(i.lat) && Number.isFinite(i.lng));
+
+      const typeCounts: Record<string, number> = {};
+      incidents.forEach((i: any) => {
+        typeCounts[i.type] = (typeCounts[i.type] || 0) + 1;
+      });
+      const topTypes = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+      res.json({ available: true, city, totalIncidents: incidents.length, incidents, topTypes, source: `${city} Open Data Portal` });
+    } catch (error: any) {
+      console.error("Crime data fetch error:", error.message);
+      res.json({ available: false, city, message: "Could not fetch crime data at this time" });
+    }
+  });
+
   app.get("/api/profile/:id/reviews", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
     const agentId = parseInt(req.params.id, 10);

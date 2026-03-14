@@ -160,72 +160,68 @@ function SchoolLayer({ lat, lng }: { lat: number; lng: number }) {
   return null;
 }
 
-function SafetyLayer({ lat, lng }: { lat: number; lng: number }) {
+function SafetyLayer({ lat, lng, city, state, onStatusChange }: { lat: number; lng: number; city: string; state: string; onStatusChange?: (status: { available: boolean; source?: string; total?: number; topTypes?: [string, number][] }) => void }) {
   const map = useMap();
   const heatLayerRef = useRef<any>(null);
   const markersRef = useRef<L.Marker[]>([]);
 
   useEffect(() => {
     const controller = new AbortController();
-    const radius = 4000;
-    const query = `[out:json][timeout:15];(node["amenity"="bar"](around:${radius},${lat},${lng});node["amenity"="nightclub"](around:${radius},${lat},${lng});node["shop"="alcohol"](around:${radius},${lat},${lng});node["amenity"="casino"](around:${radius},${lat},${lng});node["amenity"="police"](around:${radius},${lat},${lng});way["amenity"="police"](around:${radius},${lat},${lng});node["amenity"="fire_station"](around:${radius},${lat},${lng});way["amenity"="fire_station"](around:${radius},${lat},${lng}););out center 80;`;
-    fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, { signal: controller.signal })
+
+    fetch(`/api/crime-data?lat=${lat}&lng=${lng}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`, { signal: controller.signal, credentials: "include" })
       .then(r => r.json())
       .then(data => {
         if (controller.signal.aborted) return;
-        const heatPoints: [number, number, number][] = [];
-        const safetyMarkers: Array<{ lat: number; lon: number; name: string; type: string; amenity: string }> = [];
 
-        (data.elements || []).forEach((el: any) => {
-          const elLat = el.lat || el.center?.lat;
-          const elLon = el.lon || el.center?.lon;
-          if (!elLat || !elLon) return;
-          const amenity = el.tags?.amenity || el.tags?.shop || "";
-          if (["bar", "nightclub", "casino"].includes(amenity) || el.tags?.shop === "alcohol") {
-            heatPoints.push([elLat, elLon, 0.6]);
-          }
-          if (amenity === "police" || amenity === "fire_station") {
-            safetyMarkers.push({
-              lat: elLat, lon: elLon,
-              name: el.tags?.name || (amenity === "police" ? "Police Station" : "Fire Station"),
-              type: amenity === "police" ? "police" : "fire",
-              amenity,
-            });
-          }
-        });
+        if (data.available && data.incidents?.length > 0) {
+          const heatPoints: [number, number, number][] = data.incidents.map((i: any) => [i.lat, i.lng, 0.5]);
 
-        if (heatPoints.length > 0) {
           heatLayerRef.current = (L as any).heatLayer(heatPoints, {
-            radius: 35,
-            blur: 25,
+            radius: 30,
+            blur: 20,
             maxZoom: 17,
             max: 1.0,
-            gradient: { 0.2: '#22c55e', 0.4: '#84cc16', 0.6: '#eab308', 0.8: '#f97316', 1.0: '#ef4444' },
+            gradient: { 0.1: '#22c55e', 0.3: '#84cc16', 0.5: '#eab308', 0.7: '#f97316', 1.0: '#ef4444' },
           });
           heatLayerRef.current.addTo(map);
-        }
 
-        safetyMarkers.forEach((sm) => {
-          const isPolice = sm.type === "police";
-          const color = isPolice ? "#1d4ed8" : "#dc2626";
-          const svgPath = isPolice
-            ? '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
-            : '<path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>';
-          const icon = L.divIcon({
-            html: `<div style="background:${color};width:24px;height:24px;border-radius:50%;border:2.5px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">${svgPath}</svg>
-            </div>`,
-            className: '',
-            iconSize: [24, 24],
-            iconAnchor: [12, 12],
-          });
-          const m = L.marker([sm.lat, sm.lon], { icon })
-            .bindPopup(`<div style="min-width:120px"><strong>${escapeHtml(sm.name)}</strong><br/><span style="font-size:11px;color:#666">${isPolice ? "🛡️ Police Station" : "🚒 Fire Station"}</span></div>`, { maxWidth: 200 })
-            .addTo(map);
-          markersRef.current.push(m);
-        });
+          onStatusChange?.({ available: true, source: data.source, total: data.totalIncidents, topTypes: data.topTypes });
+        } else {
+          onStatusChange?.({ available: false });
+          const radius = 3000;
+          const query = `[out:json][timeout:10];(node["amenity"="police"](around:${radius},${lat},${lng});way["amenity"="police"](around:${radius},${lat},${lng});node["amenity"="fire_station"](around:${radius},${lat},${lng});way["amenity"="fire_station"](around:${radius},${lat},${lng}););out center 20;`;
+          fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`, { signal: controller.signal })
+            .then(r => r.json())
+            .then(osm => {
+              if (controller.signal.aborted) return;
+              (osm.elements || []).forEach((el: any) => {
+                const elLat = el.lat || el.center?.lat;
+                const elLon = el.lon || el.center?.lon;
+                if (!elLat || !elLon) return;
+                const isPolice = el.tags?.amenity === "police";
+                const rawName = el.tags?.name || (isPolice ? "Police Station" : "Fire Station");
+                const color = isPolice ? "#1d4ed8" : "#dc2626";
+                const svgPath = isPolice
+                  ? '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
+                  : '<path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>';
+                const icon = L.divIcon({
+                  html: `<div style="background:${color};width:24px;height:24px;border-radius:50%;border:2.5px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">${svgPath}</svg>
+                  </div>`,
+                  className: '',
+                  iconSize: [24, 24],
+                  iconAnchor: [12, 12],
+                });
+                const m = L.marker([elLat, elLon], { icon })
+                  .bindPopup(`<div style="min-width:120px"><strong>${escapeHtml(rawName)}</strong><br/><span style="font-size:11px;color:#666">${isPolice ? "Police Station" : "Fire Station"}</span></div>`, { maxWidth: 200 })
+                  .addTo(map);
+                markersRef.current.push(m);
+              });
+            })
+            .catch(() => {});
+        }
       })
-      .catch(() => {});
+      .catch(() => { onStatusChange?.({ available: false }); });
 
     return () => {
       controller.abort();
@@ -233,19 +229,24 @@ function SafetyLayer({ lat, lng }: { lat: number; lng: number }) {
       markersRef.current.forEach(m => map.removeLayer(m));
       markersRef.current = [];
     };
-  }, [map, lat, lng]);
+  }, [map, lat, lng, city, state]);
 
   return null;
 }
 
-function PropertyMap({ lat, lng, address }: { lat: number; lng: number; address: string }) {
+function PropertyMap({ lat, lng, address, city, state }: { lat: number; lng: number; address: string; city: string; state: string }) {
   const [activeLayers, setActiveLayers] = useState<Set<string>>(new Set());
+  const [crimeStatus, setCrimeStatus] = useState<{ available: boolean; source?: string; total?: number; topTypes?: [string, number][] } | null>(null);
 
   const toggleLayer = (layer: string) => {
     setActiveLayers(prev => {
       const next = new Set(prev);
-      if (next.has(layer)) next.delete(layer);
-      else next.add(layer);
+      if (next.has(layer)) {
+        next.delete(layer);
+        if (layer === 'safety') setCrimeStatus(null);
+      } else {
+        next.add(layer);
+      }
       return next;
     });
   };
@@ -304,17 +305,47 @@ function PropertyMap({ lat, lng, address }: { lat: number; lng: number; address:
             <Marker position={[lat, lng]} icon={propertyMarkerIcon} />
             {activeLayers.has('flood') && <FloodLayer />}
             {activeLayers.has('schools') && <SchoolLayer lat={lat} lng={lng} />}
-            {activeLayers.has('safety') && <SafetyLayer lat={lat} lng={lng} />}
+            {activeLayers.has('safety') && <SafetyLayer lat={lat} lng={lng} city={city} state={state} onStatusChange={setCrimeStatus} />}
           </MapContainer>
         </div>
         <p className="text-xs text-muted-foreground mt-2">{address}</p>
         {activeLayers.size > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {activeLayers.has('safety') && (
-              <Badge variant="outline" className="text-[10px] gap-1">
-                <AlertTriangle className="h-2.5 w-2.5 text-red-500" />
-                Heat map: green = low activity, red = high activity
-              </Badge>
+              <div className="flex flex-col gap-1">
+                {crimeStatus?.available ? (
+                  <>
+                    <Badge variant="outline" className="text-[10px] gap-1">
+                      <AlertTriangle className="h-2.5 w-2.5 text-red-500" />
+                      {crimeStatus.total} incidents · Source: {crimeStatus.source}
+                    </Badge>
+                    {crimeStatus.topTypes && crimeStatus.topTypes.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {crimeStatus.topTypes.slice(0, 5).map(([type, count]) => (
+                          <Badge key={type} variant="secondary" className="text-[9px] py-0 gap-0.5">
+                            {type.toLowerCase().replace(/_/g, ' ')} ({count})
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                      <span className="inline-block w-2 h-2 rounded-full bg-green-500" />Low
+                      <span className="inline-block w-2 h-2 rounded-full bg-yellow-500 ml-1" />Medium
+                      <span className="inline-block w-2 h-2 rounded-full bg-red-500 ml-1" />High density
+                    </span>
+                  </>
+                ) : crimeStatus !== null ? (
+                  <Badge variant="outline" className="text-[10px] gap-1">
+                    <AlertTriangle className="h-2.5 w-2.5 text-amber-500" />
+                    Crime data not available for this area · Showing emergency services
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[10px] gap-1">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    Loading crime data...
+                  </Badge>
+                )}
+              </div>
             )}
             {activeLayers.has('schools') && (
               <div className="flex flex-wrap items-center gap-1.5">
@@ -739,7 +770,7 @@ export default function ListingDetailPage() {
             const lat = rc?.latitude || rc?.lat;
             const lng = rc?.longitude || rc?.lng || rc?.lon;
             if (lat && lng) {
-              return <PropertyMap lat={lat} lng={lng} address={`${listing.address}${listing.city ? `, ${listing.city}` : ''}${listing.state ? `, ${listing.state}` : ''} ${listing.zip_code || ''}`} />;
+              return <PropertyMap lat={lat} lng={lng} city={listing.city || ''} state={listing.state || ''} address={`${listing.address}${listing.city ? `, ${listing.city}` : ''}${listing.state ? `, ${listing.state}` : ''} ${listing.zip_code || ''}`} />;
             }
             return null;
           })()}
