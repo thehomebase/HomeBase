@@ -93,6 +93,10 @@ function listingMatchesAlert(listing: RentCastListing, alert: AlertRow): boolean
 }
 
 async function fetchListings(params: URLSearchParams): Promise<RentCastListing[]> {
+  if (process.env.NODE_ENV !== "production" && process.env.RENTCAST_ALLOW_DEV !== "true") {
+    console.log("[ListingAlerts] RentCast API call blocked in development mode");
+    return [];
+  }
   const apiKey = process.env.RENTCAST_API_KEY;
   if (!apiKey) {
     console.error("[ListingAlerts] RentCast API key not configured");
@@ -121,6 +125,10 @@ async function fetchListings(params: URLSearchParams): Promise<RentCastListing[]
 }
 
 async function fetchPropertyByAddress(address: string): Promise<RentCastListing | null> {
+  if (process.env.NODE_ENV !== "production" && process.env.RENTCAST_ALLOW_DEV !== "true") {
+    console.log("[ListingAlerts] RentCast property fetch blocked in development mode");
+    return null;
+  }
   const apiKey = process.env.RENTCAST_API_KEY;
   if (!apiKey) return null;
 

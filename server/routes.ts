@@ -2688,7 +2688,11 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // RentCast property search with caching
+  const RENTCAST_DEV_BLOCK = process.env.NODE_ENV !== "production" && process.env.RENTCAST_ALLOW_DEV !== "true";
+  if (RENTCAST_DEV_BLOCK) {
+    console.log("[RentCast] ⛔ Development mode: all live RentCast API calls are BLOCKED. Set RENTCAST_ALLOW_DEV=true to override.");
+  }
+
   const rentcastCache = new Map<string, { data: any; timestamp: number }>();
   const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
   let monthlyCallCount = 0;
@@ -2736,6 +2740,9 @@ export function registerRoutes(app: Express): Server {
     }
 
     resetMonthlyCounterIfNeeded();
+    if (RENTCAST_DEV_BLOCK) {
+      return res.json({ listings: [], fromCache: true, devBlocked: true, message: "RentCast API calls blocked in development. Set RENTCAST_ALLOW_DEV=true to override.", apiCallsUsed: monthlyCallCount, apiCallsLimit: MONTHLY_LIMIT });
+    }
     if (monthlyCallCount >= MONTHLY_LIMIT) {
       return res.status(429).json({
         error: `Monthly API limit reached (${MONTHLY_LIMIT} calls). Resets next month. Try a cached search or adjust filters.`,
@@ -2796,6 +2803,9 @@ export function registerRoutes(app: Express): Server {
     }
 
     resetMonthlyCounterIfNeeded();
+    if (RENTCAST_DEV_BLOCK) {
+      return res.json({ property: null, fromCache: true, devBlocked: true, message: "RentCast API calls blocked in development." });
+    }
     if (monthlyCallCount >= MONTHLY_LIMIT) {
       return res.status(429).json({ error: "Monthly API limit reached." });
     }
@@ -4274,12 +4284,18 @@ export function registerRoutes(app: Express): Server {
       }
 
       if (needsRefresh) {
+        if (RENTCAST_DEV_BLOCK) {
+          console.log("[RentCast] Verified listings refresh blocked in development mode");
+          needsRefresh = false;
+        }
+
         const apiKey = process.env.RENTCAST_API_KEY;
-        if (!apiKey) {
+        if (!apiKey || !needsRefresh) {
           if (existingListings.rows.length > 0) {
             const listingsWithMarketing = await enrichListingsWithMarketing(existingListings.rows);
             return res.json({ listings: listingsWithMarketing, fromCache: true });
           }
+          if (!needsRefresh) return res.json({ listings: [], message: "RentCast API calls blocked in development" });
           return res.json({ listings: [], message: "RentCast API key not configured" });
         }
 

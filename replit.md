@@ -53,7 +53,7 @@ Preferred communication style: Simple, everyday language.
 - **Stripe**: Payment processing and subscriptions.
 - **Twilio**: SMS communication.
 - **Google OAuth**: Gmail integration and authentication.
-- **RentCast API**: Property listing data.
+- **RentCast API**: Property listing data. **Development safety**: All live RentCast API calls are automatically blocked in development mode (non-production). Existing cached/DB data is returned instead. Set env var `RENTCAST_ALLOW_DEV=true` to temporarily allow live calls during development. In production, calls are allowed normally with a monthly cap of 45.
 - **iCal Generator**: Calendar event creation.
 - **Leaflet & leaflet-draw**: Mapping functionalities.
 - **pdf-parse**: PDF text extraction.
