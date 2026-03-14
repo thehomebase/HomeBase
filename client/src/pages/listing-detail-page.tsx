@@ -21,6 +21,7 @@ import { MapContainer, TileLayer, Marker, useMap, Circle } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
+import * as esri from "esri-leaflet";
 
 type ListingDetail = {
   id: number;
@@ -74,10 +75,13 @@ function FloodLayer() {
   const map = useMap();
 
   useEffect(() => {
-    const floodOverlay = L.tileLayer(
-      "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/tile/{z}/{y}/{x}",
-      { opacity: 0.45, attribution: "FEMA NFHL" }
-    );
+    const floodOverlay = esri.dynamicMapLayer({
+      url: "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer",
+      layers: [28],
+      opacity: 0.55,
+      attribution: "FEMA NFHL",
+      f: "image" as any,
+    });
     floodOverlay.addTo(map);
     return () => { map.removeLayer(floodOverlay); };
   }, [map]);
