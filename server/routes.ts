@@ -7721,6 +7721,128 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/leads/metrics", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+
+    try {
+      const leads = await storage.getLeadsByAgent(req.user.id);
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      const total = leads.length;
+      const newCount = leads.filter(l => l.status === 'new' || l.status === 'assigned').length;
+      const accepted = leads.filter(l => l.status === 'accepted').length;
+      const converted = leads.filter(l => l.status === 'converted').length;
+      const rejected = leads.filter(l => l.status === 'rejected').length;
+      const expired = leads.filter(l => l.status === 'expired').length;
+      const acceptanceRate = (accepted + converted + rejected) > 0
+        ? Math.round(((accepted + converted) / (accepted + converted + rejected)) * 100) : 0;
+
+      const contacted = leads.filter(l => l.contactedAt).length;
+      const connected = leads.filter(l => l.connectedAt).length;
+      const connectionRate = contacted > 0 ? Math.round((connected / contacted) * 100) : 0;
+
+      const sourceCounts: Record<string, number> = {};
+      const sourceConversions: Record<string, { total: number; converted: number; accepted: number; rejected: number; avgResponseMs: number; responseTimes: number[] }> = {};
+      leads.forEach(l => {
+        const src = l.source || 'unknown';
+        sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+        if (!sourceConversions[src]) {
+          sourceConversions[src] = { total: 0, converted: 0, accepted: 0, rejected: 0, avgResponseMs: 0, responseTimes: [] };
+        }
+        sourceConversions[src].total++;
+        if (l.status === 'converted') sourceConversions[src].converted++;
+        if (l.status === 'accepted') sourceConversions[src].accepted++;
+        if (l.status === 'rejected') sourceConversions[src].rejected++;
+        if (l.contactedAt && l.assignedAt) {
+          const rt = new Date(l.contactedAt).getTime() - new Date(l.assignedAt).getTime();
+          if (rt > 0) sourceConversions[src].responseTimes.push(rt);
+        }
+      });
+
+      Object.values(sourceConversions).forEach(sc => {
+        if (sc.responseTimes.length > 0) {
+          sc.avgResponseMs = Math.round(sc.responseTimes.reduce((a, b) => a + b, 0) / sc.responseTimes.length);
+        }
+      });
+
+      const monthlyData: { month: string; monthNum: number; year: number; total: number; converted: number; accepted: number; rejected: number }[] = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(currentYear, currentMonth - i, 1);
+        const m = d.getMonth();
+        const y = d.getFullYear();
+        const monthLeads = leads.filter(l => {
+          if (!l.createdAt) return false;
+          const ld = new Date(l.createdAt);
+          return ld.getMonth() === m && ld.getFullYear() === y;
+        });
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        monthlyData.push({
+          month: monthNames[m],
+          monthNum: m,
+          year: y,
+          total: monthLeads.length,
+          converted: monthLeads.filter(l => l.status === 'converted').length,
+          accepted: monthLeads.filter(l => l.status === 'accepted').length,
+          rejected: monthLeads.filter(l => l.status === 'rejected').length,
+        });
+      }
+
+      const thisMonthLeads = leads.filter(l => {
+        if (!l.createdAt) return false;
+        const ld = new Date(l.createdAt);
+        return ld.getMonth() === currentMonth && ld.getFullYear() === currentYear;
+      }).length;
+      const lastMonthDate = new Date(currentYear, currentMonth - 1, 1);
+      const lastMonthLeads = leads.filter(l => {
+        if (!l.createdAt) return false;
+        const ld = new Date(l.createdAt);
+        return ld.getMonth() === lastMonthDate.getMonth() && ld.getFullYear() === lastMonthDate.getFullYear();
+      }).length;
+      const monthChange = lastMonthLeads > 0 ? Math.round(((thisMonthLeads - lastMonthLeads) / lastMonthLeads) * 100) : undefined;
+
+      const avgResponseMs = leads.filter(l => l.contactedAt && l.assignedAt).map(l => {
+        return new Date(l.contactedAt!).getTime() - new Date(l.assignedAt!).getTime();
+      }).filter(t => t > 0);
+      const avgResponseTime = avgResponseMs.length > 0
+        ? Math.round(avgResponseMs.reduce((a, b) => a + b, 0) / avgResponseMs.length)
+        : 0;
+
+      const sourcePerformance = Object.entries(sourceConversions).map(([source, data]) => ({
+        source,
+        total: data.total,
+        converted: data.converted,
+        accepted: data.accepted,
+        rejected: data.rejected,
+        conversionRate: (data.accepted + data.converted + data.rejected) > 0
+          ? Math.round(((data.accepted + data.converted) / (data.accepted + data.converted + data.rejected)) * 100) : 0,
+        avgResponseMs: data.avgResponseMs,
+      })).sort((a, b) => b.total - a.total);
+
+      const funnelData = {
+        total,
+        assigned: leads.filter(l => l.assignedAt || l.assignedAgentId).length,
+        contacted,
+        connected,
+        accepted: accepted + converted,
+        converted,
+      };
+
+      res.json({
+        summary: { total, new: newCount, accepted, converted, rejected, expired, acceptanceRate, connectionRate, contacted, connected, avgResponseTime, thisMonthLeads, monthChange },
+        sourceCounts,
+        sourcePerformance,
+        monthlyData,
+        funnelData,
+      });
+    } catch (error) {
+      console.error('Error fetching lead metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch lead metrics' });
+    }
+  });
+
   app.patch("/api/leads/:id/contact", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);

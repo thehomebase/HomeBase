@@ -65,7 +65,8 @@ import {
   Zap,
   Key,
   User as UserIcon,
-  Settings
+  Settings,
+  Target
 } from "lucide-react";
 import React, { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -98,6 +99,7 @@ import BillingPage from "@/pages/billing-page";
 import DripCampaignsPage from "@/pages/drip-campaigns-page";
 import { TopAgentsPage, AgentReviewsPage } from "@/pages/agent-reviews-page";
 import LeadGenerationPage from "@/pages/lead-generation-page";
+import LeadMetricsPage from "@/pages/lead-metrics-page";
 import DashboardPage from "@/pages/dashboard-page";
 import LeadSubmitPage from "@/pages/lead-submit-page";
 import LenderLeadSubmitPage from "@/pages/lender-lead-submit-page";
@@ -325,6 +327,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                                     </span>
                                   )}
                                 </span>
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Lead Metrics">
+                              <Link href="/lead-metrics" className="flex items-center gap-2">
+                                <Target className="h-4 w-4" />
+                                <span>Lead Metrics</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -747,6 +757,9 @@ function Router() {
           <Route path="/lead-gen">
             <ProtectedRoute path="/lead-gen" component={LeadGenerationPage} />
           </Route>
+          <Route path="/lead-metrics">
+            <ProtectedRoute path="/lead-metrics" component={LeadMetricsPage} />
+          </Route>
           <Route path="/reminders">
             <ProtectedRoute path="/reminders" component={RemindersPage} />
           </Route>
@@ -812,6 +825,9 @@ function Router() {
           </Route>
           <Route path="/lead-gen">
             <ProtectedRoute path="/lead-gen" component={LeadGenerationPage} />
+          </Route>
+          <Route path="/lead-metrics">
+            <ProtectedRoute path="/lead-metrics" component={LeadMetricsPage} />
           </Route>
           <Route path="/reminders">
             <ProtectedRoute path="/reminders" component={RemindersPage} />
