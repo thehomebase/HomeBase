@@ -2695,15 +2695,45 @@ export function registerRoutes(app: Express): Server {
 
   const rentcastCache = new Map<string, { data: any; timestamp: number }>();
   const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
-  let monthlyCallCount = 0;
-  let monthlyCallResetDate = new Date();
   const MONTHLY_LIMIT = 45; // leave buffer under 50
 
-  function resetMonthlyCounterIfNeeded() {
-    const now = new Date();
-    if (now.getMonth() !== monthlyCallResetDate.getMonth() || now.getFullYear() !== monthlyCallResetDate.getFullYear()) {
-      monthlyCallCount = 0;
-      monthlyCallResetDate = now;
+  async function getRentcastCallCount(): Promise<number> {
+    try {
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+      const result = await db.execute(sql`
+        SELECT call_count, reset_month, reset_year FROM api_usage_counters WHERE id = 'rentcast'
+      `);
+      if (result.rows.length === 0) {
+        await db.execute(sql`
+          INSERT INTO api_usage_counters (id, call_count, reset_month, reset_year) VALUES ('rentcast', 0, ${month}, ${year})
+        `);
+        return 0;
+      }
+      const row = result.rows[0] as any;
+      if (row.reset_month !== month || row.reset_year !== year) {
+        await db.execute(sql`
+          UPDATE api_usage_counters SET call_count = 0, reset_month = ${month}, reset_year = ${year}, updated_at = NOW() WHERE id = 'rentcast'
+        `);
+        return 0;
+      }
+      return row.call_count;
+    } catch (e) {
+      console.error("[RentCast] Failed to read call counter:", e);
+      return MONTHLY_LIMIT;
+    }
+  }
+
+  async function incrementRentcastCallCount(): Promise<number> {
+    try {
+      const result = await db.execute(sql`
+        UPDATE api_usage_counters SET call_count = call_count + 1, updated_at = NOW() WHERE id = 'rentcast' RETURNING call_count
+      `);
+      return (result.rows[0] as any)?.call_count ?? 0;
+    } catch (e) {
+      console.error("[RentCast] Failed to increment call counter:", e);
+      return 0;
     }
   }
 
@@ -2736,17 +2766,18 @@ export function registerRoutes(app: Express): Server {
 
     const cached = rentcastCache.get(cacheKey);
     if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return res.json({ listings: cached.data, fromCache: true, apiCallsUsed: monthlyCallCount, apiCallsLimit: MONTHLY_LIMIT });
+      const count = await getRentcastCallCount();
+      return res.json({ listings: cached.data, fromCache: true, apiCallsUsed: count, apiCallsLimit: MONTHLY_LIMIT });
     }
 
-    resetMonthlyCounterIfNeeded();
     if (RENTCAST_DEV_BLOCK) {
-      return res.json({ listings: [], fromCache: true, devBlocked: true, message: "RentCast API calls blocked in development. Set RENTCAST_ALLOW_DEV=true to override.", apiCallsUsed: monthlyCallCount, apiCallsLimit: MONTHLY_LIMIT });
+      return res.json({ listings: [], fromCache: true, devBlocked: true, message: "RentCast API calls blocked in development. Set RENTCAST_ALLOW_DEV=true to override.", apiCallsUsed: 0, apiCallsLimit: MONTHLY_LIMIT });
     }
-    if (monthlyCallCount >= MONTHLY_LIMIT) {
+    const callCount = await getRentcastCallCount();
+    if (callCount >= MONTHLY_LIMIT) {
       return res.status(429).json({
         error: `Monthly API limit reached (${MONTHLY_LIMIT} calls). Resets next month. Try a cached search or adjust filters.`,
-        apiCallsUsed: monthlyCallCount,
+        apiCallsUsed: callCount,
         apiCallsLimit: MONTHLY_LIMIT
       });
     }
@@ -2758,7 +2789,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const url = `https://api.rentcast.io/v1/listings/sale?${params.toString()}`;
-      console.log(`RentCast API call #${monthlyCallCount + 1}: ${url}`);
+      console.log(`RentCast API call #${callCount + 1}: ${url}`);
 
       const response = await fetch(url, {
         headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
@@ -2771,12 +2802,12 @@ export function registerRoutes(app: Express): Server {
       }
 
       const data = await response.json();
-      monthlyCallCount++;
+      const newCount = await incrementRentcastCallCount();
       console.log(`RentCast returned ${Array.isArray(data) ? data.length : 'non-array'} listings for: ${cacheKey}`);
 
       rentcastCache.set(cacheKey, { data, timestamp: Date.now() });
 
-      res.json({ listings: data, fromCache: false, apiCallsUsed: monthlyCallCount, apiCallsLimit: MONTHLY_LIMIT });
+      res.json({ listings: data, fromCache: false, apiCallsUsed: newCount, apiCallsLimit: MONTHLY_LIMIT });
     } catch (error) {
       console.error("RentCast API fetch error:", error);
       res.status(500).json({ error: "Failed to fetch listings from RentCast" });
@@ -2802,11 +2833,11 @@ export function registerRoutes(app: Express): Server {
       return res.json({ property: cached.data, fromCache: true });
     }
 
-    resetMonthlyCounterIfNeeded();
     if (RENTCAST_DEV_BLOCK) {
       return res.json({ property: null, fromCache: true, devBlocked: true, message: "RentCast API calls blocked in development." });
     }
-    if (monthlyCallCount >= MONTHLY_LIMIT) {
+    const propCallCount = await getRentcastCallCount();
+    if (propCallCount >= MONTHLY_LIMIT) {
       return res.status(429).json({ error: "Monthly API limit reached." });
     }
 
@@ -2844,7 +2875,7 @@ export function registerRoutes(app: Express): Server {
       if (resolvedZip) params.set("zipCode", resolvedZip);
 
       const url = `https://api.rentcast.io/v1/properties?${params.toString()}`;
-      console.log(`RentCast property lookup #${monthlyCallCount + 1}: ${url}`);
+      console.log(`RentCast property lookup #${propCallCount + 1}: ${url}`);
 
       const response = await fetch(url, {
         headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
@@ -2860,7 +2891,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const data = await response.json();
-      monthlyCallCount++;
+      await incrementRentcastCallCount();
 
       const property = Array.isArray(data) && data.length > 0 ? data[0] : null;
       if (property) {
@@ -2876,12 +2907,13 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/rentcast/status", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    resetMonthlyCounterIfNeeded();
+    const statusCount = await getRentcastCallCount();
+    const now = new Date();
     res.json({
-      apiCallsUsed: monthlyCallCount,
+      apiCallsUsed: statusCount,
       apiCallsLimit: MONTHLY_LIMIT,
       cacheEntries: rentcastCache.size,
-      resetDate: new Date(monthlyCallResetDate.getFullYear(), monthlyCallResetDate.getMonth() + 1, 1).toISOString()
+      resetDate: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
     });
   });
 
@@ -4299,8 +4331,8 @@ export function registerRoutes(app: Express): Server {
           return res.json({ listings: [], message: "RentCast API key not configured" });
         }
 
-        resetMonthlyCounterIfNeeded();
-        if (monthlyCallCount >= MONTHLY_LIMIT) {
+        let verifiedCallCount = await getRentcastCallCount();
+        if (verifiedCallCount >= MONTHLY_LIMIT) {
           if (existingListings.rows.length > 0) {
             const listingsWithMarketing = await enrichListingsWithMarketing(existingListings.rows);
             return res.json({ listings: listingsWithMarketing, fromCache: true });
@@ -4326,7 +4358,8 @@ export function registerRoutes(app: Express): Server {
         const matchedListings: any[] = [];
 
         for (const city of searchCities) {
-          if (monthlyCallCount >= MONTHLY_LIMIT) break;
+          verifiedCallCount = await getRentcastCallCount();
+          if (verifiedCallCount >= MONTHLY_LIMIT) break;
 
           const params = new URLSearchParams();
           if (city) params.set("city", city);
@@ -4343,7 +4376,7 @@ export function registerRoutes(app: Express): Server {
           } else {
             try {
               const url = `https://api.rentcast.io/v1/listings/sale?${params.toString()}`;
-              console.log(`[VerifiedListings] RentCast API call #${monthlyCallCount + 1} for agent ${agentId}: ${url}`);
+              console.log(`[VerifiedListings] RentCast API call #${verifiedCallCount + 1} for agent ${agentId}: ${url}`);
               const response = await fetch(url, {
                 headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
               });
@@ -4352,7 +4385,7 @@ export function registerRoutes(app: Express): Server {
                 continue;
               }
               listings = await response.json();
-              monthlyCallCount++;
+              await incrementRentcastCallCount();
               rentcastCache.set(cacheKey, { data: listings, timestamp: Date.now() });
             } catch (e) {
               console.error("[VerifiedListings] RentCast fetch error:", e);
