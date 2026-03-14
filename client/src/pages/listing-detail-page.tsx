@@ -16,7 +16,8 @@ import {
   Home, Play, Box, FileText, ImagePlus, Trash2, Pencil, Flag, ChevronLeft,
   ChevronRight, Loader2, X, ExternalLink, User as UserIcon,
   AlertTriangle, GraduationCap, Droplets, Heart, Share2, Clock,
-  Calendar, Copy, Check, TrendingUp, TrendingDown, Minus
+  Calendar, Copy, Check, TrendingUp, TrendingDown, Minus,
+  GripVertical, Upload, Images
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MapContainer, TileLayer, Marker, useMap, Circle } from "react-leaflet";
@@ -408,6 +409,11 @@ export default function ListingDetailPage() {
   const [showShowing, setShowShowing] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [showPhotoManager, setShowPhotoManager] = useState(false);
+  const [dragOverPhoto, setDragOverPhoto] = useState(false);
+  const [draggedPhotoIdx, setDraggedPhotoIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const [editForm, setEditForm] = useState({
     youtubeUrl: "",
@@ -542,10 +548,11 @@ export default function ListingDetailPage() {
   });
 
   const uploadPhotoMut = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async (files: File[]) => {
+      setUploadProgress(`Uploading ${files.length} photo${files.length > 1 ? 's' : ''}...`);
       const fd = new FormData();
-      fd.append("photo", file);
-      const res = await fetch(`/api/verified-listings/${listingId}/photos`, {
+      for (const file of files) fd.append("photos", file);
+      const res = await fetch(`/api/verified-listings/${listingId}/photos/bulk`, {
         method: "POST", body: fd, credentials: "include"
       });
       if (!res.ok) {
@@ -554,12 +561,57 @@ export default function ListingDetailPage() {
       }
       return res.json();
     },
+    onSuccess: (data: any) => {
+      setUploadProgress(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/verified-listings", listingId] });
+      toast({ title: `${data.count || 1} photo${(data.count || 1) > 1 ? 's' : ''} added` });
+    },
+    onError: (e: Error) => {
+      setUploadProgress(null);
+      toast({ title: e.message, variant: "destructive" });
+    },
+  });
+
+  const reorderPhotosMut = useMutation({
+    mutationFn: async (photoIds: number[]) => {
+      const res = await apiRequest("PUT", `/api/verified-listings/${listingId}/photos/reorder`, { photoIds });
+      if (!res.ok) throw new Error("Reorder failed");
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/verified-listings", listingId] });
-      toast({ title: "Photo added" });
+      toast({ title: "Photo order updated" });
     },
-    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+    onError: () => toast({ title: "Failed to reorder", variant: "destructive" }),
   });
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverPhoto(false);
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
+    if (files.length > 0) uploadPhotoMut.mutate(files);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) uploadPhotoMut.mutate(files);
+    e.target.value = "";
+  };
+
+  const handlePhotoDragStart = (idx: number) => setDraggedPhotoIdx(idx);
+  const handlePhotoDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    setDragOverIdx(idx);
+  };
+  const handlePhotoDrop = (idx: number) => {
+    if (draggedPhotoIdx == null || draggedPhotoIdx === idx || !listing.marketingPhotos) return;
+    const photos = [...listing.marketingPhotos];
+    const [moved] = photos.splice(draggedPhotoIdx, 1);
+    photos.splice(idx, 0, moved);
+    reorderPhotosMut.mutate(photos.map(p => p.id));
+    setDraggedPhotoIdx(null);
+    setDragOverIdx(null);
+  };
 
   const deletePhotoMut = useMutation({
     mutationFn: async (photoId: number) => {
@@ -656,7 +708,20 @@ export default function ListingDetailPage() {
 
       <div className="max-w-4xl mx-auto pb-20">
         {allPhotos.length > 0 ? (
-          <div className="relative bg-black">
+          <div
+            className={`relative bg-black ${isOwner && dragOverPhoto ? 'ring-4 ring-emerald-500 ring-inset' : ''}`}
+            onDragOver={isOwner ? (e) => { e.preventDefault(); setDragOverPhoto(true); } : undefined}
+            onDragLeave={isOwner ? () => setDragOverPhoto(false) : undefined}
+            onDrop={isOwner ? handleFileDrop : undefined}
+          >
+            {dragOverPhoto && (
+              <div className="absolute inset-0 z-10 bg-emerald-500/30 flex items-center justify-center pointer-events-none">
+                <div className="bg-white dark:bg-gray-900 rounded-lg px-6 py-4 flex items-center gap-3 shadow-xl">
+                  <Upload className="h-6 w-6 text-emerald-600" />
+                  <span className="font-medium text-emerald-700 dark:text-emerald-400">Drop photos here</span>
+                </div>
+              </div>
+            )}
             <img
               src={allPhotos[currentPhotoIndex]}
               alt={listing.address}
@@ -682,32 +747,73 @@ export default function ListingDetailPage() {
               </>
             )}
 
+            {uploadProgress && (
+              <div className="absolute bottom-12 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-xs px-4 py-2 rounded-full flex items-center gap-2 shadow-lg">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {uploadProgress}
+              </div>
+            )}
+
             {isOwner && (
               <div className="absolute top-3 right-3 flex gap-2">
                 <button
                   className="bg-white/90 rounded-full p-2 hover:bg-white transition-colors"
                   onClick={() => photoRef.current?.click()}
+                  title="Add photos"
                 >
                   <ImagePlus className="h-4 w-4 text-black" />
                 </button>
                 {listing.marketingPhotos?.length > 0 && (
-                  <button
-                    className="bg-red-500/90 rounded-full p-2 hover:bg-red-600 transition-colors"
-                    onClick={() => deletePhotoMut.mutate(listing.marketingPhotos[currentPhotoIndex]?.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-white" />
-                  </button>
+                  <>
+                    <button
+                      className="bg-white/90 rounded-full p-2 hover:bg-white transition-colors"
+                      onClick={() => setShowPhotoManager(true)}
+                      title="Manage photos"
+                    >
+                      <Images className="h-4 w-4 text-black" />
+                    </button>
+                    <button
+                      className="bg-red-500/90 rounded-full p-2 hover:bg-red-600 transition-colors"
+                      onClick={() => deletePhotoMut.mutate(listing.marketingPhotos[currentPhotoIndex]?.id)}
+                      title="Delete this photo"
+                    >
+                      <Trash2 className="h-4 w-4 text-white" />
+                    </button>
+                  </>
                 )}
               </div>
             )}
           </div>
         ) : (
-          <div className="h-48 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900 flex flex-col items-center justify-center gap-2">
-            <Home className="h-12 w-12 text-emerald-300 dark:text-emerald-700" />
-            {isOwner && (
-              <Button variant="outline" size="sm" onClick={() => photoRef.current?.click()}>
-                <ImagePlus className="h-3.5 w-3.5 mr-1.5" /> Add Photos
-              </Button>
+          <div
+            className={`h-48 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900 flex flex-col items-center justify-center gap-2 ${isOwner && dragOverPhoto ? 'ring-4 ring-emerald-500 ring-inset' : ''}`}
+            onDragOver={isOwner ? (e) => { e.preventDefault(); setDragOverPhoto(true); } : undefined}
+            onDragLeave={isOwner ? () => setDragOverPhoto(false) : undefined}
+            onDrop={isOwner ? handleFileDrop : undefined}
+          >
+            {dragOverPhoto ? (
+              <div className="flex items-center gap-3">
+                <Upload className="h-8 w-8 text-emerald-500" />
+                <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Drop photos here</span>
+              </div>
+            ) : (
+              <>
+                <Home className="h-12 w-12 text-emerald-300 dark:text-emerald-700" />
+                {isOwner && (
+                  <div className="flex flex-col items-center gap-1.5">
+                    <Button variant="outline" size="sm" onClick={() => photoRef.current?.click()}>
+                      <ImagePlus className="h-3.5 w-3.5 mr-1.5" /> Add Photos
+                    </Button>
+                    <p className="text-[10px] text-muted-foreground">or drag & drop images here</p>
+                  </div>
+                )}
+              </>
+            )}
+            {uploadProgress && (
+              <div className="flex items-center gap-2 text-emerald-600 text-xs mt-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {uploadProgress}
+              </div>
             )}
           </div>
         )}
@@ -1067,12 +1173,9 @@ export default function ListingDetailPage() {
         ref={photoRef}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
-        onChange={e => {
-          const file = e.target.files?.[0];
-          if (file) uploadPhotoMut.mutate(file);
-          e.target.value = "";
-        }}
+        onChange={handleFileSelect}
       />
 
       <Dialog open={showEditMarketing} onOpenChange={setShowEditMarketing}>
@@ -1163,6 +1266,84 @@ export default function ListingDetailPage() {
               title="Floor Plan"
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPhotoManager} onOpenChange={setShowPhotoManager}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Images className="h-5 w-5 text-emerald-500" />
+              Manage Photos ({listing.marketingPhotos?.length || 0})
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-2">Drag photos to reorder. The first photo is the cover image.</p>
+
+          <div
+            className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${dragOverPhoto ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950' : 'border-muted-foreground/25 hover:border-muted-foreground/50'}`}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverPhoto(true); }}
+            onDragLeave={(e) => { e.stopPropagation(); setDragOverPhoto(false); }}
+            onDrop={(e) => { e.stopPropagation(); handleFileDrop(e); }}
+          >
+            <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
+            <p className="text-xs text-muted-foreground">Drag & drop images here or</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => photoRef.current?.click()}>
+              <ImagePlus className="h-3.5 w-3.5 mr-1.5" /> Choose Files
+            </Button>
+            {uploadProgress && (
+              <div className="flex items-center justify-center gap-2 mt-2 text-emerald-600 text-xs">
+                <Loader2 className="h-3 w-3 animate-spin" /> {uploadProgress}
+              </div>
+            )}
+          </div>
+
+          {listing.marketingPhotos && listing.marketingPhotos.length > 0 && (
+            <div className="space-y-1">
+              {listing.marketingPhotos.map((photo: any, idx: number) => (
+                <div
+                  key={photo.id}
+                  draggable
+                  onDragStart={() => handlePhotoDragStart(idx)}
+                  onDragOver={(e) => handlePhotoDragOver(e, idx)}
+                  onDrop={() => handlePhotoDrop(idx)}
+                  onDragEnd={() => { setDraggedPhotoIdx(null); setDragOverIdx(null); }}
+                  className={`flex items-center gap-3 p-2 rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
+                    draggedPhotoIdx === idx ? 'opacity-40 scale-95' : ''
+                  } ${dragOverIdx === idx && draggedPhotoIdx !== idx ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950' : 'border-border hover:bg-muted/50'}`}
+                >
+                  <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <img
+                    src={photo.photo_url}
+                    alt={`Photo ${idx + 1}`}
+                    className="h-14 w-20 object-cover rounded flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium">
+                      {idx === 0 ? (
+                        <Badge variant="default" className="text-[10px] bg-emerald-600">Cover Photo</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">Photo {idx + 1}</span>
+                      )}
+                    </p>
+                    {photo.caption && <p className="text-[10px] text-muted-foreground truncate">{photo.caption}</p>}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-red-500 flex-shrink-0"
+                    onClick={() => deletePhotoMut.mutate(photo.id)}
+                    disabled={deletePhotoMut.isPending}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPhotoManager(false)}>Done</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

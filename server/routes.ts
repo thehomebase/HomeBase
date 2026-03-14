@@ -4577,6 +4577,63 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/verified-listings/:id/photos/bulk", upload.array("photos", 20), async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const role = req.user.role;
+    if (role !== "agent" && role !== "broker") return res.status(403).json({ error: "Only agents/brokers can upload photos" });
+    const listingId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(listingId) || listingId <= 0) return res.status(400).json({ error: "Invalid listing ID" });
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) return res.status(400).json({ error: "No files uploaded" });
+    try {
+      const listing = await db.execute(sql`SELECT agent_id FROM verified_listings WHERE id = ${listingId}`);
+      if (listing.rows.length === 0) return res.status(404).json({ error: "Listing not found" });
+      if (listing.rows[0].agent_id !== req.user.id) return res.status(403).json({ error: "Not your listing" });
+
+      const maxOrder = await db.execute(sql`SELECT COALESCE(MAX(sort_order), -1) as max_order FROM listing_marketing_photos WHERE verified_listing_id = ${listingId}`);
+      let nextOrder = (maxOrder.rows[0]?.max_order ?? -1) + 1;
+
+      const inserted = [];
+      for (const file of files) {
+        const base64 = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+        const result = await db.execute(sql`
+          INSERT INTO listing_marketing_photos (verified_listing_id, agent_id, photo_url, sort_order)
+          VALUES (${listingId}, ${req.user.id}, ${base64}, ${nextOrder++})
+          RETURNING id, photo_url, sort_order
+        `);
+        inserted.push(result.rows[0]);
+      }
+      res.json({ success: true, photos: inserted, count: inserted.length });
+    } catch (error) {
+      console.error("Bulk photo upload error:", error);
+      res.status(500).json({ error: "Failed to upload photos" });
+    }
+  });
+
+  app.put("/api/verified-listings/:id/photos/reorder", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const listingId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(listingId) || listingId <= 0) return res.status(400).json({ error: "Invalid listing ID" });
+    const schema = z.object({ photoIds: z.array(z.number().int().positive()) });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid photo order data" });
+    try {
+      const listing = await db.execute(sql`SELECT agent_id FROM verified_listings WHERE id = ${listingId}`);
+      if (listing.rows.length === 0) return res.status(404).json({ error: "Listing not found" });
+      if (listing.rows[0].agent_id !== req.user.id) return res.status(403).json({ error: "Not your listing" });
+
+      for (let i = 0; i < parsed.data.photoIds.length; i++) {
+        await db.execute(sql`
+          UPDATE listing_marketing_photos SET sort_order = ${i}
+          WHERE id = ${parsed.data.photoIds[i]} AND verified_listing_id = ${listingId}
+        `);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to reorder photos" });
+    }
+  });
+
   app.post("/api/verified-listings/:id/report", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
     const listingId = parseInt(req.params.id, 10);
