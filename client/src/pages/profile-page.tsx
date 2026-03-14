@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Camera, Shield, ShieldCheck, CheckCircle2, MapPin, Phone, Mail, Pencil,
   Building2, FileText, User as UserIcon, Star, ChevronLeft, ChevronRight,
-  Home, Plus, Trash2, ImagePlus, X, Eraser, CreditCard, ExternalLink, Loader2
+  Home, X, Eraser, CreditCard, ExternalLink, Loader2
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiLinkedin } from "react-icons/si";
 import { PhotoTouchup } from "@/components/photo-touchup";
@@ -24,18 +24,28 @@ import type { User } from "@shared/schema";
 
 type PublicProfile = Omit<User, "password" | "emailVerificationToken" | "emailVerificationExpires" | "registrationIp">;
 
-type ListingPhoto = { id: number; photoUrl: string; caption: string | null; sortOrder: number };
-type ActiveListing = {
+type VerifiedListingData = {
   id: number;
-  street_name: string;
+  agent_id: number;
+  mls_number: string | null;
+  address: string;
   city: string | null;
   state: string | null;
   zip_code: string | null;
-  status: string;
-  type: string;
-  contract_price: number | null;
-  mls_number: string | null;
-  photos: ListingPhoto[];
+  price: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  square_feet: number | null;
+  property_type: string | null;
+  listing_agent_name: string | null;
+  photo_url: string | null;
+  listing_status: string | null;
+  marketing: {
+    youtube_url: string | null;
+    matterport_url: string | null;
+    description: string | null;
+  } | null;
+  marketingPhotos: Array<{ id: number; photo_url: string; caption: string | null; sort_order: number }>;
 };
 
 type ProfileReviewData = {
@@ -460,51 +470,22 @@ function ReviewsSection({ profileId, profileName }: { profileId: number; profile
   );
 }
 
-function ListingsSection({ profileId, profileName, isOwn }: { profileId: number; profileName: string; isOwn: boolean }) {
-  const { toast } = useToast();
-  const photoRef = useRef<HTMLInputElement>(null);
-  const [uploadingFor, setUploadingFor] = useState<number | null>(null);
-
-  const { data: listings, isLoading } = useQuery<ActiveListing[]>({
-    queryKey: ["/api/profile", profileId, "listings"],
+function VerifiedListingsSection({ profileId, profileName, isOwn }: { profileId: number; profileName: string; isOwn: boolean }) {
+  const { data, isLoading } = useQuery<{ listings: VerifiedListingData[]; fromCache?: boolean; message?: string }>({
+    queryKey: ["/api/profile", profileId, "verified-listings"],
     queryFn: async () => {
-      const res = await fetch(`/api/profile/${profileId}/listings`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch listings");
+      const res = await fetch(`/api/profile/${profileId}/verified-listings`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch verified listings");
       return res.json();
     },
   });
 
-  const deleteMut = useMutation({
-    mutationFn: (photoId: number) => apiRequest("DELETE", `/api/listing-photos/${photoId}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/profile", profileId, "listings"] });
-      toast({ title: "Photo removed" });
-    },
-    onError: () => toast({ title: "Failed to remove photo", variant: "destructive" }),
-  });
-
-  async function handlePhotoUpload(transactionId: number, file: File) {
-    setUploadingFor(transactionId);
-    try {
-      const fd = new FormData();
-      fd.append("photo", file);
-      const res = await fetch(`/api/listing-photos/${transactionId}`, { method: "POST", body: fd, credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Upload failed" }));
-        throw new Error(err.error);
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/profile", profileId, "listings"] });
-      toast({ title: "Listing photo added" });
-    } catch (e: any) {
-      toast({ title: e.message || "Failed to upload photo", variant: "destructive" });
-    }
-    setUploadingFor(null);
-  }
+  const listings = data?.listings || [];
 
   if (isLoading) {
     return (
       <div className="space-y-3">
-        <h2 className="text-lg font-bold">{profileName} Listings</h2>
+        <h2 className="text-lg font-bold">Active Listings</h2>
         <div className="flex gap-3 overflow-x-auto pb-2">
           {[1, 2, 3].map(i => <div key={i} className="h-48 w-40 rounded-xl bg-muted animate-pulse flex-shrink-0" />)}
         </div>
@@ -512,16 +493,16 @@ function ListingsSection({ profileId, profileName, isOwn }: { profileId: number;
     );
   }
 
-  if (!listings || listings.length === 0) {
+  if (listings.length === 0) {
     if (!isOwn) return null;
     return (
       <div className="space-y-3">
-        <h2 className="text-lg font-bold">My Listings</h2>
+        <h2 className="text-lg font-bold">Active Listings</h2>
         <Card>
           <CardContent className="py-8 text-center">
             <Home className="h-10 w-10 mx-auto mb-3 opacity-20" />
             <p className="text-sm text-muted-foreground">
-              No active listings yet. Your transactions with addresses will appear here.
+              {data?.message || "No active MLS listings found. Listings are auto-discovered from MLS data once your identity is verified."}
             </p>
           </CardContent>
         </Card>
@@ -533,102 +514,82 @@ function ListingsSection({ profileId, profileName, isOwn }: { profileId: number;
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold">{profileName} Listings</h2>
-        <Badge variant="outline" className="text-xs">{listings.length} active</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs gap-1">
+            <ShieldCheck className="h-3 w-3 text-emerald-500" />
+            MLS Verified
+          </Badge>
+          <Badge variant="outline" className="text-xs">{listings.length} active</Badge>
+        </div>
       </div>
 
       <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide" style={{ WebkitOverflowScrolling: "touch" }}>
-        {listings.map((listing) => (
-          <div key={listing.id} className="min-w-[160px] max-w-[180px] flex-shrink-0 snap-start">
-            <div className="relative rounded-xl overflow-hidden bg-muted aspect-[4/5] group">
-              {listing.photos && listing.photos.length > 0 ? (
-                <img
-                  src={listing.photos[0].photoUrl}
-                  alt={listing.street_name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900">
-                  <Home className="h-10 w-10 text-emerald-300 dark:text-emerald-700" />
-                </div>
-              )}
+        {listings.map((listing) => {
+          const displayPhoto = listing.marketingPhotos?.[0]?.photo_url || listing.photo_url;
+          const hasMarketing = listing.marketing?.youtube_url || listing.marketing?.matterport_url || listing.marketing?.description;
 
-              <div className="absolute top-2 left-2">
-                <Badge className="text-[9px] px-1.5 py-0 bg-black/60 text-white border-0 capitalize">
-                  {listing.type === "sell" ? "Listing" : listing.type === "buy" ? "Buyer" : listing.type}
-                </Badge>
+          return (
+            <Link key={listing.id} href={`/listing/${listing.id}`}>
+              <div className="min-w-[160px] max-w-[180px] flex-shrink-0 snap-start cursor-pointer">
+                <div className="relative rounded-xl overflow-hidden bg-muted aspect-[4/5] group">
+                  {displayPhoto ? (
+                    <img
+                      src={displayPhoto}
+                      alt={listing.address}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900">
+                      <Home className="h-10 w-10 text-emerald-300 dark:text-emerald-700" />
+                    </div>
+                  )}
+
+                  <div className="absolute top-2 left-2 flex gap-1">
+                    <Badge className="text-[9px] px-1.5 py-0 bg-emerald-600 text-white border-0">
+                      <ShieldCheck className="h-2.5 w-2.5 mr-0.5" />
+                      Verified
+                    </Badge>
+                  </div>
+
+                  {listing.marketingPhotos && listing.marketingPhotos.length > 1 && (
+                    <div className="absolute top-2 right-2">
+                      <Badge className="text-[9px] px-1.5 py-0 bg-primary text-primary-foreground border-0">
+                        {listing.marketingPhotos.length}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {hasMarketing && (
+                    <div className="absolute top-8 left-2">
+                      <Badge className="text-[9px] px-1.5 py-0 bg-blue-600 text-white border-0">
+                        Tour
+                      </Badge>
+                    </div>
+                  )}
+
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent pt-8 pb-2 px-2">
+                    <p className="text-white text-xs font-medium truncate">{listing.address}</p>
+                    {listing.city && (
+                      <p className="text-white/70 text-[10px] truncate">{listing.city}, {listing.state}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-1.5 px-0.5">
+                  {listing.price && (
+                    <p className="text-xs font-semibold">${listing.price.toLocaleString()}</p>
+                  )}
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    {listing.bedrooms && <span>{listing.bedrooms} bd</span>}
+                    {listing.bathrooms && <span>· {listing.bathrooms} ba</span>}
+                    {listing.square_feet && <span>· {listing.square_feet.toLocaleString()} sqft</span>}
+                  </div>
+                </div>
               </div>
-
-              {listing.photos && listing.photos.length > 1 && (
-                <div className="absolute top-2 right-2">
-                  <Badge className="text-[9px] px-1.5 py-0 bg-primary text-primary-foreground border-0">
-                    {listing.photos.length}
-                  </Badge>
-                </div>
-              )}
-
-              {isOwn && (
-                <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                  <button
-                    className="bg-white/90 dark:bg-black/70 rounded-full p-1.5 hover:bg-white transition-colors"
-                    onClick={() => {
-                      setUploadingFor(listing.id);
-                      photoRef.current?.click();
-                    }}
-                  >
-                    <ImagePlus className="h-3.5 w-3.5 text-foreground" />
-                  </button>
-                </div>
-              )}
-
-              {isOwn && listing.photos && listing.photos.length > 0 && (
-                <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    className="bg-red-500/90 rounded-full p-1.5 hover:bg-red-600 transition-colors"
-                    onClick={() => deleteMut.mutate(listing.photos[0].id)}
-                  >
-                    <Trash2 className="h-3 w-3 text-white" />
-                  </button>
-                </div>
-              )}
-
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent pt-8 pb-2 px-2">
-                <p className="text-white text-xs font-medium truncate">{listing.street_name}</p>
-                {listing.city && (
-                  <p className="text-white/70 text-[10px] truncate">{listing.city}, {listing.state}</p>
-                )}
-              </div>
-            </div>
-
-            {listing.contract_price && (
-              <p className="text-xs font-semibold mt-1.5 px-0.5">
-                ${listing.contract_price.toLocaleString()}
-              </p>
-            )}
-          </div>
-        ))}
-
-        {isOwn && (
-          <div className="min-w-[60px] flex-shrink-0 snap-start flex items-center justify-center">
-            <Link href="/transactions">
-              <button className="h-10 w-10 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center hover:border-primary hover:text-primary transition-colors">
-                <Plus className="h-5 w-5" />
-              </button>
             </Link>
-          </div>
-        )}
+          );
+        })}
       </div>
-
-      <input
-        ref={photoRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={e => {
-          const file = e.target.files?.[0];
-          if (file && uploadingFor) handlePhotoUpload(uploadingFor, file);
-          e.target.value = "";
-        }}
-      />
     </div>
   );
 }
@@ -856,7 +817,7 @@ export default function ProfilePage() {
       {isAgentOrBroker && (
         <div className="space-y-8">
           <ReviewsSection profileId={profile.id} profileName={profileName} />
-          <ListingsSection profileId={profile.id} profileName={profileName} isOwn={isOwn} />
+          <VerifiedListingsSection profileId={profile.id} profileName={profileName} isOwn={isOwn} />
         </div>
       )}
 

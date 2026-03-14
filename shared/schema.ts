@@ -1435,3 +1435,64 @@ export const listingAlertResults = pgTable("listing_alert_results", {
 });
 
 export type ListingAlertResult = typeof listingAlertResults.$inferSelect;
+
+export const verifiedListings = pgTable("verified_listings", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  mlsNumber: text("mls_number"),
+  address: text("address").notNull(),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  price: integer("price"),
+  bedrooms: integer("bedrooms"),
+  bathrooms: real("bathrooms"),
+  squareFeet: integer("square_feet"),
+  propertyType: text("property_type"),
+  listingAgentName: text("listing_agent_name"),
+  listingAgentPhone: text("listing_agent_phone"),
+  listingAgentEmail: text("listing_agent_email"),
+  photoUrl: text("photo_url"),
+  listingStatus: text("listing_status"),
+  rentcastData: json("rentcast_data"),
+  lastVerifiedAt: timestamp("last_verified_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type VerifiedListing = typeof verifiedListings.$inferSelect;
+
+export const listingMarketing = pgTable("listing_marketing", {
+  id: serial("id").primaryKey(),
+  verifiedListingId: integer("verified_listing_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  youtubeUrl: text("youtube_url"),
+  matterportUrl: text("matterport_url"),
+  description: text("description"),
+  floorplanPdf: text("floorplan_pdf"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ListingMarketing = typeof listingMarketing.$inferSelect;
+
+export const listingMarketingPhotos = pgTable("listing_marketing_photos", {
+  id: serial("id").primaryKey(),
+  verifiedListingId: integer("verified_listing_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  photoUrl: text("photo_url").notNull(),
+  caption: text("caption"),
+  sortOrder: integer("sort_order").default(0),
+});
+
+export type ListingMarketingPhoto = typeof listingMarketingPhotos.$inferSelect;
+
+export const listingReports = pgTable("listing_reports", {
+  id: serial("id").primaryKey(),
+  verifiedListingId: integer("verified_listing_id").notNull(),
+  reportedBy: integer("reported_by").notNull(),
+  reason: text("reason").notNull(),
+  status: text("status", { enum: ['pending', 'reviewed', 'dismissed'] }).default('pending'),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ListingReport = typeof listingReports.$inferSelect;

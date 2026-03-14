@@ -44,7 +44,8 @@ Preferred communication style: Simple, everyday language.
 - **Billing**: Stripe integration for subscriptions.
 - **Notifications**: Real-time SMS and Web Push for new leads, WebSocket-based in-app notifications (bell, unread count, toasts, activity feed).
 - **Agent/Broker Verification**: Multi-level verification process (license, Stripe name cross-check, manual broker/admin verification) with feature gating and verification history.
-- **Profile Pages**: Customizable agent/broker profiles with confirmed information, bio, contact details, social media, reviews, and active listings with photo management.
+- **Profile Pages**: Customizable agent/broker profiles with confirmed information, bio, contact details, social media, reviews, and MLS-verified active listings auto-discovered from RentCast.
+- **Verified Listings**: Auto-discovered from RentCast API by fuzzy-matching the listing agent name against the verified agent's name. Listings refresh when a user visits the profile (24hr cache). Each verified listing has its own detail page (`/listing/:id`) with marketing material support: YouTube video tours, Matterport 3D tours, PDF floorplans, agent-uploaded photos, and custom descriptions. Report button for flagging inappropriate listings. DB tables: `verified_listings`, `listing_marketing`, `listing_marketing_photos`, `listing_reports`. Documents table has `manually_moved` flag to prevent DocuSign sync from overriding manual drag-and-drop status changes.
 
 ## External Dependencies
 

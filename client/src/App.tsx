@@ -80,6 +80,7 @@ import ClientPage from "@/pages/client-page";
 import MapPage from "@/pages/map-page";
 import PropertySearchPage from "@/pages/property-search-page";
 import ListingAlertsPage from "@/pages/listing-alerts-page";
+import ListingDetailPage from "@/pages/listing-detail-page";
 import MailPage from "@/pages/mail-page";
 import PhonePage from "@/pages/phone-page";
 import DocumentScannerPage from "@/pages/document-scanner-page";
@@ -634,6 +635,9 @@ function Router() {
       </Route>
       <Route path="/calculators">
         <ProtectedRoute path="/calculators" component={CalculatorsPage} />
+      </Route>
+      <Route path="/listing/:id">
+        <ProtectedRoute path="/listing/:id" component={ListingDetailPage} />
       </Route>
       <Route path="/profile/:id">
         <ProtectedRoute path="/profile/:id" component={ProfilePage} />

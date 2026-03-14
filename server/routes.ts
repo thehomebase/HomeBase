@@ -4237,6 +4237,373 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // ============ Verified Listings (Auto-Discovered) ============
+
+  app.get("/api/profile/:id/verified-listings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const agentId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(agentId) || agentId <= 0) return res.status(400).json({ error: "Invalid ID" });
+
+    try {
+      const agent = await storage.getUser(agentId);
+      if (!agent) return res.status(404).json({ error: "Agent not found" });
+      if (agent.role !== "agent" && agent.role !== "broker") {
+        return res.json({ listings: [], message: "Only agents/brokers have verified listings" });
+      }
+      if (agent.verificationStatus === "unverified") {
+        return res.json({ listings: [], message: "Agent is not verified" });
+      }
+
+      const agentFullName = `${agent.firstName || ''} ${agent.lastName || ''}`.trim();
+      if (!agentFullName) {
+        return res.json({ listings: [], message: "Agent name not available" });
+      }
+
+      const existingListings = await db.execute(sql`
+        SELECT * FROM verified_listings WHERE agent_id = ${agentId} ORDER BY created_at DESC
+      `);
+
+      const STALE_HOURS = 24;
+      let needsRefresh = existingListings.rows.length === 0;
+      if (!needsRefresh && existingListings.rows.length > 0) {
+        const lastVerified = existingListings.rows[0].last_verified_at;
+        if (lastVerified) {
+          const hoursSinceVerified = (Date.now() - new Date(lastVerified as string).getTime()) / (1000 * 60 * 60);
+          needsRefresh = hoursSinceVerified >= STALE_HOURS;
+        }
+      }
+
+      if (needsRefresh) {
+        const apiKey = process.env.RENTCAST_API_KEY;
+        if (!apiKey) {
+          if (existingListings.rows.length > 0) {
+            const listingsWithMarketing = await enrichListingsWithMarketing(existingListings.rows);
+            return res.json({ listings: listingsWithMarketing, fromCache: true });
+          }
+          return res.json({ listings: [], message: "RentCast API key not configured" });
+        }
+
+        resetMonthlyCounterIfNeeded();
+        if (monthlyCallCount >= MONTHLY_LIMIT) {
+          if (existingListings.rows.length > 0) {
+            const listingsWithMarketing = await enrichListingsWithMarketing(existingListings.rows);
+            return res.json({ listings: listingsWithMarketing, fromCache: true });
+          }
+          return res.json({ listings: [], message: "Monthly API limit reached" });
+        }
+
+        const searchCities: string[] = [];
+        const txnCities = await db.execute(sql`
+          SELECT DISTINCT city FROM transactions 
+          WHERE agent_id = ${agentId} AND city IS NOT NULL AND city != '' 
+          LIMIT 3
+        `);
+        for (const row of txnCities.rows) {
+          if (row.city) searchCities.push(String(row.city));
+        }
+
+        if (searchCities.length === 0 && agent.licenseState) {
+          searchCities.push('');
+        }
+
+        const { fuzzyNameMatch } = await import("./license-verification");
+        const matchedListings: any[] = [];
+
+        for (const city of searchCities) {
+          if (monthlyCallCount >= MONTHLY_LIMIT) break;
+
+          const params = new URLSearchParams();
+          if (city) params.set("city", city);
+          if (agent.licenseState) params.set("state", agent.licenseState);
+          params.set("status", "Active");
+          params.set("limit", "500");
+
+          const cacheKey = `verified-agent-${agentId}-${params.toString()}`;
+          const cached = rentcastCache.get(cacheKey);
+          let listings: any[];
+
+          if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+            listings = cached.data;
+          } else {
+            try {
+              const url = `https://api.rentcast.io/v1/listings/sale?${params.toString()}`;
+              console.log(`[VerifiedListings] RentCast API call #${monthlyCallCount + 1} for agent ${agentId}: ${url}`);
+              const response = await fetch(url, {
+                headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
+              });
+              if (!response.ok) {
+                console.error(`[VerifiedListings] RentCast error: ${response.status}`);
+                continue;
+              }
+              listings = await response.json();
+              monthlyCallCount++;
+              rentcastCache.set(cacheKey, { data: listings, timestamp: Date.now() });
+            } catch (e) {
+              console.error("[VerifiedListings] RentCast fetch error:", e);
+              continue;
+            }
+          }
+
+          if (!Array.isArray(listings)) continue;
+
+          for (const listing of listings) {
+            const listingAgentName = listing.listingAgent?.name || listing.listedByAgentName || '';
+            if (!listingAgentName) continue;
+
+            const match = fuzzyNameMatch(agentFullName, listingAgentName);
+            if (match.score >= 0.7) {
+              matchedListings.push(listing);
+            }
+          }
+        }
+
+        await db.execute(sql`
+          UPDATE verified_listings SET last_verified_at = NOW() WHERE agent_id = ${agentId}
+        `);
+
+        for (const listing of matchedListings) {
+          const addr = listing.formattedAddress || listing.addressLine1 || '';
+          const mlsNum = listing.mlsNumber || listing.id || '';
+
+          const existing = await db.execute(sql`
+            SELECT id FROM verified_listings 
+            WHERE agent_id = ${agentId} AND (mls_number = ${mlsNum} OR address = ${addr})
+            LIMIT 1
+          `);
+
+          if (existing.rows.length > 0) {
+            await db.execute(sql`
+              UPDATE verified_listings SET
+                price = ${listing.price || null},
+                listing_status = ${listing.status || 'Active'},
+                rentcast_data = ${JSON.stringify(listing)}::json,
+                last_verified_at = NOW()
+              WHERE id = ${existing.rows[0].id}
+            `);
+          } else {
+            await db.execute(sql`
+              INSERT INTO verified_listings (agent_id, mls_number, address, city, state, zip_code, price, bedrooms, bathrooms, square_feet, property_type, listing_agent_name, listing_agent_phone, listing_agent_email, photo_url, listing_status, rentcast_data, last_verified_at)
+              VALUES (${agentId}, ${mlsNum}, ${addr}, ${listing.city || null}, ${listing.state || null}, ${listing.zipCode || null}, ${listing.price || null}, ${listing.bedrooms || null}, ${listing.bathrooms || null}, ${listing.squareFootage || null}, ${listing.propertyType || null}, ${listing.listingAgent?.name || null}, ${listing.listingAgent?.phone || null}, ${listing.listingAgent?.email || null}, ${listing.photos?.[0] || null}, ${listing.status || 'Active'}, ${JSON.stringify(listing)}::json, NOW())
+            `);
+          }
+        }
+
+        if (matchedListings.length > 0) {
+          const mlsIds = matchedListings.map(l => l.mlsNumber || l.id || '');
+          const removed = await db.execute(sql`
+            DELETE FROM verified_listings 
+            WHERE agent_id = ${agentId} 
+              AND mls_number IS NOT NULL 
+              AND mls_number NOT IN (${sql.join(mlsIds.map(id => sql`${id}`), sql`,`)})
+              AND last_verified_at < NOW() - INTERVAL '48 hours'
+            RETURNING id
+          `);
+          if (removed.rows.length > 0) {
+            console.log(`[VerifiedListings] Removed ${removed.rows.length} stale listings for agent ${agentId}`);
+          }
+        }
+      }
+
+      const finalListings = await db.execute(sql`
+        SELECT * FROM verified_listings WHERE agent_id = ${agentId} ORDER BY created_at DESC
+      `);
+
+      const listingsWithMarketing = await enrichListingsWithMarketing(finalListings.rows);
+      res.json({ listings: listingsWithMarketing, fromCache: !needsRefresh });
+
+    } catch (error) {
+      console.error("Error fetching verified listings:", error);
+      res.status(500).json({ error: "Failed to fetch verified listings" });
+    }
+  });
+
+  async function enrichListingsWithMarketing(listings: any[]) {
+    const result = [];
+    for (const listing of listings) {
+      const marketing = await db.execute(sql`
+        SELECT * FROM listing_marketing WHERE verified_listing_id = ${listing.id} LIMIT 1
+      `);
+      const photos = await db.execute(sql`
+        SELECT * FROM listing_marketing_photos WHERE verified_listing_id = ${listing.id} ORDER BY sort_order
+      `);
+      result.push({
+        ...listing,
+        marketing: marketing.rows[0] || null,
+        marketingPhotos: photos.rows || [],
+      });
+    }
+    return result;
+  }
+
+  app.get("/api/verified-listings/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "Invalid ID" });
+    try {
+      const listing = await db.execute(sql`SELECT * FROM verified_listings WHERE id = ${id}`);
+      if (listing.rows.length === 0) return res.status(404).json({ error: "Listing not found" });
+
+      const marketing = await db.execute(sql`
+        SELECT * FROM listing_marketing WHERE verified_listing_id = ${id} LIMIT 1
+      `);
+      const photos = await db.execute(sql`
+        SELECT * FROM listing_marketing_photos WHERE verified_listing_id = ${id} ORDER BY sort_order
+      `);
+      const agent = await storage.getUser(listing.rows[0].agent_id as number);
+
+      res.json({
+        ...listing.rows[0],
+        marketing: marketing.rows[0] || null,
+        marketingPhotos: photos.rows || [],
+        agent: agent ? {
+          id: agent.id,
+          firstName: agent.firstName,
+          lastName: agent.lastName,
+          profilePhotoUrl: agent.profilePhotoUrl,
+          profilePhone: agent.profilePhone,
+          email: agent.email,
+          brokerageName: agent.brokerageName,
+          verificationStatus: agent.verificationStatus,
+        } : null,
+      });
+    } catch (error) {
+      console.error("Error fetching verified listing:", error);
+      res.status(500).json({ error: "Failed to fetch listing" });
+    }
+  });
+
+  app.put("/api/verified-listings/:id/marketing", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.status(403).json({ error: "Agents/brokers only" });
+    const listingId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(listingId) || listingId <= 0) return res.status(400).json({ error: "Invalid ID" });
+
+    const schema = z.object({
+      youtubeUrl: z.string().max(500).nullable().optional(),
+      matterportUrl: z.string().max(500).nullable().optional(),
+      description: z.string().max(5000).nullable().optional(),
+      floorplanPdf: z.string().nullable().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid data", details: parsed.error.issues });
+
+    try {
+      const listing = await db.execute(sql`SELECT agent_id FROM verified_listings WHERE id = ${listingId}`);
+      if (listing.rows.length === 0) return res.status(404).json({ error: "Listing not found" });
+      if (listing.rows[0].agent_id !== req.user.id) return res.status(403).json({ error: "Not your listing" });
+
+      if (parsed.data.floorplanPdf) {
+        const pdfSize = Buffer.byteLength(parsed.data.floorplanPdf, 'utf8');
+        if (pdfSize > 7 * 1024 * 1024) {
+          return res.status(400).json({ error: "Floorplan PDF too large. Maximum 5MB." });
+        }
+      }
+
+      const existing = await db.execute(sql`
+        SELECT id FROM listing_marketing WHERE verified_listing_id = ${listingId} LIMIT 1
+      `);
+
+      if (existing.rows.length > 0) {
+        await db.execute(sql`
+          UPDATE listing_marketing SET
+            youtube_url = COALESCE(${parsed.data.youtubeUrl ?? null}, youtube_url),
+            matterport_url = COALESCE(${parsed.data.matterportUrl ?? null}, matterport_url),
+            description = COALESCE(${parsed.data.description ?? null}, description),
+            floorplan_pdf = COALESCE(${parsed.data.floorplanPdf ?? null}, floorplan_pdf),
+            updated_at = NOW()
+          WHERE verified_listing_id = ${listingId}
+        `);
+      } else {
+        await db.execute(sql`
+          INSERT INTO listing_marketing (verified_listing_id, agent_id, youtube_url, matterport_url, description, floorplan_pdf)
+          VALUES (${listingId}, ${req.user.id}, ${parsed.data.youtubeUrl || null}, ${parsed.data.matterportUrl || null}, ${parsed.data.description || null}, ${parsed.data.floorplanPdf || null})
+        `);
+      }
+
+      const result = await db.execute(sql`SELECT * FROM listing_marketing WHERE verified_listing_id = ${listingId} LIMIT 1`);
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error updating listing marketing:", error);
+      res.status(500).json({ error: "Failed to update marketing materials" });
+    }
+  });
+
+  app.post("/api/verified-listings/:id/photos", upload.single("photo"), async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.status(403).json({ error: "Agents/brokers only" });
+    const listingId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(listingId) || listingId <= 0) return res.status(400).json({ error: "Invalid ID" });
+
+    try {
+      const listing = await db.execute(sql`SELECT agent_id FROM verified_listings WHERE id = ${listingId}`);
+      if (listing.rows.length === 0) return res.status(404).json({ error: "Listing not found" });
+      if (listing.rows[0].agent_id !== req.user.id) return res.status(403).json({ error: "Not your listing" });
+
+      if (!req.file) return res.status(400).json({ error: "No photo provided" });
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+      if (!allowedTypes.includes(req.file.mimetype)) return res.status(400).json({ error: "Invalid file type" });
+      if (req.file.size > 5 * 1024 * 1024) return res.status(400).json({ error: "Image too large. Maximum 5MB." });
+
+      const sharp = (await import("sharp")).default;
+      const processed = await sharp(req.file.buffer).resize(1200, 800, { fit: "cover" }).jpeg({ quality: 85 }).toBuffer();
+      const base64 = `data:image/jpeg;base64,${processed.toString("base64")}`;
+      const caption = typeof req.body.caption === "string" ? req.body.caption : null;
+
+      const result = await db.execute(sql`
+        INSERT INTO listing_marketing_photos (verified_listing_id, agent_id, photo_url, caption, sort_order)
+        VALUES (${listingId}, ${req.user.id}, ${base64}, ${caption},
+          COALESCE((SELECT MAX(sort_order) + 1 FROM listing_marketing_photos WHERE verified_listing_id = ${listingId}), 0))
+        RETURNING *
+      `);
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error uploading listing marketing photo:", error);
+      res.status(500).json({ error: "Failed to upload photo" });
+    }
+  });
+
+  app.delete("/api/verified-listings/photos/:photoId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const photoId = parseInt(req.params.photoId, 10);
+    if (!Number.isFinite(photoId) || photoId <= 0) return res.status(400).json({ error: "Invalid ID" });
+    try {
+      const result = await db.execute(sql`
+        DELETE FROM listing_marketing_photos WHERE id = ${photoId} AND agent_id = ${req.user.id} RETURNING id
+      `);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Photo not found or not yours" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete photo" });
+    }
+  });
+
+  app.post("/api/verified-listings/:id/report", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const listingId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(listingId) || listingId <= 0) return res.status(400).json({ error: "Invalid ID" });
+    const schema = z.object({ reason: z.string().min(5).max(500) });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Please provide a reason (5-500 characters)" });
+
+    try {
+      const listing = await db.execute(sql`SELECT id FROM verified_listings WHERE id = ${listingId}`);
+      if (listing.rows.length === 0) return res.status(404).json({ error: "Listing not found" });
+
+      const existingReport = await db.execute(sql`
+        SELECT id FROM listing_reports WHERE verified_listing_id = ${listingId} AND reported_by = ${req.user.id} LIMIT 1
+      `);
+      if (existingReport.rows.length > 0) return res.status(400).json({ error: "You've already reported this listing" });
+
+      await db.execute(sql`
+        INSERT INTO listing_reports (verified_listing_id, reported_by, reason)
+        VALUES (${listingId}, ${req.user.id}, ${parsed.data.reason})
+      `);
+      res.json({ success: true, message: "Report submitted for review" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to submit report" });
+    }
+  });
+
   app.get("/api/profile/:id/reviews", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
     const agentId = parseInt(req.params.id, 10);
