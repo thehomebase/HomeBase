@@ -32,7 +32,7 @@ Preferred communication style: Simple, everyday language.
 ### Key Features
 - **Transaction & Document Management**: Contract upload with data extraction, document signing link tracking, transaction timelines with risk alerts, client portal, transaction templates, Kanban pipelines for buyers and sellers, document scanning.
 - **Client Management**: Client invitation, automated feedback, smart reminders (anniversaries/birthdays), client linking.
-- **HomeBase Pros (Unified Vendor/Contractor Hub)**: Centralized marketplace for vendors with search, team management, ratings, inspection bid system, and vendor self-registration with agent team request functionality.
+- **HomeBase Pros (Unified Vendor/Contractor Hub)**: Public marketplace shows only verified vendor profiles (those with `vendorUserId`). Agents/brokers have a "My Team" tab for privately-added contractors with edit/delete/invite capabilities. Invite flow generates referral links for vendors to sign up. Marketplace features: search, proximity search, category filters, team management, ratings, inspection bid system, and vendor self-registration with agent team request functionality.
 - **Communication Tools**: Encrypted private messaging (AES-256-GCM), SMS via Twilio, email integration via Google OAuth, call logging, communication metrics dashboard, and snippet management.
 - **e-Signatures**: SignNow and DocuSign integrations via OAuth2 — agents/brokers connect their own accounts to upload documents and send signing invites from the document checklist. Settings page cards for connect/disconnect. Routes role-gated to agent/broker. Audit logging for all actions.
 - **Post-Close Engagement**: "MyHome" hub for homeowners.

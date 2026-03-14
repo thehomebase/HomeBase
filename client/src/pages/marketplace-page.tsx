@@ -22,13 +22,15 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { type Contractor, type ContractorReview, type VendorRating, type VendorTeamRequest } from "@shared/schema";
 import { PerformanceStatsDisplay, RateVendorDialog } from "@/pages/vendor-ratings-page";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search, Star, Phone, Mail, Globe, MapPin, UserPlus, CheckCircle2,
   Wrench, Zap, Thermometer, Home, Paintbrush, Trees, Sparkles, Hammer,
   Bug, Waves, Square, DoorOpen, Key, TreePine, Droplets, SprayCan,
   Layers, Shield, Camera, Sofa, Truck, MoreHorizontal, Construction,
   ClipboardList, Map, Settings, Users, Plus, Pencil, Trash2,
-  ExternalLink, Building2, Award, ThumbsUp, LayoutGrid, List, Check, X, Bell
+  ExternalLink, Building2, Award, ThumbsUp, LayoutGrid, List, Check, X, Bell,
+  Send, Copy
 } from "lucide-react";
 import { SiYelp, SiGoogle } from "react-icons/si";
 
@@ -534,6 +536,8 @@ function ContractorDetail({
 export default function MarketplacePage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isAgentOrBroker = user?.role === "agent" || user?.role === "broker";
+  const [activeTab, setActiveTab] = useState<string>("marketplace");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
@@ -545,6 +549,7 @@ export default function MarketplacePage() {
   const [zipSearch, setZipSearch] = useState("");
   const [searchRadius, setSearchRadius] = useState("20");
   const [proximityEnabled, setProximityEnabled] = useState(false);
+  const [inviteContractor, setInviteContractor] = useState<ContractorWithDetails | null>(null);
 
   const { data: categories, isLoading: categoriesLoading } = useQuery<MarketplaceCategory[]>({
     queryKey: ["/api/marketplace/categories"],
@@ -589,6 +594,31 @@ export default function MarketplacePage() {
     queryKey: ["/api/my-team"],
   });
 
+  const { data: myPrivateContractors = [], isLoading: myContractorsLoading } = useQuery<Contractor[]>({
+    queryKey: ["/api/contractors/my"],
+    enabled: isAgentOrBroker,
+  });
+
+  const { data: referralCode } = useQuery<{ id: number; code: string } | null>({
+    queryKey: ["/api/referral/my-code"],
+    queryFn: async () => {
+      const res = await fetch("/api/referral/my-code", { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: isAgentOrBroker,
+  });
+
+  const generateReferralMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/referral/generate");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/referral/my-code"] });
+    },
+  });
+
   const addToTeamMutation = useMutation({
     mutationFn: async (contractor: ContractorWithDetails) => {
       await apiRequest("POST", "/api/my-team", {
@@ -614,9 +644,10 @@ export default function MarketplacePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marketplace/contractors"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contractors/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/contractors"] });
       setShowAddDialog(false);
-      toast({ title: "Pro added successfully" });
+      toast({ title: "Pro added to your team" });
     },
     onError: () => {
       toast({ title: "Failed to add pro", variant: "destructive" });
@@ -630,6 +661,7 @@ export default function MarketplacePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marketplace/contractors"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contractors/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/contractors"] });
       setEditingContractor(null);
       toast({ title: "Pro updated successfully" });
@@ -645,6 +677,7 @@ export default function MarketplacePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marketplace/contractors"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contractors/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/contractors"] });
       toast({ title: "Pro deleted successfully" });
     },
@@ -762,17 +795,136 @@ export default function MarketplacePage() {
           <h1 className="text-2xl font-bold">HomeBase Pros</h1>
           <p className="text-muted-foreground">Find trusted home service professionals</p>
         </div>
-        <div className="flex items-center gap-2">
-          {(user?.role === "agent" || user?.role === "broker") && (
-            <Button onClick={() => setShowAddDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Pro
-            </Button>
-          )}
-        </div>
+        {isAgentOrBroker && activeTab === "my-team" && (
+          <Button onClick={() => setShowAddDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add to My Team
+          </Button>
+        )}
       </div>
 
-      {(user?.role === "agent" || user?.role === "broker") && pendingTeamRequests.length > 0 && (
+      {isAgentOrBroker && (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="marketplace">
+              <Building2 className="h-4 w-4 mr-2" />
+              Marketplace
+            </TabsTrigger>
+            <TabsTrigger value="my-team">
+              <Users className="h-4 w-4 mr-2" />
+              My Team ({myPrivateContractors.length})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
+
+      {activeTab === "my-team" && isAgentOrBroker ? (
+        <div className="space-y-4">
+          {myContractorsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : myPrivateContractors.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <h3 className="text-lg font-medium">No private team members yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Add vendors you work with to keep their info handy. These won't appear in the public marketplace.
+              </p>
+              <Button onClick={() => setShowAddDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Pro
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {myPrivateContractors.map((contractor) => {
+                const categoryLabel = categories?.find((c) => c.id === contractor.category)?.name
+                  || CATEGORIES.find(c => c.value === contractor.category)?.label
+                  || contractor.category;
+                const rating = contractor.agentRating ?? 0;
+                const isLinked = !!contractor.vendorUserId;
+
+                return (
+                  <Card key={contractor.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <CardTitle className="text-base truncate">{contractor.name}</CardTitle>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <Badge variant="secondary" className="text-xs">{categoryLabel}</Badge>
+                            {isLinked ? (
+                              <Badge variant="outline" className="gap-1 text-xs text-green-600 border-green-200 bg-green-50">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Linked
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="gap-1 text-xs text-orange-600 border-orange-200 bg-orange-50">
+                                Private
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingContractor(contractor as ContractorWithDetails)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(contractor as ContractorWithDetails)}>
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {rating > 0 && (
+                        <div className="flex items-center gap-2">
+                          <StarRating rating={rating} />
+                          <span className="text-xs text-muted-foreground">Your rating</span>
+                        </div>
+                      )}
+                      {contractor.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">{contractor.description}</p>
+                      )}
+                      <div className="flex flex-col gap-1 text-sm">
+                        {contractor.phone && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="truncate">{contractor.phone}</span>
+                          </div>
+                        )}
+                        {contractor.email && (
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="truncate">{contractor.email}</span>
+                          </div>
+                        )}
+                      </div>
+                      {contractor.agentNotes && (
+                        <div className="p-2 bg-muted/50 rounded text-xs text-muted-foreground">
+                          {contractor.agentNotes}
+                        </div>
+                      )}
+                      {!isLinked && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-2"
+                          onClick={() => setInviteContractor(contractor as ContractorWithDetails)}
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          Invite to HomeBase
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6">
+      {isAgentOrBroker && pendingTeamRequests.length > 0 && (
         <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -943,14 +1095,8 @@ export default function MarketplacePage() {
           <p className="text-muted-foreground">
             {searchQuery || selectedCategory || proximityEnabled
               ? "Try adjusting your search, category, or location filter"
-              : "No professionals are available yet"}
+              : "No verified professionals are available yet"}
           </p>
-          {(user?.role === "agent" || user?.role === "broker") && !searchQuery && !selectedCategory && (
-            <Button className="mt-4" onClick={() => setShowAddDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Your First Pro
-            </Button>
-          )}
         </div>
       ) : viewMode === "cards" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -960,7 +1106,6 @@ export default function MarketplacePage() {
               || contractor.category;
             const rating = contractor.averageRating ?? contractor.agentRating ?? 0;
             const onTeam = isOnTeam(contractor.id);
-            const isOwner = contractor.agentId === user?.id;
 
             return (
               <Card
@@ -976,24 +1121,12 @@ export default function MarketplacePage() {
                         <Badge variant="secondary" className="text-xs">
                           {categoryLabel}
                         </Badge>
-                        {contractor.vendorUserId && (
-                          <Badge variant="outline" className="gap-1 text-xs text-green-600 border-green-200 bg-green-50">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Verified
-                          </Badge>
-                        )}
+                        <Badge variant="outline" className="gap-1 text-xs text-green-600 border-green-200 bg-green-50">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Verified
+                        </Badge>
                       </div>
                     </div>
-                    {isOwner && (
-                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingContractor(contractor)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(contractor)}>
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -1110,7 +1243,6 @@ export default function MarketplacePage() {
                   || contractor.category;
                 const rating = contractor.averageRating ?? contractor.agentRating ?? 0;
                 const onTeam = isOnTeam(contractor.id);
-                const isOwner = contractor.agentId === user?.id;
 
                 return (
                   <TableRow key={contractor.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleViewDetails(contractor)}>
@@ -1223,16 +1355,6 @@ export default function MarketplacePage() {
                             Team
                           </Badge>
                         )}
-                        {isOwner && (
-                          <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingContractor(contractor)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(contractor)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1248,6 +1370,8 @@ export default function MarketplacePage() {
           Showing {contractors.length} of {marketplaceData.total} pros
         </p>
       )}
+        </div>
+      )}
 
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -1259,7 +1383,7 @@ export default function MarketplacePage() {
               <ContractorDetail
                 contractor={selectedContractor}
                 onClose={() => setDetailDialogOpen(false)}
-                isOwner={selectedContractor.agentId === user?.id}
+                isOwner={false}
               />
             </>
           )}
@@ -1269,7 +1393,7 @@ export default function MarketplacePage() {
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Pro</DialogTitle>
+            <DialogTitle>Add to My Team</DialogTitle>
           </DialogHeader>
           <ContractorForm
             onClose={() => setShowAddDialog(false)}
@@ -1290,6 +1414,67 @@ export default function MarketplacePage() {
               onSave={(data) => updateMutation.mutate({ id: editingContractor.id, data })}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!inviteContractor} onOpenChange={() => setInviteContractor(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Invite {inviteContractor?.name} to HomeBase</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Share your referral link with this vendor so they can create a HomeBase account and appear in the public marketplace.
+              When they sign up, their profile will automatically link to your team entry.
+            </p>
+            {referralCode ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Input
+                    readOnly
+                    value={`${window.location.origin}/register?ref=${referralCode.code}&role=vendor`}
+                    className="text-sm"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/register?ref=${referralCode.code}&role=vendor`);
+                      toast({ title: "Link copied to clipboard" });
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                {inviteContractor?.email && (
+                  <Button
+                    className="w-full gap-2"
+                    onClick={() => {
+                      const subject = encodeURIComponent("Join HomeBase Pros - Invitation");
+                      const body = encodeURIComponent(
+                        `Hi ${inviteContractor.name},\n\nI'd like to invite you to join HomeBase Pros, our vendor marketplace for home service professionals.\n\nSign up here: ${window.location.origin}/register?ref=${referralCode.code}&role=vendor\n\nOnce registered, your profile will be visible to agents and clients in our marketplace.\n\nBest regards`
+                      );
+                      window.open(`mailto:${inviteContractor.email}?subject=${subject}&body=${body}`);
+                      setInviteContractor(null);
+                    }}
+                  >
+                    <Mail className="h-4 w-4" />
+                    Send Email Invite to {inviteContractor.email}
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="text-center space-y-3">
+                <p className="text-sm text-muted-foreground">You need a referral code first.</p>
+                <Button
+                  onClick={() => generateReferralMutation.mutate()}
+                  disabled={generateReferralMutation.isPending}
+                >
+                  Generate Referral Code
+                </Button>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

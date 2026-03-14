@@ -4477,10 +4477,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMarketplaceContractors(filters?: { category?: string; search?: string; limit?: number; offset?: number }): Promise<Contractor[]> {
-    const conditions: any[] = [];
+    const conditions: any[] = [sql`vendor_user_id IS NOT NULL`];
     if (filters?.category) conditions.push(sql`category = ${filters.category}`);
     if (filters?.search) conditions.push(sql`LOWER(name) LIKE LOWER(${'%' + filters.search + '%'})`);
-    const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
+    const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
     const limit = filters?.limit || 50;
     const offset = filters?.offset || 0;
     const result = await db.execute(sql`SELECT * FROM contractors ${whereClause} ORDER BY name ASC LIMIT ${limit} OFFSET ${offset}`);
@@ -4488,10 +4488,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMarketplaceContractorCount(filters?: { category?: string; search?: string }): Promise<number> {
-    const conditions: any[] = [];
+    const conditions: any[] = [sql`vendor_user_id IS NOT NULL`];
     if (filters?.category) conditions.push(sql`category = ${filters.category}`);
     if (filters?.search) conditions.push(sql`LOWER(name) LIKE LOWER(${'%' + filters.search + '%'})`);
-    const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
+    const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
     const result = await db.execute(sql`SELECT COUNT(*) as count FROM contractors ${whereClause}`);
     return Number((result.rows[0] as any)?.count || 0);
   }

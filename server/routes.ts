@@ -1584,7 +1584,8 @@ export function registerRoutes(app: Express): Server {
         return R * c;
       };
       
-      const contractors = await storage.getAllContractors();
+      const allContractors = await storage.getAllContractors();
+      const contractors = allContractors.filter(c => c.vendorUserId !== null);
       
       const contractorsWithDistance = await Promise.all(
         contractors.map(async (contractor) => {
@@ -6430,6 +6431,7 @@ export function registerRoutes(app: Express): Server {
 
       const contractor = await storage.getContractor(id);
       if (!contractor) return res.status(404).json({ error: 'Contractor not found' });
+      if (!contractor.vendorUserId) return res.status(404).json({ error: 'Contractor not found in marketplace' });
 
       const [reviews, recommendationCount, teamCount, trustedByCount] = await Promise.all([
         storage.getContractorReviews(id),
