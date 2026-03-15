@@ -14,13 +14,48 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus, Megaphone, Eye, MousePointerClick, DollarSign, Trash2, Edit, Pause, Play,
-  ImagePlus, X, ExternalLink, Star
+  ImagePlus, X, ExternalLink, Star, Monitor, Smartphone
 } from "lucide-react";
 
-function AdPreview({ title, description, imageUrl, type, targetUrl }: {
-  title: string; description: string; imageUrl?: string; type: string; targetUrl?: string;
+function AdPreview({ title, description, imageUrl, type, targetUrl, mobile }: {
+  title: string; description: string; imageUrl?: string; type: string; targetUrl?: string; mobile?: boolean;
 }) {
   if (type === "marketplace") {
+    if (mobile) {
+      return (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 shadow-sm">
+          <div className="p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Megaphone className="h-3 w-3 text-primary" />
+              <span className="text-[10px] font-semibold text-primary uppercase tracking-wider">Sponsored</span>
+            </div>
+            <div className="flex items-center gap-3">
+              {imageUrl ? (
+                <img src={imageUrl} alt={title || "Ad"} className="h-12 w-12 rounded-lg object-cover shrink-0 border" />
+              ) : (
+                <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center shrink-0 border border-dashed">
+                  <ImagePlus className="h-4 w-4 text-muted-foreground/40" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-sm truncate">{title || "Your Ad Title"}</h4>
+                <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                  {description || "Your ad description..."}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex">
+                {[1,2,3,4,5].map(i => (
+                  <Star key={i} className={`h-3 w-3 ${i <= 4 ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
+                ))}
+              </div>
+              <span className="text-[10px] text-muted-foreground">4.8 (reviews)</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="rounded-xl border border-primary/20 bg-primary/5 shadow-sm">
         <div className="p-4 flex items-center gap-4">
@@ -57,6 +92,33 @@ function AdPreview({ title, description, imageUrl, type, targetUrl }: {
   }
 
   if (type === "sidebar") {
+    if (mobile) {
+      return (
+        <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+          <div className="p-3 flex items-center gap-3">
+            {imageUrl ? (
+              <img src={imageUrl} alt={title || "Ad"} className="h-14 w-14 rounded-lg object-cover shrink-0 border" />
+            ) : (
+              <div className="h-14 w-14 rounded-lg bg-muted flex items-center justify-center shrink-0 border border-dashed">
+                <ImagePlus className="h-5 w-5 text-muted-foreground/30" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-center gap-1.5">
+                <span className="bg-primary text-primary-foreground text-[8px] font-semibold px-1.5 py-0.5 rounded-full uppercase">Ad</span>
+                <h4 className="font-bold text-xs truncate">{title || "Your Ad Title"}</h4>
+              </div>
+              <p className="text-[11px] text-muted-foreground line-clamp-1">
+                {description || "Your ad description..."}
+              </p>
+              <button className="bg-primary text-primary-foreground text-[10px] font-semibold py-1 px-3 rounded-md">
+                {targetUrl ? "Visit →" : "Learn More →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden max-w-[280px]">
         {imageUrl ? (
@@ -81,6 +143,29 @@ function AdPreview({ title, description, imageUrl, type, targetUrl }: {
           </p>
           <button className="w-full bg-primary text-primary-foreground text-xs font-semibold py-2 px-4 rounded-lg">
             {targetUrl ? "Visit Website →" : "Learn More →"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (mobile) {
+    return (
+      <div className="rounded-lg border border-primary/20 bg-gradient-to-r from-primary/5 via-background to-primary/5 shadow-sm overflow-hidden">
+        <div className="p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Megaphone className="h-3 w-3 text-primary" />
+            <span className="text-[10px] font-semibold text-primary uppercase tracking-wider">Sponsored</span>
+          </div>
+          {imageUrl && (
+            <img src={imageUrl} alt={title || "Ad"} className="w-full h-28 rounded-lg object-cover border" />
+          )}
+          <h3 className="font-bold text-sm">{title || "Your Ad Title"}</h3>
+          <p className="text-xs text-muted-foreground">
+            {description || "Your ad description will appear here..."}
+          </p>
+          <button className="w-full bg-primary text-primary-foreground text-xs font-semibold py-2 px-4 rounded-lg">
+            Learn More
           </button>
         </div>
       </div>
@@ -125,6 +210,7 @@ export default function SponsoredAdsPage() {
     targetUrl: "", imageUrl: "", budgetCents: "", startDate: "", endDate: ""
   });
   const [imageUploading, setImageUploading] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: ads = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/ads/mine"] });
@@ -416,22 +502,67 @@ export default function SponsoredAdsPage() {
               </TabsContent>
               <TabsContent value="preview" className="mt-4">
                 <div className="space-y-4">
-                  <div className="bg-muted/30 rounded-lg p-4 border border-dashed">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                      Preview — {currentType === "marketplace" ? "Marketplace" : currentType === "sidebar" ? "Sidebar" : "Banner"} Ad
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">
+                      {currentType === "marketplace" ? "Marketplace" : currentType === "sidebar" ? "Sidebar" : "Banner"} Ad Preview
                     </p>
-                    <div className={currentType === "sidebar" ? "flex justify-center" : ""}>
-                      <AdPreview
-                        title={currentTitle}
-                        description={currentDesc}
-                        imageUrl={currentImage}
-                        type={currentType}
-                        targetUrl={currentUrl}
-                      />
+                    <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                      <button
+                        onClick={() => setPreviewDevice("desktop")}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          previewDevice === "desktop" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Monitor className="h-3.5 w-3.5" />
+                        Desktop
+                      </button>
+                      <button
+                        onClick={() => setPreviewDevice("mobile")}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          previewDevice === "mobile" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Smartphone className="h-3.5 w-3.5" />
+                        Mobile
+                      </button>
                     </div>
                   </div>
+
+                  <div className="flex justify-center">
+                    <div
+                      className={`transition-all duration-300 ${
+                        previewDevice === "mobile"
+                          ? "w-full max-w-[320px] border-[6px] border-foreground/10 rounded-[2rem] p-3 bg-background shadow-lg"
+                          : "w-full"
+                      }`}
+                    >
+                      {previewDevice === "mobile" && (
+                        <div className="w-20 h-1 bg-foreground/10 rounded-full mx-auto mb-3" />
+                      )}
+                      <div className={`bg-muted/30 rounded-lg p-4 border border-dashed pointer-events-none select-none ${
+                        currentType === "sidebar" && previewDevice === "desktop" ? "flex justify-center" : ""
+                      }`}>
+                        <AdPreview
+                          title={currentTitle}
+                          description={currentDesc}
+                          imageUrl={currentImage}
+                          type={currentType}
+                          targetUrl={currentUrl}
+                          mobile={previewDevice === "mobile"}
+                        />
+                      </div>
+                      {previewDevice === "mobile" && (
+                        <div className="w-10 h-1 bg-foreground/10 rounded-full mx-auto mt-3" />
+                      )}
+                    </div>
+                  </div>
+
                   <p className="text-xs text-muted-foreground text-center">
-                    This is how your ad will appear to users. Switch the "Type" in Details to see other formats.
+                    {previewDevice === "desktop"
+                      ? "This is how your ad will look on desktop screens."
+                      : "This is how your ad will look on mobile devices."
+                    }
+                    {" "}Switch the "Type" in Details to see other formats.
                   </p>
                 </div>
               </TabsContent>
