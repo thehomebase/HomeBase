@@ -20,6 +20,21 @@
   100% { opacity: 1; }
 }
 
+/* Hide reCAPTCHA badge and error overlays */
+.grecaptcha-badge,
+.grecaptcha-error,
+div[style*="position: fixed"][style*="background-color: rgb(255"][style*="bottom"] {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  z-index: -1 !important;
+}
+iframe[src*="recaptcha/api2/aframe"],
+iframe[title*="recaptcha"] {
+  display: none !important;
+}
+
 /* Light/Dark mode transitions */
 html {
   transition: background-color 0.3s ease;

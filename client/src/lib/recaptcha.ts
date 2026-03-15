@@ -9,9 +9,18 @@ declare global {
 
 const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
 
+const isRecaptchaDomainValid = (() => {
+  try {
+    const host = window.location.hostname;
+    return !host.includes('.replit.dev') && !host.includes('.repl.co') && !host.includes('localhost');
+  } catch {
+    return true;
+  }
+})();
+
 let scriptLoaded = false;
 function loadRecaptchaScript(): Promise<void> {
-  if (scriptLoaded || !SITE_KEY) return Promise.resolve();
+  if (scriptLoaded || !SITE_KEY || !isRecaptchaDomainValid) return Promise.resolve();
   scriptLoaded = true;
   return new Promise((resolve) => {
     const s = document.createElement("script");
@@ -23,7 +32,7 @@ function loadRecaptchaScript(): Promise<void> {
   });
 }
 
-if (SITE_KEY) {
+if (SITE_KEY && isRecaptchaDomainValid) {
   loadRecaptchaScript();
 }
 
