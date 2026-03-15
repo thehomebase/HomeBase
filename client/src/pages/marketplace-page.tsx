@@ -33,6 +33,54 @@ import {
   Send, Copy
 } from "lucide-react";
 import { SiYelp, SiGoogle } from "react-icons/si";
+import { Megaphone } from "lucide-react";
+
+function SponsoredAdBanner() {
+  const { data: ads } = useQuery<any[]>({
+    queryKey: ['/api/ads/active', 'marketplace'],
+    queryFn: async () => {
+      const res = await fetch('/api/ads/active', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  if (!ads || ads.length === 0) return null;
+
+  const handleAdClick = async (ad: any) => {
+    try {
+      await fetch(`/api/ads/${ad.id}/click`, { method: 'POST', credentials: 'include' });
+    } catch {}
+    const url = ad.target_url || ad.targetUrl;
+    if (url) window.open(url, '_blank', 'noopener');
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {ads.map((ad: any) => (
+        <Card
+          key={ad.id}
+          className="cursor-pointer hover:shadow-md transition-shadow border-primary/20 bg-primary/5"
+          onClick={() => handleAdClick(ad)}
+        >
+          <CardContent className="p-4 flex items-center gap-4">
+            {(ad.image_url || ad.imageUrl) && (
+              <img src={ad.image_url || ad.imageUrl} alt={ad.title} className="h-16 w-16 rounded-lg object-cover shrink-0" />
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <Megaphone className="h-3 w-3 text-primary" />
+                <span className="text-[10px] font-medium text-primary uppercase tracking-wider">Sponsored</span>
+              </div>
+              <h4 className="font-semibold text-sm truncate">{ad.title}</h4>
+              {ad.description && <p className="text-xs text-muted-foreground line-clamp-2">{ad.description}</p>}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
 type MarketplaceCategory = {
   id: string;
@@ -817,6 +865,8 @@ export default function MarketplacePage() {
           </TabsList>
         </Tabs>
       )}
+
+      {activeTab === "marketplace" && <SponsoredAdBanner />}
 
       {activeTab === "my-team" && isAgentOrBroker ? (
         <div className="space-y-4">

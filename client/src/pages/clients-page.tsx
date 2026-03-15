@@ -1395,6 +1395,27 @@ export default function ClientsPage() {
                   </DialogContent>
                 </Dialog>
                 
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="whitespace-nowrap font-bold">
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => {
+                      window.open('/api/clients/export?format=csv', '_blank');
+                    }}>
+                      Export as CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      window.open('/api/clients/export?format=xlsx', '_blank');
+                    }}>
+                      Export as Excel
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="whitespace-nowrap font-bold">

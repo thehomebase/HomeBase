@@ -1498,3 +1498,59 @@ export const listingReports = pgTable("listing_reports", {
 });
 
 export type ListingReport = typeof listingReports.$inferSelect;
+
+export const tasks = pgTable("tasks", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status", { enum: ['todo', 'in_progress', 'completed'] }).notNull().default('todo'),
+  priority: text("priority", { enum: ['low', 'medium', 'high', 'urgent'] }).notNull().default('medium'),
+  dueDate: timestamp("due_date"),
+  transactionId: integer("transaction_id"),
+  assignedTo: integer("assigned_to"),
+  createdBy: integer("created_by").notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Task = typeof tasks.$inferSelect;
+
+export const sponsoredAds = pgTable("sponsored_ads", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  type: text("type", { enum: ['marketplace', 'sidebar', 'banner'] }).notNull().default('marketplace'),
+  title: text("title").notNull(),
+  description: text("description"),
+  imageUrl: text("image_url"),
+  targetUrl: text("target_url"),
+  category: text("category"),
+  zipCodes: text("zip_codes").array().default([]),
+  budgetCents: integer("budget_cents").notNull().default(0),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  status: text("status", { enum: ['draft', 'pending', 'active', 'paused', 'rejected', 'expired'] }).notNull().default('draft'),
+  impressions: integer("impressions").notNull().default(0),
+  clicks: integer("clicks").notNull().default(0),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSponsoredAdSchema = createInsertSchema(sponsoredAds).omit({ id: true, impressions: true, clicks: true, adminNotes: true, createdAt: true, updatedAt: true });
+export type InsertSponsoredAd = z.infer<typeof insertSponsoredAdSchema>;
+export type SponsoredAd = typeof sponsoredAds.$inferSelect;
+
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: serial("id").primaryKey(),
+  adminId: integer("admin_id").notNull(),
+  action: text("action").notNull(),
+  targetType: text("target_type").notNull(),
+  targetId: integer("target_id"),
+  details: json("details"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;

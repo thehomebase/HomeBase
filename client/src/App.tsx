@@ -117,10 +117,15 @@ import CommissionsPage from "@/pages/commissions-page";
 import RemindersPage from "@/pages/reminders-page";
 import OpenHousesPage from "@/pages/open-houses-page";
 import OpenHouseSignInPage from "@/pages/open-house-sign-in-page";
+import AdminPage from "@/pages/admin-page";
+import TasksPage from "@/pages/tasks-page";
+import SponsoredAdsPage from "@/pages/sponsored-ads-page";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { BiometricSetupButton } from "@/components/biometric-setup";
 import { useLeadAlerts } from "@/hooks/use-lead-alerts";
 import { NotificationBell } from "@/components/notification-bell";
+import { useQuery as useQueryRQ } from "@tanstack/react-query";
+import { ListTodo, Megaphone as MegaphoneIcon, ShieldCheck } from "lucide-react";
 
 function LeadAlertBanner() {
   const { newLeadCount, isAgent } = useLeadAlerts();
@@ -167,7 +172,20 @@ function Layout({ children }: { children: React.ReactNode }) {
   const isBroker = user?.role === 'broker';
   const { newLeadCount } = useLeadAlerts();
   const isAgentOrBroker = user?.role === 'agent' || user?.role === 'broker';
+  const isAdmin = user?.role === 'admin';
   const tutorial = useOnboardingTutorial(user?.id, user?.role);
+
+  const { data: badgeCounts } = useQueryRQ<{
+    unreadMessages: number;
+    pendingDocuments: number;
+    overdueTasks: number;
+    upcomingDeadlines: number;
+    newLeads: number;
+  }>({
+    queryKey: ['/api/badge-counts'],
+    enabled: !!user,
+    refetchInterval: 60000,
+  });
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -383,6 +401,11 @@ function Layout({ children }: { children: React.ReactNode }) {
                             <Link href="/messages" className="flex items-center gap-2">
                               <MessageSquare className="h-4 w-4" />
                               <span>Messages</span>
+                              {(badgeCounts?.unreadMessages ?? 0) > 0 && (
+                                <span className="ml-auto inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-medium px-1.5 min-w-[20px] h-5">
+                                  {badgeCounts!.unreadMessages}
+                                </span>
+                              )}
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -414,6 +437,19 @@ function Layout({ children }: { children: React.ReactNode }) {
                             </SidebarMenuItem>
                           </>
                         )}
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Tasks">
+                            <Link href="/tasks" className="flex items-center gap-2">
+                              <ListTodo className="h-4 w-4" />
+                              <span>Tasks</span>
+                              {(badgeCounts?.overdueTasks ?? 0) > 0 && (
+                                <span className="ml-auto inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-medium px-1.5 min-w-[20px] h-5">
+                                  {badgeCounts!.overdueTasks}
+                                </span>
+                              )}
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
                       </SidebarMenu>
                     </CollapsibleContent>
                   </SidebarGroup>
@@ -524,6 +560,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                           </SidebarMenuItem>
                         )}
                         <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Sponsored Ads">
+                            <Link href="/sponsored-ads" className="flex items-center gap-2">
+                              <MegaphoneIcon className="h-4 w-4" />
+                              <span>Sponsored Ads</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="Settings">
                             <Link href="/settings" className="flex items-center gap-2">
                               <Settings className="h-4 w-4" />
@@ -535,6 +579,22 @@ function Layout({ children }: { children: React.ReactNode }) {
                     </CollapsibleContent>
                   </SidebarGroup>
                 </Collapsible>
+
+                {isAdmin && (
+                  <SidebarGroup>
+                    <SidebarGroupLabel>Administration</SidebarGroupLabel>
+                    <SidebarMenu>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Admin Dashboard">
+                          <Link href="/admin" className="flex items-center gap-2">
+                            <ShieldCheck className="h-4 w-4" />
+                            <span>Admin Dashboard</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </SidebarMenu>
+                  </SidebarGroup>
+                )}
               </SidebarContent>
               <SidebarFooter>
                 <div className="p-2 space-y-2">
@@ -664,6 +724,17 @@ function Router() {
       <Route path="/settings">
         <ProtectedRoute path="/settings" component={SettingsPage} />
       </Route>
+      <Route path="/tasks">
+        <ProtectedRoute path="/tasks" component={TasksPage} />
+      </Route>
+      <Route path="/sponsored-ads">
+        <ProtectedRoute path="/sponsored-ads" component={SponsoredAdsPage} />
+      </Route>
+      {user?.role === "admin" && (
+        <Route path="/admin">
+          <ProtectedRoute path="/admin" component={AdminPage} />
+        </Route>
+      )}
 
       {user?.role === "vendor" ? (
         <>

@@ -131,6 +131,22 @@ const apiLimiter = createRateLimiter(60_000, 120);
 const authLimiter = createRateLimiter(15 * 60_000, 15);
 const rentcastLimiter = createRateLimiter(60_000, 5);
 const sensitiveApiLimiter = createRateLimiter(60_000, 30);
+const exportLimiter = createRateLimiter(60_000, 5);
+
+function requireAdmin(req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) {
+  if (!req.isAuthenticated() || req.user.role !== "admin") {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+  next();
+}
+
+async function logAdminAction(adminId: number, action: string, targetType: string, targetId?: number, details?: any) {
+  try {
+    await db.execute(sql`INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details) VALUES (${adminId}, ${action}, ${targetType}, ${targetId || null}, ${JSON.stringify(details || {})})`);
+  } catch (e) {
+    console.error("Failed to log admin action:", e);
+  }
+}
 
 // Seller checklist items
 const SELLER_CHECKLIST_ITEMS = [
@@ -10489,6 +10505,482 @@ export function registerRoutes(app: Express): Server {
       timestamp: Date.now(),
       status: "ok" 
     });
+  });
+
+  // ============ Badge Counts ============
+  app.get("/api/badge-counts", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const userId = req.user.id;
+      const role = req.user.role;
+      let unreadMessages = 0;
+      let pendingDocuments = 0;
+      let upcomingDeadlines = 0;
+      let overdueTasks = 0;
+      let newLeads = 0;
+
+      const msgResult = await db.execute(sql`SELECT COUNT(*) as count FROM private_messages WHERE recipient_id = ${userId} AND read = false`);
+      unreadMessages = Number(msgResult.rows[0]?.count || 0);
+
+      if (role === "agent" || role === "broker") {
+        const docResult = await db.execute(sql`SELECT COUNT(*) as count FROM documents d JOIN transactions t ON d.transaction_id = t.id WHERE t.agent_id = ${userId} AND d.status IN ('pending', 'waiting_signatures')`);
+        pendingDocuments = Number(docResult.rows[0]?.count || 0);
+
+        const deadlineResult = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE agent_id = ${userId} AND status = 'active' AND closing_date IS NOT NULL AND closing_date <= NOW() + INTERVAL '7 days' AND closing_date > NOW()`);
+        upcomingDeadlines = Number(deadlineResult.rows[0]?.count || 0);
+
+        const leadResult = await db.execute(sql`SELECT COUNT(*) as count FROM leads WHERE agent_id = ${userId} AND status = 'new'`);
+        newLeads = Number(leadResult.rows[0]?.count || 0);
+      }
+
+      const taskResult = await db.execute(sql`SELECT COUNT(*) as count FROM tasks WHERE (created_by = ${userId} OR assigned_to = ${userId}) AND status != 'completed' AND due_date IS NOT NULL AND due_date < NOW()`);
+      overdueTasks = Number(taskResult.rows[0]?.count || 0);
+
+      res.json({ unreadMessages, pendingDocuments, upcomingDeadlines, overdueTasks, newLeads });
+    } catch (error) {
+      console.error("Badge counts error:", error);
+      res.status(500).json({ error: "Failed to fetch badge counts" });
+    }
+  });
+
+  // ============ Export Clients ============
+  app.get("/api/clients/export", exportLimiter, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const clients = await storage.getClients(req.user.id);
+      const format = (req.query.format as string) || "csv";
+
+      const rows = clients.map(c => ({
+        "First Name": c.firstName || "",
+        "Last Name": c.lastName || "",
+        "Email": c.email || "",
+        "Phone": c.phone || "",
+        "Mobile Phone": c.mobilePhone || "",
+        "Address": c.address || "",
+        "Street": c.street || "",
+        "City": c.city || "",
+        "Zip Code": c.zipCode || "",
+        "Type": Array.isArray(c.type) ? c.type.join(", ") : (c.type || ""),
+        "Status": c.status || "",
+        "Source": c.source || "",
+        "Labels": Array.isArray(c.labels) ? c.labels.join(", ") : "",
+        "Birthday": c.birthday || "",
+        "Anniversary": c.anniversary || "",
+        "Notes": c.notes || "",
+      }));
+
+      if (format === "xlsx") {
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Clients");
+        const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", `attachment; filename="clients_export.xlsx"`);
+        res.send(buffer);
+      } else {
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader("Content-Disposition", `attachment; filename="clients_export.csv"`);
+        res.send(csv);
+      }
+    } catch (error) {
+      console.error("Export clients error:", error);
+      res.status(500).json({ error: "Failed to export clients" });
+    }
+  });
+
+  // ============ Tasks CRUD ============
+  app.get("/api/tasks", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const userId = req.user.id;
+      const result = await db.execute(sql`SELECT * FROM tasks WHERE created_by = ${userId} OR assigned_to = ${userId} ORDER BY CASE WHEN status = 'completed' THEN 1 ELSE 0 END, CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, due_date ASC NULLS LAST`);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Get tasks error:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  app.post("/api/tasks", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const allowedFields = ['title', 'description', 'status', 'priority', 'dueDate', 'transactionId', 'assignedTo'];
+      const data: Record<string, any> = {};
+      for (const key of allowedFields) {
+        if (req.body[key] !== undefined) data[key] = req.body[key];
+      }
+      if (!data.title) return res.status(400).json({ error: "Title is required" });
+
+      if (data.transactionId) {
+        const { allowed } = await verifyTransactionAccess(Number(data.transactionId), req.user.id, req.user.role);
+        if (!allowed) return res.status(403).json({ error: "Not authorized for this transaction" });
+      }
+
+      const result = await db.execute(sql`INSERT INTO tasks (title, description, status, priority, due_date, transaction_id, assigned_to, created_by) VALUES (${data.title}, ${data.description || null}, ${data.status || 'todo'}, ${data.priority || 'medium'}, ${data.dueDate ? new Date(data.dueDate) : null}, ${data.transactionId ? Number(data.transactionId) : null}, ${data.assignedTo ? Number(data.assignedTo) : null}, ${req.user.id}) RETURNING *`);
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("Create task error:", error);
+      res.status(500).json({ error: "Failed to create task" });
+    }
+  });
+
+  app.patch("/api/tasks/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const taskId = Number(req.params.id);
+      const existing = await db.execute(sql`SELECT * FROM tasks WHERE id = ${taskId} LIMIT 1`);
+      if (existing.rows.length === 0) return res.status(404).json({ error: "Task not found" });
+      const task = existing.rows[0] as any;
+      if (task.created_by !== req.user.id && task.assigned_to !== req.user.id) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      const allowedFields = ['title', 'description', 'status', 'priority', 'dueDate', 'assignedTo'];
+      const updates: string[] = [];
+      const values: any[] = [];
+      for (const key of allowedFields) {
+        if (req.body[key] !== undefined) {
+          const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+          updates.push(`${dbKey} = $${values.length + 1}`);
+          values.push(key === 'dueDate' && req.body[key] ? new Date(req.body[key]) : req.body[key]);
+        }
+      }
+      if (req.body.status === 'completed') {
+        updates.push(`completed_at = $${values.length + 1}`);
+        values.push(new Date());
+      } else if (req.body.status && req.body.status !== 'completed') {
+        updates.push(`completed_at = NULL`);
+      }
+      updates.push(`updated_at = $${values.length + 1}`);
+      values.push(new Date());
+
+      if (updates.length === 0) return res.json(task);
+
+      const setClauses = updates.join(', ');
+      values.push(taskId);
+      const result = await db.execute(sql.raw(`UPDATE tasks SET ${setClauses} WHERE id = $${values.length} RETURNING *`, values));
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Update task error:", error);
+      res.status(500).json({ error: "Failed to update task" });
+    }
+  });
+
+  app.delete("/api/tasks/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const taskId = Number(req.params.id);
+      const existing = await db.execute(sql`SELECT created_by FROM tasks WHERE id = ${taskId} LIMIT 1`);
+      if (existing.rows.length === 0) return res.status(404).json({ error: "Task not found" });
+      if ((existing.rows[0] as any).created_by !== req.user.id) {
+        return res.status(403).json({ error: "Only the task creator can delete it" });
+      }
+      await db.execute(sql`DELETE FROM tasks WHERE id = ${taskId}`);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error("Delete task error:", error);
+      res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // ============ Sponsored Ads ============
+  app.get("/api/ads/mine", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const result = await db.execute(sql`SELECT * FROM sponsored_ads WHERE user_id = ${req.user.id} ORDER BY created_at DESC`);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Get my ads error:", error);
+      res.status(500).json({ error: "Failed to fetch ads" });
+    }
+  });
+
+  app.post("/api/ads", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (!["agent", "vendor", "lender", "broker"].includes(req.user.role)) return res.sendStatus(403);
+    try {
+      const allowed = ['type', 'title', 'description', 'imageUrl', 'targetUrl', 'category', 'zipCodes', 'budgetCents', 'startDate', 'endDate'];
+      const data: Record<string, any> = {};
+      for (const key of allowed) {
+        if (req.body[key] !== undefined) data[key] = req.body[key];
+      }
+      if (!data.title) return res.status(400).json({ error: "Title is required" });
+      if (data.targetUrl && !/^https?:\/\/.+/.test(data.targetUrl)) return res.status(400).json({ error: "Invalid target URL" });
+
+      const result = await db.execute(sql`INSERT INTO sponsored_ads (user_id, type, title, description, image_url, target_url, category, zip_codes, budget_cents, start_date, end_date, status) VALUES (${req.user.id}, ${data.type || 'marketplace'}, ${data.title}, ${data.description || null}, ${data.imageUrl || null}, ${data.targetUrl || null}, ${data.category || null}, ${data.zipCodes || []}, ${data.budgetCents || 0}, ${data.startDate ? new Date(data.startDate) : null}, ${data.endDate ? new Date(data.endDate) : null}, 'pending') RETURNING *`);
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("Create ad error:", error);
+      res.status(500).json({ error: "Failed to create ad" });
+    }
+  });
+
+  app.patch("/api/ads/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const adId = Number(req.params.id);
+      const existing = await db.execute(sql`SELECT * FROM sponsored_ads WHERE id = ${adId} LIMIT 1`);
+      if (existing.rows.length === 0) return res.status(404).json({ error: "Ad not found" });
+      if ((existing.rows[0] as any).user_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+
+      const allowed = ['title', 'description', 'imageUrl', 'targetUrl', 'category', 'zipCodes', 'budgetCents', 'startDate', 'endDate', 'status'];
+      const data: Record<string, any> = {};
+      for (const key of allowed) {
+        if (req.body[key] !== undefined) data[key] = req.body[key];
+      }
+      if (data.status && !['draft', 'paused'].includes(data.status)) {
+        delete data.status;
+      }
+
+      const result = await db.execute(sql`UPDATE sponsored_ads SET title = COALESCE(${data.title}, title), description = COALESCE(${data.description}, description), image_url = COALESCE(${data.imageUrl}, image_url), target_url = COALESCE(${data.targetUrl}, target_url), category = COALESCE(${data.category}, category), budget_cents = COALESCE(${data.budgetCents}, budget_cents), status = COALESCE(${data.status}, status), updated_at = NOW() WHERE id = ${adId} RETURNING *`);
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Update ad error:", error);
+      res.status(500).json({ error: "Failed to update ad" });
+    }
+  });
+
+  app.delete("/api/ads/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const adId = Number(req.params.id);
+      const existing = await db.execute(sql`SELECT user_id FROM sponsored_ads WHERE id = ${adId} LIMIT 1`);
+      if (existing.rows.length === 0) return res.status(404).json({ error: "Ad not found" });
+      if ((existing.rows[0] as any).user_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      await db.execute(sql`DELETE FROM sponsored_ads WHERE id = ${adId}`);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error("Delete ad error:", error);
+      res.status(500).json({ error: "Failed to delete ad" });
+    }
+  });
+
+  app.get("/api/ads/active", async (req, res) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const zipCode = req.query.zipCode as string | undefined;
+      let result;
+      if (category && zipCode) {
+        result = await db.execute(sql`SELECT id, type, title, description, image_url, target_url, category, user_id FROM sponsored_ads WHERE status = 'active' AND (start_date IS NULL OR start_date <= NOW()) AND (end_date IS NULL OR end_date >= NOW()) AND (category = ${category} OR category IS NULL) AND (${zipCode} = ANY(zip_codes) OR zip_codes = '{}') ORDER BY budget_cents DESC LIMIT 5`);
+      } else if (category) {
+        result = await db.execute(sql`SELECT id, type, title, description, image_url, target_url, category, user_id FROM sponsored_ads WHERE status = 'active' AND (start_date IS NULL OR start_date <= NOW()) AND (end_date IS NULL OR end_date >= NOW()) AND (category = ${category} OR category IS NULL) ORDER BY budget_cents DESC LIMIT 5`);
+      } else {
+        result = await db.execute(sql`SELECT id, type, title, description, image_url, target_url, category, user_id FROM sponsored_ads WHERE status = 'active' AND (start_date IS NULL OR start_date <= NOW()) AND (end_date IS NULL OR end_date >= NOW()) ORDER BY budget_cents DESC LIMIT 5`);
+      }
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Get active ads error:", error);
+      res.status(500).json({ error: "Failed to fetch ads" });
+    }
+  });
+
+  app.post("/api/ads/:id/click", async (req, res) => {
+    try {
+      const adId = Number(req.params.id);
+      if (req.isAuthenticated()) {
+        const ad = await db.execute(sql`SELECT user_id FROM sponsored_ads WHERE id = ${adId} LIMIT 1`);
+        if (ad.rows.length > 0 && (ad.rows[0] as any).user_id === req.user!.id) {
+          return res.json({ tracked: false });
+        }
+      }
+      await db.execute(sql`UPDATE sponsored_ads SET clicks = clicks + 1 WHERE id = ${adId}`);
+      res.json({ tracked: true });
+    } catch (error) {
+      res.json({ tracked: false });
+    }
+  });
+
+  app.post("/api/ads/:id/impression", async (req, res) => {
+    try {
+      await db.execute(sql`UPDATE sponsored_ads SET impressions = impressions + 1 WHERE id = ${Number(req.params.id)}`);
+      res.json({ tracked: true });
+    } catch (error) {
+      res.json({ tracked: false });
+    }
+  });
+
+  // ============ Admin Dashboard ============
+  app.get("/api/admin/stats", requireAdmin, async (req, res) => {
+    try {
+      const [usersCount, txCount, activeAds, pendingVerifications, pendingReports] = await Promise.all([
+        db.execute(sql`SELECT COUNT(*) as count, role FROM users GROUP BY role`),
+        db.execute(sql`SELECT COUNT(*) as count, status FROM transactions GROUP BY status`),
+        db.execute(sql`SELECT COUNT(*) as count FROM sponsored_ads WHERE status = 'active'`),
+        db.execute(sql`SELECT COUNT(*) as count FROM users WHERE verification_status = 'pending'`),
+        db.execute(sql`SELECT COUNT(*) as count FROM listing_reports WHERE status = 'pending'`),
+      ]);
+
+      const totalUsers = await db.execute(sql`SELECT COUNT(*) as count FROM users`);
+      const totalTx = await db.execute(sql`SELECT COUNT(*) as count FROM transactions`);
+
+      res.json({
+        totalUsers: Number(totalUsers.rows[0]?.count || 0),
+        totalTransactions: Number(totalTx.rows[0]?.count || 0),
+        usersByRole: usersCount.rows,
+        transactionsByStatus: txCount.rows,
+        activeAds: Number(activeAds.rows[0]?.count || 0),
+        pendingVerifications: Number(pendingVerifications.rows[0]?.count || 0),
+        pendingReports: Number(pendingReports.rows[0]?.count || 0),
+      });
+    } catch (error) {
+      console.error("Admin stats error:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  app.get("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+      const page = Number(req.query.page) || 1;
+      const limit = Math.min(Number(req.query.limit) || 50, 100);
+      const offset = (page - 1) * limit;
+      const search = (req.query.search as string) || "";
+      const roleFilter = req.query.role as string | undefined;
+
+      let result;
+      if (search && roleFilter) {
+        result = await db.execute(sql`SELECT id, email, first_name, last_name, role, email_verified, verification_status, created_at, stripe_subscription_id FROM users WHERE role = ${roleFilter} AND (email ILIKE ${'%' + search + '%'} OR first_name ILIKE ${'%' + search + '%'} OR last_name ILIKE ${'%' + search + '%'}) ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
+      } else if (search) {
+        result = await db.execute(sql`SELECT id, email, first_name, last_name, role, email_verified, verification_status, created_at, stripe_subscription_id FROM users WHERE email ILIKE ${'%' + search + '%'} OR first_name ILIKE ${'%' + search + '%'} OR last_name ILIKE ${'%' + search + '%'} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
+      } else if (roleFilter) {
+        result = await db.execute(sql`SELECT id, email, first_name, last_name, role, email_verified, verification_status, created_at, stripe_subscription_id FROM users WHERE role = ${roleFilter} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
+      } else {
+        result = await db.execute(sql`SELECT id, email, first_name, last_name, role, email_verified, verification_status, created_at, stripe_subscription_id FROM users ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
+      }
+
+      const countResult = await db.execute(sql`SELECT COUNT(*) as count FROM users`);
+      res.json({ users: result.rows, total: Number(countResult.rows[0]?.count || 0), page, limit });
+    } catch (error) {
+      console.error("Admin users error:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const targetId = Number(req.params.id);
+      const allowedFields = ['role', 'emailVerified', 'verificationStatus'];
+      const data: Record<string, any> = {};
+      for (const key of allowedFields) {
+        if (req.body[key] !== undefined) data[key] = req.body[key];
+      }
+
+      if (data.role) {
+        await db.execute(sql`UPDATE users SET role = ${data.role} WHERE id = ${targetId}`);
+      }
+      if (data.emailVerified !== undefined) {
+        await db.execute(sql`UPDATE users SET email_verified = ${data.emailVerified} WHERE id = ${targetId}`);
+      }
+      if (data.verificationStatus) {
+        await db.execute(sql`UPDATE users SET verification_status = ${data.verificationStatus} WHERE id = ${targetId}`);
+      }
+
+      await logAdminAction(req.user!.id, "update_user", "user", targetId, data);
+
+      const updated = await db.execute(sql`SELECT id, email, first_name, last_name, role, email_verified, verification_status FROM users WHERE id = ${targetId}`);
+      res.json(updated.rows[0]);
+    } catch (error) {
+      console.error("Admin update user error:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.get("/api/admin/verifications", requireAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(sql`SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.verification_status, u.license_number, u.license_state, u.brokerage_name, lv.verification_method, lv.name_matched, lv.name_match_score, lv.lookup_url, lv.created_at FROM users u LEFT JOIN license_verifications lv ON u.id = lv.user_id WHERE u.verification_status IN ('pending', 'license_verified', 'stripe_verified') ORDER BY lv.created_at DESC NULLS LAST`);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Admin verifications error:", error);
+      res.status(500).json({ error: "Failed to fetch verifications" });
+    }
+  });
+
+  app.post("/api/admin/verifications/:id/approve", requireAdmin, async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      await db.execute(sql`UPDATE users SET verification_status = 'admin_verified' WHERE id = ${userId}`);
+      await logAdminAction(req.user!.id, "approve_verification", "user", userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Admin approve error:", error);
+      res.status(500).json({ error: "Failed to approve verification" });
+    }
+  });
+
+  app.post("/api/admin/verifications/:id/reject", requireAdmin, async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      await db.execute(sql`UPDATE users SET verification_status = 'unverified' WHERE id = ${userId}`);
+      await logAdminAction(req.user!.id, "reject_verification", "user", userId, { reason: req.body.reason });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Admin reject error:", error);
+      res.status(500).json({ error: "Failed to reject verification" });
+    }
+  });
+
+  app.get("/api/admin/reports", requireAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(sql`SELECT lr.*, vl.address, vl.listing_agent_name, u.first_name, u.last_name, u.email FROM listing_reports lr LEFT JOIN verified_listings vl ON lr.verified_listing_id = vl.id LEFT JOIN users u ON lr.reported_by = u.id ORDER BY lr.created_at DESC`);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Admin reports error:", error);
+      res.status(500).json({ error: "Failed to fetch reports" });
+    }
+  });
+
+  app.patch("/api/admin/reports/:id", requireAdmin, async (req, res) => {
+    try {
+      const reportId = Number(req.params.id);
+      const status = req.body.status;
+      if (!['reviewed', 'dismissed'].includes(status)) return res.status(400).json({ error: "Invalid status" });
+      await db.execute(sql`UPDATE listing_reports SET status = ${status} WHERE id = ${reportId}`);
+      await logAdminAction(req.user!.id, `report_${status}`, "listing_report", reportId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Admin update report error:", error);
+      res.status(500).json({ error: "Failed to update report" });
+    }
+  });
+
+  app.get("/api/admin/ads", requireAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(sql`SELECT sa.*, u.first_name, u.last_name, u.email FROM sponsored_ads sa JOIN users u ON sa.user_id = u.id ORDER BY CASE sa.status WHEN 'pending' THEN 0 WHEN 'active' THEN 1 ELSE 2 END, sa.created_at DESC`);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Admin ads error:", error);
+      res.status(500).json({ error: "Failed to fetch ads" });
+    }
+  });
+
+  app.patch("/api/admin/ads/:id", requireAdmin, async (req, res) => {
+    try {
+      const adId = Number(req.params.id);
+      const { status, adminNotes } = req.body;
+      if (status && !['active', 'rejected', 'paused'].includes(status)) return res.status(400).json({ error: "Invalid status" });
+
+      if (status) await db.execute(sql`UPDATE sponsored_ads SET status = ${status}, updated_at = NOW() WHERE id = ${adId}`);
+      if (adminNotes) await db.execute(sql`UPDATE sponsored_ads SET admin_notes = ${adminNotes}, updated_at = NOW() WHERE id = ${adId}`);
+
+      await logAdminAction(req.user!.id, `ad_${status || 'update'}`, "sponsored_ad", adId, { status, adminNotes });
+      const updated = await db.execute(sql`SELECT * FROM sponsored_ads WHERE id = ${adId}`);
+      res.json(updated.rows[0]);
+    } catch (error) {
+      console.error("Admin update ad error:", error);
+      res.status(500).json({ error: "Failed to update ad" });
+    }
+  });
+
+  app.get("/api/admin/audit-log", requireAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(sql`SELECT al.*, u.first_name, u.last_name FROM admin_audit_log al JOIN users u ON al.admin_id = u.id ORDER BY al.created_at DESC LIMIT 100`);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Admin audit log error:", error);
+      res.status(500).json({ error: "Failed to fetch audit log" });
+    }
   });
 
   return createServer(app);
