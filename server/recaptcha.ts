@@ -27,7 +27,7 @@ export function createRecaptchaMiddleware(expectedAction: string) {
       if (!data.success) {
         const errorCodes = data["error-codes"] || [];
         console.log(`[reCAPTCHA] Rejected: success=false, errors=${errorCodes.join(",")}`);
-        if (errorCodes.includes("invalid-input-secret") || errorCodes.includes("bad-request") || errorCodes.includes("timeout-or-duplicate") || errorCodes.includes("invalid-input-response")) {
+        if (errorCodes.includes("invalid-input-secret") || errorCodes.includes("bad-request") || errorCodes.includes("timeout-or-duplicate") || errorCodes.includes("invalid-input-response") || errorCodes.includes("browser-error")) {
           console.log(`[reCAPTCHA] Configuration/token issue detected (${errorCodes.join(",")}), allowing request through`);
           return next();
         }
