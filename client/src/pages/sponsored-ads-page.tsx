@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -11,9 +11,109 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Plus, Megaphone, Eye, MousePointerClick, DollarSign, Trash2, Edit, Pause, Play
+  Plus, Megaphone, Eye, MousePointerClick, DollarSign, Trash2, Edit, Pause, Play,
+  ImagePlus, X, ExternalLink, Star
 } from "lucide-react";
+
+function AdPreview({ title, description, imageUrl, type, targetUrl }: {
+  title: string; description: string; imageUrl?: string; type: string; targetUrl?: string;
+}) {
+  if (type === "marketplace") {
+    return (
+      <div className="rounded-xl border border-primary/20 bg-primary/5 shadow-sm">
+        <div className="p-4 flex items-center gap-4">
+          {imageUrl ? (
+            <img src={imageUrl} alt={title || "Ad"} className="h-16 w-16 rounded-lg object-cover shrink-0 border" />
+          ) : (
+            <div className="h-16 w-16 rounded-lg bg-muted flex items-center justify-center shrink-0 border border-dashed">
+              <ImagePlus className="h-6 w-6 text-muted-foreground/40" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <Megaphone className="h-3 w-3 text-primary" />
+              <span className="text-[10px] font-semibold text-primary uppercase tracking-wider">Sponsored</span>
+            </div>
+            <h4 className="font-semibold text-sm truncate">{title || "Your Ad Title"}</h4>
+            {(description || !title) && (
+              <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                {description || "Your ad description will appear here..."}
+              </p>
+            )}
+            <div className="flex items-center gap-2 mt-2">
+              <div className="flex">
+                {[1,2,3,4,5].map(i => (
+                  <Star key={i} className={`h-3 w-3 ${i <= 4 ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
+                ))}
+              </div>
+              <span className="text-[10px] text-muted-foreground">4.8 (reviews)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === "sidebar") {
+    return (
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden max-w-[280px]">
+        {imageUrl ? (
+          <div className="relative">
+            <img src={imageUrl} alt={title || "Ad"} className="w-full h-32 object-cover" />
+            <div className="absolute top-2 left-2">
+              <span className="bg-primary text-primary-foreground text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider">Ad</span>
+            </div>
+          </div>
+        ) : (
+          <div className="relative h-32 bg-muted flex items-center justify-center">
+            <ImagePlus className="h-8 w-8 text-muted-foreground/30" />
+            <div className="absolute top-2 left-2">
+              <span className="bg-primary text-primary-foreground text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider">Ad</span>
+            </div>
+          </div>
+        )}
+        <div className="p-3 space-y-2">
+          <h4 className="font-bold text-sm">{title || "Your Ad Title"}</h4>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {description || "Your ad description will appear here..."}
+          </p>
+          <button className="w-full bg-primary text-primary-foreground text-xs font-semibold py-2 px-4 rounded-lg">
+            {targetUrl ? "Visit Website →" : "Learn More →"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 via-background to-primary/5 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-5 p-4">
+        {imageUrl ? (
+          <img src={imageUrl} alt={title || "Ad"} className="h-20 w-20 rounded-xl object-cover shrink-0 border hidden sm:block" />
+        ) : (
+          <div className="h-20 w-20 rounded-xl bg-muted flex items-center justify-center shrink-0 border border-dashed hidden sm:block">
+            <ImagePlus className="h-6 w-6 text-muted-foreground/40" />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <Megaphone className="h-3 w-3 text-primary" />
+            <span className="text-[10px] font-semibold text-primary uppercase tracking-wider">Sponsored</span>
+          </div>
+          <h3 className="font-bold text-base">{title || "Your Ad Title"}</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            {description || "Your ad description will appear here. Make it compelling to attract clicks!"}
+          </p>
+        </div>
+        <button className="bg-primary text-primary-foreground text-xs font-semibold py-2.5 px-5 rounded-lg shrink-0 hidden sm:block">
+          Learn More
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function SponsoredAdsPage() {
   const { user } = useAuth();
@@ -22,8 +122,10 @@ export default function SponsoredAdsPage() {
   const [editAd, setEditAd] = useState<any>(null);
   const [form, setForm] = useState({
     title: "", description: "", type: "marketplace", category: "",
-    targetUrl: "", budgetCents: "", startDate: "", endDate: ""
+    targetUrl: "", imageUrl: "", budgetCents: "", startDate: "", endDate: ""
   });
+  const [imageUploading, setImageUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: ads = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/ads/mine"] });
 
@@ -32,7 +134,7 @@ export default function SponsoredAdsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ads/mine"] });
       setShowCreate(false);
-      setForm({ title: "", description: "", type: "marketplace", category: "", targetUrl: "", budgetCents: "", startDate: "", endDate: "" });
+      resetForm();
       toast({ title: "Ad submitted for review" });
     },
   });
@@ -53,6 +155,52 @@ export default function SponsoredAdsPage() {
       toast({ title: "Ad deleted" });
     },
   });
+
+  function resetForm() {
+    setForm({ title: "", description: "", type: "marketplace", category: "", targetUrl: "", imageUrl: "", budgetCents: "", startDate: "", endDate: "" });
+  }
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Please select an image file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Image must be under 5MB", variant: "destructive" });
+      return;
+    }
+
+    setImageUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        if (editAd) {
+          setEditAd({ ...editAd, image_url: base64 });
+        } else {
+          setForm(prev => ({ ...prev, imageUrl: base64 }));
+        }
+        setImageUploading(false);
+      };
+      reader.onerror = () => {
+        toast({ title: "Failed to read image", variant: "destructive" });
+        setImageUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      toast({ title: "Failed to upload image", variant: "destructive" });
+      setImageUploading(false);
+    }
+  }
+
+  const currentTitle = editAd ? editAd.title : form.title;
+  const currentDesc = editAd ? (editAd.description || "") : form.description;
+  const currentImage = editAd ? (editAd.image_url || "") : form.imageUrl;
+  const currentType = editAd ? editAd.type : form.type;
+  const currentUrl = editAd ? (editAd.target_url || "") : form.targetUrl;
 
   const totalImpressions = ads.reduce((sum: number, a: any) => sum + (a.impressions || 0), 0);
   const totalClicks = ads.reduce((sum: number, a: any) => sum + (a.clicks || 0), 0);
@@ -91,7 +239,7 @@ export default function SponsoredAdsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Title</TableHead>
+                <TableHead>Ad</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Budget</TableHead>
                 <TableHead>Impressions</TableHead>
@@ -104,9 +252,14 @@ export default function SponsoredAdsPage() {
               {ads.map((ad: any) => (
                 <TableRow key={ad.id}>
                   <TableCell>
-                    <div>
-                      <p className="font-medium">{ad.title}</p>
-                      {ad.description && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{ad.description}</p>}
+                    <div className="flex items-center gap-3">
+                      {(ad.image_url || ad.imageUrl) && (
+                        <img src={ad.image_url || ad.imageUrl} alt={ad.title} className="h-10 w-10 rounded-lg object-cover shrink-0" />
+                      )}
+                      <div>
+                        <p className="font-medium">{ad.title}</p>
+                        {ad.description && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{ad.description}</p>}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell><Badge variant="outline">{ad.type}</Badge></TableCell>
@@ -141,89 +294,161 @@ export default function SponsoredAdsPage() {
       )}
 
       {(showCreate || editAd) && (
-        <Dialog open onOpenChange={() => { setShowCreate(false); setEditAd(null); }}>
-          <DialogContent className="max-w-lg">
+        <Dialog open onOpenChange={() => { setShowCreate(false); setEditAd(null); resetForm(); }}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editAd ? "Edit Ad" : "Create Sponsored Ad"}</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <Input
-                placeholder="Ad title"
-                value={editAd ? editAd.title : form.title}
-                onChange={(e) => editAd ? setEditAd({ ...editAd, title: e.target.value }) : setForm({ ...form, title: e.target.value })}
-              />
-              <Textarea
-                placeholder="Description"
-                value={editAd ? (editAd.description || "") : form.description}
-                onChange={(e) => editAd ? setEditAd({ ...editAd, description: e.target.value }) : setForm({ ...form, description: e.target.value })}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Type</label>
-                  <Select
-                    value={editAd ? editAd.type : form.type}
-                    onValueChange={(v) => editAd ? setEditAd({ ...editAd, type: v }) : setForm({ ...form, type: v })}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="marketplace">Marketplace</SelectItem>
-                      <SelectItem value="sidebar">Sidebar</SelectItem>
-                      <SelectItem value="banner">Banner</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Category</label>
-                  <Input
-                    placeholder="e.g. Plumbing, Roofing"
-                    value={editAd ? (editAd.category || "") : form.category}
-                    onChange={(e) => editAd ? setEditAd({ ...editAd, category: e.target.value }) : setForm({ ...form, category: e.target.value })}
-                  />
-                </div>
-              </div>
-              <Input
-                placeholder="Target URL (https://...)"
-                value={editAd ? (editAd.target_url || "") : form.targetUrl}
-                onChange={(e) => editAd ? setEditAd({ ...editAd, target_url: e.target.value }) : setForm({ ...form, targetUrl: e.target.value })}
-              />
-              <div>
-                <label className="text-sm font-medium">Monthly Budget ($)</label>
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="preview">Live Preview</TabsTrigger>
+              </TabsList>
+              <TabsContent value="details" className="space-y-4 mt-4">
                 <Input
-                  type="number"
-                  placeholder="25"
-                  value={editAd ? ((editAd.budget_cents || 0) / 100).toString() : form.budgetCents}
-                  onChange={(e) => editAd ? setEditAd({ ...editAd, budget_cents: Math.round(Number(e.target.value) * 100) }) : setForm({ ...form, budgetCents: e.target.value })}
+                  placeholder="Ad title"
+                  value={editAd ? editAd.title : form.title}
+                  onChange={(e) => editAd ? setEditAd({ ...editAd, title: e.target.value }) : setForm({ ...form, title: e.target.value })}
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+                <Textarea
+                  placeholder="Description"
+                  value={editAd ? (editAd.description || "") : form.description}
+                  onChange={(e) => editAd ? setEditAd({ ...editAd, description: e.target.value }) : setForm({ ...form, description: e.target.value })}
+                />
+
                 <div>
-                  <label className="text-sm font-medium">Start Date</label>
-                  <Input
-                    type="date"
-                    value={editAd ? (editAd.start_date ? new Date(editAd.start_date).toISOString().split("T")[0] : "") : form.startDate}
-                    onChange={(e) => editAd ? setEditAd({ ...editAd, start_date: e.target.value }) : setForm({ ...form, startDate: e.target.value })}
+                  <label className="text-sm font-medium mb-2 block">Ad Image</label>
+                  <div className="flex items-center gap-3">
+                    {currentImage ? (
+                      <div className="relative group">
+                        <img src={currentImage} alt="Ad image" className="h-20 w-20 rounded-lg object-cover border" />
+                        <button
+                          className="absolute -top-2 -right-2 h-5 w-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => editAd ? setEditAd({ ...editAd, image_url: "" }) : setForm(prev => ({ ...prev, imageUrl: "" }))}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        className="h-20 w-20 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <ImagePlus className="h-6 w-6 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={imageUploading}
+                      >
+                        <ImagePlus className="h-4 w-4 mr-2" />
+                        {imageUploading ? "Uploading..." : currentImage ? "Change Image" : "Upload Image"}
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG, or WebP. Max 5MB.</p>
+                    </div>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="hidden"
+                    onChange={handleImageUpload}
                   />
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Type</label>
+                    <Select
+                      value={editAd ? editAd.type : form.type}
+                      onValueChange={(v) => editAd ? setEditAd({ ...editAd, type: v }) : setForm({ ...form, type: v })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="marketplace">Marketplace</SelectItem>
+                        <SelectItem value="sidebar">Sidebar</SelectItem>
+                        <SelectItem value="banner">Banner</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Category</label>
+                    <Input
+                      placeholder="e.g. Plumbing, Roofing"
+                      value={editAd ? (editAd.category || "") : form.category}
+                      onChange={(e) => editAd ? setEditAd({ ...editAd, category: e.target.value }) : setForm({ ...form, category: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <Input
+                  placeholder="Target URL (https://...)"
+                  value={editAd ? (editAd.target_url || "") : form.targetUrl}
+                  onChange={(e) => editAd ? setEditAd({ ...editAd, target_url: e.target.value }) : setForm({ ...form, targetUrl: e.target.value })}
+                />
                 <div>
-                  <label className="text-sm font-medium">End Date</label>
+                  <label className="text-sm font-medium">Monthly Budget ($)</label>
                   <Input
-                    type="date"
-                    value={editAd ? (editAd.end_date ? new Date(editAd.end_date).toISOString().split("T")[0] : "") : form.endDate}
-                    onChange={(e) => editAd ? setEditAd({ ...editAd, end_date: e.target.value }) : setForm({ ...form, endDate: e.target.value })}
+                    type="number"
+                    placeholder="25"
+                    value={editAd ? ((editAd.budget_cents || 0) / 100).toString() : form.budgetCents}
+                    onChange={(e) => editAd ? setEditAd({ ...editAd, budget_cents: Math.round(Number(e.target.value) * 100) }) : setForm({ ...form, budgetCents: e.target.value })}
                   />
                 </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setShowCreate(false); setEditAd(null); }}>Cancel</Button>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Start Date</label>
+                    <Input
+                      type="date"
+                      value={editAd ? (editAd.start_date ? new Date(editAd.start_date).toISOString().split("T")[0] : "") : form.startDate}
+                      onChange={(e) => editAd ? setEditAd({ ...editAd, start_date: e.target.value }) : setForm({ ...form, startDate: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">End Date</label>
+                    <Input
+                      type="date"
+                      value={editAd ? (editAd.end_date ? new Date(editAd.end_date).toISOString().split("T")[0] : "") : form.endDate}
+                      onChange={(e) => editAd ? setEditAd({ ...editAd, end_date: e.target.value }) : setForm({ ...form, endDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="preview" className="mt-4">
+                <div className="space-y-4">
+                  <div className="bg-muted/30 rounded-lg p-4 border border-dashed">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                      Preview — {currentType === "marketplace" ? "Marketplace" : currentType === "sidebar" ? "Sidebar" : "Banner"} Ad
+                    </p>
+                    <div className={currentType === "sidebar" ? "flex justify-center" : ""}>
+                      <AdPreview
+                        title={currentTitle}
+                        description={currentDesc}
+                        imageUrl={currentImage}
+                        type={currentType}
+                        targetUrl={currentUrl}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    This is how your ad will appear to users. Switch the "Type" in Details to see other formats.
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => { setShowCreate(false); setEditAd(null); resetForm(); }}>Cancel</Button>
               <Button
                 disabled={createAd.isPending || updateAd.isPending}
                 onClick={() => {
                   if (editAd) {
-                    updateAd.mutate({ id: editAd.id, data: { title: editAd.title, description: editAd.description, type: editAd.type, category: editAd.category, targetUrl: editAd.target_url, budgetCents: editAd.budget_cents } });
+                    updateAd.mutate({ id: editAd.id, data: { title: editAd.title, description: editAd.description, type: editAd.type, category: editAd.category, targetUrl: editAd.target_url, imageUrl: editAd.image_url, budgetCents: editAd.budget_cents } });
                   } else {
                     if (!form.title.trim()) return;
                     createAd.mutate({
                       title: form.title, description: form.description || undefined, type: form.type,
                       category: form.category || undefined, targetUrl: form.targetUrl || undefined,
+                      imageUrl: form.imageUrl || undefined,
                       budgetCents: form.budgetCents ? Math.round(Number(form.budgetCents) * 100) : 0,
                       startDate: form.startDate || undefined, endDate: form.endDate || undefined,
                     });

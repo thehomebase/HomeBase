@@ -10709,6 +10709,10 @@ export function registerRoutes(app: Express): Server {
       }
       if (!data.title) return res.status(400).json({ error: "Title is required" });
       if (data.targetUrl && !/^https?:\/\/.+/.test(data.targetUrl)) return res.status(400).json({ error: "Invalid target URL" });
+      if (data.imageUrl && typeof data.imageUrl === 'string') {
+        if (!data.imageUrl.startsWith('data:image/')) return res.status(400).json({ error: "Image must be a valid data URL" });
+        if (data.imageUrl.length > 7 * 1024 * 1024) return res.status(400).json({ error: "Image too large (max 5MB)" });
+      }
 
       const result = await db.execute(sql`INSERT INTO sponsored_ads (user_id, type, title, description, image_url, target_url, category, zip_codes, budget_cents, start_date, end_date, status) VALUES (${req.user.id}, ${data.type || 'marketplace'}, ${data.title}, ${data.description || null}, ${data.imageUrl || null}, ${data.targetUrl || null}, ${data.category || null}, ${data.zipCodes || []}, ${data.budgetCents || 0}, ${data.startDate ? new Date(data.startDate) : null}, ${data.endDate ? new Date(data.endDate) : null}, 'pending') RETURNING *`);
       res.status(201).json(result.rows[0]);
@@ -10733,6 +10737,10 @@ export function registerRoutes(app: Express): Server {
       }
       if (data.status && !['draft', 'paused'].includes(data.status)) {
         delete data.status;
+      }
+      if (data.imageUrl && typeof data.imageUrl === 'string') {
+        if (!data.imageUrl.startsWith('data:image/')) return res.status(400).json({ error: "Image must be a valid data URL" });
+        if (data.imageUrl.length > 7 * 1024 * 1024) return res.status(400).json({ error: "Image too large (max 5MB)" });
       }
 
       const result = await db.execute(sql`UPDATE sponsored_ads SET title = COALESCE(${data.title}, title), description = COALESCE(${data.description}, description), image_url = COALESCE(${data.imageUrl}, image_url), target_url = COALESCE(${data.targetUrl}, target_url), category = COALESCE(${data.category}, category), budget_cents = COALESCE(${data.budgetCents}, budget_cents), status = COALESCE(${data.status}, status), updated_at = NOW() WHERE id = ${adId} RETURNING *`);
