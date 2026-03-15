@@ -37,6 +37,9 @@ import {
   User,
   Settings,
   Target,
+  ListTodo,
+  Megaphone,
+  ShieldCheck,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -52,13 +55,26 @@ interface NavItem {
 const MORE_ITEM: NavItem = { icon: MoreHorizontal, label: "More", href: "__more__", id: "more" };
 
 function getAllNavItems(role: string | undefined): NavItem[] {
+  if (role === "admin") {
+    return [
+      { icon: ShieldCheck, label: "Admin", href: "/admin", id: "admin" },
+      { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
+      { icon: MessageSquare, label: "Messages", href: "/messages", id: "messages" },
+      { icon: Users, label: "Users", href: "/admin", id: "admin-users" },
+      { icon: Megaphone, label: "Ads", href: "/sponsored-ads", id: "sponsored-ads" },
+      { icon: Settings, label: "Settings", href: "/settings", id: "settings" },
+    ];
+  }
+
   if (role === "vendor") {
     return [
       { icon: Wrench, label: "Portal", href: "/vendor", id: "vendor-portal" },
       { icon: BarChart3, label: "Ratings", href: "/vendor-ratings", id: "vendor-ratings" },
       { icon: Store, label: "Pros", href: "/marketplace", id: "marketplace" },
       { icon: MessageSquare, label: "Messages", href: "/messages", id: "messages" },
+      { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
       { icon: HardHat, label: "My Team", href: "/my-team", id: "my-team" },
+      { icon: Megaphone, label: "Ads", href: "/sponsored-ads", id: "sponsored-ads" },
       { icon: Home, label: "MyHome", href: "/my-home", id: "my-home" },
       { icon: Star, label: "Find Agents", href: "/top-agents", id: "top-agents" },
       { icon: Search, label: "Search", href: "/property-search", id: "search" },
@@ -73,6 +89,8 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: FileText, label: "Pipeline", href: "/lender-portal", id: "lender-portal" },
       { icon: Store, label: "Pros", href: "/marketplace", id: "marketplace" },
       { icon: MessageSquare, label: "Messages", href: "/messages", id: "messages" },
+      { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
+      { icon: Megaphone, label: "Ads", href: "/sponsored-ads", id: "sponsored-ads" },
       { icon: Search, label: "Search", href: "/property-search", id: "search" },
       { icon: HardHat, label: "My Team", href: "/my-team", id: "my-team" },
       { icon: Home, label: "MyHome", href: "/my-home", id: "my-home" },
@@ -89,7 +107,9 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Users, label: "Clients", href: "/clients", id: "clients" },
       { icon: MessageSquare, label: "Messages", href: "/messages", id: "messages" },
       { icon: Briefcase, label: "Broker Portal", href: "/broker-portal", id: "broker-portal" },
+      { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
       { icon: DollarSign, label: "Commissions", href: "/commissions", id: "commissions" },
+      { icon: Megaphone, label: "Ads", href: "/sponsored-ads", id: "sponsored-ads" },
       { icon: Search, label: "Search", href: "/property-search", id: "search" },
       { icon: BarChart3, label: "Data", href: "/data", id: "data" },
       { icon: Map, label: "Map", href: "/map", id: "map" },
@@ -115,6 +135,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: FileText, label: "Transaction", href: "/my-transaction", id: "my-transaction" },
       { icon: Search, label: "Search", href: "/property-search", id: "search" },
       { icon: MessageSquare, label: "Messages", href: "/messages", id: "messages" },
+      { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
       { icon: HardHat, label: "My Team", href: "/my-team", id: "my-team" },
       { icon: Store, label: "HomeBase Pros", href: "/marketplace", id: "marketplace" },
       { icon: Home, label: "MyHome", href: "/my-home", id: "my-home" },
@@ -130,6 +151,8 @@ function getAllNavItems(role: string | undefined): NavItem[] {
     { icon: FileText, label: "Deals", href: "/transactions", id: "transactions" },
     { icon: Users, label: "Clients", href: "/clients", id: "clients" },
     { icon: MessageSquare, label: "Messages", href: "/messages", id: "messages" },
+    { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
+    { icon: Megaphone, label: "Ads", href: "/sponsored-ads", id: "sponsored-ads" },
     { icon: Search, label: "Search", href: "/property-search", id: "search" },
     { icon: BarChart3, label: "Data", href: "/data", id: "data" },
     { icon: Map, label: "Map", href: "/map", id: "map" },
@@ -151,6 +174,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
 }
 
 function getDefaultSelectedIds(role: string | undefined): string[] {
+  if (role === "admin") return ["admin", "tasks", "messages", "more"];
   if (role === "vendor") return ["vendor-portal", "messages", "marketplace", "more"];
   if (role === "lender") return ["lender-portal", "messages", "search", "more"];
   if (role === "client") return ["my-transaction", "messages", "search", "more"];
