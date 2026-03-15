@@ -42,7 +42,8 @@ Preferred communication style: Simple, everyday language.
 - **Specialized Portals**: Lender Portal (loan pipelines, checklist sync), Broker Portal (agent oversight, sales competitions, lead routing).
 - **Zapier Integration**: API key authentication, webhook triggers for key events, public REST API for data access.
 - **Financial Calculators**: Mortgage, Affordability, Refinance, Rent vs Buy, Financing Guide, and Lender Comparison with profile management and email results functionality.
-- **Billing**: Stripe integration for subscriptions.
+- **Billing**: Stripe integration for subscriptions and sponsored ad billing (monthly ad budgets charged via user's existing Stripe payment method upon admin approval; pausing/deleting ads pauses/cancels the subscription).
+- **Sponsored Ads**: Ad creation with image upload, live desktop/mobile preview, admin review flow, 3 ad types (marketplace, sidebar, banner). DB: `sponsored_ads` table with `stripe_subscription_id`. Billing linked to platform Stripe payment method.
 - **Notifications**: Real-time SMS and Web Push for new leads, WebSocket-based in-app notifications (bell, unread count, toasts, activity feed).
 - **Agent/Broker Verification**: Multi-level verification process (license, Stripe name cross-check, manual broker/admin verification) with feature gating and verification history.
 - **Profile Pages**: Customizable agent/broker profiles with confirmed information, bio, contact details, social media, reviews, and MLS-verified active listings auto-discovered from RentCast.

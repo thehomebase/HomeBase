@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus, Megaphone, Eye, MousePointerClick, DollarSign, Trash2, Edit, Pause, Play,
-  ImagePlus, X, ExternalLink, Star, Monitor, Smartphone
+  ImagePlus, X, ExternalLink, Star, Monitor, Smartphone, CreditCard, AlertTriangle, Info
 } from "lucide-react";
 
 function AdPreview({ title, description, imageUrl, type, targetUrl, mobile }: {
@@ -214,6 +214,8 @@ export default function SponsoredAdsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: ads = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/ads/mine"] });
+  const { data: stripeInfo } = useQuery<any>({ queryKey: ["/api/stripe/subscription"] });
+  const hasPaymentMethod = stripeInfo?.hasPaymentMethod === true;
 
   const createAd = useMutation({
     mutationFn: async (data: any) => { await apiRequest("POST", "/api/ads", data); },
@@ -309,6 +311,31 @@ export default function SponsoredAdsPage() {
         <Card><CardContent className="p-4 text-center"><div className="flex items-center justify-center gap-1"><Eye className="h-4 w-4 text-muted-foreground" /><p className="text-2xl font-bold">{totalImpressions.toLocaleString()}</p></div><p className="text-xs text-muted-foreground">Impressions</p></CardContent></Card>
         <Card><CardContent className="p-4 text-center"><div className="flex items-center justify-center gap-1"><MousePointerClick className="h-4 w-4 text-muted-foreground" /><p className="text-2xl font-bold">{totalClicks.toLocaleString()}</p></div><p className="text-xs text-muted-foreground">Clicks ({ctr}% CTR)</p></CardContent></Card>
       </div>
+
+      {!hasPaymentMethod && stripeInfo && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
+          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-amber-900 dark:text-amber-200">Payment method required</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+              You need a payment method on file to run ads. Your ad budget will be billed monthly through the same payment system used for your platform subscription.
+              <a href="/settings" className="underline ml-1 font-medium">Go to Settings → Billing</a> to add one.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {hasPaymentMethod && (
+        <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-4">
+          <CreditCard className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium">How ad billing works</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Your monthly ad budget is charged through the same payment method used for your platform subscription. Billing starts when an admin approves your ad and stops if you pause or delete it.
+            </p>
+          </div>
+        </div>
+      )}
 
       {isLoading && <p className="text-center text-muted-foreground py-8">Loading...</p>}
 
@@ -567,10 +594,19 @@ export default function SponsoredAdsPage() {
                 </div>
               </TabsContent>
             </Tabs>
+            {!hasPaymentMethod && !editAd && (
+              <div className="flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3 mt-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  A payment method is required before your ad can go live.
+                  <a href="/settings" className="underline ml-1 font-medium">Add one in Settings</a>
+                </p>
+              </div>
+            )}
             <DialogFooter className="mt-4">
               <Button variant="outline" onClick={() => { setShowCreate(false); setEditAd(null); resetForm(); }}>Cancel</Button>
               <Button
-                disabled={createAd.isPending || updateAd.isPending}
+                disabled={createAd.isPending || updateAd.isPending || (!hasPaymentMethod && !editAd)}
                 onClick={() => {
                   if (editAd) {
                     updateAd.mutate({ id: editAd.id, data: { title: editAd.title, description: editAd.description, type: editAd.type, category: editAd.category, targetUrl: editAd.target_url, imageUrl: editAd.image_url, budgetCents: editAd.budget_cents } });

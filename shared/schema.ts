@@ -1535,6 +1535,7 @@ export const sponsoredAds = pgTable("sponsored_ads", {
   impressions: integer("impressions").notNull().default(0),
   clicks: integer("clicks").notNull().default(0),
   adminNotes: text("admin_notes"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

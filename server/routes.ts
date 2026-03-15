@@ -10743,6 +10743,17 @@ export function registerRoutes(app: Express): Server {
         if (data.imageUrl.length > 7 * 1024 * 1024) return res.status(400).json({ error: "Image too large (max 5MB)" });
       }
 
+      const ad = existing.rows[0] as any;
+      if (data.status === 'paused' && ad.stripe_subscription_id) {
+        try {
+          const { getUncachableStripeClient } = await import('./stripeClient');
+          const stripe = await getUncachableStripeClient();
+          await stripe.subscriptions.update(ad.stripe_subscription_id, { pause_collection: { behavior: 'void' } });
+        } catch (stripeErr: any) {
+          console.error("Stripe pause on user ad pause:", stripeErr);
+        }
+      }
+
       const result = await db.execute(sql`UPDATE sponsored_ads SET title = COALESCE(${data.title}, title), description = COALESCE(${data.description}, description), image_url = COALESCE(${data.imageUrl}, image_url), target_url = COALESCE(${data.targetUrl}, target_url), category = COALESCE(${data.category}, category), budget_cents = COALESCE(${data.budgetCents}, budget_cents), status = COALESCE(${data.status}, status), updated_at = NOW() WHERE id = ${adId} RETURNING *`);
       res.json(result.rows[0]);
     } catch (error) {
@@ -10755,9 +10766,21 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const adId = Number(req.params.id);
-      const existing = await db.execute(sql`SELECT user_id FROM sponsored_ads WHERE id = ${adId} LIMIT 1`);
+      const existing = await db.execute(sql`SELECT * FROM sponsored_ads WHERE id = ${adId} LIMIT 1`);
       if (existing.rows.length === 0) return res.status(404).json({ error: "Ad not found" });
-      if ((existing.rows[0] as any).user_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      const ad = existing.rows[0] as any;
+      if (ad.user_id !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+
+      if (ad.stripe_subscription_id) {
+        try {
+          const { getUncachableStripeClient } = await import('./stripeClient');
+          const stripe = await getUncachableStripeClient();
+          await stripe.subscriptions.cancel(ad.stripe_subscription_id);
+        } catch (stripeErr: any) {
+          console.error("Stripe cancel on ad delete:", stripeErr);
+        }
+      }
+
       await db.execute(sql`DELETE FROM sponsored_ads WHERE id = ${adId}`);
       res.sendStatus(200);
     } catch (error) {
@@ -10969,8 +10992,78 @@ export function registerRoutes(app: Express): Server {
       const { status, adminNotes } = req.body;
       if (status && !['active', 'rejected', 'paused'].includes(status)) return res.status(400).json({ error: "Invalid status" });
 
-      if (status) await db.execute(sql`UPDATE sponsored_ads SET status = ${status}, updated_at = NOW() WHERE id = ${adId}`);
       if (adminNotes) await db.execute(sql`UPDATE sponsored_ads SET admin_notes = ${adminNotes}, updated_at = NOW() WHERE id = ${adId}`);
+
+      if (status) {
+        const adResult = await db.execute(sql`SELECT sa.*, u.stripe_customer_id FROM sponsored_ads sa JOIN users u ON sa.user_id = u.id WHERE sa.id = ${adId}`);
+        const ad = adResult.rows[0] as any;
+
+        if (status === 'active' && ad && ad.budget_cents > 0) {
+          try {
+            const { getUncachableStripeClient } = await import('./stripeClient');
+            const stripe = await getUncachableStripeClient();
+
+            if (!ad.stripe_customer_id) {
+              await db.execute(sql`UPDATE sponsored_ads SET status = 'rejected', admin_notes = COALESCE(admin_notes || E'\n', '') || 'Rejected: No payment method on file.', updated_at = NOW() WHERE id = ${adId}`);
+              await logAdminAction(req.user!.id, 'ad_rejected', "sponsored_ad", adId, { reason: 'No payment method' });
+              const updated = await db.execute(sql`SELECT * FROM sponsored_ads WHERE id = ${adId}`);
+              return res.json(updated.rows[0]);
+            }
+
+            const paymentMethods = await stripe.paymentMethods.list({
+              customer: ad.stripe_customer_id,
+              type: 'card',
+            });
+            if (paymentMethods.data.length === 0) {
+              await db.execute(sql`UPDATE sponsored_ads SET status = 'rejected', admin_notes = COALESCE(admin_notes || E'\n', '') || 'Rejected: No payment method on file.', updated_at = NOW() WHERE id = ${adId}`);
+              await logAdminAction(req.user!.id, 'ad_rejected', "sponsored_ad", adId, { reason: 'No payment method' });
+              const updated = await db.execute(sql`SELECT * FROM sponsored_ads WHERE id = ${adId}`);
+              return res.json(updated.rows[0]);
+            }
+
+            const price = await stripe.prices.create({
+              unit_amount: ad.budget_cents,
+              currency: 'usd',
+              recurring: { interval: 'month' },
+              product_data: {
+                name: `Sponsored Ad: ${ad.title}`,
+                metadata: { adId: String(adId), type: ad.type },
+              },
+            });
+
+            const subscription = await stripe.subscriptions.create({
+              customer: ad.stripe_customer_id,
+              items: [{ price: price.id }],
+              default_payment_method: paymentMethods.data[0].id,
+              metadata: { adId: String(adId), type: 'sponsored_ad' },
+            });
+
+            await db.execute(sql`UPDATE sponsored_ads SET status = 'active', stripe_subscription_id = ${subscription.id}, updated_at = NOW() WHERE id = ${adId}`);
+          } catch (stripeErr: any) {
+            console.error("Stripe ad billing error:", stripeErr);
+            await db.execute(sql`UPDATE sponsored_ads SET status = 'rejected', admin_notes = COALESCE(admin_notes || E'\n', '') || 'Rejected: Payment failed. Please update your payment method.', updated_at = NOW() WHERE id = ${adId}`);
+            await logAdminAction(req.user!.id, 'ad_rejected', "sponsored_ad", adId, { reason: 'Stripe billing failed' });
+            const updated = await db.execute(sql`SELECT * FROM sponsored_ads WHERE id = ${adId}`);
+            return res.json(updated.rows[0]);
+          }
+        } else if ((status === 'paused' || status === 'rejected') && ad?.stripe_subscription_id) {
+          try {
+            const { getUncachableStripeClient } = await import('./stripeClient');
+            const stripe = await getUncachableStripeClient();
+            if (status === 'paused') {
+              await stripe.subscriptions.update(ad.stripe_subscription_id, { pause_collection: { behavior: 'void' } });
+            } else {
+              await stripe.subscriptions.cancel(ad.stripe_subscription_id);
+              await db.execute(sql`UPDATE sponsored_ads SET stripe_subscription_id = NULL WHERE id = ${adId}`);
+            }
+          } catch (stripeErr: any) {
+            console.error("Stripe ad cancel/pause error:", stripeErr);
+          }
+          await db.execute(sql`UPDATE sponsored_ads SET status = ${status}, updated_at = NOW() WHERE id = ${adId}`);
+        } else {
+          await db.execute(sql`UPDATE sponsored_ads SET status = ${status}, updated_at = NOW() WHERE id = ${adId}`);
+        }
+      }
 
       await logAdminAction(req.user!.id, `ad_${status || 'update'}`, "sponsored_ad", adId, { status, adminNotes });
       const updated = await db.execute(sql`SELECT * FROM sponsored_ads WHERE id = ${adId}`);
