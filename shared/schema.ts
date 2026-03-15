@@ -1555,3 +1555,16 @@ export const adminAuditLog = pgTable("admin_audit_log", {
 });
 
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+
+export const adminMessages = pgTable("admin_messages", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  subject: text("subject"),
+  content: text("content").notNull(),
+  adminReply: text("admin_reply"),
+  adminRepliedAt: timestamp("admin_replied_at"),
+  read: boolean("read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AdminMessage = typeof adminMessages.$inferSelect;

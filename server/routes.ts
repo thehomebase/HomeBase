@@ -10836,25 +10836,56 @@ export function registerRoutes(app: Express): Server {
   // ============ Admin Dashboard ============
   app.get("/api/admin/stats", requireAdmin, async (req, res) => {
     try {
-      const [usersCount, txCount, activeAds, pendingVerifications, pendingReports] = await Promise.all([
+      const [usersCount, txCount, activeAds, pendingVerifications, pendingReports, totalUsers, totalTx, totalClients, totalLeads, userGrowth, txGrowth, recentSignups, adStats, pendingAds] = await Promise.all([
         db.execute(sql`SELECT COUNT(*) as count, role FROM users GROUP BY role`),
         db.execute(sql`SELECT COUNT(*) as count, status FROM transactions GROUP BY status`),
         db.execute(sql`SELECT COUNT(*) as count FROM sponsored_ads WHERE status = 'active'`),
         db.execute(sql`SELECT COUNT(*) as count FROM users WHERE verification_status = 'pending'`),
         db.execute(sql`SELECT COUNT(*) as count FROM listing_reports WHERE status = 'pending'`),
+        db.execute(sql`SELECT COUNT(*) as count FROM users`),
+        db.execute(sql`SELECT COUNT(*) as count FROM transactions`),
+        db.execute(sql`SELECT COUNT(*) as count FROM clients`),
+        db.execute(sql`SELECT COUNT(*) as count FROM leads`),
+        db.execute(sql`SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') as month, COUNT(*) as count FROM users WHERE created_at >= NOW() - INTERVAL '12 months' GROUP BY month ORDER BY month`),
+        db.execute(sql`SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') as month, COUNT(*) as count FROM transactions WHERE created_at >= NOW() - INTERVAL '12 months' GROUP BY month ORDER BY month`),
+        db.execute(sql`SELECT id, first_name, last_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 10`),
+        db.execute(sql`SELECT SUM(impressions) as total_impressions, SUM(clicks) as total_clicks, SUM(budget_cents) as total_budget FROM sponsored_ads WHERE status = 'active'`),
+        db.execute(sql`SELECT COUNT(*) as count FROM sponsored_ads WHERE status = 'pending'`),
       ]);
 
-      const totalUsers = await db.execute(sql`SELECT COUNT(*) as count FROM users`);
-      const totalTx = await db.execute(sql`SELECT COUNT(*) as count FROM transactions`);
+      const usersThisMonth = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE created_at >= DATE_TRUNC('month', NOW())`);
+      const usersLastMonth = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE created_at >= DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND created_at < DATE_TRUNC('month', NOW())`);
+      const txThisMonth = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE created_at >= DATE_TRUNC('month', NOW())`);
+      const txLastMonth = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE created_at >= DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND created_at < DATE_TRUNC('month', NOW())`);
+
+      const thisM = Number(usersThisMonth.rows[0]?.count || 0);
+      const lastM = Number(usersLastMonth.rows[0]?.count || 0);
+      const userChange = lastM > 0 ? Math.round(((thisM - lastM) / lastM) * 100) : (thisM > 0 ? 100 : 0);
+
+      const txThisM = Number(txThisMonth.rows[0]?.count || 0);
+      const txLastM = Number(txLastMonth.rows[0]?.count || 0);
+      const txChange = txLastM > 0 ? Math.round(((txThisM - txLastM) / txLastM) * 100) : (txThisM > 0 ? 100 : 0);
 
       res.json({
         totalUsers: Number(totalUsers.rows[0]?.count || 0),
         totalTransactions: Number(totalTx.rows[0]?.count || 0),
+        totalClients: Number(totalClients.rows[0]?.count || 0),
+        totalLeads: Number(totalLeads.rows[0]?.count || 0),
         usersByRole: usersCount.rows,
         transactionsByStatus: txCount.rows,
         activeAds: Number(activeAds.rows[0]?.count || 0),
+        pendingAds: Number(pendingAds.rows[0]?.count || 0),
         pendingVerifications: Number(pendingVerifications.rows[0]?.count || 0),
         pendingReports: Number(pendingReports.rows[0]?.count || 0),
+        userGrowth: userGrowth.rows,
+        txGrowth: txGrowth.rows,
+        recentSignups: recentSignups.rows,
+        adStats: adStats.rows[0] || { total_impressions: 0, total_clicks: 0, total_budget: 0 },
+        usersThisMonth: thisM,
+        usersLastMonth: lastM,
+        userChange,
+        txThisMonth: txThisM,
+        txChange,
       });
     } catch (error) {
       console.error("Admin stats error:", error);
@@ -11081,6 +11112,42 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Admin audit log error:", error);
       res.status(500).json({ error: "Failed to fetch audit log" });
+    }
+  });
+
+  app.post("/api/contact-admin", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const { subject, content } = req.body;
+    if (!content?.trim()) return res.status(400).json({ error: "Message content is required" });
+    try {
+      const result = await db.execute(sql`INSERT INTO admin_messages (user_id, subject, content) VALUES (${req.user.id}, ${subject || null}, ${content.trim()}) RETURNING *`);
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Contact admin error:", error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  app.get("/api/admin/messages", requireAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(sql`SELECT am.*, u.first_name, u.last_name, u.email, u.role FROM admin_messages am JOIN users u ON am.user_id = u.id ORDER BY am.created_at DESC LIMIT 100`);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Admin messages error:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  app.post("/api/admin/messages/:id/reply", requireAdmin, async (req, res) => {
+    const msgId = Number(req.params.id);
+    const { content } = req.body;
+    if (!content?.trim()) return res.status(400).json({ error: "Reply content is required" });
+    try {
+      await db.execute(sql`UPDATE admin_messages SET admin_reply = ${content.trim()}, admin_replied_at = NOW(), read = TRUE WHERE id = ${msgId}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Admin reply error:", error);
+      res.status(500).json({ error: "Failed to send reply" });
     }
   });
 
