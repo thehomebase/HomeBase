@@ -10890,6 +10890,27 @@ export function registerRoutes(app: Express): Server {
         safeQuery(db.execute(sql`SELECT COALESCE(SUM(monthly_rate), 0) as total FROM vendor_zip_codes WHERE is_active = true`)),
       ]);
 
+      const [leadTotal, leadConverted, leadByStatus, leadBySource, leadAvgResponse, leadByZip,
+             txByState, txByZip, activeClaimedZips] = await Promise.all([
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM leads`)),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM leads WHERE status = 'converted'`)),
+        safeQuery(db.execute(sql`SELECT COALESCE(status, 'new') as status, COUNT(*) as count FROM leads GROUP BY status ORDER BY count DESC`)),
+        safeQuery(db.execute(sql`SELECT COALESCE(source, 'direct') as source, COUNT(*) as count FROM leads GROUP BY source ORDER BY count DESC`)),
+        safeQuery(db.execute(sql`SELECT AVG(EXTRACT(EPOCH FROM (responded_at - created_at))) as avg_seconds, COUNT(*) as responded_count FROM leads WHERE responded_at IS NOT NULL AND created_at IS NOT NULL`)),
+        safeQuery(db.execute(sql`SELECT zip_code, COUNT(*) as count FROM leads WHERE zip_code IS NOT NULL GROUP BY zip_code ORDER BY count DESC LIMIT 10`)),
+        safeQuery(db.execute(sql`SELECT state, COUNT(*) as count FROM transactions WHERE state IS NOT NULL AND state != '' GROUP BY state ORDER BY count DESC LIMIT 10`)),
+        safeQuery(db.execute(sql`SELECT zip_code, COUNT(*) as count FROM transactions WHERE zip_code IS NOT NULL AND zip_code != '' GROUP BY zip_code ORDER BY count DESC LIMIT 10`)),
+        safeQuery(db.execute(sql`
+          SELECT zip_code, SUM(cnt) as total_claims FROM (
+            SELECT zip_code, COUNT(*) as cnt FROM lead_zip_codes WHERE is_active = true GROUP BY zip_code
+            UNION ALL
+            SELECT zip_code, COUNT(*) as cnt FROM lender_zip_codes WHERE is_active = true GROUP BY zip_code
+            UNION ALL
+            SELECT zip_code, COUNT(*) as cnt FROM vendor_zip_codes WHERE is_active = true GROUP BY zip_code
+          ) combined GROUP BY zip_code ORDER BY total_claims DESC LIMIT 10
+        `)),
+      ]);
+
       res.json({
         totalUsers: Number(totalUsers.rows[0]?.count || 0),
         totalTransactions: Number(totalTx.rows[0]?.count || 0),
@@ -10926,6 +10947,23 @@ export function registerRoutes(app: Express): Server {
             vendors: Number(vendorLeadRev.rows[0]?.total || 0),
             total: Number(agentLeadRev.rows[0]?.total || 0) + Number(lenderLeadRev.rows[0]?.total || 0) + Number(vendorLeadRev.rows[0]?.total || 0),
           },
+        },
+        leadInsights: {
+          totalLeads: Number(leadTotal.rows[0]?.count || 0),
+          convertedLeads: Number(leadConverted.rows[0]?.count || 0),
+          conversionRate: Number(leadTotal.rows[0]?.count || 0) > 0
+            ? Math.round((Number(leadConverted.rows[0]?.count || 0) / Number(leadTotal.rows[0]?.count || 0)) * 100)
+            : 0,
+          avgResponseSeconds: Number(leadAvgResponse.rows[0]?.avg_seconds || 0),
+          respondedCount: Number(leadAvgResponse.rows[0]?.responded_count || 0),
+          byStatus: leadByStatus.rows,
+          bySource: leadBySource.rows,
+          byZipCode: leadByZip.rows,
+        },
+        geographic: {
+          transactionsByState: txByState.rows,
+          transactionsByZip: txByZip.rows,
+          activeClaimedZips: activeClaimedZips.rows,
         },
       });
     } catch (error) {

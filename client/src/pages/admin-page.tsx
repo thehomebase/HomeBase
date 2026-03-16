@@ -23,7 +23,8 @@ import {
   CheckCircle, XCircle, Search, ExternalLink, Eye, TrendingUp,
   ArrowUpRight, ArrowDownRight, Target, FileText, UserPlus,
   MessageSquare, Send, Loader2, ChevronLeft, ChevronRight,
-  DollarSign, CreditCard, Receipt
+  DollarSign, CreditCard, Receipt, MapPin, Clock, Percent,
+  Activity
 } from "lucide-react";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -423,6 +424,8 @@ export default function AdminPage() {
             </TabsTrigger>
             <TabsTrigger value="ads"><Megaphone className="h-4 w-4 mr-1" />Ads</TabsTrigger>
             <TabsTrigger value="financial"><DollarSign className="h-4 w-4 mr-1" />Financial</TabsTrigger>
+            <TabsTrigger value="leads"><Activity className="h-4 w-4 mr-1" />Leads</TabsTrigger>
+            <TabsTrigger value="geographic"><MapPin className="h-4 w-4 mr-1" />Geographic</TabsTrigger>
             <TabsTrigger value="messages"><MessageSquare className="h-4 w-4 mr-1" />Messages</TabsTrigger>
             <TabsTrigger value="audit"><ClipboardList className="h-4 w-4 mr-1" />Audit Log</TabsTrigger>
           </TabsList>
@@ -779,6 +782,249 @@ export default function AdminPage() {
                         <Receipt className="h-10 w-10 mx-auto mb-3 opacity-30" />
                         <p>No invoices yet</p>
                         <p className="text-xs mt-1">Invoices will appear here once users subscribe via Stripe.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            );
+          })()}
+        </TabsContent>
+
+        <TabsContent value="leads" className="space-y-4">
+          {(() => {
+            const li = stats?.leadInsights || {};
+            const totalLeads = li.totalLeads || 0;
+            const avgSeconds = li.avgResponseSeconds || 0;
+            const avgMinutes = avgSeconds > 0 ? Math.round(avgSeconds / 60) : 0;
+            const avgDisplay = avgMinutes >= 60
+              ? `${Math.floor(avgMinutes / 60)}h ${avgMinutes % 60}m`
+              : avgMinutes > 0 ? `${avgMinutes}m` : "—";
+            const statusData = (li.byStatus || []).map((s: any) => ({
+              name: (s.status || "new").replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
+              value: Number(s.count || 0),
+            }));
+            const sourceData = (li.bySource || []).map((s: any) => ({
+              name: (s.source || "direct").replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
+              value: Number(s.count || 0),
+            }));
+            const SOURCE_COLORS = ["#2563eb", "#059669", "#ea580c", "#7c3aed", "#dc2626", "#d946ef", "#0891b2"];
+            const STATUS_COLORS = ["#059669", "#2563eb", "#f59e0b", "#dc2626", "#7c3aed", "#64748b"];
+            return (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard title="Total Leads" value={totalLeads} icon={Target} />
+                  <StatCard title="Conversion Rate" value={`${li.conversionRate || 0}%`} icon={Percent} subtitle={`${li.convertedLeads || 0} converted`} />
+                  <StatCard title="Avg Response Time" value={avgDisplay} icon={Clock} subtitle={`${li.respondedCount || 0} responded`} />
+                  <StatCard title="Lead Sources" value={(li.bySource || []).length} icon={Activity} />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card className="border border-border/60 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Leads by Source</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {sourceData.length > 0 ? (
+                        <div className="flex items-center gap-6">
+                          <ResponsiveContainer width="50%" height={200}>
+                            <PieChart>
+                              <Pie data={sourceData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={2}>
+                                {sourceData.map((_: any, i: number) => (
+                                  <Cell key={i} fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <div className="flex-1 space-y-2">
+                            {sourceData.map((s: any, i: number) => (
+                              <div key={s.name} className="flex items-center justify-between text-sm">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-3 w-3 rounded-full" style={{ background: SOURCE_COLORS[i % SOURCE_COLORS.length] }} />
+                                  <span>{s.name}</span>
+                                </div>
+                                <span className="font-medium">{s.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">No lead data yet</div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border border-border/60 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Lead Status Breakdown</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {statusData.length > 0 ? (
+                        <div className="flex items-center gap-6">
+                          <ResponsiveContainer width="50%" height={200}>
+                            <PieChart>
+                              <Pie data={statusData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={2}>
+                                {statusData.map((_: any, i: number) => (
+                                  <Cell key={i} fill={STATUS_COLORS[i % STATUS_COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <div className="flex-1 space-y-2">
+                            {statusData.map((s: any, i: number) => (
+                              <div key={s.name} className="flex items-center justify-between text-sm">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-3 w-3 rounded-full" style={{ background: STATUS_COLORS[i % STATUS_COLORS.length] }} />
+                                  <span>{s.name}</span>
+                                </div>
+                                <span className="font-medium">{s.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">No lead data yet</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {(li.byZipCode || []).length > 0 && (
+                  <Card className="border border-border/60 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Top Lead Zip Codes</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {(li.byZipCode as any[]).map((z: any) => {
+                          const maxCount = Math.max(...(li.byZipCode as any[]).map((x: any) => Number(x.count)));
+                          const pct = maxCount > 0 ? (Number(z.count) / maxCount) * 100 : 0;
+                          return (
+                            <div key={z.zip_code} className="flex items-center gap-3">
+                              <span className="text-sm font-mono w-14 shrink-0">{z.zip_code}</span>
+                              <div className="flex-1 bg-muted/30 rounded-full h-5 overflow-hidden">
+                                <div className="h-full rounded-full bg-blue-500/70 flex items-center px-2" style={{ width: `${Math.max(pct, 8)}%` }}>
+                                  <span className="text-[10px] font-medium text-white">{z.count}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            );
+          })()}
+        </TabsContent>
+
+        <TabsContent value="geographic" className="space-y-4">
+          {(() => {
+            const geo = stats?.geographic || {};
+            const stateData = (geo.transactionsByState || []).map((s: any) => ({
+              name: s.state,
+              value: Number(s.count || 0),
+            }));
+            const GEO_COLORS = ["#2563eb", "#059669", "#ea580c", "#7c3aed", "#dc2626", "#d946ef", "#0891b2", "#65a30d", "#c026d3", "#0d9488"];
+            return (
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card className="border border-border/60 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Transactions by State</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {stateData.length > 0 ? (
+                        <div className="flex items-center gap-6">
+                          <ResponsiveContainer width="50%" height={220}>
+                            <PieChart>
+                              <Pie data={stateData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={2}>
+                                {stateData.map((_: any, i: number) => (
+                                  <Cell key={i} fill={GEO_COLORS[i % GEO_COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <div className="flex-1 space-y-2">
+                            {stateData.map((s: any, i: number) => (
+                              <div key={s.name} className="flex items-center justify-between text-sm">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-3 w-3 rounded-full" style={{ background: GEO_COLORS[i % GEO_COLORS.length] }} />
+                                  <span>{s.name}</span>
+                                </div>
+                                <span className="font-medium">{s.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">No transaction location data yet</div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border border-border/60 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Most Active Transaction Zip Codes</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {(geo.transactionsByZip || []).length > 0 ? (
+                        <div className="space-y-2">
+                          {(geo.transactionsByZip as any[]).map((z: any) => {
+                            const maxCount = Math.max(...(geo.transactionsByZip as any[]).map((x: any) => Number(x.count)));
+                            const pct = maxCount > 0 ? (Number(z.count) / maxCount) * 100 : 0;
+                            return (
+                              <div key={z.zip_code} className="flex items-center gap-3">
+                                <span className="text-sm font-mono w-14 shrink-0">{z.zip_code}</span>
+                                <div className="flex-1 bg-muted/30 rounded-full h-5 overflow-hidden">
+                                  <div className="h-full rounded-full bg-green-500/70 flex items-center px-2" style={{ width: `${Math.max(pct, 8)}%` }}>
+                                    <span className="text-[10px] font-medium text-white">{z.count}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">No zip code data yet</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card className="border border-border/60 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                      <MapPin className="h-4 w-4" /> Most Claimed Zip Codes (Lead Gen)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(geo.activeClaimedZips || []).length > 0 ? (
+                      <div className="space-y-2">
+                        {(geo.activeClaimedZips as any[]).map((z: any) => {
+                          const maxCount = Math.max(...(geo.activeClaimedZips as any[]).map((x: any) => Number(x.total_claims)));
+                          const pct = maxCount > 0 ? (Number(z.total_claims) / maxCount) * 100 : 0;
+                          return (
+                            <div key={z.zip_code} className="flex items-center gap-3">
+                              <span className="text-sm font-mono w-14 shrink-0">{z.zip_code}</span>
+                              <div className="flex-1 bg-muted/30 rounded-full h-5 overflow-hidden">
+                                <div className="h-full rounded-full bg-purple-500/70 flex items-center px-2" style={{ width: `${Math.max(pct, 8)}%` }}>
+                                  <span className="text-[10px] font-medium text-white">{z.total_claims} claims</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        <MapPin className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p>No claimed zip codes yet</p>
+                        <p className="text-xs mt-1">Zip codes will appear here once agents, lenders, or vendors claim them for lead generation.</p>
                       </div>
                     )}
                   </CardContent>
