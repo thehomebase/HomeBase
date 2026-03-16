@@ -117,8 +117,8 @@ export function TransactionContacts({ transactionId, readOnly = false }: Transac
 
   const queryClient = useQueryClient();
 
-  // Watch for client updates and sync contact information
   React.useEffect(() => {
+    if (readOnly) return;
     contacts.forEach((contact: Contact) => {
       if (contact.clientId) {
         console.log('Checking sync for contact:', contact);
@@ -163,7 +163,7 @@ export function TransactionContacts({ transactionId, readOnly = false }: Transac
         }
       }
     });
-  }, [clients, contacts]); 
+  }, [clients, contacts, readOnly]); 
 
   // Create new client mutation
   const createClientMutation = useMutation({

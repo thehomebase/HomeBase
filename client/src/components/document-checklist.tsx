@@ -1302,15 +1302,17 @@ export function DocumentChecklist({ transactionId, readOnly = false }: { transac
   const hasSyncedOnLoad = useRef(false);
 
   useEffect(() => {
+    if (readOnly) return;
     const hasWaitingDocuSign = documents.some(d => d.docusignEnvelopeId && d.status !== 'signed' && d.status !== 'complete');
     if (hasWaitingDocuSign && !hasSyncedOnLoad.current && !syncDocuSignMutation.isPending && (user?.role === 'agent' || user?.role === 'broker')) {
       hasSyncedOnLoad.current = true;
       autoSyncRef.current = true;
       syncDocuSignMutation.mutate();
     }
-  }, [documents]);
+  }, [documents, readOnly]);
 
   useEffect(() => {
+    if (readOnly) return;
     const hasWaitingDocuSign = documents.some(d => d.docusignEnvelopeId && d.status !== 'signed' && d.status !== 'complete');
     if (!hasWaitingDocuSign || user?.role !== 'agent' && user?.role !== 'broker') return;
 
@@ -1322,7 +1324,7 @@ export function DocumentChecklist({ transactionId, readOnly = false }: { transac
     }, 60000);
 
     return () => clearInterval(interval);
-  }, [documents, user?.role]);
+  }, [documents, user?.role, readOnly]);
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -1347,7 +1349,7 @@ export function DocumentChecklist({ transactionId, readOnly = false }: { transac
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Documents</CardTitle>
-        {(user?.role === 'agent' || user?.role === 'broker') && documents.some(d => d.docusignEnvelopeId) && (
+        {!readOnly && (user?.role === 'agent' || user?.role === 'broker') && documents.some(d => d.docusignEnvelopeId) && (
           <Button
             variant="outline"
             size="sm"
