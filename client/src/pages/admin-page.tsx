@@ -197,15 +197,15 @@ export default function AdminPage() {
       roleMap.get(r.role)!.set(r.month, Number(r.count));
     });
     const sortedMonths = Array.from(months).sort();
+    let cumulative = 0;
     return sortedMonths.map(m => {
       const entry: any = { month: m.slice(5) };
-      let total = 0;
       roleMap.forEach((counts, role) => {
         const val = counts.get(m) || 0;
         entry[role] = val;
-        total += val;
+        cumulative += val;
       });
-      entry.total = total;
+      entry.totalToDate = cumulative;
       return entry;
     });
   }, [stats]);
