@@ -1779,9 +1779,62 @@ export class DatabaseStorage implements IStorage {
       };
     }
 
+    if (role === "admin") {
+      const usersResult = await db.execute(sql`
+        SELECT COUNT(*)::int as total,
+          COUNT(*) FILTER (WHERE role = 'agent')::int as agents,
+          COUNT(*) FILTER (WHERE role = 'broker')::int as brokers,
+          COUNT(*) FILTER (WHERE role = 'client')::int as clients,
+          COUNT(*) FILTER (WHERE role = 'vendor')::int as vendors,
+          COUNT(*) FILTER (WHERE role = 'lender')::int as lenders,
+          COUNT(*) FILTER (WHERE created_at >= ${monthStart}::timestamp)::int as new_this_month
+        FROM users
+      `);
+      const txResult = await db.execute(sql`
+        SELECT COUNT(*)::int as total,
+          COUNT(*) FILTER (WHERE status = 'closed')::int as closed,
+          COUNT(*) FILTER (WHERE status != 'closed')::int as active
+        FROM transactions
+      `);
+      const leadsResult = await db.execute(sql`
+        SELECT COUNT(*)::int as total,
+          COUNT(*) FILTER (WHERE status = 'new')::int as pending
+        FROM leads
+      `);
+      const unreadResult = await db.execute(sql`
+        SELECT COUNT(*)::int as count FROM private_messages
+        WHERE recipient_id = ${userId} AND read = false
+      `);
+      const users = (usersResult.rows[0] as any) || {};
+      const txs = (txResult.rows[0] as any) || {};
+      const leads = (leadsResult.rows[0] as any) || {};
+      return {
+        role: "admin",
+        users: {
+          total: users.total || 0,
+          agents: users.agents || 0,
+          brokers: users.brokers || 0,
+          clients: users.clients || 0,
+          vendors: users.vendors || 0,
+          lenders: users.lenders || 0,
+          newThisMonth: users.new_this_month || 0,
+        },
+        transactions: {
+          total: txs.total || 0,
+          active: txs.active || 0,
+          closed: txs.closed || 0,
+        },
+        leads: {
+          total: leads.total || 0,
+          pending: leads.pending || 0,
+        },
+        unreadMessages: (unreadResult.rows[0] as any)?.count || 0,
+      };
+    }
+
     if (role === "client") {
       const txResult = await db.execute(sql`
-        SELECT t.id, t.street_name, t.status, t.closing_date, t.contract_price
+        SELECT t.id, t.street_name, t.status, t.closing_date, t.contract_price, t.type
         FROM transactions t
         JOIN users u ON u.id = ${userId}
         WHERE t.client_id = u.client_record_id OR t.secondary_client_id = u.client_record_id
@@ -1808,6 +1861,7 @@ export class DatabaseStorage implements IStorage {
           status: tx.status,
           closingDate: tx.closing_date,
           contractPrice: tx.contract_price,
+          type: tx.type,
         } : null,
         pendingDocuments: pendingDocs,
         unreadMessages: (unreadResult.rows[0] as any)?.count || 0,

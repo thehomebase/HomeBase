@@ -17,7 +17,8 @@ import {
 import {
   LayoutDashboard, TrendingUp, TrendingDown, Users, FileText, MessageSquare,
   Target, DollarSign, CalendarClock, ArrowRight, Plus, Send, Settings,
-  X, Clock, AlertTriangle, Briefcase, Zap, CheckCircle2, Minus, Phone, Mail, TrendingUp as TrendUp, UserPlus
+  X, Clock, AlertTriangle, Briefcase, Zap, CheckCircle2, Minus, Phone, Mail, TrendingUp as TrendUp, UserPlus,
+  Shield, Activity, Building2
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
@@ -55,12 +56,20 @@ const CLIENT_WIDGETS = [
   { id: "quick_actions", label: "Quick Actions" },
 ];
 
+const ADMIN_WIDGETS = [
+  { id: "stats", label: "Platform Overview" },
+  { id: "users", label: "User Breakdown" },
+  { id: "quick_actions", label: "Quick Actions" },
+];
+
 function getWidgetsForRole(role: string) {
   switch (role) {
     case "agent": return AGENT_WIDGETS;
+    case "broker": return AGENT_WIDGETS;
     case "vendor": return VENDOR_WIDGETS;
     case "lender": return LENDER_WIDGETS;
     case "client": return CLIENT_WIDGETS;
+    case "admin": return ADMIN_WIDGETS;
     default: return AGENT_WIDGETS;
   }
 }
@@ -965,6 +974,87 @@ export default function DashboardPage() {
             </Card>
           )}
           {isWidgetVisible("quick_actions") && <QuickActionsWidget role="lender" />}
+        </>
+      )}
+
+      {role === "admin" && (
+        <>
+          {isWidgetVisible("stats") && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <StatCard
+                icon={Users}
+                label="Total Users"
+                value={dashData.users?.total || 0}
+                subValue={`${dashData.users?.newThisMonth || 0} new this month`}
+                accent="border-l-blue-500"
+              />
+              <StatCard
+                icon={Building2}
+                label="Transactions"
+                value={dashData.transactions?.total || 0}
+                subValue={`${dashData.transactions?.active || 0} active`}
+                accent="border-l-emerald-500"
+              />
+              <StatCard
+                icon={Target}
+                label="Leads"
+                value={dashData.leads?.total || 0}
+                subValue={`${dashData.leads?.pending || 0} pending`}
+                accent="border-l-purple-500"
+              />
+              <StatCard
+                icon={MessageSquare}
+                label="Unread Messages"
+                value={dashData.unreadMessages || 0}
+                accent="border-l-amber-500"
+              />
+            </div>
+          )}
+          {isWidgetVisible("users") && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+              {[
+                { label: "Agents", count: dashData.users?.agents || 0, color: "bg-blue-500" },
+                { label: "Brokers", count: dashData.users?.brokers || 0, color: "bg-violet-500" },
+                { label: "Clients", count: dashData.users?.clients || 0, color: "bg-emerald-500" },
+                { label: "Vendors", count: dashData.users?.vendors || 0, color: "bg-orange-500" },
+                { label: "Lenders", count: dashData.users?.lenders || 0, color: "bg-pink-500" },
+              ].map(item => (
+                <Card key={item.label} className="p-4 text-center">
+                  <div className={`w-2 h-2 rounded-full ${item.color} mx-auto mb-2`} />
+                  <p className="text-2xl font-bold">{item.count}</p>
+                  <p className="text-xs text-muted-foreground">{item.label}</p>
+                </Card>
+              ))}
+            </div>
+          )}
+          {isWidgetVisible("quick_actions") && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Link href="/admin">
+                <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+                  <Shield className="h-5 w-5" />
+                  <span className="text-xs">Admin Panel</span>
+                </Button>
+              </Link>
+              <Link href="/messages">
+                <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  <span className="text-xs">Messages</span>
+                </Button>
+              </Link>
+              <Link href="/tasks">
+                <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+                  <Activity className="h-5 w-5" />
+                  <span className="text-xs">Tasks</span>
+                </Button>
+              </Link>
+              <Link href="/settings">
+                <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+                  <Settings className="h-5 w-5" />
+                  <span className="text-xs">Settings</span>
+                </Button>
+              </Link>
+            </div>
+          )}
         </>
       )}
 
