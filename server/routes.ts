@@ -10870,6 +10870,19 @@ export function registerRoutes(app: Express): Server {
       const txLastM = Number(txLastMonth.rows[0]?.count || 0);
       const txChange = txLastM > 0 ? Math.round(((txThisM - txLastM) / txLastM) * 100) : (txThisM > 0 ? 100 : 0);
 
+      const [stripeSubs, stripeRevenue, stripeRecentInvoices, stripeSubsByStatus, stripeMonthlyRevenue, stripeCustomerCount] = await Promise.all([
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM stripe.subscriptions WHERE status = 'active'`)),
+        safeQuery(db.execute(sql`SELECT COALESCE(SUM(amount_paid), 0) as total FROM stripe.invoices WHERE status = 'paid'`)),
+        safeQuery(db.execute(sql`SELECT id, customer_name, customer_email, amount_paid, currency, status, created, billing_reason FROM stripe.invoices ORDER BY created DESC LIMIT 10`)),
+        safeQuery(db.execute(sql`SELECT status, COUNT(*) as count FROM stripe.subscriptions GROUP BY status`)),
+        safeQuery(db.execute(sql`SELECT TO_CHAR(TO_TIMESTAMP(created), 'YYYY-MM') as month, SUM(amount_paid) as revenue, COUNT(*) as invoice_count FROM stripe.invoices WHERE status = 'paid' AND created >= EXTRACT(EPOCH FROM NOW() - INTERVAL '12 months')::integer GROUP BY month ORDER BY month`)),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM stripe.customers`)),
+      ]);
+
+      const usersWithSubs = await safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM users WHERE stripe_subscription_id IS NOT NULL`));
+
+      const adRevenue = await safeQuery(db.execute(sql`SELECT COALESCE(SUM(budget_cents), 0) as total FROM sponsored_ads WHERE status = 'active'`));
+
       res.json({
         totalUsers: Number(totalUsers.rows[0]?.count || 0),
         totalTransactions: Number(totalTx.rows[0]?.count || 0),
@@ -10890,6 +10903,16 @@ export function registerRoutes(app: Express): Server {
         userChange,
         txThisMonth: txThisM,
         txChange,
+        financial: {
+          activeSubscriptions: Number(stripeSubs.rows[0]?.count || 0),
+          totalRevenue: Number(stripeRevenue.rows[0]?.total || 0),
+          stripeCustomers: Number(stripeCustomerCount.rows[0]?.count || 0),
+          subscribedUsers: Number(usersWithSubs.rows[0]?.count || 0),
+          subscriptionsByStatus: stripeSubsByStatus.rows,
+          monthlyRevenue: stripeMonthlyRevenue.rows,
+          recentInvoices: stripeRecentInvoices.rows,
+          adRevenueCents: Number(adRevenue.rows[0]?.total || 0),
+        },
       });
     } catch (error) {
       console.error("Admin stats error:", error);

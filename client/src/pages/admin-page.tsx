@@ -16,12 +16,14 @@ import { useToast } from "@/hooks/use-toast";
 import {
   XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, Legend,
+  BarChart, Bar,
 } from "recharts";
 import {
   Users, BarChart3, Shield, Flag, Megaphone, ClipboardList,
   CheckCircle, XCircle, Search, ExternalLink, Eye, TrendingUp,
   ArrowUpRight, ArrowDownRight, Target, FileText, UserPlus,
-  MessageSquare, Send, Loader2, ChevronLeft, ChevronRight
+  MessageSquare, Send, Loader2, ChevronLeft, ChevronRight,
+  DollarSign, CreditCard, Receipt
 } from "lucide-react";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -420,6 +422,7 @@ export default function AdminPage() {
               {pendingReportsCount > 0 && <span className="ml-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 inline-flex items-center justify-center">{pendingReportsCount}</span>}
             </TabsTrigger>
             <TabsTrigger value="ads"><Megaphone className="h-4 w-4 mr-1" />Ads</TabsTrigger>
+            <TabsTrigger value="financial"><DollarSign className="h-4 w-4 mr-1" />Financial</TabsTrigger>
             <TabsTrigger value="messages"><MessageSquare className="h-4 w-4 mr-1" />Messages</TabsTrigger>
             <TabsTrigger value="audit"><ClipboardList className="h-4 w-4 mr-1" />Audit Log</TabsTrigger>
           </TabsList>
@@ -625,6 +628,142 @@ export default function AdminPage() {
               </Table>
             </div>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="financial" className="space-y-4">
+          {(() => {
+            const fin = stats?.financial || {};
+            const revenueData = (fin.monthlyRevenue || []).map((m: any) => ({
+              month: m.month?.slice(5) || "",
+              revenue: Number(m.revenue || 0) / 100,
+              invoices: Number(m.invoice_count || 0),
+            }));
+            const subStatusData = (fin.subscriptionsByStatus || []).map((s: any) => ({
+              name: (s.status || "unknown").charAt(0).toUpperCase() + (s.status || "unknown").slice(1),
+              value: Number(s.count || 0),
+            }));
+            const SUB_COLORS = ["#059669", "#2563eb", "#ea580c", "#dc2626", "#7c3aed"];
+            return (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard title="Active Subscriptions" value={fin.activeSubscriptions || 0} icon={CreditCard} />
+                  <StatCard title="Total Revenue" value={`$${(fin.totalRevenue / 100 || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={DollarSign} />
+                  <StatCard title="Stripe Customers" value={fin.stripeCustomers || 0} icon={Users} />
+                  <StatCard title="Ad Revenue" value={`$${((fin.adRevenueCents || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}/mo`} icon={Megaphone} />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card className="border border-border/60 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Monthly Revenue</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {revenueData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={220}>
+                          <BarChart data={revenueData}>
+                            <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                            <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={50} tickFormatter={(v: number) => `$${v}`} />
+                            <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }} formatter={(v: number) => [`$${v.toFixed(2)}`, "Revenue"]} />
+                            <Bar dataKey="revenue" name="Revenue" fill="#059669" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">No revenue data yet</div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border border-border/60 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Subscriptions by Status</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {subStatusData.length > 0 ? (
+                        <div className="flex items-center gap-6">
+                          <ResponsiveContainer width="50%" height={200}>
+                            <PieChart>
+                              <Pie data={subStatusData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={2}>
+                                {subStatusData.map((_: any, i: number) => (
+                                  <Cell key={i} fill={SUB_COLORS[i % SUB_COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <div className="flex-1 space-y-2">
+                            {subStatusData.map((s: any, i: number) => (
+                              <div key={s.name} className="flex items-center justify-between text-sm">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-3 w-3 rounded-full" style={{ background: SUB_COLORS[i % SUB_COLORS.length] }} />
+                                  <span>{s.name}</span>
+                                </div>
+                                <span className="font-medium">{s.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">No subscriptions yet</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card className="border border-border/60 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                      <Receipt className="h-4 w-4" /> Recent Invoices
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(fin.recentInvoices || []).length > 0 ? (
+                      <div className="rounded-md overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Customer</TableHead>
+                              <TableHead>Amount</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Reason</TableHead>
+                              <TableHead>Date</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(fin.recentInvoices as any[]).map((inv: any) => (
+                              <TableRow key={inv.id}>
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium text-sm">{inv.customer_name || "—"}</p>
+                                    <p className="text-xs text-muted-foreground">{inv.customer_email || ""}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="font-medium">${((inv.amount_paid || 0) / 100).toFixed(2)}</TableCell>
+                                <TableCell>
+                                  <Badge variant={inv.status === "paid" ? "default" : inv.status === "open" ? "secondary" : "outline"} className="text-[10px]">
+                                    {inv.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground">{(inv.billing_reason || "").replace(/_/g, " ")}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                                  {inv.created ? new Date(inv.created * 1000).toLocaleDateString() : "—"}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        <Receipt className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p>No invoices yet</p>
+                        <p className="text-xs mt-1">Invoices will appear here once users subscribe via Stripe.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            );
+          })()}
         </TabsContent>
 
         <TabsContent value="messages" className="space-y-4">
