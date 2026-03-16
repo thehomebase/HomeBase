@@ -14,8 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area,
+  XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, LineChart, Line, Legend,
 } from "recharts";
 import {
   Users, BarChart3, Shield, Flag, Megaphone, ClipboardList,
@@ -182,24 +182,26 @@ export default function AdminPage() {
     }));
   }, [stats]);
 
-  const txStatusData = useMemo(() => {
-    if (!stats?.transactionsByStatus) return [];
-    return (stats.transactionsByStatus as any[]).map((t: any) => ({
-      name: t.status.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
-      value: Number(t.count),
-    }));
+  const roleGrowthData = useMemo(() => {
+    if (!stats?.roleGrowth || (stats.roleGrowth as any[]).length === 0) return [];
+    const months = new Set<string>();
+    const roleMap = new Map<string, Map<string, number>>();
+    (stats.roleGrowth as any[]).forEach((r: any) => {
+      months.add(r.month);
+      if (!roleMap.has(r.role)) roleMap.set(r.role, new Map());
+      roleMap.get(r.role)!.set(r.month, Number(r.count));
+    });
+    const sortedMonths = Array.from(months).sort();
+    return sortedMonths.map(m => {
+      const entry: any = { month: m.slice(5) };
+      roleMap.forEach((counts, role) => { entry[role] = counts.get(m) || 0; });
+      return entry;
+    });
   }, [stats]);
 
-  const growthData = useMemo(() => {
-    if (!stats?.userGrowth) return [];
-    const userMap = new Map((stats.userGrowth as any[]).map((u: any) => [u.month, Number(u.count)]));
-    const txMap = new Map((stats.txGrowth as any[] || []).map((t: any) => [t.month, Number(t.count)]));
-    const allMonths = new Set([...userMap.keys(), ...txMap.keys()]);
-    return Array.from(allMonths).sort().map(m => ({
-      month: m.slice(5),
-      users: userMap.get(m) || 0,
-      transactions: txMap.get(m) || 0,
-    }));
+  const roleKeys = useMemo(() => {
+    if (!stats?.roleGrowth) return [];
+    return [...new Set((stats.roleGrowth as any[]).map((r: any) => r.role))];
   }, [stats]);
 
   if (!isAdmin) {
@@ -244,28 +246,30 @@ export default function AdminPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border border-border/60 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">User & Transaction Growth</CardTitle>
+            <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">User Growth by Role</CardTitle>
           </CardHeader>
           <CardContent>
-            {growthData.length > 0 ? (
+            {roleGrowthData.length > 0 ? (
               <ResponsiveContainer width="100%" height={240}>
-                <AreaChart data={growthData}>
+                <LineChart data={roleGrowthData}>
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={30} />
+                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={30} allowDecimals={false} />
                   <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                  <Area type="monotone" dataKey="users" name="Users" stroke="hsl(var(--foreground))" fill="hsl(var(--foreground) / 0.15)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="transactions" name="Transactions" stroke="hsl(var(--foreground) / 0.5)" fill="hsl(var(--foreground) / 0.08)" strokeWidth={2} strokeDasharray="4 4" />
-                </AreaChart>
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {roleKeys.map((role: string, i: number) => (
+                    <Line key={role} type="monotone" dataKey={role} name={role.charAt(0).toUpperCase() + role.slice(1)} stroke={ROLE_COLORS[role] || PIE_SHADES[i % PIE_SHADES.length]} strokeWidth={2} dot={{ r: 3 }} />
+                  ))}
+                </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[240px] flex items-center justify-center text-muted-foreground text-sm">No data yet</div>
+              <div className="h-[240px] flex items-center justify-center text-muted-foreground text-sm">No growth data yet</div>
             )}
           </CardContent>
         </Card>
 
         <Card className="border border-border/60 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Users by Role</CardTitle>
+            <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Current Users by Role</CardTitle>
           </CardHeader>
           <CardContent>
             {roleData.length > 0 ? (
@@ -299,24 +303,6 @@ export default function AdminPage() {
         </Card>
       </div>
 
-      {txStatusData.length > 0 && (
-        <Card className="border border-border/60 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Transactions by Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={txStatusData} layout="vertical">
-                <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={120} />
-                <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
-                <Bar dataKey="value" name="Count" fill="hsl(var(--foreground) / 0.6)" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
       {(stats?.recentSignups as any[])?.length > 0 && (
         <Card className="border border-border/60 shadow-sm">
           <CardHeader className="pb-2">
@@ -349,7 +335,7 @@ export default function AdminPage() {
       )}
 
       <Tabs defaultValue="users">
-        <TabsList className="flex-wrap">
+        <TabsList className="flex-wrap relative z-0">
           <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" />Users</TabsTrigger>
           <TabsTrigger value="verifications" className="relative">
             <Shield className="h-4 w-4 mr-1" />Verifications
@@ -365,7 +351,7 @@ export default function AdminPage() {
         </TabsList>
 
         <TabsContent value="users" className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap relative z-10">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="pl-9" />
