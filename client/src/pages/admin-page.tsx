@@ -646,11 +646,33 @@ export default function AdminPage() {
             return (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard title="MRR (Subscriptions)" value={`$${((fin.mrr || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={DollarSign} subtitle="per month" />
                   <StatCard title="Active Subscriptions" value={fin.activeSubscriptions || 0} icon={CreditCard} />
-                  <StatCard title="Total Revenue" value={`$${(fin.totalRevenue / 100 || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={DollarSign} />
-                  <StatCard title="Stripe Customers" value={fin.stripeCustomers || 0} icon={Users} />
-                  <StatCard title="Ad Revenue" value={`$${((fin.adRevenueCents || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}/mo`} icon={Megaphone} />
+                  <StatCard title="Ad Revenue" value={`$${((fin.adRevenueCents || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Megaphone} subtitle="per month" />
+                  <StatCard title="Lead Gen Revenue" value={`$${((fin.leadGenRevenue?.total || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={TrendingUp} subtitle="per month" />
                 </div>
+
+                <Card className="border border-border/60 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Lead Generation Revenue Breakdown</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center p-3 rounded-lg bg-muted/30">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Agents</p>
+                        <p className="text-lg font-bold">${((fin.leadGenRevenue?.agents || 0) / 100).toFixed(2)}<span className="text-xs font-normal text-muted-foreground">/mo</span></p>
+                      </div>
+                      <div className="text-center p-3 rounded-lg bg-muted/30">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Lenders</p>
+                        <p className="text-lg font-bold">${((fin.leadGenRevenue?.lenders || 0) / 100).toFixed(2)}<span className="text-xs font-normal text-muted-foreground">/mo</span></p>
+                      </div>
+                      <div className="text-center p-3 rounded-lg bg-muted/30">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Vendors</p>
+                        <p className="text-lg font-bold">${((fin.leadGenRevenue?.vendors || 0) / 100).toFixed(2)}<span className="text-xs font-normal text-muted-foreground">/mo</span></p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <Card className="border border-border/60 shadow-sm">
