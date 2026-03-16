@@ -3101,10 +3101,12 @@ export class DatabaseStorage implements IStorage {
 
   async deleteContractor(id: number): Promise<void> {
     try {
-      await db.execute(sql`UPDATE bids SET contractor_id = NULL WHERE contractor_id = ${id}`);
-      await db.execute(sql`UPDATE bid_requests SET contractor_id = NULL WHERE contractor_id = ${id}`);
-      await db.execute(sql`DELETE FROM contractor_reviews WHERE contractor_id = ${id}`);
-      await db.execute(sql`DELETE FROM contractors WHERE id = ${id}`);
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`UPDATE bids SET contractor_id = NULL WHERE contractor_id = ${id}`);
+        await tx.execute(sql`UPDATE bid_requests SET contractor_id = NULL WHERE contractor_id = ${id}`);
+        await tx.execute(sql`DELETE FROM contractor_reviews WHERE contractor_id = ${id}`);
+        await tx.execute(sql`DELETE FROM contractors WHERE id = ${id}`);
+      });
     } catch (error) {
       console.error('Error in deleteContractor:', error);
       throw error;
