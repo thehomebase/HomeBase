@@ -21,26 +21,29 @@ import {
   Users, BarChart3, Shield, Flag, Megaphone, ClipboardList,
   CheckCircle, XCircle, Search, ExternalLink, Eye, TrendingUp,
   ArrowUpRight, ArrowDownRight, Target, FileText, UserPlus,
-  MessageSquare, Send, Loader2
+  MessageSquare, Send, Loader2, ChevronLeft, ChevronRight
 } from "lucide-react";
 
 const ROLE_COLORS: Record<string, string> = {
-  agent: "hsl(var(--foreground))",
-  broker: "hsl(var(--foreground) / 0.7)",
-  client: "hsl(var(--foreground) / 0.5)",
-  vendor: "hsl(var(--foreground) / 0.35)",
-  lender: "hsl(var(--foreground) / 0.2)",
-  admin: "hsl(var(--foreground) / 0.1)",
+  agent: "#2563eb",
+  broker: "#7c3aed",
+  client: "#059669",
+  vendor: "#ea580c",
+  lender: "#d946ef",
+  admin: "#dc2626",
+  total: "#334155",
 };
 
 const PIE_SHADES = [
-  "hsl(var(--foreground))",
-  "hsl(var(--foreground) / 0.7)",
-  "hsl(var(--foreground) / 0.5)",
-  "hsl(var(--foreground) / 0.35)",
-  "hsl(var(--foreground) / 0.2)",
-  "hsl(var(--foreground) / 0.1)",
+  "#2563eb",
+  "#7c3aed",
+  "#059669",
+  "#ea580c",
+  "#d946ef",
+  "#dc2626",
 ];
+
+const USERS_PER_PAGE = 10;
 
 function StatCard({ title, value, change, icon: Icon, subtitle }: {
   title: string; value: string | number; change?: number; icon: typeof Users; subtitle?: string;
@@ -85,6 +88,8 @@ export default function AdminPage() {
   const [adNotes, setAdNotes] = useState<Record<number, string>>({});
   const [replyTo, setReplyTo] = useState<any>(null);
   const [replyText, setReplyText] = useState("");
+  const [usersPage, setUsersPage] = useState(0);
+  const [chartRoleFilter, setChartRoleFilter] = useState<string>("all");
 
   const isAdmin = user?.role === "admin";
 
@@ -194,7 +199,13 @@ export default function AdminPage() {
     const sortedMonths = Array.from(months).sort();
     return sortedMonths.map(m => {
       const entry: any = { month: m.slice(5) };
-      roleMap.forEach((counts, role) => { entry[role] = counts.get(m) || 0; });
+      let total = 0;
+      roleMap.forEach((counts, role) => {
+        const val = counts.get(m) || 0;
+        entry[role] = val;
+        total += val;
+      });
+      entry.total = total;
       return entry;
     });
   }, [stats]);
@@ -203,6 +214,11 @@ export default function AdminPage() {
     if (!stats?.roleGrowth) return [];
     return [...new Set((stats.roleGrowth as any[]).map((r: any) => r.role))];
   }, [stats]);
+
+  const visibleRoleKeys = useMemo(() => {
+    if (chartRoleFilter === "all") return roleKeys;
+    return roleKeys.filter(r => r === chartRoleFilter);
+  }, [roleKeys, chartRoleFilter]);
 
   if (!isAdmin) {
     navigate("/");
@@ -246,7 +262,23 @@ export default function AdminPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border border-border/60 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">User Growth by Role</CardTitle>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">User Growth by Role</CardTitle>
+              <Select value={chartRoleFilter} onValueChange={setChartRoleFilter}>
+                <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {roleKeys.map((r: string) => (
+                    <SelectItem key={r} value={r}>
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full inline-block" style={{ background: ROLE_COLORS[r] }} />
+                        {r.charAt(0).toUpperCase() + r.slice(1)}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             {roleGrowthData.length > 0 ? (
@@ -256,7 +288,8 @@ export default function AdminPage() {
                   <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={30} allowDecimals={false} />
                   <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  {roleKeys.map((role: string, i: number) => (
+                  <Line type="monotone" dataKey="total" name="Total" stroke={ROLE_COLORS.total} strokeWidth={2.5} strokeDasharray="6 3" dot={{ r: 3 }} />
+                  {visibleRoleKeys.map((role: string, i: number) => (
                     <Line key={role} type="monotone" dataKey={role} name={role.charAt(0).toUpperCase() + role.slice(1)} stroke={ROLE_COLORS[role] || PIE_SHADES[i % PIE_SHADES.length]} strokeWidth={2} dot={{ r: 3 }} />
                   ))}
                 </LineChart>
@@ -335,28 +368,30 @@ export default function AdminPage() {
       )}
 
       <Tabs defaultValue="users">
-        <TabsList className="flex-wrap relative z-0">
-          <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" />Users</TabsTrigger>
-          <TabsTrigger value="verifications" className="relative">
-            <Shield className="h-4 w-4 mr-1" />Verifications
-            {pendingCount > 0 && <span className="ml-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-full h-4 w-4 inline-flex items-center justify-center">{pendingCount}</span>}
-          </TabsTrigger>
-          <TabsTrigger value="reports" className="relative">
-            <Flag className="h-4 w-4 mr-1" />Reports
-            {pendingReportsCount > 0 && <span className="ml-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 inline-flex items-center justify-center">{pendingReportsCount}</span>}
-          </TabsTrigger>
-          <TabsTrigger value="ads"><Megaphone className="h-4 w-4 mr-1" />Ads</TabsTrigger>
-          <TabsTrigger value="messages"><MessageSquare className="h-4 w-4 mr-1" />Messages</TabsTrigger>
-          <TabsTrigger value="audit"><ClipboardList className="h-4 w-4 mr-1" />Audit Log</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+          <TabsList className="inline-flex w-max md:w-auto">
+            <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" />Users</TabsTrigger>
+            <TabsTrigger value="verifications" className="relative">
+              <Shield className="h-4 w-4 mr-1" />Verifications
+              {pendingCount > 0 && <span className="ml-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-full h-4 w-4 inline-flex items-center justify-center">{pendingCount}</span>}
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="relative">
+              <Flag className="h-4 w-4 mr-1" />Reports
+              {pendingReportsCount > 0 && <span className="ml-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 inline-flex items-center justify-center">{pendingReportsCount}</span>}
+            </TabsTrigger>
+            <TabsTrigger value="ads"><Megaphone className="h-4 w-4 mr-1" />Ads</TabsTrigger>
+            <TabsTrigger value="messages"><MessageSquare className="h-4 w-4 mr-1" />Messages</TabsTrigger>
+            <TabsTrigger value="audit"><ClipboardList className="h-4 w-4 mr-1" />Audit Log</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="users" className="space-y-4">
-          <div className="flex gap-2 flex-wrap relative z-10">
+          <div className="flex gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} className="pl-9" />
+              <Input placeholder="Search users..." value={userSearch} onChange={(e) => { setUserSearch(e.target.value); setUsersPage(0); }} className="pl-9" />
             </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setUsersPage(0); }}>
               <SelectTrigger className="w-[140px]"><SelectValue placeholder="All Roles" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
@@ -369,55 +404,74 @@ export default function AdminPage() {
               </SelectContent>
             </Select>
           </div>
-          <Card className="border border-border/60 shadow-sm">
-            <div className="rounded-md overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Verified</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(usersData?.users || []).length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No users found</TableCell>
-                    </TableRow>
-                  )}
-                  {(usersData?.users || []).map((u: any) => (
-                    <TableRow key={u.id}>
-                      <TableCell className="text-muted-foreground">{u.id}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="h-7 w-7 rounded-full bg-muted/50 flex items-center justify-center text-[10px] font-medium shrink-0">
-                            {(u.first_name?.[0] || "")}{(u.last_name?.[0] || "")}
-                          </div>
-                          <span className="font-medium">{u.first_name} {u.last_name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[200px] truncate text-muted-foreground">{u.email}</TableCell>
-                      <TableCell><Badge variant="outline">{u.role}</Badge></TableCell>
-                      <TableCell>{u.email_verified ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-red-400" />}</TableCell>
-                      <TableCell><Badge variant={u.verification_status === "admin_verified" ? "default" : "secondary"} className="text-[10px]">{u.verification_status || "unverified"}</Badge></TableCell>
-                      <TableCell>
-                        <Button size="sm" variant="outline" onClick={() => setEditUser(u)}>Edit</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            {usersData?.total > 0 && (
-              <div className="p-3 border-t text-xs text-muted-foreground">
-                Showing {usersData.users?.length || 0} of {usersData.total} users
-              </div>
-            )}
-          </Card>
+          {(() => {
+            const allUsers = usersData?.users || [];
+            const totalCount = allUsers.length;
+            const totalPages = Math.max(1, Math.ceil(totalCount / USERS_PER_PAGE));
+            const pageUsers = allUsers.slice(usersPage * USERS_PER_PAGE, (usersPage + 1) * USERS_PER_PAGE);
+            return (
+              <Card className="border border-border/60 shadow-sm">
+                <div className="rounded-md overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Verified</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pageUsers.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No users found</TableCell>
+                        </TableRow>
+                      )}
+                      {pageUsers.map((u: any) => (
+                        <TableRow key={u.id}>
+                          <TableCell className="text-muted-foreground">{u.id}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="h-7 w-7 rounded-full bg-muted/50 flex items-center justify-center text-[10px] font-medium shrink-0">
+                                {(u.first_name?.[0] || "")}{(u.last_name?.[0] || "")}
+                              </div>
+                              <span className="font-medium">{u.first_name} {u.last_name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-[200px] truncate text-muted-foreground">{u.email}</TableCell>
+                          <TableCell><Badge variant="outline">{u.role}</Badge></TableCell>
+                          <TableCell>{u.email_verified ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-red-400" />}</TableCell>
+                          <TableCell><Badge variant={u.verification_status === "admin_verified" ? "default" : "secondary"} className="text-[10px]">{u.verification_status || "unverified"}</Badge></TableCell>
+                          <TableCell>
+                            <Button size="sm" variant="outline" onClick={() => setEditUser(u)}>Edit</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {totalCount > 0 && (
+                  <div className="flex items-center justify-between p-3 border-t">
+                    <span className="text-xs text-muted-foreground">
+                      Showing {usersPage * USERS_PER_PAGE + 1}–{Math.min((usersPage + 1) * USERS_PER_PAGE, totalCount)} of {totalCount}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="outline" className="h-7 w-7 p-0" disabled={usersPage === 0} onClick={() => setUsersPage(p => p - 1)}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-xs px-2">{usersPage + 1} / {totalPages}</span>
+                      <Button size="sm" variant="outline" className="h-7 w-7 p-0" disabled={usersPage >= totalPages - 1} onClick={() => setUsersPage(p => p + 1)}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            );
+          })()}
         </TabsContent>
 
         <TabsContent value="verifications" className="space-y-4">
