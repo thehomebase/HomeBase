@@ -2839,7 +2839,7 @@ export function registerRoutes(app: Express): Server {
       const extracted = await parseContract(req.file.buffer);
       (req as any).file.buffer = Buffer.alloc(0);
 
-      const { rawTextPreview, documentType, inspectionItems, notes, aiUsed, ...fields } = extracted;
+      const { rawTextPreview, documentType, notes, aiUsed, ...fields } = extracted;
 
       const fieldCount = Object.values(fields).filter(v => v !== null && v !== undefined && v !== '').length;
       console.log(`=== DOCUMENT PARSED (AI: ${aiUsed ? 'yes' : 'no'}${documentType ? ', type: ' + documentType : ''}, fields: ${fieldCount}) ===`);
@@ -2848,7 +2848,6 @@ export function registerRoutes(app: Express): Server {
         extracted: fields,
         rawTextPreview: rawTextPreview.substring(0, 2000),
         documentType: documentType || (aiUsed ? 'unknown' : 'purchase_contract'),
-        inspectionItems: inspectionItems || null,
         notes: notes || null,
         aiUsed: aiUsed || false,
         message: aiUsed
@@ -6581,30 +6580,16 @@ export function registerRoutes(app: Express): Server {
       if (!transaction || transaction.agentId !== req.user.id) {
         return res.status(403).json({ error: 'Not authorized for this transaction' });
       }
-      const { parseInspectionReport, parseInspectionReportWithPages } = await import("./inspection-parser");
       let items;
+      let aiUsed = false;
+      let rawText = "";
 
       if (req.file.mimetype === 'application/pdf') {
         try {
           const pdfParseModule = await import("pdf-parse");
           const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
           const pdfData = await pdfParseFn(req.file.buffer);
-
-          if (pdfData.numpages && pdfData.numpages > 1) {
-            const pageTexts: Array<{ pageNumber: number; text: string }> = [];
-            const fullText = pdfData.text || "";
-            const pageMarkers = fullText.split(/\f/);
-            for (let i = 0; i < pageMarkers.length; i++) {
-              if (pageMarkers[i].trim().length > 0) {
-                pageTexts.push({ pageNumber: i + 1, text: pageMarkers[i] });
-              }
-            }
-            items = pageTexts.length > 1
-              ? parseInspectionReportWithPages(pageTexts)
-              : parseInspectionReport(fullText);
-          } else {
-            items = parseInspectionReport(pdfData.text || "");
-          }
+          rawText = pdfData.text || "";
 
           const fs = await import("fs");
           const path = await import("path");
@@ -6619,10 +6604,23 @@ export function registerRoutes(app: Express): Server {
           return res.status(400).json({ error: 'Failed to parse PDF file' });
         }
       } else {
-        const text = req.file.buffer.toString('utf-8');
-        items = parseInspectionReport(text);
+        rawText = req.file.buffer.toString('utf-8');
       }
-      res.json({ items, transactionId });
+
+      try {
+        console.log("[InspectionParser] Using AI parser (primary)");
+        const { parseInspectionWithAI } = await import("./ai-document-parser");
+        const aiResult = await parseInspectionWithAI(rawText);
+        items = aiResult.items;
+        aiUsed = true;
+        console.log(`[InspectionParser] AI extracted ${items.length} items`);
+      } catch (aiErr) {
+        console.error("[InspectionParser] AI parsing failed, falling back to regex:", aiErr);
+        const { parseInspectionReport } = await import("./inspection-parser");
+        items = parseInspectionReport(rawText);
+      }
+
+      res.json({ items, transactionId, aiUsed });
     } catch (error) {
       console.error('Error parsing inspection report:', error);
       res.status(500).json({ error: 'Failed to parse inspection report' });

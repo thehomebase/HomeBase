@@ -718,35 +718,28 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
   return extracted;
 }
 
-export async function parseContract(buffer: Buffer): Promise<ExtractedContractData & { documentType?: string; inspectionItems?: Array<{ item: string; condition: string; recommendation: string }> | null; notes?: string | null; aiUsed?: boolean }> {
+export async function parseContract(buffer: Buffer): Promise<ExtractedContractData & { documentType?: string; notes?: string | null; aiUsed?: boolean }> {
   const uint8 = new Uint8Array(buffer);
   const parser = new PDFParse(uint8 as any);
   await parser.load();
   const pdfResult = await parser.getText();
   const text = (pdfResult as any).text || "";
 
-  const pages = splitPages(text);
-  const regexResult = parseTRECForm(text, pages);
-
-  const { shouldUseAI, parseDocumentWithAI } = await import("./ai-document-parser");
-
-  if (shouldUseAI(regexResult)) {
-    try {
-      console.log("[DocumentParser] Regex found <2 key fields, falling back to AI parser");
-      const aiResult = await parseDocumentWithAI(text);
-      return {
-        ...aiResult.extracted,
-        rawTextPreview: text.substring(0, 2000),
-        documentType: aiResult.documentType,
-        inspectionItems: aiResult.inspectionItems,
-        notes: aiResult.notes,
-        aiUsed: true,
-      };
-    } catch (err) {
-      console.error("[DocumentParser] AI parsing failed, returning regex results:", err);
-      return { ...regexResult, aiUsed: false };
-    }
+  try {
+    console.log("[DocumentParser] Using AI parser (primary)");
+    const { parseDocumentWithAI } = await import("./ai-document-parser");
+    const aiResult = await parseDocumentWithAI(text);
+    return {
+      ...aiResult.extracted,
+      rawTextPreview: text.substring(0, 2000),
+      documentType: aiResult.documentType,
+      notes: aiResult.notes,
+      aiUsed: true,
+    };
+  } catch (err) {
+    console.error("[DocumentParser] AI parsing failed, falling back to regex:", err);
+    const pages = splitPages(text);
+    const regexResult = parseTRECForm(text, pages);
+    return { ...regexResult, aiUsed: false };
   }
-
-  return { ...regexResult, aiUsed: false };
 }

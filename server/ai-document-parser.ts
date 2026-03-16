@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import type { ExtractedContractData, ExtractedContactInfo } from "./contract-parser";
+import type { ParsedInspectionItem } from "./inspection-parser";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -16,7 +17,6 @@ function stripPII(text: string): string {
   stripped = stripped.replace(/\b\d{9,10}\b(?=\s|$)/g, "[ACCOUNT_REDACTED]");
   stripped = stripped.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, "[EMAIL_REDACTED]");
   stripped = stripped.replace(/\(?\b\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g, "[PHONE_REDACTED]");
-  stripped = stripped.replace(/\b(?:0[1-9]|1[0-2])[\/\-](?:0[1-9]|[12]\d|3[01])[\/\-](?:19|20)\d{2}\b/g, (match) => match);
   stripped = stripped.replace(/\b\d{2}[\/\-]\d{2}[\/\-]\d{4}\s+\d{2}:\d{2}:\d{2}\b/g, "[TIMESTAMP_REDACTED]");
   stripped = stripped.replace(/\b[A-Z]{2}\s*(?:License|Lic\.?|ID)[\s#:]*\d{5,10}\b/gi, "[LICENSE_REDACTED]");
   stripped = stripped.replace(/\bDOB[\s:]+\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/gi, "[DOB_REDACTED]");
@@ -28,7 +28,7 @@ function truncateText(text: string, maxChars: number = 30000): string {
   return text.substring(0, maxChars) + "\n[DOCUMENT TRUNCATED]";
 }
 
-const EXTRACTION_PROMPT = `You are a real estate document parser. Extract the following fields from this document text. Return ONLY a valid JSON object with no markdown formatting, no code fences, no explanation.
+const DOCUMENT_EXTRACTION_PROMPT = `You are a real estate document parser. Extract the following fields from this document text. Return ONLY a valid JSON object with no markdown formatting, no code fences, no explanation.
 
 Fields to extract:
 - documentType: string - the type of document (e.g. "purchase_contract", "listing_agreement", "inspection_report", "addendum", "disclosure", "closing_document", "lease", "amendment", "unknown")
@@ -46,7 +46,6 @@ Fields to extract:
 - buyerName: string or null - buyer name(s)
 - sellerName: string or null - seller name(s)
 - contacts: array of objects with { role, firstName, lastName, email, phone, brokerage } - extracted people (buyers, sellers, agents, brokers, inspectors, lenders, title officers, etc.)
-- inspectionItems: array of objects with { item, condition, recommendation } or null - for inspection reports only
 - notes: string or null - any important terms, contingencies, or special conditions worth noting
 
 Rules:
@@ -60,10 +59,33 @@ Rules:
 Document text:
 `;
 
+const INSPECTION_EXTRACTION_PROMPT = `You are a home inspection report parser. Extract ALL deficiencies, issues, and repair items from this inspection report. Return ONLY a valid JSON object with no markdown formatting, no code fences, no explanation.
+
+Return a JSON object with:
+- propertyAddress: string or null - the property address from the report
+- inspectionDate: string or null - date of inspection in ISO format
+- inspectorName: string or null - name of the inspector
+- items: array of objects, each with:
+  - category: string - one of: "roof", "plumbing", "electrical", "hvac", "foundation", "exterior", "interior", "appliances", "other"
+  - description: string - clear description of the deficiency or issue found
+  - severity: string - one of: "safety" (immediate hazard), "major" (significant repair needed), "moderate" (should be addressed), "minor" (cosmetic or low priority)
+  - location: string - where in the home the issue was found (e.g. "master bathroom", "north side exterior", "attic")
+  - recommendation: string - what the inspector recommends (e.g. "Replace immediately", "Have licensed plumber evaluate", "Monitor")
+
+Rules:
+- Extract EVERY deficiency, issue, concern, or recommended repair mentioned in the report
+- Include items marked as "deficient", "needs repair", "safety hazard", "not functioning", "damaged", etc.
+- Do NOT include items that are noted as satisfactory, functional, or in good condition
+- Classify severity accurately: safety hazards (exposed wiring, gas leaks, no GFCI) are "safety"; structural/roof/major system failures are "major"; general repairs are "moderate"; cosmetic issues are "minor"
+- Be thorough - inspection reports often have 10-50+ items
+- Do NOT fabricate items that aren't in the report
+
+Inspection report text:
+`;
+
 export async function parseDocumentWithAI(rawText: string): Promise<{
   extracted: ExtractedContractData;
   documentType: string;
-  inspectionItems: Array<{ item: string; condition: string; recommendation: string }> | null;
   notes: string | null;
   aiUsed: true;
 }> {
@@ -72,7 +94,7 @@ export async function parseDocumentWithAI(rawText: string): Promise<{
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: EXTRACTION_PROMPT + truncatedText,
+    contents: DOCUMENT_EXTRACTION_PROMPT + truncatedText,
     config: {
       maxOutputTokens: 4096,
       temperature: 0.1,
@@ -89,8 +111,8 @@ export async function parseDocumentWithAI(rawText: string): Promise<{
     }
     parsed = JSON.parse(jsonMatch[0]);
   } catch (e) {
-    console.error("AI response parse error:", e);
-    console.error("Raw response:", responseText.substring(0, 500));
+    console.error("[AI Parser] Response parse error:", e);
+    console.error("[AI Parser] Raw response preview:", responseText.substring(0, 500));
     throw new Error("Failed to parse AI extraction results");
   }
 
@@ -128,32 +150,72 @@ export async function parseDocumentWithAI(rawText: string): Promise<{
     rawTextPreview: rawText.substring(0, 2000),
   };
 
-  let inspectionItems: Array<{ item: string; condition: string; recommendation: string }> | null = null;
-  if (Array.isArray(parsed.inspectionItems)) {
-    inspectionItems = parsed.inspectionItems.map((item: Record<string, unknown>) => ({
-      item: String(item.item || ""),
-      condition: String(item.condition || ""),
-      recommendation: String(item.recommendation || ""),
-    }));
-  }
-
   return {
     extracted,
     documentType: typeof parsed.documentType === "string" ? parsed.documentType : "unknown",
-    inspectionItems,
     notes: typeof parsed.notes === "string" ? parsed.notes : null,
     aiUsed: true,
   };
 }
 
-export function shouldUseAI(regexResult: ExtractedContractData): boolean {
-  const importantFields = [
-    regexResult.contractPrice,
-    regexResult.closingDate,
-    regexResult.buyerName,
-    regexResult.sellerName,
-    regexResult.propertyAddress,
-  ];
-  const foundCount = importantFields.filter(f => f !== null).length;
-  return foundCount < 2;
+export async function parseInspectionWithAI(rawText: string): Promise<{
+  items: ParsedInspectionItem[];
+  propertyAddress: string | null;
+  inspectionDate: string | null;
+  inspectorName: string | null;
+  aiUsed: true;
+}> {
+  const sanitizedText = stripPII(rawText);
+  const truncatedText = truncateText(sanitizedText, 40000);
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: INSPECTION_EXTRACTION_PROMPT + truncatedText,
+    config: {
+      maxOutputTokens: 8192,
+      temperature: 0.1,
+    },
+  });
+
+  const responseText = response.text || "";
+
+  let parsed: Record<string, unknown>;
+  try {
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No JSON object found in AI response");
+    }
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    console.error("[AI Inspection Parser] Response parse error:", e);
+    console.error("[AI Inspection Parser] Raw response preview:", responseText.substring(0, 500));
+    throw new Error("Failed to parse AI inspection extraction results");
+  }
+
+  const items: ParsedInspectionItem[] = [];
+  if (Array.isArray(parsed.items)) {
+    for (const item of parsed.items) {
+      if (item && typeof item === "object") {
+        const validCategories = ["roof", "plumbing", "electrical", "hvac", "foundation", "exterior", "interior", "appliances", "other"];
+        const validSeverities = ["safety", "major", "moderate", "minor"];
+        const category = validCategories.includes(String(item.category)) ? String(item.category) : "other";
+        const severity = validSeverities.includes(String(item.severity)) ? String(item.severity) : "moderate";
+
+        items.push({
+          category,
+          description: String(item.description || ""),
+          severity,
+          location: String(item.location || ""),
+        });
+      }
+    }
+  }
+
+  return {
+    items,
+    propertyAddress: typeof parsed.propertyAddress === "string" ? parsed.propertyAddress : null,
+    inspectionDate: typeof parsed.inspectionDate === "string" ? parsed.inspectionDate : null,
+    inspectorName: typeof parsed.inspectorName === "string" ? parsed.inspectorName : null,
+    aiUsed: true,
+  };
 }
