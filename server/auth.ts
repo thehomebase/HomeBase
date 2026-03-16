@@ -131,6 +131,19 @@ export function setupAuth(app: Express) {
     next();
   });
 
+  const accountStatusExemptPaths = ["/api/account/reactivate", "/api/logout", "/api/user"];
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated()) return next();
+    const user = req.user as any;
+    if (user.accountStatus && user.accountStatus !== "active") {
+      if (!accountStatusExemptPaths.some(p => req.path === p)) {
+        req.logout(() => {});
+        return res.status(403).json({ error: "Your account is not active. Please contact support." });
+      }
+    }
+    next();
+  });
+
   passport.use(
     new LocalStrategy(
       { usernameField: 'email' },

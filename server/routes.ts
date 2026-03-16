@@ -4167,7 +4167,11 @@ export function registerRoutes(app: Express): Server {
         `DELETE FROM session WHERE sess::jsonb -> 'passport' ->> 'user' = $1`,
         [String(userId)]
       );
-      res.json({ success: true });
+      req.logout(() => {
+        req.session.destroy(() => {
+          res.json({ success: true });
+        });
+      });
     } catch (error) {
       console.error('Error deactivating account:', error);
       res.status(500).json({ error: "Failed to deactivate account" });
