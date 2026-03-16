@@ -552,6 +552,54 @@ export default function InspectionReviewPage() {
                     {item.notes && (
                       <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>
                     )}
+                    {(item as any).repairRequested && (
+                      <div className="flex items-center gap-2 mt-2 p-2 rounded bg-muted/50 border">
+                        <span className="text-xs text-muted-foreground">Repair Status:</span>
+                        <Select
+                          value={(item as any).repairStatus || 'requested'}
+                          onValueChange={async (val) => {
+                            try {
+                              await apiRequest("PATCH", `/api/inspection-items/${item.id}/repair-status`, {
+                                repairStatus: val,
+                              });
+                              queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
+                              toast({ title: "Repair status updated" });
+                            } catch {
+                              toast({ title: "Failed to update", variant: "destructive" });
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-7 w-[140px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="requested">Requested</SelectItem>
+                            <SelectItem value="agreed">Seller Agreed</SelectItem>
+                            <SelectItem value="denied">Seller Denied</SelectItem>
+                            <SelectItem value="credit_offered">Credit Offered</SelectItem>
+                            <SelectItem value="resolved">Resolved</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {(item as any).repairStatus === 'credit_offered' && (
+                          <Input
+                            type="number"
+                            placeholder="Credit $"
+                            className="h-7 w-24 text-xs"
+                            defaultValue={(item as any).creditAmount || ''}
+                            onBlur={async (e) => {
+                              if (e.target.value) {
+                                try {
+                                  await apiRequest("PATCH", `/api/inspection-items/${item.id}/repair-status`, {
+                                    creditAmount: Number(e.target.value),
+                                  });
+                                  queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
+                                } catch {}
+                              }
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {item.status === "approved" && (

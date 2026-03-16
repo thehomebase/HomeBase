@@ -6175,10 +6175,188 @@ export function registerRoutes(app: Express): Server {
         }
       }
 
-      res.json({ transaction, documents, checklist, timeline, agent, contacts, pendingActions });
+      let inspectionData: any = null;
+      try {
+        const items = await storage.getInspectionItemsByTransaction(transaction.id);
+        if (items.length > 0) {
+          const bidRequestsResult = await db.execute(sql`
+            SELECT br.id, br.inspection_item_id, br.contractor_id, br.status,
+              c.name as contractor_name, c.category as contractor_category
+            FROM bid_requests br
+            LEFT JOIN contractors c ON c.id = br.contractor_id
+            WHERE br.transaction_id = ${transaction.id}
+          `);
+          const bidsResult = await db.execute(sql`
+            SELECT b.id, b.bid_request_id, b.amount, b.estimated_days, b.description, b.status,
+              c.name as contractor_name
+            FROM bids b
+            JOIN bid_requests br ON br.id = b.bid_request_id
+            LEFT JOIN contractors c ON c.id = br.contractor_id
+            WHERE br.transaction_id = ${transaction.id}
+          `);
+          const bidsByItem: Record<number, any[]> = {};
+          for (const bid of bidsResult.rows as any[]) {
+            const br = (bidRequestsResult.rows as any[]).find(r => r.id === bid.bid_request_id);
+            if (br) {
+              if (!bidsByItem[br.inspection_item_id]) bidsByItem[br.inspection_item_id] = [];
+              bidsByItem[br.inspection_item_id].push({
+                id: bid.id,
+                amount: bid.amount,
+                estimatedDays: bid.estimated_days,
+                description: bid.description,
+                status: bid.status,
+                contractorName: bid.contractor_name,
+              });
+            }
+          }
+          const bidRequestsByItem: Record<number, number> = {};
+          for (const br of bidRequestsResult.rows as any[]) {
+            bidRequestsByItem[br.inspection_item_id] = (bidRequestsByItem[br.inspection_item_id] || 0) + 1;
+          }
+          const enrichedItems = items.map((item: any) => ({
+            id: item.id,
+            category: item.category,
+            description: item.description,
+            severity: item.severity,
+            location: item.location,
+            status: item.status,
+            notes: item.notes,
+            repairRequested: item.repairRequested ?? item.repair_requested ?? false,
+            repairStatus: item.repairStatus ?? item.repair_status ?? 'not_requested',
+            repairNotes: item.repairNotes ?? item.repair_notes ?? null,
+            creditAmount: item.creditAmount ?? item.credit_amount ?? null,
+            bidRequestCount: bidRequestsByItem[item.id] || 0,
+            bids: bidsByItem[item.id] || [],
+            lowestBid: bidsByItem[item.id]?.length
+              ? Math.min(...bidsByItem[item.id].map((b: any) => Number(b.amount)))
+              : null,
+          }));
+
+          const totalItems = enrichedItems.length;
+          const itemsWithBids = enrichedItems.filter((i: any) => i.bids.length > 0).length;
+          const requestedRepairs = enrichedItems.filter((i: any) => i.repairRequested).length;
+          const resolvedRepairs = enrichedItems.filter((i: any) =>
+            ['agreed', 'credit_offered', 'resolved'].includes(i.repairStatus)
+          ).length;
+          const deniedRepairs = enrichedItems.filter((i: any) => i.repairStatus === 'denied').length;
+
+          let currentStep = 'report';
+          if (requestedRepairs > 0 && (resolvedRepairs + deniedRepairs) === requestedRepairs) {
+            currentStep = 'resolution';
+          } else if (requestedRepairs > 0) {
+            currentStep = 'negotiation';
+          } else if (itemsWithBids > 0) {
+            currentStep = 'choose_repairs';
+          } else if (totalItems > 0 && enrichedItems.some((i: any) => i.bidRequestCount > 0)) {
+            currentStep = 'estimates';
+          }
+
+          inspectionData = {
+            items: enrichedItems,
+            summary: {
+              totalItems,
+              itemsWithBids,
+              requestedRepairs,
+              resolvedRepairs,
+              deniedRepairs,
+              currentStep,
+            },
+          };
+        }
+      } catch (e) {
+        console.error("Error loading inspection data for client:", e);
+      }
+
+      res.json({ transaction, documents, checklist, timeline, agent, contacts, pendingActions, inspectionData });
     } catch (error: any) {
       console.error("Client portal error:", error);
       res.status(500).json({ error: "Failed to load transaction data" });
+    }
+  });
+
+  // Client repair request toggle
+  app.patch("/api/client/inspection-items/:id/repair-request", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      const itemId = Number(req.params.id);
+      const { repairRequested } = req.body;
+      if (typeof repairRequested !== 'boolean') {
+        return res.status(400).json({ error: 'repairRequested must be a boolean' });
+      }
+      const item = await db.execute(sql`SELECT * FROM inspection_items WHERE id = ${itemId} LIMIT 1`);
+      if (item.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+      const inspItem = item.rows[0] as any;
+      let transaction = null;
+      if (req.user.claimedTransactionId) {
+        const claimed = await storage.getTransaction(req.user.claimedTransactionId);
+        if (claimed && claimed.id === inspItem.transaction_id) transaction = claimed;
+      }
+      if (!transaction && req.user.clientRecordId) {
+        const result = await db.execute(sql`
+          SELECT * FROM transactions WHERE id = ${inspItem.transaction_id}
+          AND (client_id = ${req.user.clientRecordId} OR secondary_client_id = ${req.user.clientRecordId})
+          LIMIT 1
+        `);
+        if (result.rows.length > 0) transaction = result.rows[0];
+      }
+      if (!transaction) return res.status(403).json({ error: 'Not authorized' });
+      if (repairRequested) {
+        await db.execute(sql`
+          UPDATE inspection_items
+          SET repair_requested = true,
+              repair_status = 'requested'
+          WHERE id = ${itemId}
+        `);
+      } else {
+        await db.execute(sql`
+          UPDATE inspection_items
+          SET repair_requested = false,
+              repair_status = 'not_requested',
+              repair_notes = NULL,
+              credit_amount = NULL
+          WHERE id = ${itemId}
+        `);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating repair request:", error);
+      res.status(500).json({ error: "Failed to update repair request" });
+    }
+  });
+
+  // Agent/broker update repair negotiation status
+  app.patch("/api/inspection-items/:id/repair-status", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) {
+      return res.sendStatus(401);
+    }
+    try {
+      const itemId = Number(req.params.id);
+      const allowedFields = ['repairStatus', 'repairNotes', 'creditAmount'];
+      const data: Record<string, any> = {};
+      for (const key of allowedFields) {
+        if (req.body[key] !== undefined) data[key] = req.body[key];
+      }
+      const validStatuses = ['not_requested', 'requested', 'agreed', 'denied', 'credit_offered', 'resolved'];
+      if (data.repairStatus && !validStatuses.includes(data.repairStatus)) {
+        return res.status(400).json({ error: 'Invalid repair status' });
+      }
+      const item = await db.execute(sql`SELECT * FROM inspection_items WHERE id = ${itemId} LIMIT 1`);
+      if (item.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+      const inspItem = item.rows[0] as any;
+      const { allowed } = await verifyTransactionAccess(inspItem.transaction_id, req.user.id, req.user.role);
+      if (!allowed) return res.status(403).json({ error: 'Not authorized' });
+
+      await db.execute(sql`
+        UPDATE inspection_items SET
+          repair_status = COALESCE(${data.repairStatus || null}, repair_status),
+          repair_notes = COALESCE(${data.repairNotes !== undefined ? data.repairNotes : null}, repair_notes),
+          credit_amount = COALESCE(${data.creditAmount !== undefined ? String(data.creditAmount) : null}::numeric, credit_amount)
+        WHERE id = ${itemId}
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating repair status:", error);
+      res.status(500).json({ error: "Failed to update repair status" });
     }
   });
 
@@ -6308,10 +6486,8 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const transactionId = Number(req.params.id);
-      const transaction = await storage.getTransaction(transactionId);
-      if (!transaction || (req.user.role === "agent" && transaction.agentId !== req.user.id)) {
-        return res.status(403).json({ error: 'Not authorized' });
-      }
+      const { allowed } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+      if (!allowed) return res.status(403).json({ error: 'Not authorized' });
       const items = await storage.getInspectionItemsByTransaction(transactionId);
       res.json(items);
     } catch (error) {
@@ -6321,9 +6497,13 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/inspection-items/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
     try {
       const id = Number(req.params.id);
+      const item = await db.execute(sql`SELECT transaction_id FROM inspection_items WHERE id = ${id} LIMIT 1`);
+      if (item.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+      const { allowed, permissionLevel } = await verifyTransactionAccess((item.rows[0] as any).transaction_id, req.user.id, req.user.role);
+      if (!allowed || permissionLevel === 'view') return res.status(403).json({ error: 'Not authorized' });
       const allowedFields = ['category', 'description', 'severity', 'location', 'status', 'notes'];
       const sanitizedData: Record<string, any> = {};
       for (const field of allowedFields) {
@@ -6340,9 +6520,14 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/inspection-items/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
     try {
-      await storage.deleteInspectionItem(Number(req.params.id));
+      const id = Number(req.params.id);
+      const item = await db.execute(sql`SELECT transaction_id FROM inspection_items WHERE id = ${id} LIMIT 1`);
+      if (item.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+      const { allowed, permissionLevel } = await verifyTransactionAccess((item.rows[0] as any).transaction_id, req.user.id, req.user.role);
+      if (!allowed || permissionLevel === 'view') return res.status(403).json({ error: 'Not authorized' });
+      await storage.deleteInspectionItem(id);
       res.sendStatus(200);
     } catch (error) {
       console.error('Error deleting inspection item:', error);
@@ -6352,7 +6537,7 @@ export function registerRoutes(app: Express): Server {
 
   // ============ Bid Requests ============
   app.post("/api/inspection-items/:id/send-bids", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
     try {
       const inspectionItemId = Number(req.params.id);
       const { contractorIds, transactionId } = req.body;
@@ -6362,8 +6547,13 @@ export function registerRoutes(app: Express): Server {
       if (!transactionId) {
         return res.status(400).json({ error: 'transactionId is required' });
       }
-      const transaction = await storage.getTransaction(Number(transactionId));
-      if (!transaction || transaction.agentId !== req.user.id) {
+      const itemCheck = await db.execute(sql`SELECT transaction_id FROM inspection_items WHERE id = ${inspectionItemId} LIMIT 1`);
+      if (itemCheck.rows.length === 0) return res.status(404).json({ error: 'Inspection item not found' });
+      if ((itemCheck.rows[0] as any).transaction_id !== Number(transactionId)) {
+        return res.status(400).json({ error: 'Item does not belong to this transaction' });
+      }
+      const { allowed, permissionLevel } = await verifyTransactionAccess(Number(transactionId), req.user.id, req.user.role);
+      if (!allowed || permissionLevel === 'view') {
         return res.status(403).json({ error: 'Not authorized for this transaction' });
       }
       const createdRequests = [];

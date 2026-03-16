@@ -4014,6 +4014,10 @@ export class DatabaseStorage implements IStorage {
       notes: row.notes ? String(row.notes) : null,
       pageNumber: row.page_number ? Number(row.page_number) : null,
       createdAt: row.created_at ? new Date(row.created_at) : null,
+      repairRequested: row.repair_requested ?? false,
+      repairStatus: row.repair_status ?? 'not_requested',
+      repairNotes: row.repair_notes ?? null,
+      creditAmount: row.credit_amount ?? null,
     };
   }
 
@@ -4080,6 +4084,10 @@ export class DatabaseStorage implements IStorage {
       if (data.location !== undefined) updateParts.push(sql`location = ${data.location}`);
       if (data.status !== undefined) updateParts.push(sql`status = ${data.status}`);
       if (data.notes !== undefined) updateParts.push(sql`notes = ${data.notes}`);
+      if (data.repairRequested !== undefined) updateParts.push(sql`repair_requested = ${data.repairRequested}`);
+      if (data.repairStatus !== undefined) updateParts.push(sql`repair_status = ${data.repairStatus}`);
+      if (data.repairNotes !== undefined) updateParts.push(sql`repair_notes = ${data.repairNotes}`);
+      if (data.creditAmount !== undefined) updateParts.push(sql`credit_amount = ${data.creditAmount}`);
 
       if (updateParts.length === 0) {
         const result = await db.execute(sql`SELECT * FROM inspection_items WHERE id = ${id}`);

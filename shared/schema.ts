@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, boolean, json, date, time, doublePrecision, real, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, integer, boolean, json, date, time, doublePrecision, real, uniqueIndex, numeric } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from "zod";
 
@@ -265,6 +265,10 @@ export const inspectionItems = pgTable("inspection_items", {
   status: text("status", { enum: ['pending_review', 'approved', 'sent_for_bids', 'bids_received', 'accepted', 'declined'] }).notNull().default('pending_review'),
   notes: text("notes"),
   pageNumber: integer("page_number"),
+  repairRequested: boolean("repair_requested").default(false),
+  repairStatus: text("repair_status", { enum: ['not_requested', 'requested', 'agreed', 'denied', 'credit_offered', 'resolved'] }).default('not_requested'),
+  repairNotes: text("repair_notes"),
+  creditAmount: numeric("credit_amount"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

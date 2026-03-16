@@ -1,16 +1,20 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Link } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   Home, CalendarDays, DollarSign, FileText, Clock, CheckCircle2,
   AlertCircle, ExternalLink, ClipboardList, ChevronDown, ChevronUp,
   MessageSquare, Phone, Mail, User, Shield, MapPin, Timer,
-  PenTool, AlertTriangle, PartyPopper, Users,
+  PenTool, AlertTriangle, PartyPopper, Users, Search, Hammer,
+  Handshake, CircleCheck, ClipboardCheck, Wrench,
 } from "lucide-react";
 import type { Transaction, Document as TransactionDocument, Checklist } from "@shared/schema";
 
@@ -57,6 +61,44 @@ interface PendingAction {
   count?: number;
 }
 
+interface InspectionBid {
+  id: number;
+  amount: string;
+  estimatedDays: number;
+  description: string;
+  status: string;
+  contractorName: string;
+}
+
+interface InspectionItemData {
+  id: number;
+  category: string;
+  description: string;
+  severity: string;
+  location: string | null;
+  status: string;
+  notes: string | null;
+  repairRequested: boolean;
+  repairStatus: string;
+  repairNotes: string | null;
+  creditAmount: string | null;
+  bidRequestCount: number;
+  bids: InspectionBid[];
+  lowestBid: number | null;
+}
+
+interface InspectionData {
+  items: InspectionItemData[];
+  summary: {
+    totalItems: number;
+    itemsWithBids: number;
+    requestedRepairs: number;
+    resolvedRepairs: number;
+    deniedRepairs: number;
+    currentStep: string;
+  };
+}
+
 interface MyTransactionResponse {
   transaction: Transaction;
   documents: TransactionDocument[];
@@ -65,6 +107,7 @@ interface MyTransactionResponse {
   agent: AgentInfo | null;
   contacts: ContactInfo[];
   pendingActions: PendingAction[];
+  inspectionData: InspectionData | null;
 }
 
 const BUYER_STAGES = [
@@ -273,6 +316,245 @@ function TimelineStep({ event, isLast }: { event: TimelineEvent; isLast: boolean
   );
 }
 
+const INSPECTION_STEPS = [
+  { key: "report", label: "Report", icon: Search },
+  { key: "estimates", label: "Estimates", icon: DollarSign },
+  { key: "choose_repairs", label: "Choose Repairs", icon: ClipboardCheck },
+  { key: "negotiation", label: "Negotiation", icon: Handshake },
+  { key: "resolution", label: "Resolution", icon: CircleCheck },
+];
+
+const SEVERITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  safety: { label: "Safety", color: "text-red-700 dark:text-red-400", bg: "bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800" },
+  major: { label: "Major", color: "text-orange-700 dark:text-orange-400", bg: "bg-orange-100 dark:bg-orange-900/40 border-orange-200 dark:border-orange-800" },
+  moderate: { label: "Moderate", color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800" },
+  minor: { label: "Minor", color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800" },
+};
+
+const REPAIR_STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+  not_requested: { label: "Not Requested", variant: "outline" },
+  requested: { label: "Requested", variant: "default" },
+  agreed: { label: "Seller Agreed", variant: "default" },
+  denied: { label: "Seller Denied", variant: "destructive" },
+  credit_offered: { label: "Credit Offered", variant: "secondary" },
+  resolved: { label: "Resolved", variant: "default" },
+};
+
+function InspectionStepTracker({ currentStep }: { currentStep: string }) {
+  const currentIndex = INSPECTION_STEPS.findIndex(s => s.key === currentStep);
+  return (
+    <div className="flex items-center justify-between mb-4">
+      {INSPECTION_STEPS.map((step, i) => {
+        const StepIcon = step.icon;
+        const isCompleted = i < currentIndex;
+        const isCurrent = i === currentIndex;
+        return (
+          <div key={step.key} className="flex flex-col items-center relative z-10" style={{ flex: 1 }}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all text-xs ${
+              isCompleted ? "bg-green-500 text-white" : isCurrent ? "bg-primary text-primary-foreground ring-2 ring-primary/30" : "bg-muted text-muted-foreground"
+            }`}>
+              {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : <StepIcon className="h-3.5 w-3.5" />}
+            </div>
+            <span className={`text-[10px] mt-1 text-center leading-tight ${isCurrent ? "font-semibold text-primary" : "text-muted-foreground"}`}>
+              {step.label}
+            </span>
+            {i < INSPECTION_STEPS.length - 1 && (
+              <div className={`absolute top-4 left-[55%] w-[90%] h-0.5 -z-10 ${
+                i < currentIndex ? "bg-green-500" : "bg-muted"
+              }`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function InspectionSection({ inspectionData }: { inspectionData: InspectionData }) {
+  const [expanded, setExpanded] = useState(true);
+  const [showAllItems, setShowAllItems] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { items, summary } = inspectionData;
+
+  const repairToggle = useMutation({
+    mutationFn: async ({ itemId, requested }: { itemId: number; requested: boolean }) => {
+      await apiRequest("PATCH", `/api/client/inspection-items/${itemId}/repair-request`, {
+        repairRequested: requested,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/client/my-transaction"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update repair request", variant: "destructive" });
+    },
+  });
+
+  const sortedItems = [...items].sort((a, b) => {
+    const severityOrder = { safety: 0, major: 1, moderate: 2, minor: 3 };
+    return (severityOrder[a.severity as keyof typeof severityOrder] ?? 4) - (severityOrder[b.severity as keyof typeof severityOrder] ?? 4);
+  });
+
+  const visibleItems = showAllItems ? sortedItems : sortedItems.slice(0, 5);
+  const canChooseRepairs = summary.currentStep === 'choose_repairs' || summary.currentStep === 'estimates';
+  const totalEstimate = items
+    .filter(i => i.repairRequested && i.lowestBid)
+    .reduce((sum, i) => sum + (i.lowestBid || 0), 0);
+  const totalCredits = items
+    .filter(i => i.repairStatus === 'credit_offered' && i.creditAmount)
+    .reduce((sum, i) => sum + Number(i.creditAmount || 0), 0);
+
+  return (
+    <Card className="border border-border/60 shadow-sm">
+      <CardHeader className="pb-3">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full flex items-center justify-between"
+        >
+          <CardTitle className="text-base flex items-center gap-2">
+            <Wrench className="h-4 w-4" /> Inspection & Repairs
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              {summary.totalItems} issue{summary.totalItems !== 1 ? 's' : ''} found
+            </Badge>
+            {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </div>
+        </button>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="space-y-4">
+          <InspectionStepTracker currentStep={summary.currentStep} />
+
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="p-2 rounded-lg bg-muted/50">
+              <p className="text-lg font-bold">{summary.totalItems}</p>
+              <p className="text-[10px] text-muted-foreground">Issues Found</p>
+            </div>
+            <div className="p-2 rounded-lg bg-muted/50">
+              <p className="text-lg font-bold">{summary.requestedRepairs}</p>
+              <p className="text-[10px] text-muted-foreground">Repairs Requested</p>
+            </div>
+            <div className="p-2 rounded-lg bg-muted/50">
+              <p className="text-lg font-bold">{summary.resolvedRepairs}</p>
+              <p className="text-[10px] text-muted-foreground">Resolved</p>
+            </div>
+          </div>
+
+          {totalEstimate > 0 && (
+            <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/10">
+              <span className="text-sm text-muted-foreground">Estimated Repair Cost</span>
+              <span className="font-bold">
+                {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(totalEstimate)}
+              </span>
+            </div>
+          )}
+          {totalCredits > 0 && (
+            <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+              <span className="text-sm text-muted-foreground">Credits Offered by Seller</span>
+              <span className="font-bold text-green-700 dark:text-green-400">
+                {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(totalCredits)}
+              </span>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {visibleItems.map((item) => {
+              const sev = SEVERITY_CONFIG[item.severity] || SEVERITY_CONFIG.minor;
+              const repairCfg = REPAIR_STATUS_CONFIG[item.repairStatus] || REPAIR_STATUS_CONFIG.not_requested;
+              return (
+                <div key={item.id} className={`p-3 rounded-lg border ${sev.bg}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${sev.color}`}>
+                          {sev.label}
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground capitalize">{item.category}</span>
+                        {item.location && (
+                          <span className="text-[10px] text-muted-foreground">· {item.location}</span>
+                        )}
+                      </div>
+                      <p className="text-sm">{item.description}</p>
+                    </div>
+                    {canChooseRepairs && (
+                      <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                        <Switch
+                          checked={item.repairRequested}
+                          onCheckedChange={(checked) => repairToggle.mutate({ itemId: item.id, requested: checked })}
+                          disabled={repairToggle.isPending}
+                        />
+                        <span className="text-[9px] text-muted-foreground">Request</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {item.bids.length > 0 && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        <DollarSign className="h-3 w-3 mr-0.5" />
+                        {item.bids.length} bid{item.bids.length !== 1 ? 's' : ''}
+                        {item.lowestBid && ` · from ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(item.lowestBid)}`}
+                      </Badge>
+                    )}
+                    {item.bidRequestCount > 0 && item.bids.length === 0 && (
+                      <Badge variant="outline" className="text-[10px]">
+                        <Clock className="h-3 w-3 mr-0.5" /> Awaiting estimates
+                      </Badge>
+                    )}
+                    {item.repairStatus !== 'not_requested' && (
+                      <Badge variant={repairCfg.variant} className="text-[10px]">
+                        {repairCfg.label}
+                      </Badge>
+                    )}
+                    {item.repairStatus === 'credit_offered' && item.creditAmount && (
+                      <span className="text-[10px] font-semibold text-green-700 dark:text-green-400">
+                        {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(item.creditAmount))}
+                      </span>
+                    )}
+                  </div>
+
+                  {item.repairNotes && (
+                    <p className="text-xs text-muted-foreground mt-2 italic">"{item.repairNotes}"</p>
+                  )}
+
+                  {item.bids.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {item.bids.map((bid) => (
+                        <div key={bid.id} className="flex items-center justify-between text-xs bg-background/50 p-2 rounded">
+                          <span className="text-muted-foreground">{bid.contractorName || "Contractor"}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">
+                              {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(bid.amount))}
+                            </span>
+                            {bid.estimatedDays && (
+                              <span className="text-muted-foreground">· {bid.estimatedDays} day{bid.estimatedDays !== 1 ? 's' : ''}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {sortedItems.length > 5 && (
+            <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setShowAllItems(!showAllItems)}>
+              {showAllItems
+                ? <><ChevronUp className="h-3 w-3 mr-1" /> Show Less</>
+                : <><ChevronDown className="h-3 w-3 mr-1" /> Show All {sortedItems.length} Items</>
+              }
+            </Button>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 export default function ClientTransactionPage() {
   const [showAllDocs, setShowAllDocs] = useState(false);
   const [showFinancials, setShowFinancials] = useState(false);
@@ -329,7 +611,7 @@ export default function ClientTransactionPage() {
     );
   }
 
-  const { transaction, documents, checklist, timeline, agent, contacts, pendingActions } = data;
+  const { transaction, documents, checklist, timeline, agent, contacts, pendingActions, inspectionData } = data;
   const checklistItems = checklist?.items || [];
   const completedItems = checklistItems.filter((item: any) => item.completed).length;
   const totalItems = checklistItems.length;
@@ -494,6 +776,10 @@ export default function ClientTransactionPage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {inspectionData && inspectionData.items.length > 0 && (
+        <InspectionSection inspectionData={inspectionData} />
       )}
 
       {timelineEvents.length > 0 && (
