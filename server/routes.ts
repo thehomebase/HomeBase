@@ -2816,7 +2816,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/transactions/:id/parse-contract", contractUpload.single('contract'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== 'agent') return res.status(403).json({ error: 'Only agents can upload contracts' });
+    if (req.user.role !== 'agent' && req.user.role !== 'broker') return res.status(403).json({ error: 'Only agents can upload contracts' });
 
     const transactionId = Number(req.params.id);
     try {
@@ -2839,22 +2839,25 @@ export function registerRoutes(app: Express): Server {
       const extracted = await parseContract(req.file.buffer);
       (req as any).file.buffer = Buffer.alloc(0);
 
-      const { rawTextPreview, ...fields } = extracted;
+      const { rawTextPreview, documentType, inspectionItems, notes, aiUsed, ...fields } = extracted;
 
-      const fs = await import('fs');
-      fs.writeFileSync('/tmp/contract_debug.txt', rawTextPreview);
-      console.log('=== FULL CONTRACT TEXT WRITTEN TO /tmp/contract_debug.txt ===');
-      console.log('=== EXTRACTED FIELDS ===');
-      console.log(JSON.stringify(fields, null, 2));
+      const fieldCount = Object.values(fields).filter(v => v !== null && v !== undefined && v !== '').length;
+      console.log(`=== DOCUMENT PARSED (AI: ${aiUsed ? 'yes' : 'no'}${documentType ? ', type: ' + documentType : ''}, fields: ${fieldCount}) ===`);
 
       res.json({
         extracted: fields,
-        rawTextPreview,
-        message: 'Contract parsed successfully. Review the extracted data before applying to the transaction.',
+        rawTextPreview: rawTextPreview.substring(0, 2000),
+        documentType: documentType || (aiUsed ? 'unknown' : 'purchase_contract'),
+        inspectionItems: inspectionItems || null,
+        notes: notes || null,
+        aiUsed: aiUsed || false,
+        message: aiUsed
+          ? 'Document parsed with AI assistance. Review the extracted data before applying to the transaction.'
+          : 'Contract parsed successfully. Review the extracted data before applying to the transaction.',
       });
     } catch (error) {
       console.error('Error parsing contract:', error);
-      res.status(422).json({ error: 'Failed to parse the contract. Please ensure it is a valid PDF document.' });
+      res.status(422).json({ error: 'Failed to parse the document. Please ensure it is a valid PDF file.' });
     }
   });
 

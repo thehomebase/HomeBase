@@ -89,4 +89,4 @@ DROPBOX_APP_SECRET = "bxli0hpqyl790fa"
 VITE_RECAPTCHA_SITE_KEY = "6Leem4osAAAAACcfmuBGkRtWENNNjcKLKJq334lQ"
 
 [agent]
-integrations = ["stripe:1.0.0"]
+integrations = ["stripe:1.0.0", "javascript_gemini_ai_integrations:2.0.0"]

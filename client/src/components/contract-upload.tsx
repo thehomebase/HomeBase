@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Check, X, Shield, AlertTriangle, Loader2, Users, Pencil, ArrowLeftRight } from "lucide-react";
+import { Upload, FileText, Check, X, Shield, AlertTriangle, Loader2, Users, Pencil, ArrowLeftRight, Sparkles, Bot } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { type Transaction } from "@shared/schema";
 import { Separator } from "@/components/ui/separator";
@@ -124,6 +124,9 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
   const [editValue, setEditValue] = useState("");
   const [editingContactIdx, setEditingContactIdx] = useState<number | null>(null);
   const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
+  const [aiUsed, setAiUsed] = useState(false);
+  const [documentType, setDocumentType] = useState<string | null>(null);
+  const [documentNotes, setDocumentNotes] = useState<string | null>(null);
 
   const overwriteFields = extractedData
     ? TRANSACTION_FIELDS.filter((key) => {
@@ -151,6 +154,9 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
     },
     onSuccess: (data) => {
       setExtractedData(data.extracted);
+      setAiUsed(data.aiUsed || false);
+      setDocumentType(data.documentType || null);
+      setDocumentNotes(data.notes || null);
       const initial: Record<string, boolean> = {};
       for (const key of TRANSACTION_FIELDS) {
         const val = data.extracted[key as keyof ExtractedData];
@@ -167,7 +173,10 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
       setShowReview(true);
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      toast({ title: "Contract parsed", description: "Review the extracted data below." });
+      toast({
+        title: data.aiUsed ? "Document parsed with AI" : "Contract parsed",
+        description: "Review the extracted data below.",
+      });
     },
     onError: (error: Error) => {
       toast({ title: "Upload failed", description: error.message, variant: "destructive" });
@@ -317,6 +326,9 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
       setShowReview(false);
       setShowOverwriteConfirm(false);
       setExtractedData(null);
+      setAiUsed(false);
+      setDocumentType(null);
+      setDocumentNotes(null);
       toast({ title: "Applied successfully", description: `Updated transaction${contactsToAdd.length > 0 ? ` and saved ${contactsToAdd.length} contact${contactsToAdd.length !== 1 ? "s" : ""}` : ""}.` });
     } catch {
       toast({ title: "Error", description: "Failed to apply some changes.", variant: "destructive" });
@@ -374,17 +386,17 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Upload Contract
+            Upload Document
           </CardTitle>
           <CardDescription>
-            Upload a real estate contract PDF to automatically extract key transaction data.
+            Upload a real estate document (contract, inspection report, addendum, etc.) to automatically extract key data.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
             <Shield className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-green-700 dark:text-green-300">
-              <span className="font-medium">Privacy Protected:</span> Your contract is processed in memory only and is never stored on our servers. The file is immediately discarded after data extraction.
+              <span className="font-medium">Privacy Protected:</span> Your document is processed in memory and never stored. For non-standard formats, AI-assisted extraction may be used — sensitive data (SSNs, account numbers) is automatically redacted before processing.
             </div>
           </div>
 
@@ -435,17 +447,54 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
         </CardContent>
       </Card>
 
-      <Dialog open={showReview} onOpenChange={(open) => { setShowReview(open); if (!open) setShowOverwriteConfirm(false); }}>
+      <Dialog open={showReview} onOpenChange={(open) => {
+        setShowReview(open);
+        if (!open) {
+          setShowOverwriteConfirm(false);
+          setExtractedData(null);
+          setAiUsed(false);
+          setDocumentType(null);
+          setDocumentNotes(null);
+          setSelectedFields({});
+          setSelectedContacts({});
+          setEditingField(null);
+          setEditingContactIdx(null);
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
+              {aiUsed ? <Bot className="h-5 w-5 text-purple-500" /> : <FileText className="h-5 w-5" />}
               Review Extracted Data
             </DialogTitle>
             <DialogDescription>
-              Review and edit the extracted data. Click the pencil icon to make corrections before applying.
+              {aiUsed
+                ? "AI-assisted extraction was used for this document. Please review all fields carefully before applying."
+                : "Review and edit the extracted data. Click the pencil icon to make corrections before applying."}
             </DialogDescription>
           </DialogHeader>
+
+          {aiUsed && (
+            <div className="flex items-start gap-2 p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
+              <Sparkles className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-purple-700 dark:text-purple-300">
+                <span className="font-medium">AI-Assisted Parse</span>
+                {documentType && documentType !== "unknown" && (
+                  <span> — Detected as <span className="font-medium">{documentType.replace(/_/g, " ")}</span></span>
+                )}
+                <span>. Sensitive data (SSNs, account numbers) was redacted before AI processing. Please verify all extracted values.</span>
+              </div>
+            </div>
+          )}
+
+          {documentNotes && (
+            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+              <FileText className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-blue-700 dark:text-blue-300">
+                <span className="font-medium">Notes:</span> {documentNotes}
+              </div>
+            </div>
+          )}
 
           {extractedData && overwriteFields.length > 0 && (
             <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
