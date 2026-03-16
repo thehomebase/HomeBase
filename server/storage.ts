@@ -1837,7 +1837,7 @@ export class DatabaseStorage implements IStorage {
         SELECT t.id, t.street_name, t.status, t.closing_date, t.contract_price, t.type
         FROM transactions t
         JOIN users u ON u.id = ${userId}
-        WHERE t.client_id = u.client_record_id OR t.secondary_client_id = u.client_record_id
+        WHERE t.client_id = u.client_record_id OR t.id = u.claimed_transaction_id
         LIMIT 1
       `);
       const tx = (txResult.rows[0] as any) || null;
