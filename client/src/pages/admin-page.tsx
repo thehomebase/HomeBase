@@ -90,6 +90,7 @@ export default function AdminPage() {
   const [replyText, setReplyText] = useState("");
   const [usersPage, setUsersPage] = useState(0);
   const [chartRoleFilter, setChartRoleFilter] = useState<string>("all");
+  const [chartMode, setChartMode] = useState<"growth" | "cumulative">("growth");
 
   const isAdmin = user?.role === "admin";
 
@@ -187,8 +188,9 @@ export default function AdminPage() {
     }));
   }, [stats]);
 
-  const roleGrowthData = useMemo(() => {
-    if (!stats?.roleGrowth || (stats.roleGrowth as any[]).length === 0) return [];
+  const { growthData: roleGrowthData, cumulativeData } = useMemo(() => {
+    if (!stats?.roleGrowth || (stats.roleGrowth as any[]).length === 0)
+      return { growthData: [], cumulativeData: [] };
     const months = new Set<string>();
     const roleMap = new Map<string, Map<string, number>>();
     (stats.roleGrowth as any[]).forEach((r: any) => {
@@ -197,18 +199,30 @@ export default function AdminPage() {
       roleMap.get(r.role)!.set(r.month, Number(r.count));
     });
     const sortedMonths = Array.from(months).sort();
-    let cumulative = 0;
-    return sortedMonths.map(m => {
-      const entry: any = { month: m.slice(5) };
+    const roleCumulatives = new Map<string, number>();
+    roleMap.forEach((_, role) => roleCumulatives.set(role, 0));
+    const gData: any[] = [];
+    const cData: any[] = [];
+    sortedMonths.forEach(m => {
+      const gEntry: any = { month: m.slice(5) };
+      const cEntry: any = { month: m.slice(5) };
+      let monthTotal = 0;
       roleMap.forEach((counts, role) => {
         const val = counts.get(m) || 0;
-        entry[role] = val;
-        cumulative += val;
+        gEntry[role] = val;
+        monthTotal += val;
+        roleCumulatives.set(role, (roleCumulatives.get(role) || 0) + val);
+        cEntry[role] = roleCumulatives.get(role);
       });
-      entry.totalToDate = cumulative;
-      return entry;
+      gEntry.total = monthTotal;
+      cEntry.totalToDate = Array.from(roleCumulatives.values()).reduce((a, b) => a + b, 0);
+      gData.push(gEntry);
+      cData.push(cEntry);
     });
+    return { growthData: gData, cumulativeData: cData };
   }, [stats]);
+
+  const activeChartData = chartMode === "growth" ? roleGrowthData : cumulativeData;
 
   const roleKeys = useMemo(() => {
     if (!stats?.roleGrowth) return [];
@@ -261,34 +275,60 @@ export default function AdminPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="border border-border/60 shadow-sm">
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 space-y-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">User Growth by Role</CardTitle>
-              <Select value={chartRoleFilter} onValueChange={setChartRoleFilter}>
-                <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  {roleKeys.map((r: string) => (
-                    <SelectItem key={r} value={r}>
-                      <span className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full inline-block" style={{ background: ROLE_COLORS[r] }} />
-                        {r.charAt(0).toUpperCase() + r.slice(1)}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                {chartMode === "growth" ? "New Users by Role" : "Total Users to Date"}
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-lg border border-border overflow-hidden">
+                  <button
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${chartMode === "growth" ? "bg-foreground text-background" : "hover:bg-muted"}`}
+                    onClick={() => setChartMode("growth")}
+                  >
+                    New
+                  </button>
+                  <button
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${chartMode === "cumulative" ? "bg-foreground text-background" : "hover:bg-muted"}`}
+                    onClick={() => setChartMode("cumulative")}
+                  >
+                    Cumulative
+                  </button>
+                </div>
+                <Select value={chartRoleFilter} onValueChange={setChartRoleFilter}>
+                  <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    {roleKeys.map((r: string) => (
+                      <SelectItem key={r} value={r}>
+                        <span className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full inline-block" style={{ background: ROLE_COLORS[r] }} />
+                          {r.charAt(0).toUpperCase() + r.slice(1)}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            {roleGrowthData.length > 0 ? (
+            {activeChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={roleGrowthData}>
+                <LineChart data={activeChartData}>
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={30} allowDecimals={false} />
                   <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line type="monotone" dataKey="total" name="Total" stroke={ROLE_COLORS.total} strokeWidth={2.5} strokeDasharray="6 3" dot={{ r: 3 }} />
+                  <Line
+                    type="monotone"
+                    dataKey={chartMode === "growth" ? "total" : "totalToDate"}
+                    name={chartMode === "growth" ? "Total New" : "Total Users"}
+                    stroke={ROLE_COLORS.total}
+                    strokeWidth={2.5}
+                    strokeDasharray="6 3"
+                    dot={{ r: 3 }}
+                  />
                   {visibleRoleKeys.map((role: string, i: number) => (
                     <Line key={role} type="monotone" dataKey={role} name={role.charAt(0).toUpperCase() + role.slice(1)} stroke={ROLE_COLORS[role] || PIE_SHADES[i % PIE_SHADES.length]} strokeWidth={2} dot={{ r: 3 }} />
                   ))}
