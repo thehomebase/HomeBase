@@ -172,6 +172,20 @@ export default function AdminPage() {
     },
   });
 
+  const updateAccountStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      await apiRequest("PATCH", `/api/admin/users/${id}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [usersQueryUrl] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({ title: "Account status updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update account status", variant: "destructive" });
+    },
+  });
+
   const replyMutation = useMutation({
     mutationFn: async ({ messageId, content }: { messageId: number; content: string }) => {
       await apiRequest("POST", `/api/admin/messages/${messageId}/reply`, { content });
@@ -468,14 +482,15 @@ export default function AdminPage() {
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Verified</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>Verification</TableHead>
+                        <TableHead>Account</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {pageUsers.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No users found</TableCell>
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No users found</TableCell>
                         </TableRow>
                       )}
                       {pageUsers.map((u: any) => (
@@ -494,7 +509,27 @@ export default function AdminPage() {
                           <TableCell>{u.email_verified ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-red-400" />}</TableCell>
                           <TableCell><Badge variant={u.verification_status === "admin_verified" ? "default" : "secondary"} className="text-[10px]">{u.verification_status || "unverified"}</Badge></TableCell>
                           <TableCell>
-                            <Button size="sm" variant="outline" onClick={() => setEditUser(u)}>Edit</Button>
+                            <Badge variant={u.account_status === "suspended" ? "destructive" : u.account_status === "inactive" ? "secondary" : "outline"} className="text-[10px]">
+                              {u.account_status || "active"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="outline" onClick={() => setEditUser(u)}>Edit</Button>
+                              {(u.account_status || "active") === "active" ? (
+                                <Select onValueChange={(v) => updateAccountStatusMutation.mutate({ id: u.id, status: v })}>
+                                  <SelectTrigger className="h-8 w-[100px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="inactive">Deactivate</SelectItem>
+                                    <SelectItem value="suspended">Suspend</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Button size="sm" variant="outline" onClick={() => updateAccountStatusMutation.mutate({ id: u.id, status: "active" })}>
+                                  Activate
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

@@ -99,7 +99,20 @@ export async function apiRequest(
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`API request failed: ${response.status} - ${errorText}`);
-      throw new Error(`HTTP error! status: ${response.status}`);
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const parsed = JSON.parse(errorText);
+        if (parsed.error) errorMessage = parsed.error;
+        if (parsed.accountDeactivated) {
+          const err = new Error(errorMessage) as any;
+          err.accountDeactivated = true;
+          err.email = parsed.email;
+          throw err;
+        }
+      } catch (e) {
+        if ((e as any)?.accountDeactivated) throw e;
+      }
+      throw new Error(errorMessage);
     }
 
     return response;

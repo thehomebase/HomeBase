@@ -630,6 +630,7 @@ function SecuritySection() {
   const [showNew, setShowNew] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
 
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricChecked, setBiometricChecked] = useState(false);
@@ -717,6 +718,20 @@ function SecuritySection() {
     },
     onError: () => {
       toast({ title: "Failed to delete account", variant: "destructive" });
+    },
+  });
+
+  const deactivateAccountMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/account/deactivate", {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Account deactivated" });
+      window.location.href = "/auth";
+    },
+    onError: () => {
+      toast({ title: "Failed to deactivate account", variant: "destructive" });
     },
   });
 
@@ -905,6 +920,24 @@ function SecuritySection() {
 
           <div className="flex items-center justify-between">
             <div>
+              <p className="font-medium">Deactivate account</p>
+              <p className="text-sm text-muted-foreground">
+                Temporarily deactivate your account. Your data will be preserved and you can reactivate at any time by logging in.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeactivateConfirm(true)}
+            >
+              Deactivate
+            </Button>
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between">
+            <div>
               <p className="font-medium text-destructive">Delete my account</p>
               <p className="text-sm text-muted-foreground">
                 Permanently delete the account and remove access from all workspaces.
@@ -950,6 +983,29 @@ function SecuritySection() {
                 {deleteAccountMutation.isPending ? "Deleting..." : "Delete Account"}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeactivateConfirm} onOpenChange={setShowDeactivateConfirm}>
+        <DialogContent>
+          <DialogHeader className="text-left">
+            <DialogTitle>Deactivate Account</DialogTitle>
+            <DialogDescription>
+              Your account will be deactivated and you will be logged out. All your data, transactions, and documents will be preserved. You can reactivate your account at any time by logging in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setShowDeactivateConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deactivateAccountMutation.isPending}
+              onClick={() => deactivateAccountMutation.mutate()}
+            >
+              {deactivateAccountMutation.isPending ? "Deactivating..." : "Deactivate Account"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

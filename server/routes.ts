@@ -239,6 +239,7 @@ export function registerRoutes(app: Express): Server {
     '/api/register',
     '/api/verify-email',
     '/api/resend-verification',
+    '/api/account/reactivate',
   ]);
 
   app.use('/api', apiLimiter);
@@ -434,6 +435,13 @@ export function registerRoutes(app: Express): Server {
       const user = await storage.getUser(credential.userId);
       if (!user) {
         return res.status(400).json({ error: "User not found" });
+      }
+
+      if (user.accountStatus === "suspended") {
+        return res.status(403).json({ error: "Your account has been suspended. Please contact support." });
+      }
+      if (user.accountStatus === "inactive") {
+        return res.status(403).json({ error: "Your account is deactivated.", accountDeactivated: true, email: user.email });
       }
 
       req.login(user, (err) => {
@@ -4145,6 +4153,82 @@ export function registerRoutes(app: Express): Server {
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete account" });
+    }
+  });
+
+  app.post("/api/account/deactivate", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const userId = req.user.id;
+      await storage.updateUser(userId, { accountStatus: "inactive" });
+      const { pool } = await import("@db");
+      await pool.query(
+        `DELETE FROM session WHERE sess::jsonb -> 'passport' ->> 'user' = $1`,
+        [String(userId)]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deactivating account:', error);
+      res.status(500).json({ error: "Failed to deactivate account" });
+    }
+  });
+
+  app.post("/api/account/reactivate", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+      const { comparePasswords } = await import('./auth');
+      if (!(await comparePasswords(password, user.password))) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+      if (user.accountStatus === "suspended") {
+        return res.status(403).json({ error: "Your account has been suspended. Please contact support for assistance." });
+      }
+      if (user.accountStatus === "active") {
+        return res.status(400).json({ error: "Account is already active" });
+      }
+      await storage.updateUser(user.id, { accountStatus: "active" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error reactivating account:', error);
+      res.status(500).json({ error: "Failed to reactivate account" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/status", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    try {
+      const userId = parseInt(req.params.id);
+      if (isNaN(userId)) return res.status(400).json({ error: "Invalid user ID" });
+      const { status } = req.body;
+      if (!["active", "inactive", "suspended"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status. Must be: active, inactive, or suspended" });
+      }
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) return res.status(404).json({ error: "User not found" });
+      if (targetUser.role === "admin" && req.user.id !== userId) {
+        return res.status(403).json({ error: "Cannot change status of another admin" });
+      }
+      await storage.updateUser(userId, { accountStatus: status });
+      if (status !== "active") {
+        const { pool } = await import("@db");
+        await pool.query(
+          `DELETE FROM session WHERE sess::jsonb -> 'passport' ->> 'user' = $1`,
+          [String(userId)]
+        );
+      }
+      res.json({ success: true, status });
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      res.status(500).json({ error: "Failed to update user status" });
     }
   });
 
@@ -11676,7 +11760,7 @@ export function registerRoutes(app: Express): Server {
       const search = (req.query.search as string) || "";
       const roleFilter = req.query.role as string | undefined;
 
-      const userFields = sql`id, email, first_name, last_name, role, email_verified, verification_status, stripe_subscription_id`;
+      const userFields = sql`id, email, first_name, last_name, role, email_verified, verification_status, stripe_subscription_id, account_status`;
       let result;
       if (search && roleFilter) {
         result = await db.execute(sql`SELECT ${userFields} FROM users WHERE role = ${roleFilter} AND (email ILIKE ${'%' + search + '%'} OR first_name ILIKE ${'%' + search + '%'} OR last_name ILIKE ${'%' + search + '%'}) ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);

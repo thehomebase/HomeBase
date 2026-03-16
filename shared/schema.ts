@@ -52,6 +52,7 @@ export const users = pgTable("users", {
   supportAccessExpires: timestamp("support_access_expires"),
   totpSecret: text("totp_secret"),
   totpEnabled: boolean("totp_enabled").default(false),
+  accountStatus: text("account_status").default("active"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

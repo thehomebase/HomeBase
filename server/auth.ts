@@ -60,7 +60,7 @@ export async function hashPassword(password: string) {
   return `${buf.toString("hex")}.${salt}`;
 }
 
-async function comparePasswords(supplied: string, stored: string) {
+export async function comparePasswords(supplied: string, stored: string) {
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
@@ -179,6 +179,14 @@ export function setupAuth(app: Express) {
       if (err) return next(err);
       if (!user) {
         return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      if (user.accountStatus === "suspended") {
+        return res.status(403).json({ error: "Your account has been suspended. Please contact support for assistance." });
+      }
+
+      if (user.accountStatus === "inactive") {
+        return res.status(403).json({ error: "Your account is deactivated.", accountDeactivated: true, email: user.email });
       }
 
       if (user.totpEnabled && user.totpSecret) {

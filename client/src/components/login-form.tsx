@@ -28,6 +28,9 @@ export function LoginForm({
   const [mfaToken, setMfaToken] = useState("");
   const [mfaCode, setMfaCode] = useState("");
   const [mfaLoading, setMfaLoading] = useState(false);
+  const [deactivatedEmail, setDeactivatedEmail] = useState("");
+  const [deactivatedPassword, setDeactivatedPassword] = useState("");
+  const [reactivating, setReactivating] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -47,11 +50,10 @@ export function LoginForm({
   const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
     loginMutation.mutate(
-      {
-        email: formData.get("email") as string,
-        password: formData.get("password") as string,
-      },
+      { email, password },
       {
         onSuccess: (data) => {
           if ("mfaRequired" in data && data.mfaRequired) {
@@ -59,8 +61,38 @@ export function LoginForm({
             setMfaToken(data.mfaToken);
           }
         },
+        onError: (error: any) => {
+          if (error.accountDeactivated || error.message === "Your account is deactivated.") {
+            setDeactivatedEmail(email);
+            setDeactivatedPassword(password);
+          }
+        },
       }
     );
+  };
+
+  const handleReactivate = async () => {
+    setReactivating(true);
+    try {
+      const res = await fetch("/api/account/reactivate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: deactivatedEmail, password: deactivatedPassword }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Reactivation failed");
+      }
+      toast({ title: "Account reactivated! Please log in." });
+      setDeactivatedEmail("");
+      setDeactivatedPassword("");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Reactivation failed";
+      toast({ title: message, variant: "destructive" });
+    } finally {
+      setReactivating(false);
+    }
   };
 
   const handleMfaVerify = async () => {
@@ -140,6 +172,41 @@ export function LoginForm({
     } as any);
     setShowRegister(false);
   };
+
+  if (deactivatedEmail) {
+    return (
+      <div className={cn("w-full max-w-sm mx-auto rounded-lg p-6", className)} {...props}>
+        <div className="space-y-6">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+              <ShieldCheck className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <h1 className="text-xl font-bold">Account Deactivated</h1>
+            <p className="text-sm text-muted-foreground text-center">
+              Your account has been deactivated. All your data is preserved and you can reactivate at any time.
+            </p>
+          </div>
+          <Button
+            onClick={handleReactivate}
+            className="w-full dark:bg-white dark:text-black"
+            disabled={reactivating}
+          >
+            {reactivating ? "Reactivating..." : "Reactivate My Account"}
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full"
+            onClick={() => {
+              setDeactivatedEmail("");
+              setDeactivatedPassword("");
+            }}
+          >
+            Back to login
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (mfaRequired) {
     return (
