@@ -179,7 +179,10 @@ async function handleLockMessage(ws: WebSocket, userId: number, userRole: string
 
   switch (type) {
     case 'transaction:lock': {
-      const result = lockManager.acquireLock(txId, userId, payload.userName || 'Unknown', payload.userRole || 'user', ws);
+      const lockUser = await storage.getUser(userId);
+      const serverUserName = lockUser ? `${lockUser.firstName || ''} ${lockUser.lastName || ''}`.trim() || lockUser.username : 'Unknown';
+      const serverUserRole = lockUser?.role || 'user';
+      const result = lockManager.acquireLock(txId, userId, serverUserName, serverUserRole, ws);
       if (!result.acquired && result.holder) {
         ws.send(JSON.stringify({
           type: 'transaction:locked',
