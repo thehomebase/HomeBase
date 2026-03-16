@@ -284,7 +284,7 @@ export const bidRequests = pgTable("bid_requests", {
   id: serial("id").primaryKey(),
   transactionId: integer("transaction_id").notNull(),
   inspectionItemId: integer("inspection_item_id").notNull(),
-  contractorId: integer("contractor_id").notNull(),
+  contractorId: integer("contractor_id"),
   status: text("status", { enum: ['pending', 'viewed', 'bid_submitted', 'declined', 'expired'] }).notNull().default('pending'),
   sentAt: timestamp("sent_at").defaultNow(),
   expiresAt: timestamp("expires_at"),
@@ -294,7 +294,7 @@ export const bidRequests = pgTable("bid_requests", {
 export const bids = pgTable("bids", {
   id: serial("id").primaryKey(),
   bidRequestId: integer("bid_request_id").notNull(),
-  contractorId: integer("contractor_id").notNull(),
+  contractorId: integer("contractor_id"),
   amount: integer("amount").notNull(),
   estimatedDays: integer("estimated_days"),
   description: text("description"),

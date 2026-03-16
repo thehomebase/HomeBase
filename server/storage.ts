@@ -2146,9 +2146,22 @@ export class DatabaseStorage implements IStorage {
 
   async deleteClient(clientId: number): Promise<void> {
     try {
+      const activeCheck = await db.execute(sql`
+        SELECT id, street_name FROM transactions
+        WHERE (client_id = ${clientId} OR secondary_client_id = ${clientId})
+          AND status NOT IN ('closed', 'cancelled', 'withdrawn', 'expired')
+        LIMIT 5
+      `);
+      if (activeCheck.rows.length > 0) {
+        const txNames = (activeCheck.rows as any[]).map(r => r.street_name || `#${r.id}`).join(', ');
+        const err: any = new Error(`Cannot delete client: assigned to active transaction(s): ${txNames}`);
+        err.statusCode = 409;
+        throw err;
+      }
       await db.execute(sql`UPDATE clients SET linked_client_id = NULL WHERE linked_client_id = ${clientId}`);
       await db.delete(clients).where(sql`id = ${clientId}`);
     } catch (error) {
+      if ((error as any).statusCode === 409) throw error;
       console.error('Error in deleteClient:', error);
       throw error;
     }
@@ -2369,10 +2382,25 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTransaction(id: number): Promise<void> {
     try {
-      await db.execute(sql`
-        DELETE FROM transactions 
-        WHERE id = ${id}
-      `);
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`DELETE FROM bids WHERE bid_request_id IN (SELECT id FROM bid_requests WHERE transaction_id = ${id})`);
+        await tx.execute(sql`DELETE FROM bid_requests WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM inspection_items WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM inspection_pdfs WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM documents WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM checklists WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM messages WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM contacts WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM feedback_requests WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM scanned_documents WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM agent_reviews WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM commission_entries WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM vendor_ratings WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM tasks WHERE transaction_id = ${id}`);
+        await tx.execute(sql`UPDATE open_houses SET transaction_id = NULL WHERE transaction_id = ${id}`);
+        await tx.execute(sql`UPDATE homeowner_homes SET transaction_id = NULL WHERE transaction_id = ${id}`);
+        await tx.execute(sql`DELETE FROM transactions WHERE id = ${id}`);
+      });
     } catch (error) {
       console.error('Error in deleteTransaction:', error);
       throw error;
@@ -2740,16 +2768,6 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deleteClient(clientId: number): Promise<void> {
-    try {
-      await db.execute(sql`UPDATE clients SET linked_client_id = NULL WHERE linked_client_id = ${clientId}`);
-      await db.delete(clients).where(sql`id = ${clientId}`);
-    } catch (error) {
-      console.error('Error in deleteClient:', error);
-      throw error;
-    }
-  }
-
   async createClient(insertClient: InsertClient): Promise<Client> {
     try {
       // Ensure labels is always an array
@@ -3084,6 +3102,8 @@ export class DatabaseStorage implements IStorage {
 
   async deleteContractor(id: number): Promise<void> {
     try {
+      await db.execute(sql`UPDATE bids SET contractor_id = NULL WHERE contractor_id = ${id}`);
+      await db.execute(sql`UPDATE bid_requests SET contractor_id = NULL WHERE contractor_id = ${id}`);
       await db.execute(sql`DELETE FROM contractor_reviews WHERE contractor_id = ${id}`);
       await db.execute(sql`DELETE FROM contractors WHERE id = ${id}`);
     } catch (error) {

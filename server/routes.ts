@@ -546,7 +546,10 @@ export function registerRoutes(app: Express): Server {
       }
       await storage.deleteClient(clientId);
       res.sendStatus(200);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.statusCode === 409) {
+        return res.status(409).json({ error: error.message });
+      }
       console.error('Error deleting client:', error);
       res.status(500).json({ error: 'Failed to delete client' });
     }
