@@ -4161,6 +4161,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const userId = req.user.id;
       await storage.updateUser(userId, { accountStatus: "inactive" });
+      await db.execute(sql`INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details) VALUES (${userId}, ${"self_deactivate"}, ${"user"}, ${userId}, ${JSON.stringify({ previousStatus: "active", newStatus: "inactive" })})`);
       const { pool } = await import("@db");
       await pool.query(
         `DELETE FROM session WHERE sess::jsonb -> 'passport' ->> 'user' = $1`,
@@ -4194,6 +4195,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Account is already active" });
       }
       await storage.updateUser(user.id, { accountStatus: "active" });
+      await db.execute(sql`INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details) VALUES (${user.id}, ${"self_reactivate"}, ${"user"}, ${user.id}, ${JSON.stringify({ previousStatus: "inactive", newStatus: "active" })})`);
       res.json({ success: true });
     } catch (error) {
       console.error('Error reactivating account:', error);
@@ -4217,7 +4219,9 @@ export function registerRoutes(app: Express): Server {
       if (targetUser.role === "admin" && req.user.id !== userId) {
         return res.status(403).json({ error: "Cannot change status of another admin" });
       }
+      const previousStatus = targetUser.accountStatus || "active";
       await storage.updateUser(userId, { accountStatus: status });
+      await logAdminAction(req.user!.id, "update_account_status", "user", userId, { previousStatus, newStatus: status });
       if (status !== "active") {
         const { pool } = await import("@db");
         await pool.query(
