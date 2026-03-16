@@ -13,7 +13,7 @@ export default function TermsPage() {
         </Button>
 
         <h1 className="text-3xl font-bold mb-2">Terms and Conditions</h1>
-        <p className="text-sm text-muted-foreground mb-8">Last updated: March 5, 2026</p>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: March 16, 2026</p>
 
         <div className="prose prose-neutral dark:prose-invert max-w-none space-y-6">
           <section>
@@ -84,56 +84,77 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">7. Third-Party Services</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              The platform integrates with third-party services including Twilio (SMS delivery), Google Gmail (email), and others. Your use of these integrated services is also subject to their respective terms of service and privacy policies. We are not responsible for the practices or policies of third-party service providers.
+            <h2 className="text-xl font-semibold mb-3">7. AI-Powered Document Processing</h2>
+            <p className="text-muted-foreground leading-relaxed mb-2">
+              Our platform uses artificial intelligence (AI) to extract data from uploaded real estate documents. By uploading documents, you acknowledge and agree to the following:
             </p>
+            <ul className="list-disc pl-6 text-muted-foreground space-y-1">
+              <li><strong>AI Accuracy:</strong> AI-extracted data is provided as a convenience and may contain errors. All extracted information is presented for your review before being applied. You are responsible for verifying the accuracy of any AI-extracted data before relying on it.</li>
+              <li><strong>Not a Substitute for Professional Review:</strong> AI-powered document analysis does not constitute legal, financial, or professional advice. You should always have contracts and other important documents reviewed by qualified professionals.</li>
+              <li><strong>Data Processing:</strong> Document text is sent to a third-party AI service (Google Gemini) for processing. Sensitive personal information (such as Social Security numbers, bank account numbers, and similar data) is automatically redacted before transmission. See our Privacy Policy for full details.</li>
+              <li><strong>No Liability:</strong> Home-Base is not liable for any errors, omissions, or inaccuracies in AI-extracted data, or for any decisions made based on AI-generated output. You assume full responsibility for verifying all extracted information.</li>
+            </ul>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">8. Intellectual Property</h2>
+            <h2 className="text-xl font-semibold mb-3">8. Third-Party Services</h2>
+            <p className="text-muted-foreground leading-relaxed mb-2">
+              The platform integrates with third-party services. Your use of these integrated services is also subject to their respective terms of service and privacy policies. We are not responsible for the practices or policies of third-party service providers. Third-party services include:
+            </p>
+            <ul className="list-disc pl-6 text-muted-foreground space-y-1">
+              <li><strong>Google Gemini:</strong> AI-powered document analysis and data extraction.</li>
+              <li><strong>Twilio:</strong> SMS text message delivery.</li>
+              <li><strong>Google Gmail:</strong> Email communication via linked Gmail accounts.</li>
+              <li><strong>Stripe:</strong> Payment processing and subscription management.</li>
+              <li><strong>SignNow / DocuSign:</strong> Electronic signature services.</li>
+              <li><strong>RentCast:</strong> Property listing data and market information.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold mb-3">9. Intellectual Property</h2>
             <p className="text-muted-foreground leading-relaxed">
               The Service and its original content, features, and functionality are owned by Home-Base and are protected by copyright, trademark, and other intellectual property laws. You retain ownership of any data you input into the platform.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">9. Disclaimer of Warranties</h2>
+            <h2 className="text-xl font-semibold mb-3">10. Disclaimer of Warranties</h2>
             <p className="text-muted-foreground leading-relaxed">
               The Service is provided "as is" and "as available" without warranties of any kind, whether express or implied. We do not guarantee that the Service will be uninterrupted, secure, or error-free. We do not provide legal, financial, or real estate advice through the platform. Users should consult appropriate professionals for such advice.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">10. Limitation of Liability</h2>
+            <h2 className="text-xl font-semibold mb-3">11. Limitation of Liability</h2>
             <p className="text-muted-foreground leading-relaxed">
               To the fullest extent permitted by law, Home-Base shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of or inability to use the Service, including but not limited to damages related to failed message delivery, data loss, or service interruptions.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">11. Termination</h2>
+            <h2 className="text-xl font-semibold mb-3">12. Termination</h2>
             <p className="text-muted-foreground leading-relaxed">
               We reserve the right to suspend or terminate your access to the Service at any time, with or without cause, and with or without notice. Upon termination, your right to use the Service will immediately cease.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">12. Changes to Terms</h2>
+            <h2 className="text-xl font-semibold mb-3">13. Changes to Terms</h2>
             <p className="text-muted-foreground leading-relaxed">
               We reserve the right to modify these Terms at any time. We will notify users of material changes by posting the updated terms on this page. Your continued use of the Service after changes are posted constitutes your acceptance of the modified terms.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">13. Governing Law</h2>
+            <h2 className="text-xl font-semibold mb-3">14. Governing Law</h2>
             <p className="text-muted-foreground leading-relaxed">
               These Terms shall be governed by and construed in accordance with the laws of the State of Texas, without regard to its conflict of law provisions.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">14. Contact</h2>
+            <h2 className="text-xl font-semibold mb-3">15. Contact</h2>
             <p className="text-muted-foreground leading-relaxed">
               If you have questions about these Terms and Conditions, please contact your agent or the platform administrator.
             </p>
