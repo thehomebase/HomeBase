@@ -126,7 +126,7 @@ async function verifyTransactionAccessForWs(transactionId: number, userId: numbe
   }
 }
 
-function broadcastTransactionLocked(txId: number, lock: LockInfo) {
+async function broadcastTransactionLocked(txId: number, lock: LockInfo) {
   const message = JSON.stringify({
     type: 'transaction:locked',
     payload: {
@@ -136,18 +136,26 @@ function broadcastTransactionLocked(txId: number, lock: LockInfo) {
   });
   for (const [userId, connections] of userConnections) {
     if (userId === lock.userId) continue;
+    const firstWs = connections.values().next().value;
+    const role = firstWs ? (firstWs as any).userRole || 'user' : 'user';
+    const hasAccess = await verifyTransactionAccessForWs(txId, userId, role);
+    if (!hasAccess) continue;
     for (const ws of connections) {
       if (ws.readyState === WebSocket.OPEN) ws.send(message);
     }
   }
 }
 
-function broadcastTransactionUnlocked(txId: number) {
+async function broadcastTransactionUnlocked(txId: number) {
   const message = JSON.stringify({
     type: 'transaction:unlocked',
     payload: { transactionId: txId },
   });
-  for (const [, connections] of userConnections) {
+  for (const [userId, connections] of userConnections) {
+    const firstWs = connections.values().next().value;
+    const role = firstWs ? (firstWs as any).userRole || 'user' : 'user';
+    const hasAccess = await verifyTransactionAccessForWs(txId, userId, role);
+    if (!hasAccess) continue;
     for (const ws of connections) {
       if (ws.readyState === WebSocket.OPEN) ws.send(message);
     }
@@ -161,7 +169,7 @@ async function handleLockMessage(ws: WebSocket, userId: number, userRole: string
   const txId = typeof rawTxId === 'string' ? parseInt(rawTxId, 10) : rawTxId;
   if (!Number.isFinite(txId) || txId <= 0) return;
 
-  if (type === 'transaction:lock') {
+  if (type === 'transaction:lock' || type === 'transaction:query_lock') {
     const hasAccess = await verifyTransactionAccessForWs(txId, userId, userRole);
     if (!hasAccess) {
       ws.send(JSON.stringify({ type: 'transaction:error', payload: { transactionId: txId, error: 'Access denied' } }));
