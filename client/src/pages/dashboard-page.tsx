@@ -1089,41 +1089,83 @@ export default function DashboardPage() {
               })()}
             </div>
           )}
-          {isWidgetVisible("transaction") && dashData.transaction && (
-            <Card className="p-5 mb-6 border border-border/60">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="font-bold text-lg">{dashData.transaction.streetName}</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5 capitalize">
-                    {dashData.transaction.status?.replace(/_/g, " ")} &middot; {dashData.transaction.type === "buy" ? "Buying" : "Selling"}
-                  </p>
-                </div>
-                {dashData.transaction.closingDate && (
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Closing</p>
-                    <p className="text-sm font-semibold">
-                      {new Date(dashData.transaction.closingDate).toLocaleDateString([], { month: "short", day: "numeric" })}
+          {isWidgetVisible("transaction") && (() => {
+            const txList = dashData.transactions || (dashData.transaction ? [dashData.transaction] : []);
+            if (txList.length === 0) return null;
+            return (
+              <div className="space-y-4 mb-6">
+                {txList.length > 1 && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium text-muted-foreground">
+                      You have {txList.length} active transactions
                     </p>
                   </div>
                 )}
+                {txList.map((tx: any) => {
+                  const daysToClose = tx.closingDate
+                    ? Math.ceil((new Date(tx.closingDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                    : null;
+                  return (
+                    <Card key={tx.id} className="p-5 border border-border/60">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start gap-3">
+                          <div className={`mt-0.5 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${tx.type === "buy" ? "bg-blue-500" : "bg-emerald-500"}`}>
+                            {tx.type === "buy" ? "B" : "S"}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-lg leading-tight">{tx.streetName}</h3>
+                            {tx.city && (
+                              <p className="text-xs text-muted-foreground">{tx.city}{tx.state ? `, ${tx.state}` : ''}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-0.5 capitalize">
+                              {tx.status?.replace(/_/g, " ")} &middot; {tx.type === "buy" ? "Buying" : "Selling"}
+                            </p>
+                          </div>
+                        </div>
+                        {tx.closingDate && (
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Closing</p>
+                            <p className="text-sm font-semibold">
+                              {new Date(tx.closingDate).toLocaleDateString([], { month: "short", day: "numeric" })}
+                            </p>
+                            {daysToClose !== null && daysToClose > 0 && (
+                              <p className={`text-xs font-medium ${daysToClose <= 7 ? "text-red-500" : daysToClose <= 14 ? "text-amber-500" : "text-green-600"}`}>
+                                {daysToClose} day{daysToClose !== 1 ? 's' : ''} left
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 mb-4 p-3 rounded-lg bg-muted/40">
+                        {tx.contractPrice && (
+                          <div>
+                            <p className="text-xs text-muted-foreground">Contract Price</p>
+                            <p className="font-bold text-lg">
+                              {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(tx.contractPrice))}
+                            </p>
+                          </div>
+                        )}
+                        {tx.pendingDocuments > 0 && (
+                          <div className="ml-auto text-right">
+                            <p className="text-xs text-muted-foreground">Pending Docs</p>
+                            <Badge variant="secondary" className="text-amber-600">
+                              {tx.pendingDocuments}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                      <Link href={txList.length > 1 ? `/my-transaction?tx=${tx.id}` : "/my-transaction"}>
+                        <Button className="w-full gap-2">
+                          View Transaction <ArrowRight className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                    </Card>
+                  );
+                })}
               </div>
-              {dashData.transaction.contractPrice && (
-                <div className="flex items-center gap-6 mb-4 p-3 rounded-lg bg-muted/40">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Contract Price</p>
-                    <p className="font-bold text-lg">
-                      {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(dashData.transaction.contractPrice))}
-                    </p>
-                  </div>
-                </div>
-              )}
-              <Link href="/my-transaction">
-                <Button className="w-full gap-2">
-                  View Full Transaction <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </Card>
-          )}
+            );
+          })()}
           {isWidgetVisible("quick_actions") && <QuickActionsWidget role="client" />}
         </>
       )}

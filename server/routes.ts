@@ -6074,16 +6074,88 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Client Portal - My Transaction
+  app.get("/api/client/my-transactions", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    try {
+      const userId = req.user.id;
+      const clientRecordId = req.user.clientRecordId;
+      const claimedTxId = req.user.claimedTransactionId;
+
+      const txIds = new Set<number>();
+      if (claimedTxId) txIds.add(claimedTxId);
+
+      if (clientRecordId) {
+        const result = await db.execute(sql`
+          SELECT id FROM transactions WHERE client_id = ${clientRecordId} OR secondary_client_id = ${clientRecordId}
+        `);
+        for (const row of result.rows as any[]) txIds.add(row.id);
+      }
+
+      const participantResult = await db.execute(sql`
+        SELECT id, participants FROM transactions
+      `);
+      for (const row of participantResult.rows as any[]) {
+        const participants = (row.participants as any[]) || [];
+        if (participants.some((p: any) => p.userId === userId)) {
+          txIds.add(row.id);
+        }
+      }
+
+      if (txIds.size === 0) return res.json([]);
+
+      const txList = [];
+      for (const txId of txIds) {
+        const tx = await storage.getTransaction(txId);
+        if (tx) {
+          const docsResult = await db.execute(sql`
+            SELECT COUNT(*)::int as count FROM documents
+            WHERE transaction_id = ${tx.id} AND status IN ('waiting_signatures', 'waiting_others')
+          `);
+          txList.push({
+            id: tx.id,
+            streetName: tx.streetName,
+            city: tx.city,
+            state: tx.state,
+            status: tx.status,
+            type: tx.type,
+            contractPrice: tx.contractPrice,
+            closingDate: tx.closingDate,
+            pendingDocuments: (docsResult.rows[0] as any)?.count || 0,
+          });
+        }
+      }
+      res.json(txList);
+    } catch (error) {
+      console.error("Error fetching client transactions:", error);
+      res.status(500).json({ error: "Failed to load transactions" });
+    }
+  });
+
   app.get("/api/client/my-transaction", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     try {
       let transaction = null;
-      if (req.user.claimedTransactionId) {
+      const requestedTxId = req.query.transactionId ? Number(req.query.transactionId) : null;
+
+      if (requestedTxId) {
+        const tx = await storage.getTransaction(requestedTxId);
+        if (tx) {
+          const participants = (tx.participants as any[]) || [];
+          const isParticipant = participants.some((p: any) => p.userId === req.user!.id);
+          const isLinkedClient = req.user.clientRecordId && (tx.clientId === req.user.clientRecordId || tx.secondaryClientId === req.user.clientRecordId);
+          const isClaimed = tx.id === req.user.claimedTransactionId;
+          if (isParticipant || isLinkedClient || isClaimed) {
+            transaction = tx;
+          }
+        }
+      }
+
+      if (!transaction && req.user.claimedTransactionId) {
         const claimed = await storage.getTransaction(req.user.claimedTransactionId);
         if (claimed) {
           const participants = (claimed.participants as any[]) || [];
           const isParticipant = participants.some((p: any) => p.userId === req.user!.id);
-          const isLinkedClient = claimed.clientId === req.user.clientRecordId || claimed.secondaryClientId === req.user.clientRecordId;
+          const isLinkedClient = req.user.clientRecordId && (claimed.clientId === req.user.clientRecordId || claimed.secondaryClientId === req.user.clientRecordId);
           if (isParticipant || isLinkedClient) {
             transaction = claimed;
           }

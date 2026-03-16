@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Link } from "wouter";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -559,9 +560,22 @@ export default function ClientTransactionPage() {
   const [showAllDocs, setShowAllDocs] = useState(false);
   const [showFinancials, setShowFinancials] = useState(false);
   const [showAllTimeline, setShowAllTimeline] = useState(false);
+  const [, setLocation] = useLocation();
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const txParam = searchParams.get("tx");
+
+  const { data: allTransactions } = useQuery<any[]>({
+    queryKey: ["/api/client/my-transactions"],
+  });
+
+  const apiUrl = txParam
+    ? `/api/client/my-transaction?transactionId=${txParam}`
+    : "/api/client/my-transaction";
 
   const { data, isLoading, isError } = useQuery<MyTransactionResponse | null>({
-    queryKey: ["/api/client/my-transaction"],
+    queryKey: ["/api/client/my-transaction", txParam],
+    queryFn: () => fetch(apiUrl, { credentials: "include" }).then(r => r.json()),
   });
 
   if (isLoading) {
@@ -624,8 +638,39 @@ export default function ClientTransactionPage() {
   const timelineEvents = timeline?.events || [];
   const visibleTimeline = showAllTimeline ? timelineEvents : timelineEvents.slice(0, 6);
 
+  const hasMultipleTx = allTransactions && allTransactions.length > 1;
+
   return (
     <main className="w-full max-w-3xl mx-auto px-4 py-6 min-h-screen space-y-6 pb-24">
+      {hasMultipleTx && (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/60">
+          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Transaction:</span>
+          <Select
+            value={String(transaction.id)}
+            onValueChange={(val) => {
+              window.history.replaceState(null, "", `/my-transaction?tx=${val}`);
+              setLocation(`/my-transaction?tx=${val}`);
+            }}
+          >
+            <SelectTrigger className="flex-1 h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {allTransactions.map((tx: any) => (
+                <SelectItem key={tx.id} value={String(tx.id)}>
+                  <span className="flex items-center gap-2">
+                    <span className={`inline-flex w-5 h-5 rounded-full items-center justify-center text-[10px] font-bold text-white ${tx.type === "buy" ? "bg-blue-500" : "bg-emerald-500"}`}>
+                      {tx.type === "buy" ? "B" : "S"}
+                    </span>
+                    {tx.streetName}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{transaction.streetName}</h1>

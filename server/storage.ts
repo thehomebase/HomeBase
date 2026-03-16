@@ -829,6 +829,7 @@ export class DatabaseStorage implements IStorage {
           type,
           agent_id as "agentId",
           client_id as "clientId",
+          secondary_client_id as "secondaryClientId",
           participants,
           contract_price as "contractPrice",
           option_period_expiration as "optionPeriodExpiration",
@@ -864,6 +865,7 @@ export class DatabaseStorage implements IStorage {
         type: String(row.type).replace(/[{}]/g, ''),
         agentId: Number(row.agentId),
         clientId: row.clientId ? Number(row.clientId) : null,
+        secondaryClientId: (row as any).secondaryClientId ? Number((row as any).secondaryClientId) : null,
         participants: Array.isArray(row.participants) ? row.participants : [],
         contractPrice: row.contractPrice ? Number(row.contractPrice) : null,
         optionPeriodExpiration: row.optionPeriodExpiration ? new Date(row.optionPeriodExpiration) : null,
@@ -1834,36 +1836,55 @@ export class DatabaseStorage implements IStorage {
 
     if (role === "client") {
       const txResult = await db.execute(sql`
-        SELECT t.id, t.street_name, t.status, t.closing_date, t.contract_price, t.type
+        SELECT t.id, t.street_name, t.city, t.status, t.closing_date, t.contract_price, t.type
         FROM transactions t
         JOIN users u ON u.id = ${userId}
-        WHERE t.client_id = u.client_record_id OR t.id = u.claimed_transaction_id
-        LIMIT 1
+        WHERE t.client_id = u.client_record_id OR t.secondary_client_id = u.client_record_id OR t.id = u.claimed_transaction_id
       `);
-      const tx = (txResult.rows[0] as any) || null;
-      let pendingDocs = 0;
-      if (tx) {
+
+      const participantResult = await db.execute(sql`
+        SELECT id, street_name, city, status, closing_date, contract_price, type, participants
+        FROM transactions
+      `);
+      const extraTxs = (participantResult.rows as any[]).filter(row => {
+        const parts = (row.participants as any[]) || [];
+        return parts.some((p: any) => p.userId === userId) &&
+          !(txResult.rows as any[]).some((t: any) => t.id === row.id);
+      });
+
+      const allTxRows = [...(txResult.rows as any[]), ...extraTxs];
+
+      const transactions = [];
+      let totalPendingDocs = 0;
+      for (const tx of allTxRows) {
         const docsResult = await db.execute(sql`
           SELECT COUNT(*)::int as count FROM documents
           WHERE transaction_id = ${tx.id} AND status IN ('waiting_signatures', 'waiting_others')
         `);
-        pendingDocs = (docsResult.rows[0] as any)?.count || 0;
-      }
-      const unreadResult = await db.execute(sql`
-        SELECT COUNT(*)::int as count FROM private_messages
-        WHERE recipient_id = ${userId} AND read = false
-      `);
-      return {
-        role: "client",
-        transaction: tx ? {
+        const pendingDocs = (docsResult.rows[0] as any)?.count || 0;
+        totalPendingDocs += pendingDocs;
+        transactions.push({
           id: tx.id,
           streetName: tx.street_name,
+          city: tx.city,
           status: tx.status,
           closingDate: tx.closing_date,
           contractPrice: tx.contract_price,
           type: tx.type,
-        } : null,
-        pendingDocuments: pendingDocs,
+          pendingDocuments: pendingDocs,
+        });
+      }
+
+      const unreadResult = await db.execute(sql`
+        SELECT COUNT(*)::int as count FROM private_messages
+        WHERE recipient_id = ${userId} AND read = false
+      `);
+
+      return {
+        role: "client",
+        transaction: transactions[0] || null,
+        transactions,
+        pendingDocuments: totalPendingDocs,
         unreadMessages: (unreadResult.rows[0] as any)?.count || 0,
       };
     }
