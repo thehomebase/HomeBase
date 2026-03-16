@@ -971,7 +971,7 @@ export default function DashboardPage() {
       {role === "client" && (
         <>
           {isWidgetVisible("stats") && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <StatCard
                 icon={MessageSquare}
                 label="Unread Messages"
@@ -986,28 +986,50 @@ export default function DashboardPage() {
                   accent="border-l-blue-500"
                 />
               )}
+              {dashData.transaction?.closingDate && (() => {
+                const days = Math.ceil((new Date(dashData.transaction.closingDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                return days > 0 ? (
+                  <StatCard
+                    icon={CalendarClock}
+                    label="Days to Closing"
+                    value={days}
+                    accent={days <= 7 ? "border-l-red-500" : days <= 14 ? "border-l-amber-500" : "border-l-green-500"}
+                  />
+                ) : null;
+              })()}
             </div>
           )}
           {isWidgetVisible("transaction") && dashData.transaction && (
-            <Card className="p-4 mb-6">
-              <h3 className="font-semibold text-sm mb-3">My Transaction</h3>
-              <div className="flex items-center gap-4">
+            <Card className="p-5 mb-6 border border-border/60">
+              <div className="flex items-start justify-between mb-4">
                 <div>
-                  <p className="font-medium">{dashData.transaction.streetName}</p>
-                  <Badge variant="outline" className="text-xs mt-1 capitalize">{dashData.transaction.status?.replace(/_/g, " ")}</Badge>
+                  <h3 className="font-bold text-lg">{dashData.transaction.streetName}</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5 capitalize">
+                    {dashData.transaction.status?.replace(/_/g, " ")} &middot; {dashData.transaction.type === "buy" ? "Buying" : "Selling"}
+                  </p>
                 </div>
                 {dashData.transaction.closingDate && (
-                  <div className="text-right ml-auto">
+                  <div className="text-right">
                     <p className="text-xs text-muted-foreground">Closing</p>
-                    <p className="text-sm font-medium">
+                    <p className="text-sm font-semibold">
                       {new Date(dashData.transaction.closingDate).toLocaleDateString([], { month: "short", day: "numeric" })}
                     </p>
                   </div>
                 )}
               </div>
+              {dashData.transaction.contractPrice && (
+                <div className="flex items-center gap-6 mb-4 p-3 rounded-lg bg-muted/40">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Contract Price</p>
+                    <p className="font-bold text-lg">
+                      {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(dashData.transaction.contractPrice))}
+                    </p>
+                  </div>
+                </div>
+              )}
               <Link href="/my-transaction">
-                <Button variant="outline" size="sm" className="mt-3 gap-1">
-                  View Details <ArrowRight className="h-3 w-3" />
+                <Button className="w-full gap-2">
+                  View Full Transaction <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
             </Card>

@@ -5830,13 +5830,24 @@ export function registerRoutes(app: Express): Server {
     try {
       let transaction = null;
       if (req.user.claimedTransactionId) {
-        transaction = await storage.getTransaction(req.user.claimedTransactionId);
+        const claimed = await storage.getTransaction(req.user.claimedTransactionId);
+        if (claimed) {
+          const participants = (claimed.participants as any[]) || [];
+          const isParticipant = participants.some((p: any) => p.userId === req.user!.id);
+          const isLinkedClient = claimed.clientId === req.user.clientRecordId || claimed.secondaryClientId === req.user.clientRecordId;
+          if (isParticipant || isLinkedClient) {
+            transaction = claimed;
+          }
+        }
       }
       if (!transaction && req.user.clientRecordId) {
-        const allTransactions = await storage.getTransactionsByUser(req.user.agentId || 0);
-        transaction = allTransactions.find(t =>
-          t.clientId === req.user!.clientRecordId || t.secondaryClientId === req.user!.clientRecordId
-        );
+        const clientId = req.user.clientRecordId;
+        const result = await db.execute(sql`
+          SELECT * FROM transactions WHERE client_id = ${clientId} OR secondary_client_id = ${clientId} LIMIT 1
+        `);
+        if (result.rows.length > 0) {
+          transaction = result.rows[0] as any;
+        }
       }
       if (!transaction) {
         return res.json(null);
@@ -5851,7 +5862,72 @@ export function registerRoutes(app: Express): Server {
       try {
         timeline = await generateTransactionTimeline(transaction.id);
       } catch (e) {}
-      res.json({ transaction, documents, checklist, timeline });
+
+      let agent = null;
+      try {
+        if (transaction.agentId) {
+          const agentUser = await storage.getUser(transaction.agentId);
+          if (agentUser) {
+            agent = {
+              id: agentUser.id,
+              name: `${agentUser.firstName || ""} ${agentUser.lastName || ""}`.trim() || agentUser.username,
+              email: agentUser.email,
+              phone: agentUser.phone || null,
+              profilePhoto: agentUser.profilePhoto || null,
+              role: agentUser.role,
+            };
+          }
+        }
+      } catch (e) {}
+
+      let contacts: any[] = [];
+      try {
+        const txContacts = await storage.getContactsByTransaction(transaction.id);
+        contacts = txContacts.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          role: c.role || c.type,
+          email: c.email,
+          phone: c.phone,
+          company: c.company,
+        }));
+      } catch (e) {}
+
+      const pendingActions = [];
+      const docsNeedingSig = documents.filter(d => d.status === "waiting_signatures" && d.signingUrl);
+      if (docsNeedingSig.length > 0) {
+        pendingActions.push({
+          type: "signature",
+          title: `${docsNeedingSig.length} document${docsNeedingSig.length > 1 ? 's' : ''} need${docsNeedingSig.length === 1 ? 's' : ''} your signature`,
+          priority: "high",
+          items: docsNeedingSig.map(d => ({ id: d.id, name: d.name, url: d.signingUrl })),
+        });
+      }
+      const checklistItems = checklist?.items || [];
+      const incompleteItems = checklistItems.filter((item: any) => !item.completed);
+      if (incompleteItems.length > 0) {
+        pendingActions.push({
+          type: "checklist",
+          title: `${incompleteItems.length} checklist item${incompleteItems.length > 1 ? 's' : ''} remaining`,
+          priority: "medium",
+          count: incompleteItems.length,
+        });
+      }
+      if (timeline) {
+        const urgentEvents = timeline.events.filter((e: any) =>
+          (e.status === "warning" || e.status === "overdue") && e.daysRemaining !== null
+        );
+        if (urgentEvents.length > 0) {
+          pendingActions.push({
+            type: "deadline",
+            title: `${urgentEvents.length} upcoming deadline${urgentEvents.length > 1 ? 's' : ''} need attention`,
+            priority: "high",
+            items: urgentEvents.map((e: any) => ({ event: e.event, daysRemaining: e.daysRemaining, status: e.status })),
+          });
+        }
+      }
+
+      res.json({ transaction, documents, checklist, timeline, agent, contacts, pendingActions });
     } catch (error: any) {
       console.error("Client portal error:", error);
       res.status(500).json({ error: "Failed to load transaction data" });
