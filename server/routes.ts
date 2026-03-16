@@ -10833,6 +10833,113 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // ============ API Usage Dashboard ============
+  app.get("/api/admin/api-usage", requireAdmin, async (req, res) => {
+    try {
+      const safeQuery = async (query: any, label: string, fallback: any = { rows: [] }) => {
+        try { return await query; } catch (e) { console.error(`[API Usage] ${label} query failed:`, e); return fallback; }
+      };
+
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+
+      const [
+        rentcastUsage,
+        twilioSmsThisMonth, twilioSmsLastMonth, twilioSmsByDay,
+        gmailThisMonth, gmailLastMonth, gmailByDay, gmailOpens,
+        signnowActions, docusignActions,
+        esignByDay,
+        webhookCount,
+        stripeEvents,
+      ] = await Promise.all([
+        safeQuery(db.execute(sql`SELECT call_count, reset_month, reset_year, updated_at FROM api_usage_counters WHERE id = 'rentcast'`), "rentcast"),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM communications WHERE type = 'sms' AND created_at >= DATE_TRUNC('month', NOW())`), "twilio-this-month"),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM communications WHERE type = 'sms' AND created_at >= DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND created_at < DATE_TRUNC('month', NOW())`), "twilio-last-month"),
+        safeQuery(db.execute(sql`
+          SELECT DATE(created_at) as day, COUNT(*) as count FROM communications
+          WHERE type = 'sms' AND created_at >= DATE_TRUNC('month', NOW())
+          GROUP BY DATE(created_at) ORDER BY day
+        `), "twilio-daily"),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM email_tracking WHERE sent_at >= DATE_TRUNC('month', NOW())`), "gmail-this-month"),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM email_tracking WHERE sent_at >= DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND sent_at < DATE_TRUNC('month', NOW())`), "gmail-last-month"),
+        safeQuery(db.execute(sql`
+          SELECT DATE(sent_at) as day, COUNT(*) as count FROM email_tracking
+          WHERE sent_at >= DATE_TRUNC('month', NOW())
+          GROUP BY DATE(sent_at) ORDER BY day
+        `), "gmail-daily"),
+        safeQuery(db.execute(sql`SELECT SUM(open_count) as total_opens, COUNT(CASE WHEN open_count > 0 THEN 1 END) as emails_opened FROM email_tracking WHERE sent_at >= DATE_TRUNC('month', NOW())`), "gmail-opens"),
+        safeQuery(db.execute(sql`
+          SELECT action, COUNT(*) as count FROM signnow_audit_log
+          WHERE created_at >= DATE_TRUNC('month', NOW()) AND action NOT LIKE 'docusign_%'
+          GROUP BY action ORDER BY count DESC
+        `), "signnow-actions"),
+        safeQuery(db.execute(sql`
+          SELECT action, COUNT(*) as count FROM signnow_audit_log
+          WHERE created_at >= DATE_TRUNC('month', NOW()) AND action LIKE 'docusign_%'
+          GROUP BY action ORDER BY count DESC
+        `), "docusign-actions"),
+        safeQuery(db.execute(sql`
+          SELECT DATE(created_at) as day,
+            COUNT(CASE WHEN action NOT LIKE 'docusign_%' THEN 1 END) as signnow,
+            COUNT(CASE WHEN action LIKE 'docusign_%' THEN 1 END) as docusign
+          FROM signnow_audit_log
+          WHERE created_at >= DATE_TRUNC('month', NOW())
+          GROUP BY DATE(created_at) ORDER BY day
+        `), "esign-daily"),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM webhooks`), "webhooks"),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM stripe.events`), "stripe-events"),
+      ]);
+
+      const rentcastRow = rentcastUsage.rows[0] as any;
+      const rentcastCalls = (rentcastRow && (rentcastRow.reset_month === month && rentcastRow.reset_year === year))
+        ? Number(rentcastRow.call_count) : 0;
+
+      res.json({
+        rentcast: {
+          callsUsed: rentcastCalls,
+          callsLimit: MONTHLY_LIMIT,
+          lastUsed: rentcastRow?.updated_at || null,
+          resetDate: new Date(year, month, 1).toISOString(),
+        },
+        twilio: {
+          smsThisMonth: Number(twilioSmsThisMonth.rows[0]?.count || 0),
+          smsLastMonth: Number(twilioSmsLastMonth.rows[0]?.count || 0),
+          dailyUsage: twilioSmsByDay.rows,
+        },
+        gmail: {
+          emailsThisMonth: Number(gmailThisMonth.rows[0]?.count || 0),
+          emailsLastMonth: Number(gmailLastMonth.rows[0]?.count || 0),
+          dailyUsage: gmailByDay.rows,
+          totalOpens: Number(gmailOpens.rows[0]?.total_opens || 0),
+          emailsOpened: Number(gmailOpens.rows[0]?.emails_opened || 0),
+        },
+        signnow: {
+          actions: signnowActions.rows,
+          totalThisMonth: signnowActions.rows.reduce((s: number, r: any) => s + Number(r.count), 0),
+        },
+        docusign: {
+          actions: docusignActions.rows,
+          totalThisMonth: docusignActions.rows.reduce((s: number, r: any) => s + Number(r.count), 0),
+        },
+        esignDaily: esignByDay.rows,
+        webhooks: {
+          totalConfigured: Number(webhookCount.rows[0]?.count || 0),
+        },
+        stripe: {
+          totalEvents: Number(stripeEvents.rows[0]?.count || 0),
+        },
+        period: {
+          month: now.toLocaleString('default', { month: 'long' }),
+          year,
+        },
+      });
+    } catch (error) {
+      console.error("API usage error:", error);
+      res.status(500).json({ error: "Failed to fetch API usage data" });
+    }
+  });
+
   // ============ Admin Dashboard ============
   app.get("/api/admin/stats", requireAdmin, async (req, res) => {
     try {

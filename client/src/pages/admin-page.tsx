@@ -24,7 +24,7 @@ import {
   ArrowUpRight, ArrowDownRight, Target, FileText, UserPlus,
   MessageSquare, Send, Loader2, ChevronLeft, ChevronRight,
   DollarSign, CreditCard, Receipt, MapPin, Clock, Percent,
-  Activity
+  Activity, Zap, Mail, Phone, PenTool, Home, Globe, AlertTriangle
 } from "lucide-react";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -49,7 +49,7 @@ const PIE_SHADES = [
 const USERS_PER_PAGE = 10;
 
 function StatCard({ title, value, change, icon: Icon, subtitle }: {
-  title: string; value: string | number; change?: number; icon: typeof Users; subtitle?: string;
+  title: string; value: string | number; change?: number; icon: typeof Users; subtitle?: React.ReactNode;
 }) {
   return (
     <Card className="p-5 flex flex-col justify-between gap-3 border border-border/60 shadow-sm hover:shadow-md transition-shadow">
@@ -98,6 +98,7 @@ export default function AdminPage() {
   const isAdmin = user?.role === "admin";
 
   const { data: stats, isLoading: statsLoading } = useQuery<any>({ queryKey: ["/api/admin/stats"], enabled: isAdmin });
+  const { data: apiUsage, isLoading: apiUsageLoading, isError: apiUsageError } = useQuery<any>({ queryKey: ["/api/admin/api-usage"], enabled: isAdmin });
   const usersQueryUrl = (() => {
     const params = new URLSearchParams();
     if (userSearch) params.set("search", userSearch);
@@ -426,6 +427,7 @@ export default function AdminPage() {
             <TabsTrigger value="financial"><DollarSign className="h-4 w-4 mr-1" />Financial</TabsTrigger>
             <TabsTrigger value="leads"><Activity className="h-4 w-4 mr-1" />Leads</TabsTrigger>
             <TabsTrigger value="geographic"><MapPin className="h-4 w-4 mr-1" />Geographic</TabsTrigger>
+            <TabsTrigger value="api-usage"><Zap className="h-4 w-4 mr-1" />API Usage</TabsTrigger>
             <TabsTrigger value="messages"><MessageSquare className="h-4 w-4 mr-1" />Messages</TabsTrigger>
             <TabsTrigger value="audit"><ClipboardList className="h-4 w-4 mr-1" />Audit Log</TabsTrigger>
           </TabsList>
@@ -1029,6 +1031,218 @@ export default function AdminPage() {
                     )}
                   </CardContent>
                 </Card>
+              </>
+            );
+          })()}
+        </TabsContent>
+
+        <TabsContent value="api-usage" className="space-y-4">
+          {(() => {
+            if (apiUsageLoading) return <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mr-2" />Loading API usage data...</div>;
+            if (apiUsageError || !apiUsage) return <div className="flex items-center justify-center py-12 text-muted-foreground"><AlertTriangle className="h-5 w-5 mr-2 text-red-500" />Failed to load API usage data. Please try again.</div>;
+            const rc = apiUsage.rentcast || {};
+            const tw = apiUsage.twilio || {};
+            const gm = apiUsage.gmail || {};
+            const sn = apiUsage.signnow || {};
+            const ds = apiUsage.docusign || {};
+            const period = apiUsage.period || {};
+
+            const UsageGauge = ({ used, limit, label, color }: { used: number; limit: number; label: string; color: string }) => {
+              const pct = limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
+              const isWarning = pct >= 80;
+              const isCritical = pct >= 95;
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className={`font-semibold ${isCritical ? 'text-red-500' : isWarning ? 'text-amber-500' : ''}`}>
+                      {used} / {limit}
+                    </span>
+                  </div>
+                  <div className="h-3 bg-muted/40 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(pct, 2)}%`, background: isCritical ? '#ef4444' : isWarning ? '#f59e0b' : color }} />
+                  </div>
+                  {isCritical && <p className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />Approaching limit</p>}
+                </div>
+              );
+            };
+
+            const TrendBadge = ({ current, previous }: { current: number; previous: number }) => {
+              if (previous === 0 && current === 0) return <span className="text-xs text-muted-foreground">No change</span>;
+              if (previous === 0) return <span className="text-xs text-green-600 flex items-center gap-0.5"><ArrowUpRight className="h-3 w-3" />New</span>;
+              const diff = Math.round(((current - previous) / previous) * 100);
+              if (diff > 0) return <span className="text-xs text-green-600 flex items-center gap-0.5"><ArrowUpRight className="h-3 w-3" />+{diff}%</span>;
+              if (diff < 0) return <span className="text-xs text-red-600 flex items-center gap-0.5"><ArrowDownRight className="h-3 w-3" />{diff}%</span>;
+              return <span className="text-xs text-muted-foreground">Same</span>;
+            };
+
+            const commsDaily = [...(tw.dailyUsage || []), ...(gm.dailyUsage || [])].reduce((acc: any[], item: any) => {
+              const day = String(item.day).split('T')[0];
+              const existing = acc.find((d: any) => d.day === day);
+              if (existing) {
+                if (tw.dailyUsage?.includes(item)) existing.sms = Number(item.count);
+                else existing.email = Number(item.count);
+              } else {
+                acc.push({
+                  day,
+                  sms: tw.dailyUsage?.includes(item) ? Number(item.count) : 0,
+                  email: !tw.dailyUsage?.includes(item) ? Number(item.count) : 0,
+                });
+              }
+              return acc;
+            }, []).sort((a: any, b: any) => a.day.localeCompare(b.day));
+
+            const esignDaily = (apiUsage.esignDaily || []).map((d: any) => ({
+              day: String(d.day).split('T')[0],
+              signnow: Number(d.signnow || 0),
+              docusign: Number(d.docusign || 0),
+            }));
+
+            return (
+              <>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">API Usage — {period.month} {period.year}</h3>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard title="RentCast Calls" value={`${rc.callsUsed || 0}/${rc.callsLimit || 45}`} icon={Home} subtitle="Monthly limit" />
+                  <StatCard title="SMS Sent" value={tw.smsThisMonth || 0} icon={Phone} subtitle={<TrendBadge current={tw.smsThisMonth || 0} previous={tw.smsLastMonth || 0} />} />
+                  <StatCard title="Emails Sent" value={gm.emailsThisMonth || 0} icon={Mail} subtitle={<TrendBadge current={gm.emailsThisMonth || 0} previous={gm.emailsLastMonth || 0} />} />
+                  <StatCard title="E-Signatures" value={(sn.totalThisMonth || 0) + (ds.totalThisMonth || 0)} icon={PenTool} subtitle={`SignNow: ${sn.totalThisMonth || 0} · DocuSign: ${ds.totalThisMonth || 0}`} />
+                </div>
+
+                <Card className="border border-border/60 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                      <Home className="h-4 w-4" /> RentCast API
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <UsageGauge used={rc.callsUsed || 0} limit={rc.callsLimit || 45} label="Monthly API Calls" color="#2563eb" />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Resets on {rc.resetDate ? new Date(rc.resetDate).toLocaleDateString() : 'the 1st'}
+                      {rc.lastUsed && ` · Last call: ${new Date(rc.lastUsed).toLocaleString()}`}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card className="border border-border/60 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                        <Phone className="h-4 w-4" /> Twilio SMS & <Mail className="h-4 w-4" /> Gmail
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {commsDaily.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={200}>
+                          <BarChart data={commsDaily}>
+                            <XAxis dataKey="day" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} />
+                            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                            <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                            <Bar dataKey="sms" name="SMS" fill="#059669" radius={[3, 3, 0, 0]} />
+                            <Bar dataKey="email" name="Email" fill="#2563eb" radius={[3, 3, 0, 0]} />
+                            <Legend />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">No communication data this month</div>
+                      )}
+                      <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+                        <div className="p-3 bg-muted/30 rounded-lg">
+                          <p className="text-muted-foreground text-xs">Gmail opens this month</p>
+                          <p className="text-lg font-semibold">{gm.totalOpens || 0}</p>
+                          <p className="text-xs text-muted-foreground">{gm.emailsOpened || 0} emails opened</p>
+                        </div>
+                        <div className="p-3 bg-muted/30 rounded-lg">
+                          <p className="text-muted-foreground text-xs">SMS vs Last Month</p>
+                          <p className="text-lg font-semibold">{tw.smsThisMonth || 0}</p>
+                          <TrendBadge current={tw.smsThisMonth || 0} previous={tw.smsLastMonth || 0} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border border-border/60 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                        <PenTool className="h-4 w-4" /> E-Signature Activity
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {esignDaily.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={200}>
+                          <BarChart data={esignDaily}>
+                            <XAxis dataKey="day" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} />
+                            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                            <RechartsTooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }} />
+                            <Bar dataKey="signnow" name="SignNow" fill="#ea580c" radius={[3, 3, 0, 0]} />
+                            <Bar dataKey="docusign" name="DocuSign" fill="#7c3aed" radius={[3, 3, 0, 0]} />
+                            <Legend />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">No e-signature activity this month</div>
+                      )}
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        {(sn.actions || []).length > 0 && (
+                          <div className="p-3 bg-muted/30 rounded-lg space-y-1">
+                            <p className="text-xs text-muted-foreground font-medium">SignNow Actions</p>
+                            {(sn.actions as any[]).slice(0, 5).map((a: any) => (
+                              <div key={a.action} className="flex justify-between text-xs">
+                                <span className="text-muted-foreground">{String(a.action).replace(/_/g, ' ')}</span>
+                                <span className="font-medium">{a.count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {(ds.actions || []).length > 0 && (
+                          <div className="p-3 bg-muted/30 rounded-lg space-y-1">
+                            <p className="text-xs text-muted-foreground font-medium">DocuSign Actions</p>
+                            {(ds.actions as any[]).slice(0, 5).map((a: any) => (
+                              <div key={a.action} className="flex justify-between text-xs">
+                                <span className="text-muted-foreground">{String(a.action).replace(/docusign_/g, '').replace(/_/g, ' ')}</span>
+                                <span className="font-medium">{a.count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {(sn.actions || []).length === 0 && (ds.actions || []).length === 0 && (
+                          <div className="col-span-2 text-center py-4 text-muted-foreground text-sm">No e-signature actions this month</div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="border border-border/60 shadow-sm">
+                    <CardContent className="pt-4 text-center">
+                      <Zap className="h-8 w-8 mx-auto mb-2 text-amber-500" />
+                      <p className="text-2xl font-bold">{apiUsage.stripe?.totalEvents || 0}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Stripe Events (All Time)</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border border-border/60 shadow-sm">
+                    <CardContent className="pt-4 text-center">
+                      <Globe className="h-8 w-8 mx-auto mb-2 text-blue-500" />
+                      <p className="text-2xl font-bold">{apiUsage.webhooks?.totalConfigured || 0}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Webhooks Configured</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border border-border/60 shadow-sm">
+                    <CardContent className="pt-4 text-center">
+                      <Mail className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                      <p className="text-2xl font-bold">{gm.emailsOpened || 0} / {gm.emailsThisMonth || 0}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Email Open Rate</p>
+                      {gm.emailsThisMonth > 0 && (
+                        <p className="text-sm font-semibold text-green-600 mt-1">
+                          {Math.round((gm.emailsOpened / gm.emailsThisMonth) * 100)}%
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               </>
             );
           })()}
