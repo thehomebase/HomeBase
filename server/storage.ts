@@ -2153,15 +2153,14 @@ export class DatabaseStorage implements IStorage {
         LIMIT 5
       `);
       if (activeCheck.rows.length > 0) {
-        const txNames = (activeCheck.rows as any[]).map(r => r.street_name || `#${r.id}`).join(', ');
-        const err: any = new Error(`Cannot delete client: assigned to active transaction(s): ${txNames}`);
-        err.statusCode = 409;
+        const txNames = activeCheck.rows.map((r: Record<string, unknown>) => String(r.street_name || `#${r.id}`)).join(', ');
+        const err = Object.assign(new Error(`Cannot delete client: assigned to active transaction(s): ${txNames}`), { statusCode: 409 });
         throw err;
       }
       await db.execute(sql`UPDATE clients SET linked_client_id = NULL WHERE linked_client_id = ${clientId}`);
       await db.delete(clients).where(sql`id = ${clientId}`);
     } catch (error) {
-      if ((error as any).statusCode === 409) throw error;
+      if (error instanceof Error && 'statusCode' in error) throw error;
       console.error('Error in deleteClient:', error);
       throw error;
     }
