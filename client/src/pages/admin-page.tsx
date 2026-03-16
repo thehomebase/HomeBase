@@ -86,27 +86,25 @@ export default function AdminPage() {
   const [replyTo, setReplyTo] = useState<any>(null);
   const [replyText, setReplyText] = useState("");
 
-  if (user?.role !== "admin") {
-    navigate("/");
-    return null;
-  }
+  const isAdmin = user?.role === "admin";
 
-  const { data: stats, isLoading: statsLoading } = useQuery<any>({ queryKey: ["/api/admin/stats"] });
-  const { data: usersData } = useQuery({
-    queryKey: ["/api/admin/users", userSearch, roleFilter],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (userSearch) params.set("search", userSearch);
-      if (roleFilter && roleFilter !== "all") params.set("role", roleFilter);
-      const res = await fetch(`/api/admin/users?${params}`, { credentials: "include" });
-      return res.json();
-    },
+  const { data: stats, isLoading: statsLoading } = useQuery<any>({ queryKey: ["/api/admin/stats"], enabled: isAdmin });
+  const usersQueryUrl = (() => {
+    const params = new URLSearchParams();
+    if (userSearch) params.set("search", userSearch);
+    if (roleFilter && roleFilter !== "all") params.set("role", roleFilter);
+    const qs = params.toString();
+    return qs ? `/api/admin/users?${qs}` : "/api/admin/users";
+  })();
+  const { data: usersData } = useQuery<any>({
+    queryKey: [usersQueryUrl],
+    enabled: isAdmin,
   });
-  const { data: verifications } = useQuery({ queryKey: ["/api/admin/verifications"] });
-  const { data: reports } = useQuery({ queryKey: ["/api/admin/reports"] });
-  const { data: ads } = useQuery({ queryKey: ["/api/admin/ads"] });
-  const { data: auditLog } = useQuery({ queryKey: ["/api/admin/audit-log"] });
-  const { data: adminMessages = [] } = useQuery<any[]>({ queryKey: ["/api/admin/messages"] });
+  const { data: verifications } = useQuery({ queryKey: ["/api/admin/verifications"], enabled: isAdmin });
+  const { data: reports } = useQuery({ queryKey: ["/api/admin/reports"], enabled: isAdmin });
+  const { data: ads } = useQuery({ queryKey: ["/api/admin/ads"], enabled: isAdmin });
+  const { data: auditLog } = useQuery({ queryKey: ["/api/admin/audit-log"], enabled: isAdmin });
+  const { data: adminMessages = [] } = useQuery<any[]>({ queryKey: ["/api/admin/messages"], enabled: isAdmin });
 
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
@@ -203,6 +201,11 @@ export default function AdminPage() {
       transactions: txMap.get(m) || 0,
     }));
   }, [stats]);
+
+  if (!isAdmin) {
+    navigate("/");
+    return null;
+  }
 
   if (statsLoading) {
     return (
