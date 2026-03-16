@@ -545,6 +545,24 @@ export const insertSavedPropertySchema = createInsertSchema(savedProperties).omi
   createdAt: true,
 });
 
+export const authorizedUsers = pgTable("authorized_users", {
+  id: serial("id").primaryKey(),
+  ownerId: integer("owner_id").notNull(),
+  authorizedUserId: integer("authorized_user_id").notNull(),
+  permissionLevel: text("permission_level").notNull().default("view"),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAuthorizedUserSchema = createInsertSchema(authorizedUsers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAuthorizedUser = z.infer<typeof insertAuthorizedUserSchema>;
+export type AuthorizedUser = typeof authorizedUsers.$inferSelect;
+
 export const homeTeamMembers = pgTable("home_team_members", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),

@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
+import { useActingAs } from "@/App";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -189,6 +190,7 @@ function SaveTransactionAsTemplate({
 export default function TransactionsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { actingAs } = useActingAs();
   const { toast } = useToast();
   const [view, setView] = useState<"list" | "board" | "table">("board");
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -235,13 +237,14 @@ export default function TransactionsPage() {
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<
     Transaction[]
   >({
-    queryKey: ["/api/transactions"],
+    queryKey: ["/api/transactions", actingAs?.id],
     queryFn: async () => {
       try {
         if (!user) {
           return [];
         }
-        const response = await apiRequest("GET", "/api/transactions");
+        const url = actingAs ? `/api/transactions?actingAs=${actingAs.id}` : "/api/transactions";
+        const response = await apiRequest("GET", url);
         return response.json();
       } catch (error) {
         console.error("Transaction fetch error:", error);
@@ -250,7 +253,7 @@ export default function TransactionsPage() {
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
-    retry: false, // Don't retry on failure
+    retry: false,
   });
 
   interface AlertEvent {

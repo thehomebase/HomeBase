@@ -77,23 +77,33 @@ function getClientIp(req: import('express').Request): string {
   return req.ip || req.socket.remoteAddress || 'unknown';
 }
 
-async function verifyTransactionAccess(transactionId: number, userId: number, userRole: string): Promise<{ allowed: boolean; transaction?: any }> {
+async function verifyTransactionAccess(transactionId: number, userId: number, userRole: string): Promise<{ allowed: boolean; transaction?: any; permissionLevel?: string }> {
   const transaction = await storage.getTransaction(transactionId);
   if (!transaction) return { allowed: false };
-  if (transaction.agentId === userId) return { allowed: true, transaction };
-  if (userRole === "broker") return { allowed: true, transaction };
+  if (transaction.agentId === userId) return { allowed: true, transaction, permissionLevel: "full" };
+  if (userRole === "broker") return { allowed: true, transaction, permissionLevel: "full" };
   if (transaction.clientId) {
     const client = await storage.getClient(transaction.clientId);
     if (client?.linkedClientId === userId) {
-      return { allowed: true, transaction };
+      return { allowed: true, transaction, permissionLevel: "full" };
     }
   }
   if (transaction.secondaryClientId) {
     const secondaryClient = await storage.getClient(transaction.secondaryClientId);
     if (secondaryClient?.linkedClientId === userId) {
-      return { allowed: true, transaction };
+      return { allowed: true, transaction, permissionLevel: "full" };
     }
   }
+  try {
+    const authResult = await db.execute(sql`
+      SELECT au.permission_level FROM authorized_users au
+      WHERE au.authorized_user_id = ${userId} AND au.owner_id = ${transaction.agentId} AND au.status = 'active'
+      LIMIT 1
+    `);
+    if (authResult.rows.length > 0) {
+      return { allowed: true, transaction, permissionLevel: authResult.rows[0].permission_level as string };
+    }
+  } catch (e) {}
   return { allowed: false, transaction };
 }
 
@@ -726,7 +736,18 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/transactions", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      const transactions = await storage.getTransactionsByUser(req.user.id);
+      let targetUserId = req.user.id;
+      const actingAs = req.query.actingAs ? Number(req.query.actingAs) : null;
+      if (actingAs && actingAs !== req.user.id) {
+        const authCheck = await db.execute(sql`
+          SELECT id FROM authorized_users 
+          WHERE authorized_user_id = ${req.user.id} AND owner_id = ${actingAs} AND status = 'active'
+          LIMIT 1
+        `);
+        if (authCheck.rows.length === 0) return res.status(403).json({ error: "Not authorized to view this account" });
+        targetUserId = actingAs;
+      }
+      const transactions = await storage.getTransactionsByUser(targetUserId);
       res.json(transactions);
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -743,17 +764,8 @@ export function registerRoutes(app: Express): Server {
       const id = Number(req.params.id);
       console.log('Processing request for transaction ID:', id, 'User:', req.user);
 
-      const transaction = await storage.getTransaction(id);
-
-      if (!transaction) {
-        return res.status(404).json({ error: 'Transaction not found' });
-      }
-
-      const userHasAccess =
-        transaction.agentId === req.user.id ||
-        (transaction.participants && transaction.participants.some(p => p.userId === req.user.id));
-
-      if (!userHasAccess) {
+      const { allowed, transaction } = await verifyTransactionAccess(id, req.user.id, req.user.role);
+      if (!allowed || !transaction) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -766,15 +778,14 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/transactions/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) {
       return res.sendStatus(401);
     }
 
     try {
       const id = Number(req.params.id);
-      const transaction = await storage.getTransaction(id);
-      if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
-      if (transaction.agentId !== req.user.id && req.user.role !== "broker") {
+      const { allowed, permissionLevel } = await verifyTransactionAccess(id, req.user.id, req.user.role);
+      if (!allowed || permissionLevel !== "full") {
         return res.status(403).json({ error: 'Not authorized to delete this transaction' });
       }
       await storage.deleteTransaction(id);
@@ -798,8 +809,8 @@ export function registerRoutes(app: Express): Server {
         if (req.body[key] !== undefined) data[key] = req.body[key];
       }
 
-      const oldTransaction = await storage.getTransaction(id);
-      if (!oldTransaction || (oldTransaction.agentId !== req.user.id && req.user.role !== "broker")) {
+      const { allowed: txAllowed, permissionLevel: txPermLevel, transaction: oldTransaction } = await verifyTransactionAccess(id, req.user.id, req.user.role);
+      if (!txAllowed || !oldTransaction || txPermLevel !== "full") {
         return res.status(403).json({ error: "Not authorized to update this transaction" });
       }
 
@@ -1065,8 +1076,8 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const transactionId = Number(req.params.id);
-      const { allowed, transaction } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
-      if (!allowed || !transaction) {
+      const { allowed, transaction, permissionLevel } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+      if (!allowed || !transaction || permissionLevel !== "full") {
         return res.status(403).json({ error: "Not authorized to modify this checklist" });
       }
 
@@ -1327,8 +1338,8 @@ export function registerRoutes(app: Express): Server {
     try {
       const txId = Number(req.body.transactionId);
       if (txId) {
-        const { allowed } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
-        if (!allowed) return res.status(403).json({ error: "Not authorized" });
+        const { allowed, permissionLevel } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
+        if (!allowed || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized" });
       }
       const allowedContactFields = ['name', 'role', 'email', 'phone', 'company', 'notes', 'transactionId'];
       const contactData: Record<string, any> = {};
@@ -1371,8 +1382,8 @@ export function registerRoutes(app: Express): Server {
       if (existingContacts.rows.length === 0) return res.status(404).json({ error: "Contact not found" });
       const txId = existingContacts.rows[0].transaction_id as number;
       if (txId) {
-        const { allowed } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
-        if (!allowed) return res.status(403).json({ error: "Not authorized" });
+        const { allowed, permissionLevel } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
+        if (!allowed || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized" });
       }
       const allowedContactFields = ['name', 'role', 'email', 'phone', 'company', 'notes'];
       const safeContactBody: Record<string, any> = {};
@@ -1397,8 +1408,8 @@ export function registerRoutes(app: Express): Server {
       if (existingContacts.rows.length === 0) return res.status(404).json({ error: "Contact not found" });
       const txId = existingContacts.rows[0].transaction_id as number;
       if (txId) {
-        const { allowed } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
-        if (!allowed) return res.status(403).json({ error: "Not authorized" });
+        const { allowed, permissionLevel } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
+        if (!allowed || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized" });
       }
       await storage.deleteContact(contactId);
       res.sendStatus(200);
@@ -1427,8 +1438,8 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const txId = Number(req.params.transactionId);
-      const { allowed } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
-      if (!allowed) return res.status(403).json({ error: "Not authorized" });
+      const { allowed, permissionLevel } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
+      if (!allowed || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized" });
       const document = await storage.createDocument({
         ...req.body,
         transactionId: txId
@@ -1444,9 +1455,8 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const transactionId = Number(req.params.transactionId);
-      const transaction = await storage.getTransaction(transactionId);
-      if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
-      if (transaction.agentId !== req.user.id && req.user.role !== "broker") {
+      const { allowed: docAllowed, permissionLevel: docPermLevel } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+      if (!docAllowed || docPermLevel !== "full") {
         return res.status(403).json({ error: 'Not authorized to modify documents for this transaction' });
       }
       const existing = await storage.getDocument(req.params.id);
@@ -1487,8 +1497,8 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const transactionId = Number(req.params.transactionId);
-      const { allowed } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
-      if (!allowed) return res.status(403).json({ error: "Not authorized" });
+      const { allowed, permissionLevel } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+      if (!allowed || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized" });
       const { documents } = req.body;
 
       if (!Array.isArray(documents)) {
@@ -1528,8 +1538,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Document not found" });
       }
       if (document.transactionId) {
-        const { allowed } = await verifyTransactionAccess(document.transactionId, req.user.id, req.user.role);
-        if (!allowed) return res.status(403).json({ error: "Not authorized" });
+        const { allowed, permissionLevel } = await verifyTransactionAccess(document.transactionId, req.user.id, req.user.role);
+        if (!allowed || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized" });
       }
 
       await storage.updateDocument(documentId, {
@@ -3741,6 +3751,225 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error("Error sending calculator results email:", error);
       console.error("Server error:", error); res.status(500).json({ error: "Failed to send email" });
+    }
+  });
+
+  // ============ Authorized Users ============
+
+  app.get("/api/authorized-users", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const result = await db.execute(sql`
+        SELECT au.*, 
+          u.first_name as user_first_name, u.last_name as user_last_name, u.email as user_email, u.role as user_role, u.profile_photo_url as user_photo
+        FROM authorized_users au
+        JOIN users u ON u.id = au.authorized_user_id
+        WHERE au.owner_id = ${req.user.id}
+        ORDER BY au.created_at DESC
+      `);
+      res.json(result.rows.map(r => ({
+        id: r.id,
+        ownerId: r.owner_id,
+        authorizedUserId: r.authorized_user_id,
+        permissionLevel: r.permission_level,
+        status: r.status,
+        createdAt: r.created_at,
+        user: {
+          id: r.authorized_user_id,
+          firstName: r.user_first_name,
+          lastName: r.user_last_name,
+          email: r.user_email,
+          role: r.user_role,
+          profilePhotoUrl: r.user_photo,
+        }
+      })));
+    } catch (error) {
+      console.error("Error fetching authorized users:", error);
+      res.status(500).json({ error: "Failed to fetch authorized users" });
+    }
+  });
+
+  app.get("/api/authorized-users/accounts", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const result = await db.execute(sql`
+        SELECT au.id, au.owner_id, au.permission_level, au.status,
+          u.first_name, u.last_name, u.email, u.role, u.profile_photo_url
+        FROM authorized_users au
+        JOIN users u ON u.id = au.owner_id
+        WHERE au.authorized_user_id = ${req.user.id} AND au.status = 'active'
+        ORDER BY u.last_name, u.first_name
+      `);
+      res.json(result.rows.map(r => ({
+        id: r.id,
+        ownerId: r.owner_id,
+        permissionLevel: r.permission_level,
+        owner: {
+          id: r.owner_id,
+          firstName: r.first_name,
+          lastName: r.last_name,
+          email: r.email,
+          role: r.role,
+          profilePhotoUrl: r.profile_photo_url,
+        }
+      })));
+    } catch (error) {
+      console.error("Error fetching authorized accounts:", error);
+      res.status(500).json({ error: "Failed to fetch authorized accounts" });
+    }
+  });
+
+  app.post("/api/authorized-users", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+
+    const schema = z.object({
+      email: z.string().email(),
+      permissionLevel: z.enum(["view", "full"]),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+
+    try {
+      const targetUser = await storage.getUserByEmail(parsed.data.email);
+      if (!targetUser) return res.status(404).json({ error: "No user found with that email address" });
+      if (targetUser.role !== "agent" && targetUser.role !== "broker") {
+        return res.status(400).json({ error: "Only agent or broker users can be added as authorized users" });
+      }
+      if (targetUser.id === req.user.id) {
+        return res.status(400).json({ error: "You cannot add yourself as an authorized user" });
+      }
+
+      const existing = await db.execute(sql`
+        SELECT id, status FROM authorized_users WHERE owner_id = ${req.user.id} AND authorized_user_id = ${targetUser.id}
+      `);
+      if (existing.rows.length > 0) {
+        if (existing.rows[0].status === 'active') {
+          return res.status(409).json({ error: "This user is already authorized on your account" });
+        }
+        await db.execute(sql`
+          UPDATE authorized_users SET status = 'pending', permission_level = ${parsed.data.permissionLevel}, updated_at = NOW()
+          WHERE id = ${existing.rows[0].id}
+        `);
+        return res.json({ message: "Invitation re-sent", id: existing.rows[0].id });
+      }
+
+      const result = await db.execute(sql`
+        INSERT INTO authorized_users (owner_id, authorized_user_id, permission_level, status)
+        VALUES (${req.user.id}, ${targetUser.id}, ${parsed.data.permissionLevel}, 'pending')
+        RETURNING id
+      `);
+
+      res.status(201).json({
+        id: result.rows[0].id,
+        message: "Authorized user invitation sent",
+        user: {
+          id: targetUser.id,
+          firstName: targetUser.firstName,
+          lastName: targetUser.lastName,
+          email: targetUser.email,
+        }
+      });
+    } catch (error) {
+      console.error("Error adding authorized user:", error);
+      res.status(500).json({ error: "Failed to add authorized user" });
+    }
+  });
+
+  app.post("/api/authorized-users/:id/respond", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    const schema = z.object({ action: z.enum(["accept", "decline"]) });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid action" });
+
+    try {
+      const record = await db.execute(sql`
+        SELECT * FROM authorized_users WHERE id = ${req.params.id} AND authorized_user_id = ${req.user.id} AND status = 'pending'
+      `);
+      if (record.rows.length === 0) return res.status(404).json({ error: "Invitation not found" });
+
+      const newStatus = parsed.data.action === "accept" ? "active" : "declined";
+      await db.execute(sql`
+        UPDATE authorized_users SET status = ${newStatus}, updated_at = NOW() WHERE id = ${req.params.id}
+      `);
+      res.json({ message: `Invitation ${parsed.data.action}ed`, status: newStatus });
+    } catch (error) {
+      console.error("Error responding to invitation:", error);
+      res.status(500).json({ error: "Failed to respond to invitation" });
+    }
+  });
+
+  app.patch("/api/authorized-users/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    const schema = z.object({ permissionLevel: z.enum(["view", "full"]) });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid permission level" });
+
+    try {
+      const record = await db.execute(sql`
+        SELECT * FROM authorized_users WHERE id = ${req.params.id} AND owner_id = ${req.user.id}
+      `);
+      if (record.rows.length === 0) return res.status(404).json({ error: "Authorized user not found" });
+
+      await db.execute(sql`
+        UPDATE authorized_users SET permission_level = ${parsed.data.permissionLevel}, updated_at = NOW() WHERE id = ${req.params.id}
+      `);
+      res.json({ message: "Permission level updated" });
+    } catch (error) {
+      console.error("Error updating authorized user:", error);
+      res.status(500).json({ error: "Failed to update authorized user" });
+    }
+  });
+
+  app.delete("/api/authorized-users/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const record = await db.execute(sql`
+        SELECT * FROM authorized_users WHERE id = ${req.params.id} AND (owner_id = ${req.user.id} OR authorized_user_id = ${req.user.id})
+      `);
+      if (record.rows.length === 0) return res.status(404).json({ error: "Authorized user not found" });
+
+      await db.execute(sql`DELETE FROM authorized_users WHERE id = ${req.params.id}`);
+      res.json({ message: "Authorized user removed" });
+    } catch (error) {
+      console.error("Error removing authorized user:", error);
+      res.status(500).json({ error: "Failed to remove authorized user" });
+    }
+  });
+
+  app.get("/api/authorized-users/pending", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const result = await db.execute(sql`
+        SELECT au.id, au.owner_id, au.permission_level, au.created_at,
+          u.first_name, u.last_name, u.email, u.role, u.profile_photo_url
+        FROM authorized_users au
+        JOIN users u ON u.id = au.owner_id
+        WHERE au.authorized_user_id = ${req.user.id} AND au.status = 'pending'
+        ORDER BY au.created_at DESC
+      `);
+      res.json(result.rows.map(r => ({
+        id: r.id,
+        ownerId: r.owner_id,
+        permissionLevel: r.permission_level,
+        createdAt: r.created_at,
+        owner: {
+          id: r.owner_id,
+          firstName: r.first_name,
+          lastName: r.last_name,
+          email: r.email,
+          role: r.role,
+          profilePhotoUrl: r.profile_photo_url,
+        }
+      })));
+    } catch (error) {
+      console.error("Error fetching pending invitations:", error);
+      res.status(500).json({ error: "Failed to fetch pending invitations" });
     }
   });
 
@@ -10710,8 +10939,8 @@ export function registerRoutes(app: Express): Server {
       if (!data.title) return res.status(400).json({ error: "Title is required" });
 
       if (data.transactionId) {
-        const { allowed } = await verifyTransactionAccess(Number(data.transactionId), req.user.id, req.user.role);
-        if (!allowed) return res.status(403).json({ error: "Not authorized for this transaction" });
+        const { allowed, permissionLevel } = await verifyTransactionAccess(Number(data.transactionId), req.user.id, req.user.role);
+        if (!allowed || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized for this transaction" });
       }
 
       const result = await db.execute(sql`INSERT INTO tasks (title, description, status, priority, due_date, transaction_id, assigned_to, created_by) VALUES (${data.title}, ${data.description || null}, ${data.status || 'todo'}, ${data.priority || 'medium'}, ${data.dueDate ? new Date(data.dueDate) : null}, ${data.transactionId ? Number(data.transactionId) : null}, ${data.assignedTo ? Number(data.assignedTo) : null}, ${req.user.id}) RETURNING *`);

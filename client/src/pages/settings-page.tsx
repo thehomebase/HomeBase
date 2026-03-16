@@ -93,7 +93,7 @@ import {
 import { startRegistration } from "@simplewebauthn/browser";
 import type { ApiKey, Webhook as WebhookType, ReferralCredit } from "@shared/schema";
 
-type SettingsSection = "profile" | "security" | "billing" | "integrations" | "notifications";
+type SettingsSection = "profile" | "security" | "billing" | "integrations" | "notifications" | "team-access";
 
 const WEBHOOK_EVENTS = [
   { value: "new_lead", label: "New Lead" },
@@ -107,11 +107,12 @@ const WEBHOOK_EVENTS = [
   { value: "message_received", label: "Message Received" },
 ] as const;
 
-const sidebarItems: { id: SettingsSection; label: string; icon: typeof User }[] = [
+const sidebarItems: { id: SettingsSection; label: string; icon: typeof User; roles?: string[] }[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "security", label: "Security", icon: Shield },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "integrations", label: "API Keys & Integrations", icon: Key },
+  { id: "team-access", label: "Team Access", icon: Users, roles: ["agent", "broker"] },
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
@@ -129,13 +130,15 @@ export default function SettingsPage() {
     }
   }, [location]);
 
+  const filteredItems = sidebarItems.filter(item => !item.roles || item.roles.includes(user?.role || ""));
+
   return (
     <div className={`${isMobile ? "p-4" : "p-6"}`}>
       <h1 className="text-2xl font-bold mb-6">Account Settings</h1>
       <div className={`flex ${isMobile ? "flex-col" : "flex-row"} gap-6`}>
         {isMobile ? (
           <div className="flex gap-1 overflow-x-auto pb-2 -mx-4 px-4">
-            {sidebarItems.map(item => (
+            {filteredItems.map(item => (
               <button
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
@@ -153,7 +156,7 @@ export default function SettingsPage() {
         ) : (
           <div className="w-56 shrink-0">
             <nav className="space-y-1">
-              {sidebarItems.map(item => (
+              {filteredItems.map(item => (
                 <button
                   key={item.id}
                   onClick={() => setActiveSection(item.id)}
@@ -176,6 +179,7 @@ export default function SettingsPage() {
           {activeSection === "security" && <SecuritySection />}
           {activeSection === "billing" && <BillingSection />}
           {activeSection === "integrations" && <IntegrationsSection />}
+          {activeSection === "team-access" && <TeamAccessSection />}
           {activeSection === "notifications" && <NotificationsSection />}
         </div>
       </div>
@@ -1954,6 +1958,273 @@ function IntegrationsSection() {
                 }}
               >
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function TeamAccessSection() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [permissionLevel, setPermissionLevel] = useState<"view" | "full">("view");
+  const [showAddDialog, setShowAddDialog] = useState(false);
+
+  const { data: authorizedUsers = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/authorized-users"],
+  });
+
+  const { data: pendingInvitations = [] } = useQuery<any[]>({
+    queryKey: ["/api/authorized-users/pending"],
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (data: { email: string; permissionLevel: string }) => {
+      const res = await apiRequest("POST", "/api/authorized-users", data);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to add user");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/authorized-users"] });
+      toast({ title: "Invitation sent" });
+      setEmail("");
+      setPermissionLevel("view");
+      setShowAddDialog(false);
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/authorized-users/${id}`);
+      if (!res.ok) throw new Error("Failed to remove user");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/authorized-users"] });
+      toast({ title: "User removed" });
+    },
+  });
+
+  const updatePermissionMutation = useMutation({
+    mutationFn: async ({ id, permissionLevel }: { id: number; permissionLevel: string }) => {
+      const res = await apiRequest("PATCH", `/api/authorized-users/${id}`, { permissionLevel });
+      if (!res.ok) throw new Error("Failed to update permission");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/authorized-users"] });
+      toast({ title: "Permission updated" });
+    },
+  });
+
+  const respondMutation = useMutation({
+    mutationFn: async ({ id, action }: { id: number; action: "accept" | "decline" }) => {
+      const res = await apiRequest("POST", `/api/authorized-users/${id}/respond`, { action });
+      if (!res.ok) throw new Error("Failed to respond");
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/authorized-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/authorized-users/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/authorized-users/accounts"] });
+      toast({ title: vars.action === "accept" ? "Invitation accepted" : "Invitation declined" });
+    },
+  });
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold mb-1">Team Access</h2>
+        <p className="text-sm text-muted-foreground">Add other agents or brokers as authorized users on your account for transaction coordination</p>
+      </div>
+      <Separator />
+
+      {pendingInvitations.length > 0 && (
+        <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Bell className="h-4 w-4 text-amber-500" />
+              Pending Invitations
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pendingInvitations.map((inv: any) => (
+              <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg border bg-background">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{inv.owner.firstName} {inv.owner.lastName}</p>
+                    <p className="text-xs text-muted-foreground">{inv.owner.email} — {inv.permissionLevel === "full" ? "Full Access" : "View Only"}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => respondMutation.mutate({ id: inv.id, action: "decline" })} disabled={respondMutation.isPending}>
+                    Decline
+                  </Button>
+                  <Button size="sm" onClick={() => respondMutation.mutate({ id: inv.id, action: "accept" })} disabled={respondMutation.isPending}>
+                    Accept
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Authorized Users</CardTitle>
+              <CardDescription>People who can access your account and transactions</CardDescription>
+            </div>
+            <Button size="sm" onClick={() => setShowAddDialog(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Add User
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          ) : authorizedUsers.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Users className="h-10 w-10 mx-auto mb-3 opacity-40" />
+              <p className="text-sm">No authorized users yet</p>
+              <p className="text-xs mt-1">Add agents or brokers to give them access to your transactions</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {authorizedUsers.map((au: any) => (
+                <div key={au.id} className="flex items-center justify-between p-3 rounded-lg border">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                      {au.user.profilePhotoUrl ? (
+                        <img src={au.user.profilePhotoUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <User className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{au.user.firstName} {au.user.lastName}</p>
+                      <p className="text-xs text-muted-foreground">{au.user.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={au.status === "active" ? "default" : au.status === "pending" ? "secondary" : "outline"} className="text-[10px]">
+                      {au.status === "active" ? "Active" : au.status === "pending" ? "Pending" : au.status}
+                    </Badge>
+                    <Select
+                      value={au.permissionLevel}
+                      onValueChange={(val) => updatePermissionMutation.mutate({ id: au.id, permissionLevel: val })}
+                    >
+                      <SelectTrigger className="h-8 w-[120px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="view">View Only</SelectItem>
+                        <SelectItem value="full">Full Access</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove Authorized User</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {au.user.firstName} {au.user.lastName} will no longer have access to your account and transactions.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => removeMutation.mutate(au.id)}>Remove</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          <h3 className="text-sm font-semibold mb-3">Permission Levels</h3>
+          <div className="space-y-3">
+            <div className="flex gap-3 items-start">
+              <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">View Only</p>
+                <p className="text-xs text-muted-foreground">Can view transactions, documents, contacts, and checklists but cannot make changes</p>
+              </div>
+            </div>
+            <div className="flex gap-3 items-start">
+              <div className="h-8 w-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+                <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Full Access</p>
+                <p className="text-xs text-muted-foreground">Can manage transactions, documents, contacts, and checklists as if they were the account owner</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Authorized User</DialogTitle>
+            <DialogDescription>Enter the email of an agent or broker with an existing account</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>Email Address</Label>
+              <Input
+                type="email"
+                placeholder="agent@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Permission Level</Label>
+              <Select value={permissionLevel} onValueChange={(v) => setPermissionLevel(v as "view" | "full")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="view">View Only — Can view but not modify</SelectItem>
+                  <SelectItem value="full">Full Access — Can manage everything</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
+              <Button
+                onClick={() => addMutation.mutate({ email, permissionLevel })}
+                disabled={!email || addMutation.isPending}
+              >
+                {addMutation.isPending ? "Sending..." : "Send Invitation"}
               </Button>
             </div>
           </div>

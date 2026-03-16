@@ -68,7 +68,7 @@ import {
   Settings,
   Target
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, createContext, useContext } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { OnboardingTutorial, useOnboardingTutorial, TutorialStartButton } from "@/components/onboarding-tutorial";
 import CalculatorsPage from "@/pages/calculators-page";
@@ -125,7 +125,24 @@ import { BiometricSetupButton } from "@/components/biometric-setup";
 import { useLeadAlerts } from "@/hooks/use-lead-alerts";
 import { NotificationBell } from "@/components/notification-bell";
 import { useQuery as useQueryRQ } from "@tanstack/react-query";
-import { ListTodo, Megaphone as MegaphoneIcon, ShieldCheck } from "lucide-react";
+import { ListTodo, Megaphone as MegaphoneIcon, ShieldCheck, ArrowLeftRight, Check } from "lucide-react";
+
+interface ActingAsAccount {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  profilePhotoUrl?: string;
+}
+
+interface ActingAsContextType {
+  actingAs: ActingAsAccount | null;
+  setActingAs: (account: ActingAsAccount | null) => void;
+}
+
+const ActingAsContext = createContext<ActingAsContextType>({ actingAs: null, setActingAs: () => {} });
+export function useActingAs() { return useContext(ActingAsContext); }
 
 function LeadAlertBanner() {
   const { newLeadCount, isAgent } = useLeadAlerts();
@@ -174,6 +191,13 @@ function Layout({ children }: { children: React.ReactNode }) {
   const isAgentOrBroker = user?.role === 'agent' || user?.role === 'broker';
   const isAdmin = user?.role === 'admin';
   const tutorial = useOnboardingTutorial(user?.id, user?.role);
+  const [actingAs, setActingAs] = useState<ActingAsAccount | null>(null);
+  const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
+
+  const { data: authorizedAccounts = [] } = useQueryRQ<any[]>({
+    queryKey: ["/api/authorized-users/accounts"],
+    enabled: isAgentOrBroker,
+  });
 
   const { data: badgeCounts } = useQueryRQ<{
     unreadMessages: number;
@@ -188,6 +212,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   });
 
   return (
+    <ActingAsContext.Provider value={{ actingAs, setActingAs }}>
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen bg-background w-full overflow-x-clip">
         {user && !isMobile && (
@@ -601,6 +626,72 @@ function Layout({ children }: { children: React.ReactNode }) {
                   {isAgentOrBroker && (
                     <TutorialStartButton onClick={tutorial.startTutorial} />
                   )}
+                  {isAgentOrBroker && authorizedAccounts.length > 0 && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowAccountSwitcher(!showAccountSwitcher)}
+                        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-muted transition-colors"
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5" />
+                        <span className="truncate">
+                          {actingAs ? `Viewing: ${actingAs.firstName} ${actingAs.lastName}` : "Switch Account"}
+                        </span>
+                        <ChevronDown className="h-3 w-3 ml-auto" />
+                      </button>
+                      {showAccountSwitcher && (
+                        <div className="absolute bottom-full left-0 right-0 mb-1 bg-popover border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                          <button
+                            onClick={() => { setActingAs(null); setShowAccountSwitcher(false); }}
+                            className={`flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted transition-colors ${!actingAs ? "bg-primary/5 font-medium" : ""}`}
+                          >
+                            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <span className="text-[10px] font-semibold text-primary">
+                                {(user?.firstName?.[0] || "").toUpperCase()}{(user?.lastName?.[0] || "").toUpperCase()}
+                              </span>
+                            </div>
+                            <span className="truncate">My Account</span>
+                            {!actingAs && <Check className="h-3.5 w-3.5 ml-auto text-primary" />}
+                          </button>
+                          <div className="border-t mx-2 my-1" />
+                          {authorizedAccounts.map((acc: any) => (
+                            <button
+                              key={acc.id}
+                              onClick={() => { setActingAs(acc.owner); setShowAccountSwitcher(false); }}
+                              className={`flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted transition-colors ${actingAs?.id === acc.owner.id ? "bg-primary/5 font-medium" : ""}`}
+                            >
+                              <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                                {acc.owner.profilePhotoUrl ? (
+                                  <img src={acc.owner.profilePhotoUrl} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                  <span className="text-[10px] font-semibold">
+                                    {(acc.owner.firstName?.[0] || "").toUpperCase()}{(acc.owner.lastName?.[0] || "").toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="min-w-0 text-left">
+                                <span className="truncate block">{acc.owner.firstName} {acc.owner.lastName}</span>
+                                <span className="text-[10px] text-muted-foreground block">
+                                  {acc.permissionLevel === "full" ? "Full Access" : "View Only"}
+                                </span>
+                              </div>
+                              {actingAs?.id === acc.owner.id && <Check className="h-3.5 w-3.5 ml-auto text-primary" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {actingAs && (
+                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                      <ArrowLeftRight className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                      <span className="text-xs text-amber-700 dark:text-amber-400 truncate">
+                        Viewing {actingAs.firstName}'s account
+                      </span>
+                      <button onClick={() => setActingAs(null)} className="ml-auto text-amber-600 hover:text-amber-800 text-xs font-medium shrink-0">
+                        Exit
+                      </button>
+                    </div>
+                  )}
                   <Link href="/settings" className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors">
                     {user?.profilePhotoUrl ? (
                       <img
@@ -661,6 +752,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         )}
       </div>
     </SidebarProvider>
+    </ActingAsContext.Provider>
   );
 }
 
