@@ -339,7 +339,7 @@ export default function AdminPage() {
                   </div>
                   <div className="text-right">
                     <Badge variant="outline" className="text-xs">{u.role}</Badge>
-                    {u.created_at && <p className="text-[10px] text-muted-foreground mt-0.5">{new Date(u.created_at).toLocaleDateString()}</p>}
+                    
                   </div>
                 </div>
               ))}
@@ -394,7 +394,6 @@ export default function AdminPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Verified</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Joined</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -419,7 +418,6 @@ export default function AdminPage() {
                       <TableCell><Badge variant="outline">{u.role}</Badge></TableCell>
                       <TableCell>{u.email_verified ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-red-400" />}</TableCell>
                       <TableCell><Badge variant={u.verification_status === "admin_verified" ? "default" : "secondary"} className="text-[10px]">{u.verification_status || "unverified"}</Badge></TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{u.created_at ? new Date(u.created_at).toLocaleDateString() : ""}</TableCell>
                       <TableCell>
                         <Button size="sm" variant="outline" onClick={() => setEditUser(u)}>Edit</Button>
                       </TableCell>

@@ -10850,17 +10850,17 @@ export function registerRoutes(app: Express): Server {
         safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM transactions`)),
         safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM clients`)),
         safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM leads`)),
-        safeQuery(db.execute(sql`SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') as month, COUNT(*) as count FROM users WHERE created_at >= NOW() - INTERVAL '12 months' GROUP BY month ORDER BY month`)),
-        safeQuery(db.execute(sql`SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') as month, COUNT(*) as count FROM transactions WHERE created_at >= NOW() - INTERVAL '12 months' GROUP BY month ORDER BY month`)),
-        safeQuery(db.execute(sql`SELECT id, first_name, last_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 10`)),
+        safeQuery(db.execute(sql`SELECT TO_CHAR(DATE_TRUNC('month', updated_at), 'YYYY-MM') as month, COUNT(*) as count FROM transactions WHERE updated_at >= NOW() - INTERVAL '12 months' GROUP BY month ORDER BY month`)),
+        safeQuery(db.execute(sql`SELECT TO_CHAR(DATE_TRUNC('month', updated_at), 'YYYY-MM') as month, COUNT(*) as count FROM transactions WHERE updated_at >= NOW() - INTERVAL '12 months' GROUP BY month ORDER BY month`)),
+        safeQuery(db.execute(sql`SELECT id, first_name, last_name, email, role FROM users ORDER BY id DESC LIMIT 10`)),
         safeQuery(db.execute(sql`SELECT SUM(impressions) as total_impressions, SUM(clicks) as total_clicks, SUM(budget_cents) as total_budget FROM sponsored_ads WHERE status = 'active'`)),
         safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM sponsored_ads WHERE status = 'pending'`)),
       ]);
 
-      const usersThisMonth = await safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM users WHERE created_at >= DATE_TRUNC('month', NOW())`));
-      const usersLastMonth = await safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM users WHERE created_at >= DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND created_at < DATE_TRUNC('month', NOW())`));
-      const txThisMonth = await safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE created_at >= DATE_TRUNC('month', NOW())`));
-      const txLastMonth = await safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE created_at >= DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND created_at < DATE_TRUNC('month', NOW())`));
+      const usersThisMonth = { rows: [{ count: 0 }] };
+      const usersLastMonth = { rows: [{ count: 0 }] };
+      const txThisMonth = await safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE updated_at >= DATE_TRUNC('month', NOW())`));
+      const txLastMonth = await safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE updated_at >= DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND updated_at < DATE_TRUNC('month', NOW())`));
 
       const thisM = Number(usersThisMonth.rows[0]?.count || 0);
       const lastM = Number(usersLastMonth.rows[0]?.count || 0);
@@ -10905,15 +10905,16 @@ export function registerRoutes(app: Express): Server {
       const search = (req.query.search as string) || "";
       const roleFilter = req.query.role as string | undefined;
 
+      const userFields = sql`id, email, first_name, last_name, role, email_verified, verification_status, stripe_subscription_id`;
       let result;
       if (search && roleFilter) {
-        result = await db.execute(sql`SELECT id, email, first_name, last_name, role, email_verified, verification_status, created_at, stripe_subscription_id FROM users WHERE role = ${roleFilter} AND (email ILIKE ${'%' + search + '%'} OR first_name ILIKE ${'%' + search + '%'} OR last_name ILIKE ${'%' + search + '%'}) ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
+        result = await db.execute(sql`SELECT ${userFields} FROM users WHERE role = ${roleFilter} AND (email ILIKE ${'%' + search + '%'} OR first_name ILIKE ${'%' + search + '%'} OR last_name ILIKE ${'%' + search + '%'}) ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
       } else if (search) {
-        result = await db.execute(sql`SELECT id, email, first_name, last_name, role, email_verified, verification_status, created_at, stripe_subscription_id FROM users WHERE email ILIKE ${'%' + search + '%'} OR first_name ILIKE ${'%' + search + '%'} OR last_name ILIKE ${'%' + search + '%'} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
+        result = await db.execute(sql`SELECT ${userFields} FROM users WHERE email ILIKE ${'%' + search + '%'} OR first_name ILIKE ${'%' + search + '%'} OR last_name ILIKE ${'%' + search + '%'} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
       } else if (roleFilter) {
-        result = await db.execute(sql`SELECT id, email, first_name, last_name, role, email_verified, verification_status, created_at, stripe_subscription_id FROM users WHERE role = ${roleFilter} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
+        result = await db.execute(sql`SELECT ${userFields} FROM users WHERE role = ${roleFilter} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
       } else {
-        result = await db.execute(sql`SELECT id, email, first_name, last_name, role, email_verified, verification_status, created_at, stripe_subscription_id FROM users ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
+        result = await db.execute(sql`SELECT ${userFields} FROM users ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`);
       }
 
       const countResult = await db.execute(sql`SELECT COUNT(*) as count FROM users`);
