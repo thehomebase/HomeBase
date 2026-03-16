@@ -10836,27 +10836,31 @@ export function registerRoutes(app: Express): Server {
   // ============ Admin Dashboard ============
   app.get("/api/admin/stats", requireAdmin, async (req, res) => {
     try {
+      const safeQuery = async (query: any, fallback: any = { rows: [] }) => {
+        try { return await query; } catch (e) { console.error("Admin stats sub-query error:", e); return fallback; }
+      };
+
       const [usersCount, txCount, activeAds, pendingVerifications, pendingReports, totalUsers, totalTx, totalClients, totalLeads, userGrowth, txGrowth, recentSignups, adStats, pendingAds] = await Promise.all([
-        db.execute(sql`SELECT COUNT(*) as count, role FROM users GROUP BY role`),
-        db.execute(sql`SELECT COUNT(*) as count, status FROM transactions GROUP BY status`),
-        db.execute(sql`SELECT COUNT(*) as count FROM sponsored_ads WHERE status = 'active'`),
-        db.execute(sql`SELECT COUNT(*) as count FROM users WHERE verification_status = 'pending'`),
-        db.execute(sql`SELECT COUNT(*) as count FROM listing_reports WHERE status = 'pending'`),
-        db.execute(sql`SELECT COUNT(*) as count FROM users`),
-        db.execute(sql`SELECT COUNT(*) as count FROM transactions`),
-        db.execute(sql`SELECT COUNT(*) as count FROM clients`),
-        db.execute(sql`SELECT COUNT(*) as count FROM leads`),
-        db.execute(sql`SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') as month, COUNT(*) as count FROM users WHERE created_at >= NOW() - INTERVAL '12 months' GROUP BY month ORDER BY month`),
-        db.execute(sql`SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') as month, COUNT(*) as count FROM transactions WHERE created_at >= NOW() - INTERVAL '12 months' GROUP BY month ORDER BY month`),
-        db.execute(sql`SELECT id, first_name, last_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 10`),
-        db.execute(sql`SELECT SUM(impressions) as total_impressions, SUM(clicks) as total_clicks, SUM(budget_cents) as total_budget FROM sponsored_ads WHERE status = 'active'`),
-        db.execute(sql`SELECT COUNT(*) as count FROM sponsored_ads WHERE status = 'pending'`),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count, role FROM users GROUP BY role`)),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count, status FROM transactions GROUP BY status`)),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM sponsored_ads WHERE status = 'active'`)),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM users WHERE verification_status = 'pending'`)),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM listing_reports WHERE status = 'pending'`)),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM users`)),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM transactions`)),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM clients`)),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM leads`)),
+        safeQuery(db.execute(sql`SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') as month, COUNT(*) as count FROM users WHERE created_at >= NOW() - INTERVAL '12 months' GROUP BY month ORDER BY month`)),
+        safeQuery(db.execute(sql`SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') as month, COUNT(*) as count FROM transactions WHERE created_at >= NOW() - INTERVAL '12 months' GROUP BY month ORDER BY month`)),
+        safeQuery(db.execute(sql`SELECT id, first_name, last_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 10`)),
+        safeQuery(db.execute(sql`SELECT SUM(impressions) as total_impressions, SUM(clicks) as total_clicks, SUM(budget_cents) as total_budget FROM sponsored_ads WHERE status = 'active'`)),
+        safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM sponsored_ads WHERE status = 'pending'`)),
       ]);
 
-      const usersThisMonth = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE created_at >= DATE_TRUNC('month', NOW())`);
-      const usersLastMonth = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE created_at >= DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND created_at < DATE_TRUNC('month', NOW())`);
-      const txThisMonth = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE created_at >= DATE_TRUNC('month', NOW())`);
-      const txLastMonth = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE created_at >= DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND created_at < DATE_TRUNC('month', NOW())`);
+      const usersThisMonth = await safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM users WHERE created_at >= DATE_TRUNC('month', NOW())`));
+      const usersLastMonth = await safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM users WHERE created_at >= DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND created_at < DATE_TRUNC('month', NOW())`));
+      const txThisMonth = await safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE created_at >= DATE_TRUNC('month', NOW())`));
+      const txLastMonth = await safeQuery(db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE created_at >= DATE_TRUNC('month', NOW() - INTERVAL '1 month') AND created_at < DATE_TRUNC('month', NOW())`));
 
       const thisM = Number(usersThisMonth.rows[0]?.count || 0);
       const lastM = Number(usersLastMonth.rows[0]?.count || 0);
