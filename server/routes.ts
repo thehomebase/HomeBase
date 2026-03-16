@@ -5395,23 +5395,43 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: "Not authorized for this transaction" });
       }
 
-      const docs = await db.execute(sql`SELECT id, docusign_envelope_id, status, manually_moved FROM documents WHERE transaction_id = ${parsed.data.transactionId} AND docusign_envelope_id IS NOT NULL AND status != 'signed'`);
-      const results: Array<{ documentId: number; envelopeId: string; envelopeStatus: string; advanced: boolean; skipped?: boolean }> = [];
+      const STATUS_ORDER: Record<string, number> = {
+        'not_applicable': 0,
+        'waiting_signatures': 1,
+        'signed': 2,
+        'waiting_others': 3,
+        'complete': 4,
+      };
+
+      const docs = await db.execute(sql`SELECT id, docusign_envelope_id, status, manually_moved FROM documents WHERE transaction_id = ${parsed.data.transactionId} AND docusign_envelope_id IS NOT NULL AND status NOT IN ('signed', 'complete')`);
+      const results: Array<{ documentId: number; envelopeId: string; envelopeStatus: string; advanced: boolean; skipped?: boolean; reason?: string }> = [];
 
       for (const doc of docs.rows) {
         try {
           const envStatus = await getEnvelopeStatus(req.user.id, doc.docusign_envelope_id as string);
           let advanced = false;
-          if (envStatus.status === "completed" && !doc.manually_moved) {
-            await db.execute(sql`UPDATE documents SET status = 'signed', manually_moved = false WHERE id = ${doc.id}`);
-            advanced = true;
+          let reason: string | undefined;
+
+          if (doc.manually_moved) {
+            reason = "agent_override";
+          } else if (envStatus.status === "completed") {
+            const currentOrder = STATUS_ORDER[doc.status as string] ?? 0;
+            const targetOrder = STATUS_ORDER['signed'] ?? 2;
+            if (targetOrder > currentOrder) {
+              await db.execute(sql`UPDATE documents SET status = 'signed' WHERE id = ${doc.id}`);
+              advanced = true;
+            } else {
+              reason = "already_ahead";
+            }
           }
+
           results.push({
             documentId: doc.id as number,
             envelopeId: doc.docusign_envelope_id as string,
             envelopeStatus: envStatus.status,
             advanced,
-            skipped: doc.manually_moved ? true : undefined,
+            skipped: (doc.manually_moved || reason === "already_ahead") ? true : undefined,
+            reason,
           });
         } catch (e: any) {
           results.push({
@@ -5885,11 +5905,10 @@ export function registerRoutes(app: Express): Server {
         const txContacts = await storage.getContactsByTransaction(transaction.id);
         contacts = txContacts.map((c: any) => ({
           id: c.id,
-          name: c.name,
+          name: [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || 'Unknown',
           role: c.role || c.type,
           email: c.email,
           phone: c.phone,
-          company: c.company,
         }));
       } catch (e) {}
 
