@@ -57,6 +57,12 @@ export function useWebSocket() {
     };
   }, []);
 
+  const send = useCallback((type: string, payload: any) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type, payload }));
+    }
+  }, []);
+
   useEffect(() => {
     connect();
     return () => {
@@ -69,5 +75,5 @@ export function useWebSocket() {
     };
   }, [connect]);
 
-  return { connected, on };
+  return { connected, on, send };
 }

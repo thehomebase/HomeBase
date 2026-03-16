@@ -19,6 +19,137 @@ function parseCookies(cookieHeader: string): Record<string, string> {
 
 const userConnections = new Map<number, Set<WebSocket>>();
 
+interface LockInfo {
+  userId: number;
+  userName: string;
+  userRole: string;
+  ws: WebSocket;
+  lastHeartbeat: number;
+}
+
+const transactionLocks = new Map<number, LockInfo>();
+const LOCK_TIMEOUT_MS = 5 * 60 * 1000;
+
+function cleanupExpiredLocks() {
+  const now = Date.now();
+  for (const [txId, lock] of transactionLocks) {
+    if (now - lock.lastHeartbeat > LOCK_TIMEOUT_MS) {
+      transactionLocks.delete(txId);
+      broadcastTransactionUnlocked(txId);
+    }
+  }
+}
+
+setInterval(cleanupExpiredLocks, 30_000);
+
+function broadcastTransactionLocked(txId: number, lock: LockInfo) {
+  const message = JSON.stringify({
+    type: 'transaction:locked',
+    payload: {
+      transactionId: txId,
+      lockedBy: { userId: lock.userId, name: lock.userName, role: lock.userRole },
+    },
+  });
+  for (const [userId, connections] of userConnections) {
+    if (userId === lock.userId) continue;
+    for (const ws of connections) {
+      if (ws.readyState === WebSocket.OPEN) ws.send(message);
+    }
+  }
+}
+
+function broadcastTransactionUnlocked(txId: number) {
+  const message = JSON.stringify({
+    type: 'transaction:unlocked',
+    payload: { transactionId: txId },
+  });
+  for (const [, connections] of userConnections) {
+    for (const ws of connections) {
+      if (ws.readyState === WebSocket.OPEN) ws.send(message);
+    }
+  }
+}
+
+function handleLockMessage(ws: WebSocket, userId: number, data: any) {
+  const { type, payload } = data;
+  const rawTxId = payload?.transactionId;
+  if (!rawTxId) return;
+  const txId = typeof rawTxId === 'string' ? parseInt(rawTxId, 10) : rawTxId;
+  if (!Number.isFinite(txId) || txId <= 0) return;
+
+  switch (type) {
+    case 'transaction:lock': {
+      const existing = transactionLocks.get(txId);
+      if (existing && existing.userId !== userId && existing.ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'transaction:locked',
+          payload: {
+            transactionId: txId,
+            lockedBy: { userId: existing.userId, name: existing.userName, role: existing.userRole },
+          },
+        }));
+        return;
+      }
+      const lockInfo: LockInfo = {
+        userId,
+        userName: payload.userName || 'Unknown',
+        userRole: payload.userRole || 'user',
+        ws,
+        lastHeartbeat: Date.now(),
+      };
+      transactionLocks.set(txId, lockInfo);
+      ws.send(JSON.stringify({
+        type: 'transaction:lock_acquired',
+        payload: { transactionId: txId },
+      }));
+      broadcastTransactionLocked(txId, lockInfo);
+      break;
+    }
+    case 'transaction:unlock': {
+      const lock = transactionLocks.get(txId);
+      if (lock && lock.userId === userId && lock.ws === ws) {
+        transactionLocks.delete(txId);
+        broadcastTransactionUnlocked(txId);
+      }
+      break;
+    }
+    case 'transaction:heartbeat': {
+      const lock = transactionLocks.get(txId);
+      if (lock && lock.userId === userId) {
+        lock.lastHeartbeat = Date.now();
+      }
+      break;
+    }
+    case 'transaction:query_lock': {
+      const lock = transactionLocks.get(txId);
+      if (lock && lock.userId !== userId && lock.ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'transaction:locked',
+          payload: {
+            transactionId: txId,
+            lockedBy: { userId: lock.userId, name: lock.userName, role: lock.userRole },
+          },
+        }));
+      } else {
+        ws.send(JSON.stringify({
+          type: 'transaction:unlocked',
+          payload: { transactionId: txId },
+        }));
+      }
+      break;
+    }
+  }
+}
+
+function releaseLocksForSocket(ws: WebSocket, userId: number) {
+  for (const [txId, lock] of transactionLocks) {
+    if (lock.ws === ws) {
+      transactionLocks.delete(txId);
+      broadcastTransactionUnlocked(txId);
+    }
+  }
+}
+
 let wss: WebSocketServer;
 
 export function setupWebSocket(server: HttpServer) {
@@ -58,7 +189,17 @@ export function setupWebSocket(server: HttpServer) {
 
     ws.send(JSON.stringify({ type: 'connected', payload: { userId } }));
 
+    ws.on('message', (raw) => {
+      try {
+        const data = JSON.parse(raw.toString());
+        if (typeof data.type === 'string' && data.type.startsWith('transaction:')) {
+          handleLockMessage(ws, userId, data);
+        }
+      } catch {}
+    });
+
     ws.on('close', () => {
+      releaseLocksForSocket(ws, userId);
       const connections = userConnections.get(userId);
       if (connections) {
         connections.delete(ws);

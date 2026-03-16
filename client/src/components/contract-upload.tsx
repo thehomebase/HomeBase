@@ -47,6 +47,7 @@ interface ExtractedData {
 interface ContractUploadProps {
   transactionId: number;
   transaction: Transaction;
+  readOnly?: boolean;
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -111,7 +112,7 @@ function parseEditValue(key: string, value: string): unknown {
   return value;
 }
 
-export function ContractUpload({ transactionId, transaction }: ContractUploadProps) {
+export function ContractUpload({ transactionId, transaction, readOnly = false }: ContractUploadProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -397,10 +398,11 @@ export function ContractUpload({ transactionId, transaction }: ContractUploadPro
                 accept=".pdf,application/pdf"
                 onChange={handleFileSelect}
                 className="flex-1"
+                disabled={readOnly}
               />
               <Button
                 onClick={handleUpload}
-                disabled={!selectedFile || uploadMutation.isPending}
+                disabled={readOnly || !selectedFile || uploadMutation.isPending}
               >
                 {uploadMutation.isPending ? (
                   <>

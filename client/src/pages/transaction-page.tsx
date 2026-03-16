@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useTransactionLock } from "@/hooks/use-transaction-lock";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -27,6 +29,8 @@ export default function TransactionPage() {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const parsedId = id ? parseInt(id, 10) : null;
+
+  const { isReadOnly, lockedBy } = useTransactionLock(parsedId);
 
   const [editForm, setEditForm] = useState({
     status: "",
@@ -91,6 +95,12 @@ export default function TransactionPage() {
       });
     }
   }, [transaction, isEditing]);
+
+  useEffect(() => {
+    if (isReadOnly && isEditing) {
+      setIsEditing(false);
+    }
+  }, [isReadOnly, isEditing]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: Partial<Transaction>) => {
@@ -297,15 +307,26 @@ export default function TransactionPage() {
         </div>
       </div>
 
+      {isReadOnly && lockedBy && (
+        <Alert className="mb-4 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700">
+          <Lock className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            <span className="font-medium">{lockedBy.name}</span> ({lockedBy.role}) is currently editing this transaction. You are in read-only mode.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card className="mb-6 relative">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute right-4 top-4"
-          onClick={() => setIsEditing(true)}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
+        {!isReadOnly && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-4 top-4"
+            onClick={() => setIsEditing(true)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        )}
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
@@ -415,7 +436,7 @@ export default function TransactionPage() {
                 <Landmark className="h-4 w-4 text-primary" />
                 <span className="text-sm font-semibold">Lender</span>
               </div>
-              {!lenderStatus?.linked && (
+              {!lenderStatus?.linked && !isReadOnly && (
                 <Button variant="outline" size="sm" onClick={() => setShowInviteLender(true)}>
                   <UserCheck className="h-3.5 w-3.5 mr-1.5" />
                   Invite Lender
@@ -517,15 +538,15 @@ export default function TransactionPage() {
         </TabsList>
 
         <TabsContent value="progress">
-          <ProgressChecklist transactionId={parsedId} />
+          <ProgressChecklist transactionId={parsedId} readOnly={isReadOnly} />
         </TabsContent>
 
         <TabsContent value="documents">
-          <DocumentChecklist transactionId={parsedId} />
+          <DocumentChecklist transactionId={parsedId} readOnly={isReadOnly} />
         </TabsContent>
 
         <TabsContent value="contacts">
-          <TransactionContacts transactionId={parsedId} />
+          <TransactionContacts transactionId={parsedId} readOnly={isReadOnly} />
         </TabsContent>
 
         <TabsContent value="timeline">
@@ -534,7 +555,7 @@ export default function TransactionPage() {
 
         <TabsContent value="contract-upload">
           {parsedId && transaction && (
-            <ContractUpload transactionId={parsedId} transaction={transaction} />
+            <ContractUpload transactionId={parsedId} transaction={transaction} readOnly={isReadOnly} />
           )}
         </TabsContent>
       </Tabs>

@@ -94,8 +94,9 @@ interface Checklist {
 
 interface ProgressChecklistProps {
   transactionId: number;
-  userRole: string;
+  userRole?: string;
   transactionType?: 'buy' | 'sell';
+  readOnly?: boolean;
 }
 
 // This is for SELLER transactions (selling a property)
@@ -192,7 +193,7 @@ const BUYER_CHECKLIST_ITEMS: Omit<ChecklistItem, "completed">[] = [
   { id: "begin-maintenance", text: "Begin maintenance and warranty registration", phase: "Post-Closing" }
 ];
 
-export function ProgressChecklist({ transactionId, userRole, transactionType = 'buy' }: ProgressChecklistProps) {
+export function ProgressChecklist({ transactionId, userRole, transactionType = 'buy', readOnly = false }: ProgressChecklistProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activePhase, setActivePhase] = useState<string>(
@@ -381,7 +382,7 @@ export function ProgressChecklist({ transactionId, userRole, transactionType = '
                       });
                     }
                   }}
-                  disabled={updateChecklistMutation.isPending}
+                  disabled={readOnly || updateChecklistMutation.isPending}
                 />
                 <TooltipProvider>
                   <Tooltip>

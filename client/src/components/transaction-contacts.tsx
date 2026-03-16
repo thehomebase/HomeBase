@@ -78,9 +78,10 @@ type ContactRole = typeof CONTACT_ROLES[number];
 
 interface TransactionContactsProps {
   transactionId: number;
+  readOnly?: boolean;
 }
 
-export function TransactionContacts({ transactionId }: TransactionContactsProps) {
+export function TransactionContacts({ transactionId, readOnly = false }: TransactionContactsProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [showAddOptionsDialog, setShowAddOptionsDialog] = React.useState(false);
@@ -384,15 +385,17 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                   <TableHead>Phone</TableHead>
                   <TableHead>Mobile</TableHead>
                   <TableHead>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => setShowAddOptionsDialog(true)}
-                      className="bg-black hover:bg-black/90"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Contact
-                    </Button>
+                    {!readOnly && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setShowAddOptionsDialog(true)}
+                        className="bg-black hover:bg-black/90"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Contact
+                      </Button>
+                    )}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -473,25 +476,27 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                         <TableCell>{contact.phone || "N/A"}</TableCell>
                         <TableCell>{contact.mobilePhone || "N/A"}</TableCell>
                         <TableCell>
-                          <div className="flex space-x-2">
-                            {user?.role === 'agent' && (
+                          {!readOnly && (
+                            <div className="flex space-x-2">
+                              {user?.role === 'agent' && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setEditingContact(contact)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => setEditingContact(contact)}
+                                onClick={() => contact.id && deleteContactMutation.mutate(contact.id)}
+                                disabled={deleteContactMutation.isPending}
                               >
-                                <Pencil className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => contact.id && deleteContactMutation.mutate(contact.id)}
-                              disabled={deleteContactMutation.isPending}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                            </div>
+                          )}
                         </TableCell>
                       </>
                     )}
@@ -511,15 +516,17 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
           <div className="block sm:hidden">
             <div className="flex justify-between items-center p-4 border-b">
               <h3 className="font-semibold">Contacts</h3>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setShowAddOptionsDialog(true)}
-                className="bg-black hover:bg-black/90"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Contact
-              </Button>
+              {!readOnly && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setShowAddOptionsDialog(true)}
+                  className="bg-black hover:bg-black/90"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Contact
+                </Button>
+              )}
             </div>
             <div className="divide-y">
               {contacts.map((contact: Contact) => (
@@ -529,25 +536,27 @@ export function TransactionContacts({ transactionId }: TransactionContactsProps)
                       <div className="font-medium">{contact.role}</div>
                       <div>{contact.firstName} {contact.lastName}</div>
                     </div>
-                    <div className="flex gap-2">
-                      {user?.role === 'agent' && (
+                    {!readOnly && (
+                      <div className="flex gap-2">
+                        {user?.role === 'agent' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingContact(contact)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setEditingContact(contact)}
+                          onClick={() => contact.id && deleteContactMutation.mutate(contact.id)}
+                          disabled={deleteContactMutation.isPending}
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => contact.id && deleteContactMutation.mutate(contact.id)}
-                        disabled={deleteContactMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-1 text-sm text-muted-foreground">
                     <div>{contact.email}</div>

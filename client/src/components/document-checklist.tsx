@@ -574,13 +574,15 @@ function DocumentCard({
   isDragging,
   onUpdateNotes,
   onUpdateSigning,
-  onDelete
+  onDelete,
+  readOnly = false,
 }: { 
   document: Document; 
   isDragging?: boolean;
   onUpdateNotes: (id: string, notes: string) => void;
   onUpdateSigning: (id: string, signingUrl: string, signingPlatform: string) => void;
   onDelete: (id: string, name: string) => void;
+  readOnly?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: document.id,
@@ -606,10 +608,10 @@ function DocumentCard({
       {...attributes}
       {...listeners}
       className={`bg-background border rounded-md p-3 cursor-move hover:bg-accent/50 ${isDragging ? 'opacity-50' : ''} relative`}
-      onClick={() => setIsEditing(!isEditing)}
+      onClick={() => !readOnly && setIsEditing(!isEditing)}
     >
       <div className="flex items-start justify-between gap-2">
-        <GripVertical className="h-4 w-4 text-muted-foreground/50 flex-shrink-0 mt-0.5 md:hidden" />
+        {!readOnly && <GripVertical className="h-4 w-4 text-muted-foreground/50 flex-shrink-0 mt-0.5 md:hidden" />}
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm mb-1 truncate" title={document.name}>{document.name}</div>
           <div className="flex items-center gap-1 flex-wrap">
@@ -657,33 +659,35 @@ function DocumentCard({
               </Tooltip>
             </TooltipProvider>
           )}
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <button
-                onClick={(e) => e.stopPropagation()}
-                className="p-1 rounded hover:bg-destructive/10 transition-colors"
-              >
-                <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-              </button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Document</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete "{document.name}"? This action cannot be undone and any associated signing links or notes will be permanently removed.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => onDelete(document.id, document.name)}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          {!readOnly && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button
+                  onClick={(e) => e.stopPropagation()}
+                  className="p-1 rounded hover:bg-destructive/10 transition-colors"
                 >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Document</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete "{document.name}"? This action cannot be undone and any associated signing links or notes will be permanently removed.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => onDelete(document.id, document.name)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
 
@@ -776,6 +780,7 @@ function DroppableColumn({
   onAddDocument,
   isAgentOrBroker,
   docusignConnected,
+  readOnly = false,
 }: { 
   status: typeof statusColumns[number]['key'];
   documents: Document[];
@@ -786,6 +791,7 @@ function DroppableColumn({
   onAddDocument?: (name: string, signingPlatform?: string) => void;
   isAgentOrBroker?: boolean;
   docusignConnected?: boolean;
+  readOnly?: boolean;
 }) {
   const { setNodeRef } = useDroppable({
     id: status,
@@ -826,6 +832,7 @@ function DroppableColumn({
               onUpdateNotes={onUpdateNotes}
               onUpdateSigning={onUpdateSigning}
               onDelete={onDelete}
+              readOnly={readOnly}
             />
           ))}
         </SortableContext>
@@ -1055,13 +1062,13 @@ function DropboxFileBrowser({ transactionId, open, onOpenChange }: { transaction
   );
 }
 
-export function DocumentChecklist({ transactionId }: { transactionId: number }) {
+export function DocumentChecklist({ transactionId, readOnly = false }: { transactionId: number; readOnly?: boolean }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  const sensors = useSensors(
+  const activeSensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 12,
@@ -1075,6 +1082,8 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
     }),
     useSensor(KeyboardSensor)
   );
+  const emptySensors = useSensors();
+  const sensors = readOnly ? emptySensors : activeSensors;
 
   const { data: documents = [], isLoading, isError } = useQuery({
     queryKey: ["/api/documents", transactionId],
@@ -1372,9 +1381,10 @@ export function DocumentChecklist({ transactionId }: { transactionId: number }) 
                 onUpdateNotes={handleUpdateNotes}
                 onUpdateSigning={handleUpdateSigning}
                 onDelete={handleDeleteDocument}
-                onAddDocument={(name: string, signingPlatform?: string) => addDocumentMutation.mutate({ name, signingPlatform })}
-                isAgentOrBroker={user?.role === 'agent' || user?.role === 'broker'}
+                onAddDocument={readOnly ? undefined : (name: string, signingPlatform?: string) => addDocumentMutation.mutate({ name, signingPlatform })}
+                isAgentOrBroker={!readOnly && (user?.role === 'agent' || user?.role === 'broker')}
                 docusignConnected={docusignStatus?.connected}
+                readOnly={readOnly}
               />
             ))}
           </div>
