@@ -844,7 +844,7 @@ function Router() {
             <ProtectedRoute path="/" component={DashboardPage} />
           </Route>
         </>
-      ) : user?.role === "agent" ? (
+      ) : (user?.role === "agent" || user?.role === "admin") ? (
         <>
           <Route path="/dashboard">
             <ProtectedRoute path="/dashboard" component={DashboardPage} />
