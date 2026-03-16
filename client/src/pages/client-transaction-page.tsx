@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -560,21 +560,20 @@ export default function ClientTransactionPage() {
   const [showAllDocs, setShowAllDocs] = useState(false);
   const [showFinancials, setShowFinancials] = useState(false);
   const [showAllTimeline, setShowAllTimeline] = useState(false);
-  const [, setLocation] = useLocation();
 
-  const searchParams = new URLSearchParams(window.location.search);
-  const txParam = searchParams.get("tx");
+  const initialTx = new URLSearchParams(window.location.search).get("tx");
+  const [selectedTxId, setSelectedTxId] = useState<string | null>(initialTx);
 
   const { data: allTransactions } = useQuery<any[]>({
     queryKey: ["/api/client/my-transactions"],
   });
 
-  const apiUrl = txParam
-    ? `/api/client/my-transaction?transactionId=${txParam}`
+  const apiUrl = selectedTxId
+    ? `/api/client/my-transaction?transactionId=${selectedTxId}`
     : "/api/client/my-transaction";
 
   const { data, isLoading, isError } = useQuery<MyTransactionResponse | null>({
-    queryKey: ["/api/client/my-transaction", txParam],
+    queryKey: ["/api/client/my-transaction", selectedTxId],
     queryFn: () => fetch(apiUrl, { credentials: "include" }).then(r => r.json()),
   });
 
@@ -648,8 +647,8 @@ export default function ClientTransactionPage() {
           <Select
             value={String(transaction.id)}
             onValueChange={(val) => {
+              setSelectedTxId(val);
               window.history.replaceState(null, "", `/my-transaction?tx=${val}`);
-              setLocation(`/my-transaction?tx=${val}`);
             }}
           >
             <SelectTrigger className="flex-1 h-9">
