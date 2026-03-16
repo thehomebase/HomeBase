@@ -17,7 +17,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft, Upload, FileText, Plus, Trash2, Save, Send,
-  AlertTriangle, CheckCircle2, Circle, ShieldAlert, Loader2, Eye, BookOpen
+  AlertTriangle, CheckCircle2, Circle, ShieldAlert, Loader2, Eye, BookOpen,
+  Bot, Sparkles, Shield
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -356,8 +357,15 @@ export default function InspectionReviewPage() {
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-2">
-            Upload a PDF inspection report. Items will be extracted for your review.
+            Upload a PDF inspection report. AI will extract repair items for your review before anything is saved.
           </p>
+          <div className="flex items-start gap-2 p-3 mt-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+            <Shield className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-green-700 dark:text-green-300">
+              <span className="font-medium">Privacy Protected:</span> Your report is processed in memory and never stored permanently. Sensitive data is automatically redacted before AI processing.{" "}
+              <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline font-medium hover:text-green-900 dark:hover:text-green-100">Learn more</a>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -388,6 +396,22 @@ export default function InspectionReviewPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="flex items-start gap-2 p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
+              <Sparkles className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-purple-700 dark:text-purple-300">
+                <span className="font-medium">AI-Extracted Items</span>
+                <span> — These items were automatically extracted using AI. Please review each item's category, severity, and description carefully before saving. AI may misclassify items or miss context.</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+              <Shield className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-green-700 dark:text-green-300">
+                <span className="font-medium">Privacy Protected:</span> Sensitive data (SSNs, account numbers, emails) was automatically redacted before AI processing.{" "}
+                <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline font-medium hover:text-green-900 dark:hover:text-green-100">Learn more</a>
+              </div>
+            </div>
+
             {parsedItems.map((item, idx) => (
               <div key={idx} className="flex items-start gap-3 p-3 border rounded-lg">
                 <Checkbox
