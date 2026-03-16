@@ -719,27 +719,30 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
 }
 
 export async function parseContract(buffer: Buffer): Promise<ExtractedContractData & { documentType?: string; notes?: string | null; aiUsed?: boolean }> {
-  const uint8 = new Uint8Array(buffer);
-  const parser = new PDFParse(uint8 as any);
-  await parser.load();
-  const pdfResult = await parser.getText();
-  const text = (pdfResult as any).text || "";
-
   try {
-    console.log("[DocumentParser] Using AI parser (primary)");
+    console.log("[DocumentParser] Using AI parser with direct PDF (primary)");
     const { parseDocumentWithAI } = await import("./ai-document-parser");
-    const aiResult = await parseDocumentWithAI(text);
+    const aiResult = await parseDocumentWithAI(buffer);
     return {
       ...aiResult.extracted,
-      rawTextPreview: text.substring(0, 2000),
       documentType: aiResult.documentType,
       notes: aiResult.notes,
       aiUsed: true,
     };
   } catch (err) {
-    console.error("[DocumentParser] AI parsing failed, falling back to regex:", err);
-    const pages = splitPages(text);
-    const regexResult = parseTRECForm(text, pages);
-    return { ...regexResult, aiUsed: false };
+    console.error("[DocumentParser] AI parsing failed, falling back to text extraction + regex:", err);
+    try {
+      const uint8 = new Uint8Array(buffer);
+      const parser = new PDFParse(uint8 as any);
+      await parser.load();
+      const pdfResult = await parser.getText();
+      const text = (pdfResult as any).text || "";
+      const pages = splitPages(text);
+      const regexResult = parseTRECForm(text, pages);
+      return { ...regexResult, aiUsed: false };
+    } catch (fallbackErr) {
+      console.error("[DocumentParser] Regex fallback also failed:", fallbackErr);
+      throw new Error("Failed to parse document with both AI and regex methods");
+    }
   }
 }

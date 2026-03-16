@@ -266,6 +266,7 @@ export const inspectionItems = pgTable("inspection_items", {
   status: text("status", { enum: ['pending_review', 'approved', 'sent_for_bids', 'bids_received', 'accepted', 'declined'] }).notNull().default('pending_review'),
   notes: text("notes"),
   pageNumber: integer("page_number"),
+  hasPhoto: boolean("has_photo").default(false),
   repairRequested: boolean("repair_requested").default(false),
   repairStatus: text("repair_status", { enum: ['not_requested', 'requested', 'agreed', 'denied', 'credit_offered', 'resolved'] }).default('not_requested'),
   repairNotes: text("repair_notes"),

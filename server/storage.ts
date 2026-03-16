@@ -4059,6 +4059,7 @@ export class DatabaseStorage implements IStorage {
       status: String(row.status),
       notes: row.notes ? String(row.notes) : null,
       pageNumber: row.page_number ? Number(row.page_number) : null,
+      hasPhoto: row.has_photo ?? false,
       createdAt: row.created_at ? new Date(row.created_at) : null,
       repairRequested: row.repair_requested ?? false,
       repairStatus: row.repair_status ?? 'not_requested',
@@ -4098,8 +4099,8 @@ export class DatabaseStorage implements IStorage {
   async createInspectionItem(item: InsertInspectionItem): Promise<InspectionItem> {
     try {
       const result = await db.execute(sql`
-        INSERT INTO inspection_items (transaction_id, category, description, severity, location, status, notes, page_number)
-        VALUES (${item.transactionId}, ${item.category}, ${item.description}, ${item.severity}, ${item.location || null}, ${item.status || 'pending_review'}, ${item.notes || null}, ${item.pageNumber || null})
+        INSERT INTO inspection_items (transaction_id, category, description, severity, location, status, notes, page_number, has_photo)
+        VALUES (${item.transactionId}, ${item.category}, ${item.description}, ${item.severity}, ${item.location || null}, ${item.status || 'pending_review'}, ${item.notes || null}, ${item.pageNumber || null}, ${item.hasPhoto ?? false})
         RETURNING *
       `);
       return this.mapInspectionItemRow(result.rows[0]);

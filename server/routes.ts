@@ -6582,42 +6582,49 @@ export function registerRoutes(app: Express): Server {
       }
       let items;
       let aiUsed = false;
-      let rawText = "";
+
+      const fs = await import("fs");
+      const path = await import("path");
+      const uploadDir = path.default.join(process.cwd(), 'uploads', 'inspections');
+      fs.default.mkdirSync(uploadDir, { recursive: true });
+      const fileName = `${transactionId}_${Date.now()}.pdf`;
+      const filePath = path.default.join(uploadDir, fileName);
+      fs.default.writeFileSync(filePath, req.file.buffer);
+      await storage.saveInspectionPdf(transactionId, req.file.originalname || fileName, filePath);
 
       if (req.file.mimetype === 'application/pdf') {
         try {
-          const pdfParseModule = await import("pdf-parse");
-          const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
-          const pdfData = await pdfParseFn(req.file.buffer);
-          rawText = pdfData.text || "";
-
-          const fs = await import("fs");
-          const path = await import("path");
-          const uploadDir = path.default.join(process.cwd(), 'uploads', 'inspections');
-          fs.default.mkdirSync(uploadDir, { recursive: true });
-          const fileName = `${transactionId}_${Date.now()}.pdf`;
-          const filePath = path.default.join(uploadDir, fileName);
-          fs.default.writeFileSync(filePath, req.file.buffer);
-          await storage.saveInspectionPdf(transactionId, req.file.originalname || fileName, filePath);
-        } catch (pdfErr) {
-          console.error('PDF parse error:', pdfErr);
-          return res.status(400).json({ error: 'Failed to parse PDF file' });
+          console.log("[InspectionParser] Using AI parser with direct PDF (primary, multimodal)");
+          const { parseInspectionWithAI } = await import("./ai-document-parser");
+          const aiResult = await parseInspectionWithAI(req.file.buffer);
+          items = aiResult.items;
+          aiUsed = true;
+          console.log(`[InspectionParser] AI extracted ${items.length} items (with photo detection)`);
+        } catch (aiErr) {
+          console.error("[InspectionParser] AI parsing failed, falling back to text extraction + regex:", aiErr);
+          try {
+            const pdfParseModule = await import("pdf-parse");
+            const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
+            const pdfData = await pdfParseFn(req.file.buffer);
+            const rawText = pdfData.text || "";
+            const { parseInspectionReport } = await import("./inspection-parser");
+            items = parseInspectionReport(rawText);
+          } catch (fallbackErr) {
+            console.error("[InspectionParser] Regex fallback also failed:", fallbackErr);
+            return res.status(400).json({ error: 'Failed to parse inspection report' });
+          }
         }
       } else {
-        rawText = req.file.buffer.toString('utf-8');
-      }
-
-      try {
-        console.log("[InspectionParser] Using AI parser (primary)");
-        const { parseInspectionWithAI } = await import("./ai-document-parser");
-        const aiResult = await parseInspectionWithAI(rawText);
-        items = aiResult.items;
-        aiUsed = true;
-        console.log(`[InspectionParser] AI extracted ${items.length} items`);
-      } catch (aiErr) {
-        console.error("[InspectionParser] AI parsing failed, falling back to regex:", aiErr);
-        const { parseInspectionReport } = await import("./inspection-parser");
-        items = parseInspectionReport(rawText);
+        const rawText = req.file.buffer.toString('utf-8');
+        try {
+          const { parseInspectionWithAI } = await import("./ai-document-parser");
+          const aiResult = await parseInspectionWithAI(rawText);
+          items = aiResult.items;
+          aiUsed = true;
+        } catch {
+          const { parseInspectionReport } = await import("./inspection-parser");
+          items = parseInspectionReport(rawText);
+        }
       }
 
       res.json({ items, transactionId, aiUsed });

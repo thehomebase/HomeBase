@@ -55,6 +55,7 @@ type ParsedItem = {
   severity: string;
   location: string;
   pageNumber?: number;
+  hasPhoto?: boolean;
   selected: boolean;
 };
 
@@ -228,6 +229,7 @@ export default function InspectionReviewPage() {
       severity: item.severity,
       location: item.location || null,
       pageNumber: item.pageNumber || null,
+      hasPhoto: item.hasPhoto || false,
       status: "approved",
       notes: null,
     }));
@@ -362,7 +364,7 @@ export default function InspectionReviewPage() {
           <div className="flex items-start gap-2 p-3 mt-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
             <Shield className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-green-700 dark:text-green-300">
-              <span className="font-medium">Privacy Protected:</span> Your report is processed in memory and never stored permanently. Sensitive data is automatically redacted before AI processing.{" "}
+              <span className="font-medium">Privacy Protected:</span> Your report is processed in memory. AI reads the PDF directly (including photos) for accurate extraction. The AI provider does not retain or train on your document content.{" "}
               <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline font-medium hover:text-green-900 dark:hover:text-green-100">Learn more</a>
             </div>
           </div>
@@ -400,7 +402,7 @@ export default function InspectionReviewPage() {
               <Sparkles className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
               <div className="text-sm text-purple-700 dark:text-purple-300">
                 <span className="font-medium">AI-Extracted Items</span>
-                <span> — These items were automatically extracted using AI. Please review each item's category, severity, and description carefully before saving. AI may misclassify items or miss context.</span>
+                <span> — These items were automatically extracted using AI, which analyzed both the text and photos in your report. Please review each item's category, severity, and description carefully before saving. Items marked with a "Photo" badge indicate the AI found a related photo in the report.</span>
               </div>
             </div>
 
@@ -477,11 +479,19 @@ export default function InspectionReviewPage() {
                     />
                   </div>
                 </div>
-                {item.pageNumber && (
-                  <span className="text-xs text-muted-foreground shrink-0 mt-2">
-                    p.{item.pageNumber}
-                  </span>
-                )}
+                <div className="flex flex-col items-end gap-1 shrink-0 mt-2">
+                  {item.pageNumber && (
+                    <span className="text-xs text-muted-foreground">
+                      p.{item.pageNumber}
+                    </span>
+                  )}
+                  {item.hasPhoto && (
+                    <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                      <Eye className="h-3 w-3 mr-1" />
+                      Photo
+                    </Badge>
+                  )}
+                </div>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -560,6 +570,12 @@ export default function InspectionReviewPage() {
                       <Badge variant="outline">{STATUS_LABELS[item.status] || item.status}</Badge>
                       {item.location && (
                         <span className="text-xs text-muted-foreground">{item.location}</span>
+                      )}
+                      {(item as any).hasPhoto && (
+                        <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                          <Eye className="h-3 w-3 mr-1" />
+                          Photo
+                        </Badge>
                       )}
                       {item.pageNumber && (
                         <Button

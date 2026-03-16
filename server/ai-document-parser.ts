@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, createPartFromBase64 } from "@google/genai";
 import type { ExtractedContractData, ExtractedContactInfo } from "./contract-parser";
 import type { ParsedInspectionItem } from "./inspection-parser";
 
@@ -28,7 +28,7 @@ function truncateText(text: string, maxChars: number = 30000): string {
   return text.substring(0, maxChars) + "\n[DOCUMENT TRUNCATED]";
 }
 
-const DOCUMENT_EXTRACTION_PROMPT = `You are a real estate document parser. Extract the following fields from this document text. Return ONLY a valid JSON object with no markdown formatting, no code fences, no explanation.
+const DOCUMENT_EXTRACTION_PROMPT = `You are a real estate document parser. Analyze this PDF document and extract the following fields. Return ONLY a valid JSON object with no markdown formatting, no code fences, no explanation.
 
 Fields to extract:
 - documentType: string - the type of document (e.g. "purchase_contract", "listing_agreement", "inspection_report", "addendum", "disclosure", "closing_document", "lease", "amendment", "unknown")
@@ -55,11 +55,9 @@ Rules:
 - For contacts, extract as many people as you can find with their roles
 - Be thorough but only include data you can confidently extract
 - Do NOT fabricate or guess data that isn't in the document
-
-Document text:
 `;
 
-const INSPECTION_EXTRACTION_PROMPT = `You are a home inspection report parser. Extract ALL deficiencies, issues, and repair items from this inspection report. Return ONLY a valid JSON object with no markdown formatting, no code fences, no explanation.
+const INSPECTION_EXTRACTION_PROMPT = `You are a home inspection report parser. Analyze this PDF inspection report including all text AND images/photos. Extract ALL deficiencies, issues, and repair items. Return ONLY a valid JSON object with no markdown formatting, no code fences, no explanation.
 
 Return a JSON object with:
 - propertyAddress: string or null - the property address from the report
@@ -71,6 +69,8 @@ Return a JSON object with:
   - severity: string - one of: "safety" (immediate hazard), "major" (significant repair needed), "moderate" (should be addressed), "minor" (cosmetic or low priority)
   - location: string - where in the home the issue was found (e.g. "master bathroom", "north side exterior", "attic")
   - recommendation: string - what the inspector recommends (e.g. "Replace immediately", "Have licensed plumber evaluate", "Monitor")
+  - pageNumber: number or null - the page number in the PDF where this deficiency is documented (1-based)
+  - hasPhoto: boolean - whether a photo/image of this specific deficiency appears on the same page or nearby pages in the report
 
 Rules:
 - Extract EVERY deficiency, issue, concern, or recommended repair mentioned in the report
@@ -79,22 +79,41 @@ Rules:
 - Classify severity accurately: safety hazards (exposed wiring, gas leaks, no GFCI) are "safety"; structural/roof/major system failures are "major"; general repairs are "moderate"; cosmetic issues are "minor"
 - Be thorough - inspection reports often have 10-50+ items
 - Do NOT fabricate items that aren't in the report
-
-Inspection report text:
+- Pay close attention to photos/images in the report - they often show the actual deficiency and help confirm severity
+- For pageNumber, provide the page where the item text or photo appears (1-based page numbering)
+- For hasPhoto, set true ONLY if you can see an actual photo/image of the deficiency in the report
 `;
 
-export async function parseDocumentWithAI(rawText: string): Promise<{
+function parseJSON(responseText: string): Record<string, unknown> {
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("No JSON object found in AI response");
+  }
+  return JSON.parse(jsonMatch[0]);
+}
+
+export async function parseDocumentWithAI(input: Buffer | string): Promise<{
   extracted: ExtractedContractData;
   documentType: string;
   notes: string | null;
   aiUsed: true;
 }> {
-  const sanitizedText = stripPII(rawText);
-  const truncatedText = truncateText(sanitizedText);
+  let contents: any;
+
+  if (Buffer.isBuffer(input)) {
+    const pdfPart = createPartFromBase64(input.toString("base64"), "application/pdf");
+    contents = [pdfPart, { text: DOCUMENT_EXTRACTION_PROMPT }];
+    console.log("[AI Parser] Sending PDF directly to Gemini (multimodal)");
+  } else {
+    const sanitizedText = stripPII(input);
+    const truncatedText = truncateText(sanitizedText);
+    contents = DOCUMENT_EXTRACTION_PROMPT + "\n\nDocument text:\n" + truncatedText;
+    console.log("[AI Parser] Sending text to Gemini (text-only fallback)");
+  }
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: DOCUMENT_EXTRACTION_PROMPT + truncatedText,
+    contents,
     config: {
       maxOutputTokens: 4096,
       temperature: 0.1,
@@ -105,11 +124,7 @@ export async function parseDocumentWithAI(rawText: string): Promise<{
 
   let parsed: Record<string, unknown>;
   try {
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON object found in AI response");
-    }
-    parsed = JSON.parse(jsonMatch[0]);
+    parsed = parseJSON(responseText);
   } catch (e) {
     console.error("[AI Parser] Response parse error:", e);
     console.error("[AI Parser] Raw response preview:", responseText.substring(0, 500));
@@ -132,6 +147,8 @@ export async function parseDocumentWithAI(rawText: string): Promise<{
     }
   }
 
+  const rawPreview = Buffer.isBuffer(input) ? "[PDF sent directly to AI]" : input.substring(0, 2000);
+
   const extracted: ExtractedContractData = {
     contractPrice: typeof parsed.contractPrice === "number" ? parsed.contractPrice : null,
     earnestMoney: typeof parsed.earnestMoney === "number" ? parsed.earnestMoney : null,
@@ -147,7 +164,7 @@ export async function parseDocumentWithAI(rawText: string): Promise<{
     buyerName: typeof parsed.buyerName === "string" ? parsed.buyerName : null,
     sellerName: typeof parsed.sellerName === "string" ? parsed.sellerName : null,
     extractedContacts: contacts,
-    rawTextPreview: rawText.substring(0, 2000),
+    rawTextPreview: rawPreview,
   };
 
   return {
@@ -158,19 +175,34 @@ export async function parseDocumentWithAI(rawText: string): Promise<{
   };
 }
 
-export async function parseInspectionWithAI(rawText: string): Promise<{
-  items: ParsedInspectionItem[];
+export type InspectionItemWithPhoto = ParsedInspectionItem & {
+  pageNumber?: number | null;
+  hasPhoto?: boolean;
+};
+
+export async function parseInspectionWithAI(input: Buffer | string): Promise<{
+  items: InspectionItemWithPhoto[];
   propertyAddress: string | null;
   inspectionDate: string | null;
   inspectorName: string | null;
   aiUsed: true;
 }> {
-  const sanitizedText = stripPII(rawText);
-  const truncatedText = truncateText(sanitizedText, 40000);
+  let contents: any;
+
+  if (Buffer.isBuffer(input)) {
+    const pdfPart = createPartFromBase64(input.toString("base64"), "application/pdf");
+    contents = [pdfPart, { text: INSPECTION_EXTRACTION_PROMPT }];
+    console.log("[AI Inspection Parser] Sending PDF directly to Gemini (multimodal - can see images)");
+  } else {
+    const sanitizedText = stripPII(input);
+    const truncatedText = truncateText(sanitizedText, 40000);
+    contents = INSPECTION_EXTRACTION_PROMPT + "\n\nInspection report text:\n" + truncatedText;
+    console.log("[AI Inspection Parser] Sending text to Gemini (text-only fallback, no image analysis)");
+  }
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: INSPECTION_EXTRACTION_PROMPT + truncatedText,
+    contents,
     config: {
       maxOutputTokens: 8192,
       temperature: 0.1,
@@ -181,18 +213,14 @@ export async function parseInspectionWithAI(rawText: string): Promise<{
 
   let parsed: Record<string, unknown>;
   try {
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON object found in AI response");
-    }
-    parsed = JSON.parse(jsonMatch[0]);
+    parsed = parseJSON(responseText);
   } catch (e) {
     console.error("[AI Inspection Parser] Response parse error:", e);
     console.error("[AI Inspection Parser] Raw response preview:", responseText.substring(0, 500));
     throw new Error("Failed to parse AI inspection extraction results");
   }
 
-  const items: ParsedInspectionItem[] = [];
+  const items: InspectionItemWithPhoto[] = [];
   if (Array.isArray(parsed.items)) {
     for (const item of parsed.items) {
       if (item && typeof item === "object") {
@@ -206,6 +234,8 @@ export async function parseInspectionWithAI(rawText: string): Promise<{
           description: String(item.description || ""),
           severity,
           location: String(item.location || ""),
+          pageNumber: typeof item.pageNumber === "number" ? item.pageNumber : null,
+          hasPhoto: item.hasPhoto === true,
         });
       }
     }

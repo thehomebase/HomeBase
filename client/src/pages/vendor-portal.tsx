@@ -243,6 +243,12 @@ function BidRequestsTab({ bidRequests, profile }: {
                       {br.inspectionItem.location && (
                         <span className="text-xs text-muted-foreground">{br.inspectionItem.location}</span>
                       )}
+                      {(br.inspectionItem as any).hasPhoto && (
+                        <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                          <Eye className="h-3 w-3 mr-1" />
+                          Photo in Report
+                        </Badge>
+                      )}
                       {br.inspectionItem.pageNumber && br.hasPdf && (
                         <Button
                           variant="ghost"
