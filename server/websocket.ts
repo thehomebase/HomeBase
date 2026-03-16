@@ -99,7 +99,7 @@ class TransactionLockManager {
   }
 }
 
-const lockManager = new TransactionLockManager();
+export const lockManager = new TransactionLockManager();
 
 async function verifyTransactionAccessForWs(transactionId: number, userId: number, userRole: string): Promise<boolean> {
   try {

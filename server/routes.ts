@@ -18,6 +18,7 @@ import { isDropboxConfigured, generateDropboxState, getDropboxAuthUrl, handleDro
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { notify } from "./notification-helper";
+import { lockManager } from "./websocket";
 import { getEstimatedHomeValue } from "./zip-home-values";
 import {
   generateRegistrationOptions,
@@ -105,6 +106,11 @@ async function verifyTransactionAccess(transactionId: number, userId: number, us
     }
   } catch (e) {}
   return { allowed: false, transaction };
+}
+
+function isTransactionLockedByOther(transactionId: number, userId: number): boolean {
+  const holder = lockManager.getLockHolder(transactionId);
+  return !!holder && holder.userId !== userId;
 }
 
 function createRateLimiter(windowMs: number, maxRequests: number) {
@@ -799,6 +805,9 @@ export function registerRoutes(app: Express): Server {
       if (!allowed || permissionLevel !== "full") {
         return res.status(403).json({ error: 'Not authorized to delete this transaction' });
       }
+      if (isTransactionLockedByOther(id, req.user.id)) {
+        return res.status(423).json({ error: "Transaction is currently being edited by another user" });
+      }
       await storage.deleteTransaction(id);
       res.sendStatus(200);
     } catch (error) {
@@ -823,6 +832,9 @@ export function registerRoutes(app: Express): Server {
       const { allowed: txAllowed, permissionLevel: txPermLevel, transaction: oldTransaction } = await verifyTransactionAccess(id, req.user.id, req.user.role);
       if (!txAllowed || !oldTransaction || txPermLevel !== "full") {
         return res.status(403).json({ error: "Not authorized to update this transaction" });
+      }
+      if (isTransactionLockedByOther(id, req.user.id)) {
+        return res.status(423).json({ error: "Transaction is currently being edited by another user" });
       }
 
       const VALID_BUYER_STATUSES = ['prospect', 'qualified_buyer', 'active_search', 'offer_submitted', 'under_contract', 'closing', 'closed'];
@@ -1091,6 +1103,9 @@ export function registerRoutes(app: Express): Server {
       if (!allowed || !transaction || permissionLevel !== "full") {
         return res.status(403).json({ error: "Not authorized to modify this checklist" });
       }
+      if (isTransactionLockedByOther(transactionId, req.user.id)) {
+        return res.status(423).json({ error: "Transaction is currently being edited by another user" });
+      }
 
       let checklist = await storage.getChecklist(transactionId, transaction.type);
       if (!checklist) {
@@ -1351,6 +1366,9 @@ export function registerRoutes(app: Express): Server {
       if (txId) {
         const { allowed, permissionLevel } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
         if (!allowed || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized" });
+        if (isTransactionLockedByOther(txId, req.user.id)) {
+          return res.status(423).json({ error: "Transaction is currently being edited by another user" });
+        }
       }
       const allowedContactFields = ['name', 'role', 'email', 'phone', 'company', 'notes', 'transactionId'];
       const contactData: Record<string, any> = {};
@@ -1395,6 +1413,9 @@ export function registerRoutes(app: Express): Server {
       if (txId) {
         const { allowed, permissionLevel } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
         if (!allowed || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized" });
+        if (isTransactionLockedByOther(txId, req.user.id)) {
+          return res.status(423).json({ error: "Transaction is currently being edited by another user" });
+        }
       }
       const allowedContactFields = ['name', 'role', 'email', 'phone', 'company', 'notes'];
       const safeContactBody: Record<string, any> = {};
@@ -1421,6 +1442,9 @@ export function registerRoutes(app: Express): Server {
       if (txId) {
         const { allowed, permissionLevel } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
         if (!allowed || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized" });
+        if (isTransactionLockedByOther(txId, req.user.id)) {
+          return res.status(423).json({ error: "Transaction is currently being edited by another user" });
+        }
       }
       await storage.deleteContact(contactId);
       res.sendStatus(200);
@@ -1451,6 +1475,9 @@ export function registerRoutes(app: Express): Server {
       const txId = Number(req.params.transactionId);
       const { allowed, permissionLevel } = await verifyTransactionAccess(txId, req.user.id, req.user.role);
       if (!allowed || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized" });
+      if (isTransactionLockedByOther(txId, req.user.id)) {
+        return res.status(423).json({ error: "Transaction is currently being edited by another user" });
+      }
       const document = await storage.createDocument({
         ...req.body,
         transactionId: txId
@@ -1469,6 +1496,9 @@ export function registerRoutes(app: Express): Server {
       const { allowed: docAllowed, permissionLevel: docPermLevel } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
       if (!docAllowed || docPermLevel !== "full") {
         return res.status(403).json({ error: 'Not authorized to modify documents for this transaction' });
+      }
+      if (isTransactionLockedByOther(transactionId, req.user.id)) {
+        return res.status(423).json({ error: "Transaction is currently being edited by another user" });
       }
       const existing = await storage.getDocument(req.params.id);
       if (!existing || existing.transactionId !== transactionId) {
@@ -1491,6 +1521,9 @@ export function registerRoutes(app: Express): Server {
       if (transaction.agentId !== req.user.id && req.user.role !== "broker") {
         return res.status(403).json({ error: 'Not authorized to delete documents for this transaction' });
       }
+      if (isTransactionLockedByOther(transactionId, req.user.id)) {
+        return res.status(423).json({ error: "Transaction is currently being edited by another user" });
+      }
       const existing = await storage.getDocument(req.params.id);
       if (!existing || existing.transactionId !== transactionId) {
         return res.status(404).json({ error: 'Document not found in this transaction' });
@@ -1510,6 +1543,9 @@ export function registerRoutes(app: Express): Server {
       const transactionId = Number(req.params.transactionId);
       const { allowed, permissionLevel } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
       if (!allowed || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized" });
+      if (isTransactionLockedByOther(transactionId, req.user.id)) {
+        return res.status(423).json({ error: "Transaction is currently being edited by another user" });
+      }
       const { documents } = req.body;
 
       if (!Array.isArray(documents)) {
@@ -5717,6 +5753,9 @@ export function registerRoutes(app: Express): Server {
       if (!txn) return res.status(404).json({ error: "Transaction not found" });
       if (txn.agentId !== req.user.id && req.user.role !== "broker") {
         return res.status(403).json({ error: "Not authorized for this transaction" });
+      }
+      if (isTransactionLockedByOther(parsed.data.transactionId, req.user.id)) {
+        return res.status(423).json({ error: "Transaction is currently being edited by another user" });
       }
 
       const STATUS_ORDER: Record<string, number> = {
