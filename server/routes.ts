@@ -1044,7 +1044,7 @@ export function registerRoutes(app: Express): Server {
         for (const { id, role } of clientIds) {
           try {
             const client = await storage.getClient(Number(id));
-            if (client && client.userId === req.user.id) {
+            if (client && client.agentId === req.user.id) {
               await storage.createContact({
                 role,
                 firstName: client.firstName,
@@ -10652,7 +10652,7 @@ export function registerRoutes(app: Express): Server {
       if (transaction && clientId) {
         try {
           const client = await storage.getClient(Number(clientId));
-          if (client && client.userId === req.user.id) {
+          if (client && client.agentId === req.user.id) {
             await storage.createContact({
               role: effectiveType === 'buy' ? 'Buyer' : 'Seller',
               firstName: client.firstName,
