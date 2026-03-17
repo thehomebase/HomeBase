@@ -367,7 +367,7 @@ export function setupAuth(app: Express) {
           return next(err);
         }
         const { password, totpSecret, ...userWithoutSensitive } = user;
-          res.status(201).json({ ...userWithoutSensitive, verificationCode });
+          res.status(201).json(userWithoutSensitive);
       });
     } catch (error) {
       console.error('Registration error:', error);
@@ -465,7 +465,7 @@ export function setupAuth(app: Express) {
         }
       }
 
-      res.json({ message: "Verification code sent", verificationCode });
+      res.json({ message: "Verification code sent" });
     } catch (error) {
       console.error("Resend verification error:", error);
       res.status(500).json({ error: "Failed to resend verification code" });

@@ -83,12 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return await res.json();
     },
-    onSuccess: (data: any) => {
-      if (data.verificationCode) {
-        sessionStorage.setItem("verificationCode", data.verificationCode);
-      }
-      const { verificationCode: _vc, ...userData } = data;
-      queryClient.setQueryData(["/api/user"], userData);
+    onSuccess: (data: SelectUser) => {
+      queryClient.setQueryData(["/api/user"], data);
       queryClient.setQueryData(["/api/clients"], []);
       console.log('Registration successful, user role:', data.role);
     },

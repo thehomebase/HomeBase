@@ -15,15 +15,6 @@ export default function VerifyEmailPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [code, setCode] = useState("");
-  const [displayCode, setDisplayCode] = useState<string | null>(null);
-
-  useEffect(() => {
-    const storedCode = sessionStorage.getItem("verificationCode");
-    if (storedCode) {
-      setDisplayCode(storedCode);
-      sessionStorage.removeItem("verificationCode");
-    }
-  }, []);
 
   const verifyMutation = useMutation({
     mutationFn: async (verificationCode: string) => {
@@ -65,13 +56,10 @@ export default function VerifyEmailPage() {
       if (!res.ok) throw new Error(data.error || "Failed to resend code");
       return data;
     },
-    onSuccess: (data: any) => {
-      if (data.verificationCode) {
-        setDisplayCode(data.verificationCode);
-      }
+    onSuccess: () => {
       toast({
         title: "Code sent",
-        description: "A new verification code has been generated.",
+        description: "A new verification code has been sent to your phone.",
       });
     },
     onError: (error: Error) => {
@@ -123,12 +111,6 @@ export default function VerifyEmailPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {displayCode && (
-            <div className="mb-4 p-3 bg-muted rounded-lg text-center">
-              <p className="text-sm text-muted-foreground mb-1">Your verification code:</p>
-              <p className="text-2xl font-mono font-bold tracking-widest">{displayCode}</p>
-            </div>
-          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Input
