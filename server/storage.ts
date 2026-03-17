@@ -899,7 +899,7 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log('Fetching transactions for user:', userId, year ? `year: ${year}` : '');
       const yearFilter = year 
-        ? sql`AND EXTRACT(YEAR FROM COALESCE(t.closing_date, t.created_at, NOW())) = ${year}`
+        ? sql`AND EXTRACT(YEAR FROM COALESCE(t.closing_date, t.updated_at, NOW())) = ${year}`
         : sql``;
       const result = await db.execute(sql`
         SELECT 
@@ -925,7 +925,7 @@ export class DatabaseStorage implements IStorage {
           t.mls_number as "mlsNumber",
           t.financing,
           t.updated_at::timestamptz as "updatedAt",
-          t.created_at::timestamptz as "createdAt"
+          t.updated_at::timestamptz as "createdAt"
         FROM transactions t
         WHERE t.agent_id = ${userId}
         ${yearFilter}
