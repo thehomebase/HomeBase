@@ -38,7 +38,7 @@ Preferred communication style: Simple, everyday language.
 - **Team Access / Authorized Users**: Agents/brokers can add other agents/brokers with configurable permission levels, account switcher, and extended transaction access.
 - **Client Portal**: Mobile-first "My Transaction" page with stage tracker, closing countdown, "Action Required" cards, key dates grid, interactive document hub, financial details, "Your Team" section, and multi-transaction support.
 - **Post-Close Engagement**: "MyHome" hub for homeowners.
-- **Growth & Lead Generation**: Affiliate referral system, drip campaigns, zip code-based lead generation with interactive map, Open House Manager, lead source tagging, timed exclusive lead routing, RESPA-compliant lead generation for agents and lenders. "No Leads, No Charge" guarantee.
+- **Growth & Lead Generation**: Affiliate referral system, drip campaigns, zip code-based lead generation with interactive map, Open House Manager, lead source tagging, timed exclusive lead routing, RESPA-compliant lead generation for agents and lenders. "No Leads, No Charge" guarantee. Agents must have license info + payment-verified identity (Stripe cardholder name match) before claiming zip codes. Lenders must have payment-verified identity.
 - **Lead Metrics Dashboard**: Centralized analytics page for lead performance, including summary stats, volume trends, conversion funnel, source breakdown, and Zapier setup guide.
 - **Listing & Price Alerts**: Saved search alerts with daily cron jobs checking for new listings and price changes from RentCast API, with multi-channel notifications.
 - **Specialized Portals**: Lender Portal (loan pipelines, checklist sync), Broker Portal (agent oversight, sales competitions, lead routing).

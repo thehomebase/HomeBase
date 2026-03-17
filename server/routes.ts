@@ -8173,11 +8173,30 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  const LEAD_VERIFIED_STATUSES = new Set(["payment_verified", "broker_verified", "admin_verified"]);
+
   app.post("/api/leads/zip-codes", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
 
     try {
+      const agent = await storage.getUser(req.user.id);
+      if (!agent) return res.status(404).json({ error: "User not found" });
+
+      if (!agent.licenseNumber?.trim() || !agent.licenseState?.trim() || !agent.brokerageName?.trim()) {
+        return res.status(403).json({
+          error: "License number, license state, and brokerage name are required before claiming zip codes. Please complete your profile in Settings.",
+          code: "LICENSE_REQUIRED"
+        });
+      }
+
+      if (!LEAD_VERIFIED_STATUSES.has(agent.verificationStatus || "")) {
+        return res.status(403).json({
+          error: "Your identity must be verified before claiming zip codes. Please complete payment verification so we can match your name on file.",
+          code: "VERIFICATION_REQUIRED"
+        });
+      }
+
       const { zipCode, monthlyBudget } = req.body;
       if (!zipCode || typeof zipCode !== 'string') {
         return res.status(400).json({ error: 'Zip code is required' });
@@ -9370,6 +9389,16 @@ export function registerRoutes(app: Express): Server {
     if (req.user.role !== "lender") return res.sendStatus(403);
 
     try {
+      const lender = await storage.getUser(req.user.id);
+      if (!lender) return res.status(404).json({ error: "User not found" });
+
+      if (!LEAD_VERIFIED_STATUSES.has(lender.verificationStatus || "")) {
+        return res.status(403).json({
+          error: "Your identity must be verified before claiming zip codes. Please complete payment verification so we can match your name on file.",
+          code: "VERIFICATION_REQUIRED"
+        });
+      }
+
       const { zipCode } = req.body;
       if (!zipCode || typeof zipCode !== 'string') {
         return res.status(400).json({ error: 'Zip code is required' });

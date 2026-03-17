@@ -896,7 +896,7 @@ export default function LeadGenerationPage() {
       toast({ title: "Zip code claimed successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Cannot claim zip code", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1018,6 +1018,12 @@ export default function LeadGenerationPage() {
     return { label: "Very high", color: "text-red-600", bg: "bg-red-500" };
   };
 
+  const isVerified = user?.verificationStatus === "payment_verified" ||
+    user?.verificationStatus === "broker_verified" ||
+    user?.verificationStatus === "admin_verified";
+  const hasLicense = !!(user?.licenseNumber && user?.licenseState && user?.brokerageName);
+  const needsVerification = user?.role === "agent" || user?.role === "broker";
+
   return (
     <div className="p-4 md:p-6 space-y-6 overflow-x-hidden pb-24 md:pb-6">
       <div>
@@ -1026,6 +1032,42 @@ export default function LeadGenerationPage() {
           Claim zip codes and manage incoming leads
         </p>
       </div>
+
+      {needsVerification && (!hasLicense || !isVerified) && (
+        <Card className="border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg shrink-0">
+                <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-semibold text-sm">Verification Required to Claim Zip Codes</h3>
+                <p className="text-xs text-muted-foreground">
+                  To protect consumers, we verify all agents before they can receive leads. Complete these steps:
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                  <li className="flex items-center gap-1.5">
+                    {hasLicense ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />
+                    )}
+                    Add your license number, state, and brokerage in Settings
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    {isVerified ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />
+                    )}
+                    Add a payment method and verify your identity (name on card must match your profile)
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4">
         <Card>
