@@ -314,6 +314,16 @@ export function MobileBottomNav() {
                 <button
                   onClick={() => {
                     setShowMore(false);
+                    logoutMutation.mutate();
+                  }}
+                  className="p-1.5 rounded-full hover:bg-muted active:scale-90 transition-transform text-muted-foreground"
+                  title="Logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMore(false);
                     setShowCustomize(true);
                   }}
                   className="p-1.5 rounded-full hover:bg-muted active:scale-90 transition-transform"
