@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { formatPhoneDisplay } from "@/lib/format-phone";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -411,7 +412,7 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
 
                 <div className="space-y-2">
                   <Label>To</Label>
-                  <Input value={phone || "No phone number"} disabled className="bg-muted" />
+                  <Input value={formatPhoneDisplay(phone) || "No phone number"} disabled className="bg-muted" />
                 </div>
 
                 <div className="space-y-2">
@@ -543,7 +544,7 @@ export default function ClientContactDialog({ client, open, onOpenChange }: Clie
 
             <div className="space-y-2">
               <Label>Contact</Label>
-              <Input value={`${client.firstName} ${client.lastName}${phone ? ` — ${phone}` : ""}`} disabled className="bg-muted" />
+              <Input value={`${client.firstName} ${client.lastName}${phone ? ` — ${formatPhoneDisplay(phone)}` : ""}`} disabled className="bg-muted" />
             </div>
 
             <div className="space-y-2">
