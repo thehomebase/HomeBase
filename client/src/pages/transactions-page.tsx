@@ -46,7 +46,7 @@ import { Badge } from "@/components/ui/badge";
 import { TransactionTemplate } from "@shared/schema";
 import { NavTabs } from "@/components/ui/nav-tabs";
 import { KanbanBoard } from "@/components/kanban-board";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -460,6 +460,25 @@ export default function TransactionsPage() {
       secondaryClientId: null as number | null,
     },
   });
+
+  const watchedClientId = form.watch("clientId");
+  const watchedType = form.watch("type");
+  const prevClientIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (watchedType === "sell" && watchedClientId && watchedClientId !== prevClientIdRef.current) {
+      const selectedClient = clients.find((c: any) => c.id === watchedClientId);
+      if (selectedClient) {
+        const streetVal = selectedClient.street || selectedClient.address || "";
+        const cityVal = selectedClient.city || "";
+        const zipVal = selectedClient.zipCode || "";
+        if (streetVal) form.setValue("streetName", streetVal, { shouldDirty: false });
+        if (cityVal) form.setValue("city", cityVal, { shouldDirty: false });
+        if (zipVal) form.setValue("zipCode", zipVal, { shouldDirty: false });
+      }
+    }
+    prevClientIdRef.current = watchedClientId;
+  }, [watchedClientId, watchedType, clients, form]);
 
   return (
     <div className="flex-1 min-w-0 px-4 sm:px-8 overflow-x-hidden">
