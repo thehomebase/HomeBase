@@ -2,7 +2,7 @@ import { db } from "./db";
 import { sql } from "drizzle-orm";
 import crypto from "crypto";
 
-const DOCUSIGN_AUTH_SERVER = process.env.DOCUSIGN_BASE_URL?.includes("demo")
+const DOCUSIGN_AUTH_SERVER = process.env.DOCUSIGN_AUTH_MODE === "demo"
   ? "https://account-d.docusign.com"
   : "https://account.docusign.com";
 
