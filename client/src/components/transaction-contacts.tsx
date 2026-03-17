@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { formatPhoneDisplay } from "@/lib/format-phone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -473,8 +474,8 @@ export function TransactionContacts({ transactionId, readOnly = false }: Transac
                         <TableCell>{contact.firstName}</TableCell>
                         <TableCell>{contact.lastName}</TableCell>
                         <TableCell>{contact.email}</TableCell>
-                        <TableCell>{contact.phone || "N/A"}</TableCell>
-                        <TableCell>{contact.mobilePhone || "N/A"}</TableCell>
+                        <TableCell>{formatPhoneDisplay(contact.phone) || "N/A"}</TableCell>
+                        <TableCell>{formatPhoneDisplay(contact.mobilePhone) || "N/A"}</TableCell>
                         <TableCell>
                           {!readOnly && (
                             <div className="flex space-x-2">
@@ -560,8 +561,8 @@ export function TransactionContacts({ transactionId, readOnly = false }: Transac
                   </div>
                   <div className="space-y-1 text-sm text-muted-foreground">
                     <div>{contact.email}</div>
-                    {contact.phone && <div>Phone: {contact.phone}</div>}
-                    {contact.mobilePhone && <div>Mobile: {contact.mobilePhone}</div>}
+                    {contact.phone && <div>Phone: {formatPhoneDisplay(contact.phone)}</div>}
+                    {contact.mobilePhone && <div>Mobile: {formatPhoneDisplay(contact.mobilePhone)}</div>}
                   </div>
                 </div>
               ))}
@@ -744,8 +745,8 @@ export function TransactionContacts({ transactionId, readOnly = false }: Transac
                 <div className="mt-2 space-y-1">
                   <p>Name: {potentialDuplicate.firstName} {potentialDuplicate.lastName}</p>
                   <p>Email: {potentialDuplicate.email}</p>
-                  <p>Phone: {potentialDuplicate.phone}</p>
-                  <p>Mobile: {potentialDuplicate.mobilePhone}</p>
+                  <p>Phone: {formatPhoneDisplay(potentialDuplicate.phone)}</p>
+                  <p>Mobile: {formatPhoneDisplay(potentialDuplicate.mobilePhone)}</p>
                 </div>
               )}
               Would you like to use this existing client instead?

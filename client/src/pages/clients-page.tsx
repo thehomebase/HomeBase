@@ -12,6 +12,7 @@ const getLabelColor = (label: string, index: number) => {
   return allColors[index % allColors.length];
 };
 
+import { formatPhoneDisplay } from "@/lib/format-phone";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -785,7 +786,7 @@ const TableContent = ({
           </div>
         );
       case 'phone':
-        return client.phone;
+        return formatPhoneDisplay(client.phone);
       case 'labels':
         return (
           <div className="flex flex-wrap gap-1">
