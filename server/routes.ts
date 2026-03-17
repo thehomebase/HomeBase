@@ -586,7 +586,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: 'Not authorized to update this client' });
       }
 
-      const allowedFields = ['firstName', 'lastName', 'email', 'phone', 'address', 'notes', 'type', 'status', 'preApprovalAmount', 'lenderId', 'preferredContactMethod', 'birthday', 'anniversary', 'moveInDate'];
+      const allowedFields = ['firstName', 'lastName', 'email', 'phone', 'address', 'street', 'city', 'zipCode', 'notes', 'type', 'status', 'preApprovalAmount', 'lenderId', 'preferredContactMethod', 'birthday', 'anniversary', 'moveInDate', 'labels'];
       const safeBody: Record<string, any> = {};
       for (const key of allowedFields) {
         if (req.body[key] !== undefined) safeBody[key] = req.body[key];
