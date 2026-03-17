@@ -114,6 +114,12 @@ body, #root {
     -ms-touch-action: pan-x pan-y;
   }
 
+  [data-radix-dialog-content] {
+    touch-action: pan-y;
+    -ms-touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
   body {
     @apply bg-background text-foreground;
     overscroll-behavior-x: none;

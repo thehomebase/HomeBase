@@ -335,7 +335,7 @@ export function LoginForm({
       </div>
 
       <Dialog open={showRegister} onOpenChange={setShowRegister}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create an Account</DialogTitle>
           </DialogHeader>
