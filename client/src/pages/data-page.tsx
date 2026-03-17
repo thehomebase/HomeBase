@@ -691,12 +691,27 @@ export default function DataPage() {
                     <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">
-                      {tx.streetName}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {tx.city}, {tx.state}
-                    </p>
+                    {(() => {
+                      const BUYER_ADDRESS_STAGES = new Set(["offer_submitted", "under_contract", "closing"]);
+                      const showAddress = tx.type !== "buy" || BUYER_ADDRESS_STAGES.has(tx.status);
+                      const clientName = (tx as any).client
+                        ? `${(tx as any).client.firstName} ${(tx as any).client.lastName}`
+                        : null;
+                      const displayName = showAddress && tx.streetName
+                        ? tx.streetName
+                        : (clientName || `Transaction #${tx.id}`);
+                      const displaySub = showAddress && tx.streetName
+                        ? [tx.city, tx.state].filter(Boolean).join(", ")
+                        : (tx.type === "buy" ? "Buyer" : "Seller");
+                      return (
+                        <>
+                          <p className="text-xs font-medium truncate">{displayName}</p>
+                          {displaySub && (
+                            <p className="text-[10px] text-muted-foreground">{displaySub}</p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   <div className="text-right shrink-0">
                     {tx.contractPrice ? (
