@@ -214,7 +214,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   return (
     <ActingAsContext.Provider value={{ actingAs, setActingAs }}>
     <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen bg-background w-full overflow-x-clip">
+      <div className="flex min-h-screen bg-background w-full overflow-x-hidden">
         {user && !isMobile && (
             <Sidebar
               side="left"
@@ -724,7 +724,7 @@ function Layout({ children }: { children: React.ReactNode }) {
               </SidebarFooter>
             </Sidebar>
         )}
-        <main className="flex-1 min-h-screen min-w-0 overflow-x-clip relative">
+        <main className="flex-1 min-h-screen min-w-0 overflow-x-hidden relative">
           {user && !(isMobile && isMapPage) && (
             <div className="sticky z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
               <div className="flex items-center justify-between px-4 py-2">
