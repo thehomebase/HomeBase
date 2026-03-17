@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/ui/logo";
-import { Loader2, Mail, RefreshCw, Smartphone } from "lucide-react";
+import { Loader2, Mail, RefreshCw } from "lucide-react";
 
 export default function VerifyEmailPage() {
   const { user, logoutMutation } = useAuth();
@@ -59,7 +59,7 @@ export default function VerifyEmailPage() {
     onSuccess: () => {
       toast({
         title: "Code sent",
-        description: "A new verification code has been sent to your phone.",
+        description: "A new verification code has been sent to your email.",
       });
     },
     onError: (error: Error) => {
@@ -100,14 +100,7 @@ export default function VerifyEmailPage() {
             Verify Your Account
           </CardTitle>
           <CardDescription>
-            {(user as any).profilePhone ? (
-              <>
-                <Smartphone className="inline h-4 w-4 mr-1 relative -top-px" />
-                A 6-digit code was sent to your phone. Enter it below to verify your account.
-              </>
-            ) : (
-              <>Enter the 6-digit verification code to verify your account ({user.email}).</>
-            )}
+            We sent a 6-digit verification code to <strong>{user.email}</strong>. Enter it below to verify your account. Check your spam folder if you don't see it.
           </CardDescription>
         </CardHeader>
         <CardContent>

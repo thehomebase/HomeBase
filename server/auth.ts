@@ -9,8 +9,7 @@ import { User as SelectUser } from "@shared/schema";
 import { verifyRecaptcha, verifyRecaptchaRegister } from "./recaptcha";
 import { generateSecret, generateSync, verifySync, generateURI } from "otplib";
 import * as QRCode from "qrcode";
-import { sendSMS } from "./twilio-service";
-import { sendWelcomeEmail } from "./email-service";
+import { sendVerificationEmail, sendWelcomeEmail } from "./email-service";
 
 declare global {
   namespace Express {
@@ -330,14 +329,13 @@ export function setupAuth(app: Express) {
 
       console.log('User created successfully:', { id: user.id, email: user.email });
 
-      if (req.body.phone) {
-        const smsResult = await sendSMS(
-          req.body.phone,
-          `Your HomeBase verification code is: ${verificationCode}. It expires in 24 hours.`
-        );
-        if (!smsResult.success) {
-          console.error("Failed to send verification SMS:", smsResult.error);
-        }
+      const emailResult = await sendVerificationEmail(
+        req.body.email,
+        req.body.firstName,
+        verificationCode
+      );
+      if (!emailResult.success) {
+        console.error("Failed to send verification email:", emailResult.error);
       }
 
       if (referralCodeRecord && user.role !== 'lender') {
@@ -455,14 +453,13 @@ export function setupAuth(app: Express) {
 
       console.log('Verification code resent for user', user.email);
 
-      if (user.profilePhone) {
-        const smsResult = await sendSMS(
-          user.profilePhone,
-          `Your HomeBase verification code is: ${verificationCode}. It expires in 24 hours.`
-        );
-        if (!smsResult.success) {
-          console.error("Failed to resend verification SMS:", smsResult.error);
-        }
+      const emailResult = await sendVerificationEmail(
+        user.email,
+        user.firstName,
+        verificationCode
+      );
+      if (!emailResult.success) {
+        console.error("Failed to resend verification email:", emailResult.error);
       }
 
       res.json({ message: "Verification code sent" });
