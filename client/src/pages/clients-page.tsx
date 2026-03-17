@@ -30,7 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from "framer-motion";
@@ -294,11 +294,16 @@ const ClientDetailsPanel = ({
   };
 
   const handleAddLabel = (label: string) => {
-    if (label.trim()) {
-      const newLabels = [...(editingClient.labels || []), label.trim()];
-      handleUpdate('labels', newLabels);
-      setNewLabel(""); // Clear input after adding
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    const currentLabels = editingClient.labels || [];
+    if (currentLabels.some((l: string) => l.toLowerCase() === trimmed.toLowerCase())) {
+      toast({ title: "Duplicate label", description: `"${trimmed}" is already on this client.`, variant: "destructive" });
+      setNewLabel("");
+      return;
     }
+    handleUpdate('labels', [...currentLabels, trimmed]);
+    setNewLabel("");
   };
 
   const handleRemoveLabel = async (indexToRemove: number) => {
@@ -458,18 +463,58 @@ const ClientDetailsPanel = ({
                   </motion.span>
                 ))}
               </AnimatePresence>
-              <Input
-                placeholder="Add label..."
-                className="w-32 h-6 text-xs"
-                value={newLabel}
-                onChange={(e) => setNewLabel(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddLabel(newLabel);
+              <div className="relative w-full">
+                <Input
+                  placeholder="Add label..."
+                  className="w-32 h-6 text-xs"
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddLabel(newLabel);
+                    }
+                  }}
+                />
+                {newLabel.trim() && (() => {
+                  const currentLabels = (editingClient.labels || []).map((l: string) => l.toLowerCase());
+                  const suggestions = allExistingLabels.filter(
+                    l => l.toLowerCase().includes(newLabel.trim().toLowerCase()) && !currentLabels.includes(l.toLowerCase())
+                  );
+                  return suggestions.length > 0 ? (
+                    <div className="absolute z-50 top-full mt-1 w-48 max-h-32 overflow-y-auto bg-popover border rounded-md shadow-md">
+                      {suggestions.map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          className="w-full text-left px-2 py-1 text-xs hover:bg-accent cursor-pointer"
+                          onMouseDown={(e) => { e.preventDefault(); handleAddLabel(s); }}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+              {allExistingLabels.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {allExistingLabels
+                    .filter(l => !(editingClient.labels || []).some((el: string) => el.toLowerCase() === l.toLowerCase()))
+                    .slice(0, 8)
+                    .map((label, idx) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => handleAddLabel(label)}
+                        className={`${getLabelColor(label, idx)} px-2 py-0.5 rounded-full text-xs cursor-pointer opacity-60 hover:opacity-100 transition-opacity`}
+                      >
+                        + {label}
+                      </button>
+                    ))
                   }
-                }}
-              />
+                </div>
+              )}
             </div>
           </div>
 
@@ -1165,6 +1210,12 @@ export default function ClientsPage() {
     enabled: !!user,
   });
 
+  const allExistingLabels = useMemo(() => {
+    const labelSet = new Set<string>();
+    clients.forEach(c => (c.labels || []).forEach((l: string) => labelSet.add(l)));
+    return Array.from(labelSet).sort((a, b) => a.localeCompare(b));
+  }, [clients]);
+
   const { data: invitations = [] } = useQuery<ClientInvitation[]>({
     queryKey: ["/api/client-invitations"],
     enabled: !!user && (user.role === "agent" || user.role === "broker"),
@@ -1639,7 +1690,21 @@ export default function ClientsPage() {
                       <FormField
                         control={form.control}
                         name="labels"
-                        render={({ field }) => (
+                        render={({ field }) => {
+                          const [createLabelInput, setCreateLabelInput] = useState("");
+                          const addLabel = (label: string) => {
+                            const trimmed = label.trim();
+                            if (!trimmed) return;
+                            if ((field.value || []).some((l: string) => l.toLowerCase() === trimmed.toLowerCase())) return;
+                            field.onChange([...(field.value || []), trimmed]);
+                            setCreateLabelInput("");
+                          };
+                          const currentLower = (field.value || []).map((l: string) => l.toLowerCase());
+                          const filteredSuggestions = createLabelInput.trim()
+                            ? allExistingLabels.filter(l => l.toLowerCase().includes(createLabelInput.trim().toLowerCase()) && !currentLower.includes(l.toLowerCase()))
+                            : [];
+                          const availableLabels = allExistingLabels.filter(l => !currentLower.includes(l.toLowerCase()));
+                          return (
                           <FormItem>
                             <FormLabel>Labels</FormLabel>
                             <FormControl>
@@ -1664,26 +1729,54 @@ export default function ClientsPage() {
                                     </span>
                                   ))}
                                 </div>
-                                <Input
-                                  placeholder="Type label and press Enter..."
-                                  className="w-full"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      const input = e.target as HTMLInputElement;
-                                      const newLabel = input.value.trim();
-                                      if (newLabel && !(field.value || []).includes(newLabel)) {
-                                        field.onChange([...(field.value || []), newLabel]);
-                                        input.value = '';
+                                <div className="relative">
+                                  <Input
+                                    placeholder="Type label and press Enter..."
+                                    className="w-full"
+                                    value={createLabelInput}
+                                    onChange={(e) => setCreateLabelInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        addLabel(createLabelInput);
                                       }
-                                    }
-                                  }}
-                                />
+                                    }}
+                                  />
+                                  {filteredSuggestions.length > 0 && (
+                                    <div className="absolute z-50 top-full mt-1 w-full max-h-32 overflow-y-auto bg-popover border rounded-md shadow-md">
+                                      {filteredSuggestions.map(s => (
+                                        <button
+                                          key={s}
+                                          type="button"
+                                          className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                                          onMouseDown={(e) => { e.preventDefault(); addLabel(s); }}
+                                        >
+                                          {s}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {availableLabels.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {availableLabels.slice(0, 10).map((label, idx) => (
+                                      <button
+                                        key={label}
+                                        type="button"
+                                        onClick={() => addLabel(label)}
+                                        className={`${getLabelColor(label, idx)} px-2 py-0.5 rounded-full text-xs cursor-pointer opacity-60 hover:opacity-100 transition-opacity`}
+                                      >
+                                        + {label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
-                        )}
+                          );
+                        }}
                       />
                       <FormField
                         control={form.control}
