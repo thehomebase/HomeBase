@@ -1125,7 +1125,7 @@ export default function DashboardPage() {
                             {tx.type === "buy" ? "B" : "S"}
                           </div>
                           <div>
-                            <h3 className="font-bold text-lg leading-tight">{tx.streetName}</h3>
+                            <h3 className="font-bold text-lg leading-tight">{tx.streetName || (tx.clientFirstName ? `${tx.clientFirstName} ${tx.clientLastName}` : `Transaction #${tx.id}`)}</h3>
                             {tx.city && (
                               <p className="text-xs text-muted-foreground">{tx.city}{tx.state ? `, ${tx.state}` : ''}</p>
                             )}

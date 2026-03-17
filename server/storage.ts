@@ -925,8 +925,11 @@ export class DatabaseStorage implements IStorage {
           t.mls_number as "mlsNumber",
           t.financing,
           t.updated_at::timestamptz as "updatedAt",
-          t.updated_at::timestamptz as "createdAt"
+          t.updated_at::timestamptz as "createdAt",
+          c.first_name as "clientFirstName",
+          c.last_name as "clientLastName"
         FROM transactions t
+        LEFT JOIN clients c ON c.id = t.client_id
         WHERE t.agent_id = ${userId}
         ${yearFilter}
         ORDER BY t.id DESC
@@ -957,7 +960,11 @@ export class DatabaseStorage implements IStorage {
         mlsNumber: row.mlsNumber || null,
         financing: row.financing || null,
         updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
-        createdAt: (row as any).createdAt ? new Date((row as any).createdAt) : null
+        createdAt: (row as any).createdAt ? new Date((row as any).createdAt) : null,
+        client: (row as any).clientFirstName ? {
+          firstName: String((row as any).clientFirstName),
+          lastName: String((row as any).clientLastName),
+        } : null,
       }));
     } catch (error) {
       console.error('Error in getTransactionsByUser:', error);
@@ -1659,9 +1666,11 @@ export class DatabaseStorage implements IStorage {
       }
 
       const upcomingDeadlines = await db.execute(sql`
-        SELECT d.name, d.deadline, d.status, t.street_name, t.id as transaction_id
+        SELECT d.name, d.deadline, d.status, t.street_name, t.id as transaction_id,
+          c.first_name as client_first_name, c.last_name as client_last_name
         FROM documents d
         JOIN transactions t ON d.transaction_id = t.id
+        LEFT JOIN clients c ON c.id = t.client_id
         WHERE t.agent_id = ${userId}
         AND d.deadline IS NOT NULL
         AND d.deadline >= ${todayStart}::date
@@ -1671,10 +1680,13 @@ export class DatabaseStorage implements IStorage {
       `);
 
       const recentActivity = await db.execute(sql`
-        (SELECT 'transaction' as type, street_name as title,
-          COALESCE(updated_at, NOW()) as activity_time, status as detail
-        FROM transactions WHERE agent_id = ${userId}
-        ORDER BY COALESCE(updated_at, NOW()) DESC LIMIT 5)
+        (SELECT 'transaction' as type,
+          COALESCE(NULLIF(t.street_name, ''), c.first_name || ' ' || c.last_name, 'Transaction #' || t.id::text) as title,
+          COALESCE(t.updated_at, NOW()) as activity_time, t.status as detail
+        FROM transactions t
+        LEFT JOIN clients c ON c.id = t.client_id
+        WHERE t.agent_id = ${userId}
+        ORDER BY COALESCE(t.updated_at, NOW()) DESC LIMIT 5)
         UNION ALL
         (SELECT 'lead' as type, first_name || ' ' || last_name as title,
           created_at as activity_time, status as detail
@@ -1715,7 +1727,7 @@ export class DatabaseStorage implements IStorage {
           name: d.name,
           deadline: d.deadline,
           status: d.status,
-          transactionStreet: d.street_name,
+          transactionStreet: d.street_name || (d.client_first_name ? `${d.client_first_name} ${d.client_last_name}` : `Transaction #${d.transaction_id}`),
           transactionId: d.transaction_id,
         })),
         recentActivity: (recentActivity.rows as any[]).map(a => ({
