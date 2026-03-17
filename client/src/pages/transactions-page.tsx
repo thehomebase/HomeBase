@@ -198,9 +198,7 @@ export default function TransactionsPage() {
     localStorage.getItem('theme') === 'dark' ? "dark" : "light",
   );
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const [startDate, setStartDate] = useState<string>(
-    new Date(new Date().getFullYear(), 0, 1).toISOString(),
-  );
+  const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [showNewTransactionDialog, setShowNewTransactionDialog] = useState(false);
   const [showTemplatesDialog, setShowTemplatesDialog] = useState(false);
@@ -234,16 +232,22 @@ export default function TransactionsPage() {
     retry: false, // Don't retry on failure
   });
 
+  const effectiveYear = selectedYear ?? new Date().getFullYear();
+
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<
     Transaction[]
   >({
-    queryKey: ["/api/transactions", actingAs?.id],
+    queryKey: ["/api/transactions", actingAs?.id, effectiveYear],
     queryFn: async () => {
       try {
         if (!user) {
           return [];
         }
-        const url = actingAs ? `/api/transactions?actingAs=${actingAs.id}` : "/api/transactions";
+        const params = new URLSearchParams();
+        if (actingAs) params.set("actingAs", String(actingAs.id));
+        if (effectiveYear) params.set("year", String(effectiveYear));
+        const qs = params.toString();
+        const url = `/api/transactions${qs ? `?${qs}` : ""}`;
         const response = await apiRequest("GET", url);
         return response.json();
       } catch (error) {
@@ -433,13 +437,11 @@ export default function TransactionsPage() {
       const transactionDate = transaction.createdAt
         ? new Date(transaction.createdAt)
         : new Date();
-      const yearMatch =
-        selectedYear === null || transactionDate.getFullYear() === selectedYear;
       const startDateMatch =
         startDate === "" || transactionDate >= new Date(startDate);
       const endDateMatch =
         endDate === "" || transactionDate <= new Date(endDate);
-      return yearMatch && startDateMatch && endDateMatch;
+      return startDateMatch && endDateMatch;
     },
   );
 

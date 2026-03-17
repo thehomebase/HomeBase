@@ -289,9 +289,7 @@ export function setupAuth(app: Express) {
       const role = ['agent', 'client', 'vendor', 'lender', 'broker'].includes(req.body.role) ? req.body.role : 'client';
       const isAgentOrBroker = role === 'agent' || role === 'broker';
 
-      if (isAgentOrBroker && (!req.body.licenseNumber || !req.body.licenseState || !req.body.brokerageName)) {
-        return res.status(400).json({ error: "License number, state, and brokerage name are required for agents and brokers" });
-      }
+      
 
       const user = await storage.createUser({
         email: req.body.email,
@@ -302,7 +300,7 @@ export function setupAuth(app: Express) {
         registrationIp: clientIp
       });
 
-      if (isAgentOrBroker) {
+      if (isAgentOrBroker && req.body.licenseNumber && req.body.licenseState && req.body.brokerageName) {
         await storage.updateUser(user.id, {
           licenseNumber: req.body.licenseNumber,
           licenseState: req.body.licenseState,

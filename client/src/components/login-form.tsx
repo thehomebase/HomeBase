@@ -157,10 +157,6 @@ export function LoginForm({
     const licenseNumber = formData.get("licenseNumber") as string;
     const licenseState = formData.get("licenseState") as string;
     const brokerageName = formData.get("brokerageName") as string;
-    if (isAgentOrBroker && (!licenseNumber || !licenseState || !brokerageName)) {
-      toast({ title: "License number, state, and brokerage name are required for agents and brokers", variant: "destructive" });
-      return;
-    }
     registerMutation.mutate({
       email: formData.get("email") as string,
       password: formData.get("password") as string,
@@ -168,7 +164,9 @@ export function LoginForm({
       lastName: formData.get("lastName") as string,
       role,
       ...(referralCode ? { referralCode } : {}),
-      ...(isAgentOrBroker ? { licenseNumber, licenseState, brokerageName } : {}),
+      ...(isAgentOrBroker && licenseNumber ? { licenseNumber } : {}),
+      ...(isAgentOrBroker && licenseState ? { licenseState } : {}),
+      ...(isAgentOrBroker && brokerageName ? { brokerageName } : {}),
     } as any);
     setShowRegister(false);
   };
@@ -393,17 +391,17 @@ export function LoginForm({
             </div>
             {(selectedRole === "agent" || selectedRole === "broker") && (
               <>
+                <p className="text-xs text-muted-foreground">You can add license details now or later in Settings.</p>
                 <div className="space-y-2">
-                  <Label htmlFor="reg-licenseNumber">License Number *</Label>
+                  <Label htmlFor="reg-licenseNumber">License Number</Label>
                   <Input
                     id="reg-licenseNumber"
                     name="licenseNumber"
                     placeholder="e.g. 0654321"
-                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="reg-licenseState">License State *</Label>
+                  <Label htmlFor="reg-licenseState">License State</Label>
                   <Select name="licenseState">
                     <SelectTrigger>
                       <SelectValue placeholder="Select state" />
@@ -416,12 +414,11 @@ export function LoginForm({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="reg-brokerageName">Brokerage Name *</Label>
+                  <Label htmlFor="reg-brokerageName">Brokerage Name</Label>
                   <Input
                     id="reg-brokerageName"
                     name="brokerageName"
                     placeholder="e.g. Keller Williams Realty"
-                    required
                   />
                 </div>
               </>

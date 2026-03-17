@@ -755,6 +755,7 @@ export function registerRoutes(app: Express): Server {
     try {
       let targetUserId = req.user.id;
       const actingAs = req.query.actingAs ? Number(req.query.actingAs) : null;
+      const year = req.query.year ? Number(req.query.year) : undefined;
       if (actingAs && actingAs !== req.user.id) {
         const authCheck = await db.execute(sql`
           SELECT id FROM authorized_users 
@@ -764,7 +765,7 @@ export function registerRoutes(app: Express): Server {
         if (authCheck.rows.length === 0) return res.status(403).json({ error: "Not authorized to view this account" });
         targetUserId = actingAs;
       }
-      const transactions = await storage.getTransactionsByUser(targetUserId);
+      const transactions = await storage.getTransactionsByUser(targetUserId, year);
       res.json(transactions);
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -7249,15 +7250,40 @@ export function registerRoutes(app: Express): Server {
         storage.getMarketplaceContractorCount({ category, search }),
       ]);
 
-      const enriched = await Promise.all(
-        contractors.map(async (c) => {
-          const [teamCount, trustedByCount] = await Promise.all([
-            storage.getContractorTeamCount(c.id),
-            storage.getContractorTrustedByAgentCount(c.id),
-          ]);
-          return { ...c, teamCount, trustedByCount };
-        })
-      );
+      if (contractors.length === 0) {
+        return res.json({ contractors: [], total, limit, offset });
+      }
+
+      const contractorIds = contractors.map(c => c.id);
+      const [teamCounts, trustedCounts] = await Promise.all([
+        db.execute(sql`
+          SELECT contractor_id, COUNT(DISTINCT user_id) as count 
+          FROM home_team_members 
+          WHERE contractor_id = ANY(${contractorIds})
+          GROUP BY contractor_id
+        `),
+        db.execute(sql`
+          SELECT contractor_id, COUNT(DISTINCT agent_id) as count 
+          FROM vendor_ratings 
+          WHERE contractor_id = ANY(${contractorIds}) AND would_recommend = true
+          GROUP BY contractor_id
+        `),
+      ]);
+
+      const teamMap = new Map<number, number>();
+      for (const row of teamCounts.rows as any[]) {
+        teamMap.set(row.contractor_id, Number(row.count));
+      }
+      const trustedMap = new Map<number, number>();
+      for (const row of trustedCounts.rows as any[]) {
+        trustedMap.set(row.contractor_id, Number(row.count));
+      }
+
+      const enriched = contractors.map(c => ({
+        ...c,
+        teamCount: teamMap.get(c.id) || 0,
+        trustedByCount: trustedMap.get(c.id) || 0,
+      }));
 
       res.json({ contractors: enriched, total, limit, offset });
     } catch (error) {

@@ -94,7 +94,7 @@ export interface IStorage {
   // Transaction operations
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   getTransaction(id: number): Promise<Transaction | undefined>;
-  getTransactionsByUser(userId: number): Promise<Transaction[]>;
+  getTransactionsByUser(userId: number, year?: number): Promise<Transaction[]>;
   updateTransaction(id: number, data: Partial<Transaction>): Promise<Transaction>;
   deleteTransaction(id: number): Promise<void>;
 
@@ -895,9 +895,12 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getTransactionsByUser(userId: number): Promise<Transaction[]> {
+  async getTransactionsByUser(userId: number, year?: number): Promise<Transaction[]> {
     try {
-      console.log('Fetching transactions for user:', userId);
+      console.log('Fetching transactions for user:', userId, year ? `year: ${year}` : '');
+      const yearFilter = year 
+        ? sql`AND EXTRACT(YEAR FROM COALESCE(t.closing_date, t.created_at, NOW())) = ${year}`
+        : sql``;
       const result = await db.execute(sql`
         SELECT 
           t.id::integer,
@@ -921,9 +924,11 @@ export class DatabaseStorage implements IStorage {
           t.contract_execution_date::timestamptz as "contractExecutionDate",
           t.mls_number as "mlsNumber",
           t.financing,
-          t.updated_at::timestamptz as "updatedAt"
+          t.updated_at::timestamptz as "updatedAt",
+          t.created_at::timestamptz as "createdAt"
         FROM transactions t
         WHERE t.agent_id = ${userId}
+        ${yearFilter}
         ORDER BY t.id DESC
       `);
 
@@ -951,7 +956,8 @@ export class DatabaseStorage implements IStorage {
         contractExecutionDate: row.contractExecutionDate ? new Date(row.contractExecutionDate) : null,
         mlsNumber: row.mlsNumber || null,
         financing: row.financing || null,
-        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
+        updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+        createdAt: (row as any).createdAt ? new Date((row as any).createdAt) : null
       }));
     } catch (error) {
       console.error('Error in getTransactionsByUser:', error);

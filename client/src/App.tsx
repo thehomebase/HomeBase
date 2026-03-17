@@ -1033,7 +1033,7 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background">
+      <div className="h-screen w-full flex items-center justify-center bg-background">
         <div className="animate-pulse">Loading...</div>
       </div>
     );
@@ -1054,7 +1054,7 @@ function AppShell() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background">
+      <div className="h-screen w-full flex items-center justify-center bg-background">
         <div className="animate-pulse">Loading...</div>
       </div>
     );

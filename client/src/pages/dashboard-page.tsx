@@ -377,7 +377,15 @@ function PipelineWidget({ stages }: { stages: Record<string, number> }) {
         </Link>
       </div>
       {total === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">No transactions yet</p>
+        <div className="flex flex-col items-center gap-2 py-4">
+          <p className="text-sm text-muted-foreground">No transactions yet</p>
+          <Link href="/transactions">
+            <Button size="sm" className="gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              Create Your First Transaction
+            </Button>
+          </Link>
+        </div>
       ) : (
         <>
           <div className="flex h-3 rounded-full overflow-hidden mb-3">
@@ -446,7 +454,8 @@ function DeadlinesWidget({ deadlines }: { deadlines: any[] }) {
 function RecentActivityWidget() {
   const { data: notifications = [] } = useQuery<any[]>({
     queryKey: ['/api/notifications/list', { limit: 15 }],
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
   });
 
   const typeIcons: Record<string, { icon: any; color: string }> = {
@@ -643,7 +652,8 @@ function PendingInvitationsBanner() {
   const { data: pendingInvitations = [] } = useQuery<any[]>({
     queryKey: ["/api/client-invitations/pending"],
     enabled: !!user,
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
   });
 
   const acceptMutation = useMutation({
@@ -735,7 +745,8 @@ export default function DashboardPage() {
       return res.json();
     },
     enabled: !!user,
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: prefs } = useQuery<any>({
