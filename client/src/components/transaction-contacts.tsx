@@ -249,7 +249,11 @@ export function TransactionContacts({ transactionId, readOnly = false }: Transac
       return;
     }
 
-    // Check for potential duplicates
+    if (newContact.clientId) {
+      addContactMutation.mutate(newContact);
+      return;
+    }
+
     const duplicate = clients.find(client =>
       (client.firstName.toLowerCase() === newContact.firstName?.toLowerCase() &&
         client.lastName.toLowerCase() === newContact.lastName?.toLowerCase()) &&
@@ -259,13 +263,11 @@ export function TransactionContacts({ transactionId, readOnly = false }: Transac
     );
 
     if (duplicate) {
-      console.log('Found potential duplicate:', duplicate);
       setPotentialDuplicate(duplicate);
       setShowDuplicateDialog(true);
       return;
     }
 
-    console.log('Creating new contact:', newContact);
     addContactMutation.mutate(newContact);
   };
 

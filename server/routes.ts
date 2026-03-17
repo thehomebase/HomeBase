@@ -1035,6 +1035,33 @@ export function registerRoutes(app: Express): Server {
         participants: []
       });
 
+      if (transaction && (req.body.clientId || req.body.secondaryClientId)) {
+        const clientIds = [
+          { id: req.body.clientId, role: parsed.data.type === 'buy' ? 'Buyer' : 'Seller' },
+          { id: req.body.secondaryClientId, role: 'Secondary Client' },
+        ].filter(c => c.id);
+
+        for (const { id, role } of clientIds) {
+          try {
+            const client = await storage.getClient(Number(id));
+            if (client && client.userId === req.user.id) {
+              await storage.createContact({
+                role,
+                firstName: client.firstName,
+                lastName: client.lastName,
+                email: client.email || '',
+                phone: client.phone || null,
+                mobilePhone: client.mobilePhone || null,
+                transactionId: transaction.id,
+                clientId: client.id,
+              });
+            }
+          } catch (e) {
+            console.error(`Error auto-creating contact for client ${id}:`, e);
+          }
+        }
+      }
+
       console.log('Created transaction:', transaction);
       fireWebhook("transaction_created", transaction);
       res.status(201).json(transaction);
@@ -1371,10 +1398,12 @@ export function registerRoutes(app: Express): Server {
           return res.status(423).json({ error: "Transaction is currently being edited by another user" });
         }
       }
-      const allowedContactFields = ['name', 'role', 'email', 'phone', 'company', 'notes', 'transactionId'];
+      const allowedContactFields = ['firstName', 'lastName', 'role', 'email', 'phone', 'mobilePhone', 'company', 'notes', 'transactionId', 'clientId'];
       const contactData: Record<string, any> = {};
       for (const key of allowedContactFields) {
-        if (req.body[key] !== undefined) contactData[key] = key === 'transactionId' ? Number(req.body[key]) : req.body[key];
+        if (req.body[key] !== undefined) {
+          contactData[key] = (key === 'transactionId' || key === 'clientId') ? Number(req.body[key]) : req.body[key];
+        }
       }
 
       const contact = await storage.createContact(contactData);
@@ -1418,10 +1447,12 @@ export function registerRoutes(app: Express): Server {
           return res.status(423).json({ error: "Transaction is currently being edited by another user" });
         }
       }
-      const allowedContactFields = ['name', 'role', 'email', 'phone', 'company', 'notes'];
+      const allowedContactFields = ['firstName', 'lastName', 'role', 'email', 'phone', 'mobilePhone', 'company', 'notes', 'clientId'];
       const safeContactBody: Record<string, any> = {};
       for (const key of allowedContactFields) {
-        if (req.body[key] !== undefined) safeContactBody[key] = req.body[key];
+        if (req.body[key] !== undefined) {
+          safeContactBody[key] = key === 'clientId' ? Number(req.body[key]) : req.body[key];
+        }
       }
       const contact = await storage.updateContact(contactId, safeContactBody);
       res.json(contact);
@@ -10615,6 +10646,26 @@ export function registerRoutes(app: Express): Server {
               VALUES (${transaction.id}, ${doc.name}, 'not_applicable', ${doc.notes || null})
             `);
           }
+        }
+      }
+
+      if (transaction && clientId) {
+        try {
+          const client = await storage.getClient(Number(clientId));
+          if (client && client.userId === req.user.id) {
+            await storage.createContact({
+              role: effectiveType === 'buy' ? 'Buyer' : 'Seller',
+              firstName: client.firstName,
+              lastName: client.lastName,
+              email: client.email || '',
+              phone: client.phone || null,
+              mobilePhone: client.mobilePhone || null,
+              transactionId: transaction.id,
+              clientId: client.id,
+            });
+          }
+        } catch (e) {
+          console.error(`Error auto-creating contact for client ${clientId}:`, e);
         }
       }
 
