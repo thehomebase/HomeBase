@@ -56,7 +56,8 @@ Preferred communication style: Simple, everyday language.
 
 - **Neon PostgreSQL**: Serverless database.
 - **Stripe**: Payment processing and subscriptions.
-- **Twilio**: SMS communication.
+- **Twilio**: SMS communication and SMS-based account verification. Service: `server/twilio-service.ts`. Env vars: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`.
+- **SendGrid**: Transactional email (welcome emails after account verification). Service: `server/email-service.ts`. Env vars: `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`.
 - **Google OAuth**: Gmail integration and authentication.
 - **Google Gemini Flash (via Replit AI Integrations)**: AI-powered document parsing fallback for non-TREC real estate documents. Service: `server/ai-document-parser.ts`. PII stripped before sending. Env vars: `AI_INTEGRATIONS_GEMINI_BASE_URL`, `AI_INTEGRATIONS_GEMINI_API_KEY`.
 - **RentCast API**: Property listing data.
