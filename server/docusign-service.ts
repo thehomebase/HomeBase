@@ -43,8 +43,12 @@ export function isDocuSignConfigured(): boolean {
 
 export function getDocuSignAuthUrl(state: string, codeChallenge: string): string {
   const { clientId } = getClientCredentials();
-  const redirectUri = encodeURIComponent(getRedirectUri());
+  const rawRedirectUri = getRedirectUri();
+  const redirectUri = encodeURIComponent(rawRedirectUri);
   const scopes = encodeURIComponent("signature");
+  console.log("[DocuSign] Auth URL redirect_uri:", rawRedirectUri);
+  console.log("[DocuSign] Auth server:", DOCUSIGN_AUTH_SERVER);
+  console.log("[DocuSign] Client ID:", clientId);
   return `${DOCUSIGN_AUTH_SERVER}/oauth/auth?response_type=code&scope=${scopes}&client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 }
 
