@@ -1,4 +1,4 @@
-const getLabelColor = (label: string, index: number) => {
+const getLabelColor = (label: string, _index?: number) => {
   const allColors = [
     'bg-blue-100 text-blue-800 border border-blue-200',
     'bg-red-100 text-red-800 border border-red-200',
@@ -9,7 +9,12 @@ const getLabelColor = (label: string, index: number) => {
     'bg-orange-100 text-orange-800 border border-orange-200',
     'bg-indigo-100 text-indigo-800 border border-indigo-200'
   ];
-  return allColors[index % allColors.length];
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) {
+    hash = ((hash << 5) - hash) + label.toLowerCase().charCodeAt(i);
+    hash |= 0;
+  }
+  return allColors[Math.abs(hash) % allColors.length];
 };
 
 import { formatPhoneDisplay } from "@/lib/format-phone";
