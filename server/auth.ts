@@ -9,6 +9,8 @@ import { User as SelectUser } from "@shared/schema";
 import { verifyRecaptcha, verifyRecaptchaRegister } from "./recaptcha";
 import { generateSecret, generateSync, verifySync, generateURI } from "otplib";
 import * as QRCode from "qrcode";
+import { sendSMS } from "./twilio-service";
+import { sendWelcomeEmail } from "./email-service";
 
 declare global {
   namespace Express {
@@ -297,7 +299,8 @@ export function setupAuth(app: Express) {
         firstName: req.body.firstName,
         lastName: req.body.lastName,
         role,
-        registrationIp: clientIp
+        registrationIp: clientIp,
+        ...(req.body.phone ? { profilePhone: req.body.phone } : {}),
       });
 
       if (isAgentOrBroker && req.body.licenseNumber && req.body.licenseState && req.body.brokerageName) {
@@ -326,6 +329,16 @@ export function setupAuth(app: Express) {
       recordRegistrationAttempt(clientIp);
 
       console.log('User created successfully:', { id: user.id, email: user.email });
+
+      if (req.body.phone) {
+        const smsResult = await sendSMS(
+          req.body.phone,
+          `Your HomeBase verification code is: ${verificationCode}. It expires in 24 hours.`
+        );
+        if (!smsResult.success) {
+          console.error("Failed to send verification SMS:", smsResult.error);
+        }
+      }
 
       if (referralCodeRecord && user.role !== 'lender') {
         try {
@@ -404,6 +417,10 @@ export function setupAuth(app: Express) {
         emailVerificationExpires: null,
       });
 
+      sendWelcomeEmail(user.email, user.firstName, user.role).catch((err) =>
+        console.error("Failed to send welcome email:", err)
+      );
+
       const { password, totpSecret, emailVerificationToken, emailVerificationExpires, ...safeUser } = updatedUser;
       res.json(safeUser);
     } catch (error) {
@@ -437,6 +454,16 @@ export function setupAuth(app: Express) {
       });
 
       console.log('Verification code resent for user', user.email);
+
+      if (user.profilePhone) {
+        const smsResult = await sendSMS(
+          user.profilePhone,
+          `Your HomeBase verification code is: ${verificationCode}. It expires in 24 hours.`
+        );
+        if (!smsResult.success) {
+          console.error("Failed to resend verification SMS:", smsResult.error);
+        }
+      }
 
       res.json({ message: "Verification code sent", verificationCode });
     } catch (error) {

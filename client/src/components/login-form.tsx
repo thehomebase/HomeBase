@@ -157,12 +157,14 @@ export function LoginForm({
     const licenseNumber = formData.get("licenseNumber") as string;
     const licenseState = formData.get("licenseState") as string;
     const brokerageName = formData.get("brokerageName") as string;
+    const phone = formData.get("phone") as string;
     registerMutation.mutate({
       email: formData.get("email") as string,
       password: formData.get("password") as string,
       firstName: formData.get("firstName") as string,
       lastName: formData.get("lastName") as string,
       role,
+      ...(phone ? { phone } : {}),
       ...(referralCode ? { referralCode } : {}),
       ...(isAgentOrBroker && licenseNumber ? { licenseNumber } : {}),
       ...(isAgentOrBroker && licenseState ? { licenseState } : {}),
@@ -373,6 +375,16 @@ export function LoginForm({
                 type="password"
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reg-phone">Phone Number</Label>
+              <Input
+                id="reg-phone"
+                name="phone"
+                type="tel"
+                placeholder="(555) 123-4567"
+              />
+              <p className="text-xs text-muted-foreground">We'll text your verification code here</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="reg-role">Role</Label>
