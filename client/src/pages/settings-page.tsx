@@ -1247,8 +1247,8 @@ function GmailIntegrationCard() {
     mutationFn: async () => {
       const res = await apiRequest("GET", "/api/gmail/auth-url?returnTo=/settings");
       const data = await res.json();
-      window.open(data.url, '_blank');
       setWasConnecting(true);
+      window.location.href = data.url;
     },
     onError: () => toast({ title: "Failed to connect Gmail", variant: "destructive" }),
   });
@@ -1387,8 +1387,8 @@ function SignNowIntegrationCard() {
     mutationFn: async () => {
       const res = await apiRequest("GET", "/api/signnow/auth-url");
       const data = await res.json();
-      window.open(data.url, '_blank');
       setWasConnecting(true);
+      window.location.href = data.url;
     },
     onError: () => toast({ title: "Failed to connect SignNow", variant: "destructive" }),
   });
@@ -1516,8 +1516,8 @@ function DocuSignIntegrationCard() {
     mutationFn: async () => {
       const res = await apiRequest("GET", "/api/docusign/auth-url");
       const data = await res.json();
-      window.open(data.url, '_blank');
       setWasConnecting(true);
+      window.location.href = data.url;
     },
     onError: () => toast({ title: "Failed to connect DocuSign", variant: "destructive" }),
   });
@@ -1639,8 +1639,8 @@ function DropboxIntegrationCard() {
     mutationFn: async () => {
       const res = await apiRequest("GET", "/api/dropbox/auth-url");
       const data = await res.json();
-      window.open(data.url, '_blank');
       setWasConnecting(true);
+      window.location.href = data.url;
     },
     onError: () => toast({ title: "Failed to connect Dropbox", variant: "destructive" }),
   });

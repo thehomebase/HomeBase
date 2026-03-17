@@ -5556,8 +5556,13 @@ export function registerRoutes(app: Express): Server {
     const code = req.query.code as string;
     const state = req.query.state as string;
 
-    const sendCallbackPage = (success: boolean, message: string) => {
-      res.send(`<!DOCTYPE html><html><head><title>DocuSign Connection</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f9fafb;color:#111}div{text-align:center;padding:2rem;border-radius:12px;background:white;box-shadow:0 1px 3px rgba(0,0,0,.1);max-width:400px}h2{margin:0 0 .5rem}p{color:#6b7280;margin:.5rem 0}</style></head><body><div><h2>${success ? "Connected!" : "Connection Failed"}</h2><p>${message}</p><p style="font-size:14px;color:#9ca3af">You can close this tab and return to HomeBase.</p></div></body></html>`);
+    const domains = process.env.REPLIT_DOMAINS || "";
+    const domain = domains.split(",")[0];
+    const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+
+    const sendCallbackPage = (success: boolean, _message: string) => {
+      const param = success ? "docusign=connected" : "docusign=error";
+      res.redirect(`${baseUrl}/settings?${param}`);
     };
 
     if (!code || !state) {
