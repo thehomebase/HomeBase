@@ -208,7 +208,8 @@ const ClientDetailsPanel = ({
   onClose,
   onUpdate,
   onContact,
-  allClients
+  allClients,
+  allExistingLabels = []
 }: {
   client: Client | null;
   isOpen: boolean;
@@ -216,6 +217,7 @@ const ClientDetailsPanel = ({
   onUpdate: (updatedClient: Client) => Promise<void>;
   onContact?: (client: Client) => void;
   allClients?: Client[];
+  allExistingLabels?: string[];
 }) => {
   const [editingClient, setEditingClient] = useState<Client | null>(client);
   const { toast } = useToast();
@@ -743,6 +745,12 @@ const TableContent = ({
   const [columns, setColumns] = useState<ClientColumn[]>(DEFAULT_COLUMNS);
   const [, navigate] = useLocation();
 
+  const allExistingLabels = useMemo(() => {
+    const labelSet = new Set<string>();
+    clients.forEach(c => (c.labels || []).forEach((l: string) => labelSet.add(l)));
+    return Array.from(labelSet).sort((a, b) => a.localeCompare(b));
+  }, [clients]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor)
@@ -948,6 +956,7 @@ const TableContent = ({
         onUpdate={onUpdate}
         onContact={onContact ? (client) => { setSelectedClient(null); onContact(client); } : undefined}
         allClients={clients}
+        allExistingLabels={allExistingLabels}
       />
     </>
   );
@@ -1867,6 +1876,7 @@ export default function ClientsPage() {
         onUpdate={handleClientUpdate}
         onContact={(client) => { setSelectedClient(null); setContactClient(client); }}
         allClients={clients}
+        allExistingLabels={allExistingLabels}
       />
       <ClientContactDialog
         client={contactClient}
