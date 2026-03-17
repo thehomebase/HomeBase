@@ -516,24 +516,24 @@ export default function TransactionPage() {
       <Tabs defaultValue="progress" className="w-full">
         <TabsList className="w-full overflow-x-auto flex-nowrap justify-start">
           <TabsTrigger value="progress" className="shrink-0">
-            <ClipboardCheck className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Progress</span>
+            <ClipboardCheck className="h-4 w-4 mr-2" />
+            Progress
           </TabsTrigger>
           <TabsTrigger value="documents" className="shrink-0">
-            <FileText className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Documents</span>
+            <FileText className="h-4 w-4 mr-2" />
+            Documents
           </TabsTrigger>
           <TabsTrigger value="contacts" className="shrink-0">
-            <UserPlus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Contacts</span>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Contacts
           </TabsTrigger>
           <TabsTrigger value="timeline" className="shrink-0">
-            <Clock className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Timeline</span>
+            <Clock className="h-4 w-4 mr-2" />
+            Timeline
           </TabsTrigger>
           <TabsTrigger value="contract-upload" className="shrink-0">
-            <Upload className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Contract</span>
+            <Upload className="h-4 w-4 mr-2" />
+            Contract Upload
           </TabsTrigger>
         </TabsList>
 

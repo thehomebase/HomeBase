@@ -92,6 +92,13 @@ html {
   }
 
   html {
+    touch-action: pan-y;
+    -ms-touch-action: pan-y;
+    overflow-x: hidden;
+  }
+
+  .overflow-x-auto,
+  .overflow-x-scroll {
     touch-action: pan-x pan-y;
     -ms-touch-action: pan-x pan-y;
   }
@@ -180,6 +187,7 @@ html {
 
 .leaflet-container {
   z-index: 0 !important;
+  touch-action: none;
 }
 
 @media (display-mode: standalone) {

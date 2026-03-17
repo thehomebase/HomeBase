@@ -373,7 +373,7 @@ export function TransactionContacts({ transactionId, readOnly = false }: Transac
   return (
     <>
       <Card className="flex">
-        <CardContent className="w-screen">
+        <CardContent className="w-full">
           <div className="hidden sm:block">
             <Table>
               <TableHeader>
