@@ -41,7 +41,7 @@ html {
 }
 
 /* Prevent horizontal panning on iOS - must be outside @layer for highest priority */
-html, body, #root {
+body, #root {
   overflow-x: hidden !important;
   overscroll-behavior-x: none;
 }
@@ -97,11 +97,13 @@ html, body, #root {
     -webkit-tap-highlight-color: transparent;
   }
 
-  html,
-  body,
-  #root {
+  html {
     touch-action: pan-y;
     -ms-touch-action: pan-y;
+  }
+
+  body,
+  #root {
     overflow-x: hidden;
     max-width: 100%;
   }
