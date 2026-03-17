@@ -86,6 +86,7 @@ export const clients = pgTable("clients", {
   address: text("address"),
   street: text("street"),
   city: text("city"),
+  state: text("state"),
   zipCode: text("zip_code"),
   type: text("type").array().notNull().default(['seller']), 
   status: text("status").notNull(), 

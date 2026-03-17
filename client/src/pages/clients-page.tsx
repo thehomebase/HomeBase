@@ -187,6 +187,7 @@ const ClientCard = ({ client, onSelect, onEdit }: {
                       )}
                     </span>
                     {client.city && `, ${client.city}`}
+                    {client.state && `, ${client.state}`}
                     {client.zipCode && ` ${client.zipCode}`}
                     {getAddressValidation(client).locationMissing && (
                       <AlertTriangle className="h-3 w-3 text-amber-500" title="City or zip required" />
@@ -425,12 +426,20 @@ const ClientDetailsPanel = ({
                   placeholder="123 Main St"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div className="space-y-2">
                   <Label>City</Label>
                   <Input
                     value={editingClient.city || ''}
                     onChange={(e) => handleUpdate('city', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>State</Label>
+                  <Input
+                    value={editingClient.state || ''}
+                    onChange={(e) => handleUpdate('state', e.target.value)}
+                    placeholder="TX"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1121,6 +1130,7 @@ export default function ClientsPage() {
       address: "",
       street: "",
       city: "",
+      state: "",
       zipCode: "",
       type: ["seller"],
       status: "active",
@@ -1632,7 +1642,7 @@ export default function ClientsPage() {
                           </FormItem>
                         )}
                       />
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-3 gap-2">
                         <FormField
                           control={form.control}
                           name="city"
@@ -1641,6 +1651,19 @@ export default function ClientsPage() {
                               <FormLabel>City</FormLabel>
                               <FormControl>
                                 <Input {...field} value={field.value ?? ""} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="state"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>State</FormLabel>
+                              <FormControl>
+                                <Input {...field} value={field.value ?? ""} placeholder="TX" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

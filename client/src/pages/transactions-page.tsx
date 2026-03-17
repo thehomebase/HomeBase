@@ -471,9 +471,11 @@ export default function TransactionsPage() {
       if (selectedClient) {
         const streetVal = selectedClient.street || selectedClient.address || "";
         const cityVal = selectedClient.city || "";
+        const stateVal = selectedClient.state || "";
         const zipVal = selectedClient.zipCode || "";
         if (streetVal) form.setValue("streetName", streetVal, { shouldDirty: false });
         if (cityVal) form.setValue("city", cityVal, { shouldDirty: false });
+        if (stateVal) form.setValue("state", stateVal, { shouldDirty: false });
         if (zipVal) form.setValue("zipCode", zipVal, { shouldDirty: false });
       }
     }
