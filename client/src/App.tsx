@@ -190,7 +190,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   const { newLeadCount } = useLeadAlerts();
   const isAgentOrBroker = user?.role === 'agent' || user?.role === 'broker';
   const isAdmin = user?.role === 'admin';
-  const tutorial = useOnboardingTutorial(user?.id, user?.role);
+  const tutorial = useOnboardingTutorial(user?.id, user?.role, user?.emailVerified);
   const [actingAs, setActingAs] = useState<ActingAsAccount | null>(null);
   const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
 

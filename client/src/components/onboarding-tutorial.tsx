@@ -86,12 +86,12 @@ function getActiveKey(userId: number | undefined) {
   return `homebase_tutorial_active_${userId ?? "anon"}`;
 }
 
-export function useOnboardingTutorial(userId?: number, role?: string) {
+export function useOnboardingTutorial(userId?: number, role?: string, emailVerified?: boolean) {
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [, setLocation] = useLocation();
 
-  const isEligible = role === "agent" || role === "broker";
+  const isEligible = (role === "agent" || role === "broker") && emailVerified === true;
 
   useEffect(() => {
     if (!isEligible || !userId) return;
