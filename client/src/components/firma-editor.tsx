@@ -220,51 +220,6 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
   }, []);
 
   useEffect(() => {
-    if (!showEditorDialog) return;
-
-    const prevOnerror = window.onerror;
-    window.onerror = function firmaErrorTrap(message, source, lineno, colno, error) {
-      if (!error || (typeof error === "object" && !(error instanceof Error))) {
-        return true;
-      }
-      if (typeof message === "string" && message.includes("not an error object")) {
-        return true;
-      }
-      if (prevOnerror) {
-        return prevOnerror(message, source, lineno, colno, error) as boolean;
-      }
-      return false;
-    };
-
-    const rejectionHandler = (event: PromiseRejectionEvent) => {
-      const err = event.reason;
-      if (!err || (typeof err === "object" && !(err instanceof Error) && Object.keys(err).length === 0)) {
-        event.preventDefault();
-      }
-    };
-
-    const errorHandler = (event: ErrorEvent) => {
-      if (!event.error || (typeof event.error === "object" && !(event.error instanceof Error))) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        return;
-      }
-      if (event.message?.includes?.("not an error object")) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
-    };
-
-    window.addEventListener("unhandledrejection", rejectionHandler);
-    window.addEventListener("error", errorHandler, true);
-    return () => {
-      window.onerror = prevOnerror;
-      window.removeEventListener("unhandledrejection", rejectionHandler);
-      window.removeEventListener("error", errorHandler, true);
-    };
-  }, [showEditorDialog]);
-
-  useEffect(() => {
     if (!showEditorDialog || !activeSigningRequestId) return;
 
     let destroyed = false;

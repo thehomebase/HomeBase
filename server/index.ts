@@ -11,6 +11,15 @@ import { startReminderScheduler } from "./reminder-scheduler";
 import { startListingAlertScheduler } from "./listing-alert-scheduler";
 import { setupWebSocket } from "./websocket";
 
+process.on('uncaughtException', (err) => {
+  if (err instanceof TypeError && err.message?.includes('Cannot set property message of')) {
+    console.error('[DB] Neon WebSocket connection error (non-fatal):', err.message);
+    return;
+  }
+  console.error('Uncaught exception:', err);
+  process.exit(1);
+});
+
 // Add startup message to verify nodemon restarts
 log(`Server starting... [${new Date().toISOString()}]`);
 
