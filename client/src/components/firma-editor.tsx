@@ -221,26 +221,46 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
 
   useEffect(() => {
     if (!showEditorDialog) return;
-    const handler = (event: PromiseRejectionEvent) => {
+
+    const prevOnerror = window.onerror;
+    window.onerror = function firmaErrorTrap(message, source, lineno, colno, error) {
+      if (!error || (typeof error === "object" && !(error instanceof Error))) {
+        return true;
+      }
+      if (typeof message === "string" && message.includes("not an error object")) {
+        return true;
+      }
+      if (prevOnerror) {
+        return prevOnerror(message, source, lineno, colno, error) as boolean;
+      }
+      return false;
+    };
+
+    const rejectionHandler = (event: PromiseRejectionEvent) => {
       const err = event.reason;
-      if (err && typeof err === "object" && Object.keys(err).length === 0) {
+      if (!err || (typeof err === "object" && !(err instanceof Error) && Object.keys(err).length === 0)) {
         event.preventDefault();
+      }
+    };
+
+    const errorHandler = (event: ErrorEvent) => {
+      if (!event.error || (typeof event.error === "object" && !(event.error instanceof Error))) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
         return;
       }
-      if (err?.message?.includes?.("signing request") || err?.message?.includes?.("Firma")) {
-        event.preventDefault();
-      }
-    };
-    const errHandler = (event: ErrorEvent) => {
       if (event.message?.includes?.("not an error object")) {
         event.preventDefault();
+        event.stopImmediatePropagation();
       }
     };
-    window.addEventListener("unhandledrejection", handler);
-    window.addEventListener("error", errHandler);
+
+    window.addEventListener("unhandledrejection", rejectionHandler);
+    window.addEventListener("error", errorHandler, true);
     return () => {
-      window.removeEventListener("unhandledrejection", handler);
-      window.removeEventListener("error", errHandler);
+      window.onerror = prevOnerror;
+      window.removeEventListener("unhandledrejection", rejectionHandler);
+      window.removeEventListener("error", errorHandler, true);
     };
   }, [showEditorDialog]);
 
