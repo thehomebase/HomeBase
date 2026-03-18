@@ -12234,7 +12234,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const id = parseInt(req.params.id);
       const result: any = await db.execute(sql`
-        SELECT id, file_data, file_name, title, user_id, is_shared FROM form_templates WHERE id = ${id}
+        SELECT id, file_data, file_name, title, user_id, is_shared, field_positions FROM form_templates WHERE id = ${id}
       `);
       const template = (result.rows || result)[0];
       if (!template) return res.status(404).json({ error: "Template not found" });
@@ -12242,12 +12242,58 @@ export function registerRoutes(app: Express): Server {
 
       await db.execute(sql`UPDATE form_templates SET usage_count = usage_count + 1 WHERE id = ${id}`);
 
-      res.json({
+      const response: any = {
         templateId: template.id,
         title: template.title,
         fileName: template.file_name,
         documentBase64: template.file_data,
-      });
+        fieldPositions: template.field_positions,
+      };
+
+      const { transactionId } = req.body || {};
+      if (transactionId) {
+        try {
+          const txResult: any = await db.execute(sql`
+            SELECT t.id, t.property_address, t.buyer_name, t.seller_name, t.type,
+                   u.first_name as agent_first, u.last_name as agent_last, u.email as agent_email
+            FROM transactions t
+            LEFT JOIN users u ON t.user_id = u.id
+            WHERE t.id = ${transactionId}
+          `);
+          const tx = (txResult.rows || txResult)[0];
+          if (tx) {
+            const recipients: any[] = [];
+            if (tx.buyer_name) {
+              const parts = tx.buyer_name.trim().split(/\s+/);
+              recipients.push({ role: "buyer", firstName: parts[0] || "", lastName: parts.slice(1).join(" ") || "" });
+            }
+            if (tx.seller_name) {
+              const parts = tx.seller_name.trim().split(/\s+/);
+              recipients.push({ role: "seller", firstName: parts[0] || "", lastName: parts.slice(1).join(" ") || "" });
+            }
+            if (tx.agent_first || tx.agent_last) {
+              recipients.push({ role: "agent", firstName: tx.agent_first || "", lastName: tx.agent_last || "", email: tx.agent_email });
+            }
+            const clientsResult: any = await db.execute(sql`
+              SELECT c.first_name, c.last_name, c.email, c.type as client_type
+              FROM clients c WHERE c.transaction_id = ${transactionId}
+            `);
+            const clients = clientsResult.rows || clientsResult;
+            for (const c of clients) {
+              const existingRole = c.client_type === "buyer" ? "buyer" : c.client_type === "seller" ? "seller" : "other";
+              if (!recipients.find(r => r.role === existingRole && r.firstName === c.first_name)) {
+                recipients.push({ role: existingRole, firstName: c.first_name || "", lastName: c.last_name || "", email: c.email });
+              }
+            }
+            response.transactionRecipients = recipients;
+            response.transactionAddress = tx.property_address;
+          }
+        } catch (e) {
+          console.error("Error fetching transaction data for template:", e);
+        }
+      }
+
+      res.json(response);
     } catch (error) {
       console.error("Error using form template:", error);
       res.status(500).json({ error: "Failed to use template" });

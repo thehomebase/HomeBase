@@ -96,6 +96,9 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
     enabled: showCreateDialog,
   });
 
+  const [templateFieldPositions, setTemplateFieldPositions] = useState<any>(null);
+  const [templateRecipients, setTemplateRecipients] = useState<any[]>([]);
+
   useEffect(() => {
     const stored = sessionStorage.getItem("firma_template_data");
     if (stored) {
@@ -105,7 +108,13 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
         if (data.documentBase64) {
           setDocumentBase64(data.documentBase64);
           setDocumentFile(new File([], data.fileName || "template.pdf", { type: "application/pdf" }));
-          setNewTitle(data.title || "");
+          setNewTitle(data.transactionAddress ? `${data.title} - ${data.transactionAddress}` : data.title || "");
+          if (data.fieldPositions) {
+            setTemplateFieldPositions(data.fieldPositions);
+          }
+          if (data.transactionRecipients) {
+            setTemplateRecipients(data.transactionRecipients);
+          }
           setShowCreateDialog(true);
         }
       } catch (_) {}
@@ -588,6 +597,31 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
                 </p>
               )}
             </div>
+            {templateRecipients.length > 0 && (
+              <div>
+                <label className="text-sm font-medium mb-1 block">Auto-Filled Recipients</label>
+                <div className="space-y-1.5 p-2 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-800">
+                  {templateRecipients.map((r: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <Badge variant="outline" className="text-xs capitalize">{r.role}</Badge>
+                      <span>{r.firstName} {r.lastName}</span>
+                      {r.email && <span className="text-muted-foreground">({r.email})</span>}
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Recipients will be pre-assigned when the signing request is created
+                  </p>
+                </div>
+              </div>
+            )}
+            {templateFieldPositions?.fields?.length > 0 && (
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  <FileSignature className="h-3 w-3 inline mr-1" />
+                  {templateFieldPositions.fields.length} signature fields pre-configured from template
+                </p>
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium mb-1 block">Message (optional)</label>
               <Textarea

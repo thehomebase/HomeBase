@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, lazy, Suspense } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -13,12 +13,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
-  FileText, Upload, Search, Trash2, PenLine, Send, FolderOpen, Loader2, MoreVertical, Clock, Share2, MapPin
+  FileText, Upload, Search, Trash2, PenLine, Send, FolderOpen, Loader2, MoreVertical, Clock, Share2, MapPin,
+  FileSignature, Crosshair
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { useLocation } from "wouter";
+
+const TemplateFieldEditor = lazy(() => import("@/components/template-field-editor"));
 
 const CATEGORIES = [
   { value: "contract", label: "Contract" },
@@ -63,6 +66,10 @@ export default function FormsLibraryPage() {
 
   const [showUpload, setShowUpload] = useState(false);
   const [showEdit, setShowEdit] = useState<FormTemplate | null>(null);
+  const [editingFieldsTemplate, setEditingFieldsTemplate] = useState<FormTemplate | null>(null);
+  const [showUseDialog, setShowUseDialog] = useState<FormTemplate | null>(null);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string>("");
+  const [savingFields, setSavingFields] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterState, setFilterState] = useState<string>("all");
@@ -79,6 +86,11 @@ export default function FormsLibraryPage() {
   const { data: templates = [], isLoading } = useQuery<FormTemplate[]>({
     queryKey: ["/api/form-templates"],
     enabled: !!user,
+  });
+
+  const { data: transactions = [] } = useQuery<any[]>({
+    queryKey: ["/api/transactions"],
+    enabled: !!showUseDialog,
   });
 
   const uploadMutation = useMutation({
@@ -131,20 +143,48 @@ export default function FormsLibraryPage() {
   });
 
   const useMutation2 = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest("POST", `/api/form-templates/${id}/use`);
+    mutationFn: async ({ templateId, transactionId }: { templateId: number; transactionId?: number }) => {
+      const res = await apiRequest("POST", `/api/form-templates/${templateId}/use`, { transactionId });
       if (!res.ok) throw new Error("Failed to load template");
-      return res.json();
+      const data = await res.json();
+      return { ...data, transactionId: transactionId || data.transactionId };
     },
     onSuccess: (data) => {
-      sessionStorage.setItem("firma_template_data", JSON.stringify(data));
+      sessionStorage.setItem("firma_template_data", JSON.stringify({
+        ...data,
+        transactionId: data.transactionId,
+      }));
       toast({ title: "Template loaded", description: "Opening signature editor..." });
-      setLocation("/transactions");
+      if (data.transactionId) {
+        setLocation(`/transactions/${data.transactionId}`);
+      } else {
+        setLocation("/transactions");
+      }
+      setShowUseDialog(null);
+      setSelectedTransactionId("");
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
+
+  const handleSaveFields = async (fields: any[], pageDims: { width: number; height: number }[]) => {
+    if (!editingFieldsTemplate) return;
+    setSavingFields(true);
+    try {
+      const res = await apiRequest("PATCH", `/api/form-templates/${editingFieldsTemplate.id}`, {
+        fieldPositions: { fields, pageDims },
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      toast({ title: "Signature fields saved!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/form-templates"] });
+      setEditingFieldsTemplate(null);
+    } catch (err: any) {
+      toast({ title: "Failed to save fields", variant: "destructive" });
+    } finally {
+      setSavingFields(false);
+    }
+  };
 
   const handleUpload = () => {
     if (!uploadForm.file || !uploadForm.title) return;
@@ -159,7 +199,8 @@ export default function FormsLibraryPage() {
   };
 
   const handleUseTemplate = async (template: FormTemplate) => {
-    useMutation2.mutate(template.id);
+    setShowUseDialog(template);
+    setSelectedTransactionId("");
   };
 
   const formatFileSize = (bytes: number) => {
@@ -274,6 +315,9 @@ export default function FormsLibraryPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setEditingFieldsTemplate(template)}>
+                          <Crosshair className="h-4 w-4 mr-2" /> Set Up Signature Fields
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setShowEdit(template)}>
                           <PenLine className="h-4 w-4 mr-2" /> Edit Details
                         </DropdownMenuItem>
@@ -301,6 +345,11 @@ export default function FormsLibraryPage() {
                   {template.isShared && !template.isOwner && (
                     <Badge variant="outline" className="text-xs text-blue-600">
                       <Share2 className="h-3 w-3 mr-1" />Shared
+                    </Badge>
+                  )}
+                  {template.fieldPositions?.fields?.length > 0 && (
+                    <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                      <FileSignature className="h-3 w-3 mr-1" />{template.fieldPositions.fields.length} fields
                     </Badge>
                   )}
                 </div>
@@ -538,6 +587,90 @@ export default function FormsLibraryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!showUseDialog} onOpenChange={() => { setShowUseDialog(null); setSelectedTransactionId(""); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Use Template for Signing</DialogTitle>
+          </DialogHeader>
+          {showUseDialog && (
+            <div className="space-y-4 py-2">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="font-medium text-sm">{showUseDialog.title}</p>
+                {showUseDialog.fieldPositions?.fields?.length > 0 && (
+                  <p className="text-xs text-green-600 mt-1">
+                    <FileSignature className="h-3 w-3 inline mr-1" />
+                    {showUseDialog.fieldPositions.fields.length} pre-configured signature fields
+                  </p>
+                )}
+                {!showUseDialog.fieldPositions?.fields?.length && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No signature fields configured. You can add them in the Firma editor.
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label>Link to Transaction (optional)</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Select a transaction to auto-fill recipient names from the deal
+                </p>
+                <Select value={selectedTransactionId} onValueChange={setSelectedTransactionId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="No transaction — standalone signing" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No transaction — standalone</SelectItem>
+                    {transactions.map((t: any) => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        {t.propertyAddress || t.address || `Transaction #${t.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedTransactionId && selectedTransactionId !== "none" && (
+                <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                  Transaction participants will be auto-filled as signing recipients based on their roles (Buyer, Seller, Agent).
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowUseDialog(null); setSelectedTransactionId(""); }}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!showUseDialog) return;
+                const txId = selectedTransactionId && selectedTransactionId !== "none" ? parseInt(selectedTransactionId) : undefined;
+                useMutation2.mutate({ templateId: showUseDialog.id, transactionId: txId });
+              }}
+              disabled={useMutation2.isPending}
+            >
+              {useMutation2.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Send className="h-4 w-4 mr-1" />
+              )}
+              Open in Signing Editor
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {editingFieldsTemplate && (
+        <Suspense fallback={
+          <div className="fixed inset-0 z-[9999] bg-background flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        }>
+          <TemplateFieldEditor
+            pdfUrl={`/api/form-templates/${editingFieldsTemplate.id}/file`}
+            initialFields={editingFieldsTemplate.fieldPositions?.fields || []}
+            onSave={handleSaveFields}
+            onClose={() => setEditingFieldsTemplate(null)}
+            saving={savingFields}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
