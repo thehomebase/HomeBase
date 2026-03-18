@@ -67,7 +67,8 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
   const [placingType, setPlacingType] = useState<string | null>(null);
   const [showSigners, setShowSigners] = useState(false);
   const [showFieldTypes, setShowFieldTypes] = useState(false);
-  const [newSignerName, setNewSignerName] = useState("");
+  const [newSignerFirstName, setNewSignerFirstName] = useState("");
+  const [newSignerLastName, setNewSignerLastName] = useState("");
   const [newSignerEmail, setNewSignerEmail] = useState("");
   const [scale, setScale] = useState(1);
   const [pdfDims, setPdfDims] = useState<{ width: number; height: number }[]>([]);
@@ -393,6 +394,7 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
             assignedTo: f.assignedTo,
           })),
           signers: signers.map(s => ({ name: s.name, email: s.email })),
+          pageDims: pdfDims,
         }),
       });
       if (!res.ok) {
@@ -455,14 +457,16 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
   };
 
   const addSigner = () => {
-    if (!newSignerName.trim() || !newSignerEmail.trim()) return;
+    if (!newSignerFirstName.trim() || !newSignerEmail.trim()) return;
+    const fullName = `${newSignerFirstName.trim()} ${newSignerLastName.trim()}`.trim();
     const newSigner: Signer = {
       id: `local-${Date.now()}`,
-      name: newSignerName.trim(),
+      name: fullName,
       email: newSignerEmail.trim(),
     };
     setSigners(prev => [...prev, newSigner]);
-    setNewSignerName("");
+    setNewSignerFirstName("");
+    setNewSignerLastName("");
     setNewSignerEmail("");
     toast({ title: "Signer added" });
   };
@@ -566,7 +570,8 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
             </div>
           ))}
           <div className="flex gap-1 mt-2">
-            <Input placeholder="Name" value={newSignerName} onChange={e => setNewSignerName(e.target.value)} className="h-7 text-xs flex-1 bg-white" />
+            <Input placeholder="First Name" value={newSignerFirstName} onChange={e => setNewSignerFirstName(e.target.value)} className="h-7 text-xs flex-1 bg-white" />
+            <Input placeholder="Last Name" value={newSignerLastName} onChange={e => setNewSignerLastName(e.target.value)} className="h-7 text-xs flex-1 bg-white" />
             <Input placeholder="Email" value={newSignerEmail} onChange={e => setNewSignerEmail(e.target.value)} className="h-7 text-xs flex-1 bg-white" />
             <Button size="sm" variant="outline" onClick={addSigner} className="h-7 px-2">
               <UserPlus className="h-3 w-3" />

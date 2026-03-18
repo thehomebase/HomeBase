@@ -5788,13 +5788,13 @@ export function registerRoutes(app: Express): Server {
     try {
       const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
       if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
-      const { fields, signers } = req.body;
+      const { fields, signers, pageDims } = req.body;
       if (!Array.isArray(fields) || !Array.isArray(signers)) {
         return res.status(400).json({ error: "fields and signers must be arrays" });
       }
       await db.execute(sql`
         UPDATE firma_signing_requests 
-        SET mobile_data = ${JSON.stringify({ fields, signers })}::json,
+        SET mobile_data = ${JSON.stringify({ fields, signers, pageDims: pageDims || [] })}::json,
             updated_at = NOW()
         WHERE firma_signing_request_id = ${req.params.id}
       `);
