@@ -15,7 +15,7 @@ import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailE
 import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured, logSignNowAction } from "./signnow-service";
 import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, createDraftEnvelope, createSenderView, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction, generatePKCE } from "./docusign-service";
 import { isDropboxConfigured, generateDropboxState, getDropboxAuthUrl, handleDropboxCallback, getDropboxConnectionStatus, disconnectDropbox, listDropboxFiles, downloadDropboxFile, searchDropboxFiles } from "./dropbox-service";
-import { isFirmaConfigured, createSigningRequest as firmaCreateSR, getSigningRequest as firmaGetSR, listSigningRequests as firmaListSR, sendSigningRequest as firmaSendSR, cancelSigningRequest as firmaCancelSR, updateSigningRequest as firmaUpdateSR, generateSigningRequestJWT, getEditorScriptUrl, logFirmaAction, saveFirmaSigningRequest, getUserSigningRequests, getTransactionSigningRequests, updateSigningRequestStatus, verifySigningRequestOwnership, getSigningRequestFields as firmaGetFields, getSigningRequestUsers as firmaGetUsers, addSigningRequestField as firmaAddField, updateSigningRequestField as firmaUpdateField, deleteSigningRequestField as firmaDeleteField, addSigningRequestUser as firmaAddUser, deleteSigningRequestUser as firmaDeleteUser } from "./firma-service";
+import { isFirmaConfigured, createSigningRequest as firmaCreateSR, getSigningRequest as firmaGetSR, listSigningRequests as firmaListSR, sendSigningRequest as firmaSendSR, cancelSigningRequest as firmaCancelSR, updateSigningRequest as firmaUpdateSR, generateSigningRequestJWT, getEditorScriptUrl, logFirmaAction, saveFirmaSigningRequest, getUserSigningRequests, getTransactionSigningRequests, updateSigningRequestStatus, verifySigningRequestOwnership, getSigningRequestFields as firmaGetFields, getSigningRequestUsers as firmaGetUsers, addSigningRequestField as firmaAddField, updateSigningRequestField as firmaUpdateField, deleteSigningRequestField as firmaDeleteField, addSigningRequestUser as firmaAddUser, deleteSigningRequestUser as firmaDeleteUser, getSigningRequestRecord } from "./firma-service";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { notify } from "./notification-helper";
@@ -5723,6 +5723,64 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error("Firma delete user error:", error);
       res.status(500).json({ error: error.message || "Failed to remove signer" });
+    }
+  });
+
+  app.get("/api/firma/signing-requests/:id/mobile-data", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const record = await getSigningRequestRecord(req.params.id);
+      if (!record) return res.status(404).json({ error: "Not found" });
+      const mobileData = record.mobile_data || record.mobileData || { fields: [], signers: [] };
+      res.json(mobileData);
+    } catch (error: any) {
+      console.error("Firma get mobile data error:", error);
+      res.status(500).json({ error: "Failed to get mobile data" });
+    }
+  });
+
+  app.post("/api/firma/signing-requests/:id/mobile-save", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const { fields, signers } = req.body;
+      if (!Array.isArray(fields) || !Array.isArray(signers)) {
+        return res.status(400).json({ error: "fields and signers must be arrays" });
+      }
+      await db.execute(sql`
+        UPDATE firma_signing_requests 
+        SET mobile_data = ${JSON.stringify({ fields, signers })}::json,
+            updated_at = NOW()
+        WHERE firma_signing_request_id = ${req.params.id}
+      `);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Firma mobile save error:", error);
+      res.status(500).json({ error: "Failed to save" });
+    }
+  });
+
+  app.post("/api/firma/signing-requests/:id/mobile-send", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const record = await getSigningRequestRecord(req.params.id);
+      if (!record) return res.status(404).json({ error: "Not found" });
+      const mobileData = (record.mobile_data || record.mobileData) as any;
+      if (!mobileData?.signers?.length) {
+        return res.status(400).json({ error: "Add at least one signer first" });
+      }
+
+      await firmaSendSR(req.params.id);
+      await updateSigningRequestStatus(req.params.id, "sent");
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Firma mobile send error:", error);
+      res.status(500).json({ error: error.message || "Failed to send" });
     }
   });
 

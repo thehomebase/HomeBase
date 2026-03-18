@@ -122,32 +122,33 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
 
   const loadFieldsAndUsers = async () => {
     try {
-      const [fieldsRes, usersRes] = await Promise.all([
-        fetch(`/api/firma/signing-requests/${signingRequestId}/fields`, { credentials: "include" }),
-        fetch(`/api/firma/signing-requests/${signingRequestId}/users`, { credentials: "include" }),
-      ]);
-      if (fieldsRes.ok) {
-        const data = await fieldsRes.json();
-        const fieldList = Array.isArray(data) ? data : data.fields || [];
-        setFields(fieldList.map((f: any) => ({
-          id: f.id,
-          type: f.type || "signature",
-          label: f.label || f.type || "signature",
-          page: f.page || 0,
-          x: f.x || 0,
-          y: f.y || 0,
-          width: f.width || FIELD_DEFAULTS[f.type]?.width || 200,
-          height: f.height || FIELD_DEFAULTS[f.type]?.height || 60,
-          required: f.required !== false,
-          assignedTo: f.assigned_to || f.assignedTo,
-        })));
-      }
-      if (usersRes.ok) {
-        const data = await usersRes.json();
-        setSigners(Array.isArray(data) ? data : data.users || []);
+      const res = await fetch(`/api/firma/signing-requests/${signingRequestId}/mobile-data`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.fields?.length) {
+          setFields(data.fields.map((f: any) => ({
+            id: f.id,
+            type: f.type || "signature",
+            label: f.label || f.type || "signature",
+            page: f.page || 0,
+            x: f.x || 0,
+            y: f.y || 0,
+            width: f.width || FIELD_DEFAULTS[f.type]?.width || 200,
+            height: f.height || FIELD_DEFAULTS[f.type]?.height || 60,
+            required: f.required !== false,
+            assignedTo: f.assignedTo,
+          })));
+        }
+        if (data.signers?.length) {
+          setSigners(data.signers.map((s: any) => ({
+            id: s.id || `local-${Date.now()}-${Math.random()}`,
+            name: s.name,
+            email: s.email,
+          })));
+        }
       }
     } catch (err) {
-      console.error("Failed to load fields/users:", err);
+      console.error("Failed to load saved data:", err);
     }
   };
 
@@ -322,31 +323,21 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
   const handleSave = async (silent = false): Promise<boolean> => {
     setSaving(true);
     try {
-      const existingRes = await fetch(`/api/firma/signing-requests/${signingRequestId}/fields`, { credentials: "include" });
-      let existingFields: any[] = [];
-      if (existingRes.ok) {
-        const data = await existingRes.json();
-        existingFields = Array.isArray(data) ? data : data.fields || [];
-      }
-      for (const ef of existingFields) {
-        if (ef.id) {
-          await apiRequest("DELETE", `/api/firma/signing-requests/${signingRequestId}/fields/${ef.id}`);
-        }
-      }
-      for (const field of fields) {
-        await apiRequest("POST", `/api/firma/signing-requests/${signingRequestId}/fields`, {
-          type: field.type,
-          label: field.label,
-          page: field.page,
-          x: Math.round(field.x),
-          y: Math.round(field.y),
-          width: Math.round(field.width),
-          height: Math.round(field.height),
-          required: field.required,
-          assigned_to: field.assignedTo,
-        });
-      }
-      if (!silent) toast({ title: "Fields saved" });
+      await apiRequest("POST", `/api/firma/signing-requests/${signingRequestId}/mobile-save`, {
+        fields: fields.map(f => ({
+          type: f.type,
+          label: f.label,
+          page: f.page,
+          x: Math.round(f.x),
+          y: Math.round(f.y),
+          width: Math.round(f.width),
+          height: Math.round(f.height),
+          required: f.required,
+          assignedTo: f.assignedTo,
+        })),
+        signers: signers.map(s => ({ name: s.name, email: s.email })),
+      });
+      if (!silent) toast({ title: "Saved" });
       return true;
     } catch (err: any) {
       console.error("Save failed:", err);
@@ -359,11 +350,7 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
 
   const handleSend = async () => {
     if (signers.length === 0) {
-      toast({ title: "Add at least one signer", variant: "destructive" });
-      return;
-    }
-    if (fields.length === 0) {
-      toast({ title: "Add at least one field", variant: "destructive" });
+      toast({ title: "Add at least one signer first", variant: "destructive" });
       return;
     }
     setSending(true);
@@ -373,7 +360,7 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
         setSending(false);
         return;
       }
-      await apiRequest("POST", `/api/firma/signing-requests/${signingRequestId}/send`);
+      await apiRequest("POST", `/api/firma/signing-requests/${signingRequestId}/mobile-send`);
       await apiRequest("POST", `/api/firma/signing-requests/${signingRequestId}/mark-sent`);
       toast({ title: "Signing request sent!" });
       onSent();
@@ -385,30 +372,22 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
     }
   };
 
-  const addSigner = async () => {
+  const addSigner = () => {
     if (!newSignerName.trim() || !newSignerEmail.trim()) return;
-    try {
-      const res = await apiRequest("POST", `/api/firma/signing-requests/${signingRequestId}/users`, {
-        name: newSignerName.trim(),
-        email: newSignerEmail.trim(),
-      });
-      const user = await res.json();
-      setSigners(prev => [...prev, user]);
-      setNewSignerName("");
-      setNewSignerEmail("");
-      toast({ title: "Signer added" });
-    } catch (err: any) {
-      toast({ title: "Failed to add signer", description: err.message, variant: "destructive" });
-    }
+    const newSigner: Signer = {
+      id: `local-${Date.now()}`,
+      name: newSignerName.trim(),
+      email: newSignerEmail.trim(),
+    };
+    setSigners(prev => [...prev, newSigner]);
+    setNewSignerName("");
+    setNewSignerEmail("");
+    toast({ title: "Signer added" });
   };
 
-  const removeSigner = async (signerId: string) => {
-    try {
-      await apiRequest("DELETE", `/api/firma/signing-requests/${signingRequestId}/users/${signerId}`);
-      setSigners(prev => prev.filter(s => s.id !== signerId));
-    } catch (err: any) {
-      toast({ title: "Failed to remove signer", variant: "destructive" });
-    }
+  const removeSigner = (signerId: string) => {
+    setSigners(prev => prev.filter(s => s.id !== signerId));
+    setFields(prev => prev.map(f => f.assignedTo === signerId ? { ...f, assignedTo: undefined } : f));
   };
 
   if (loading) {
@@ -560,7 +539,7 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
         </div>
       )}
 
-      <div className="border-t bg-white px-2 py-2 shrink-0">
+      <div className="border-t bg-white px-2 pt-2 shrink-0" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
         {showFieldTypes ? (
           <div className="flex gap-1 overflow-x-auto pb-1">
             {FIELD_TYPES.map(ft => (

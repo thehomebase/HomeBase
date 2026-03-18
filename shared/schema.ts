@@ -504,6 +504,7 @@ export const firmaSigningRequests = pgTable("firma_signing_requests", {
   firmaSigningRequestId: text("firma_signing_request_id").notNull().unique(),
   title: text("title").notNull(),
   status: text("status").notNull().default("draft"),
+  mobileData: json("mobile_data"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
