@@ -61,6 +61,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditorDialog, setShowEditorDialog] = useState(false);
   const [activeSigningRequestId, setActiveSigningRequestId] = useState<string | null>(null);
+  const [editorKey, setEditorKey] = useState(0);
   const [newTitle, setNewTitle] = useState("");
   const [newMessage, setNewMessage] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -169,6 +170,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
 
   const openEditor = useCallback(async (signingRequestId: string) => {
     setActiveSigningRequestId(signingRequestId);
+    setEditorKey(k => k + 1);
     setShowEditorDialog(true);
   }, []);
 
@@ -177,13 +179,17 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
 
     let destroyed = false;
 
-    async function initEditor() {
+    async function initEditor(attempt = 1) {
       try {
         await loadFirmaScript();
         const res = await apiRequest("POST", `/api/firma/signing-requests/${activeSigningRequestId}/jwt`);
         const { token } = await res.json();
 
         if (destroyed || !editorContainerRef.current) return;
+
+        if (!token) {
+          throw new Error("No JWT token received from server");
+        }
 
         editorRef.current = new window.FirmaSigningRequestEditor({
           container: editorContainerRef.current,
@@ -205,10 +211,17 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
           },
           onError: (error: any) => {
             console.error("Firma editor error:", error);
+            if (attempt < 3 && !destroyed && String(error).includes("Network error")) {
+              if (editorContainerRef.current) {
+                editorContainerRef.current.innerHTML = "";
+              }
+              setTimeout(() => initEditor(attempt + 1), 1500);
+              return;
+            }
             toast({ title: "Editor error", description: String(error), variant: "destructive" });
           },
           onLoad: () => {
-            console.log("Firma editor loaded");
+            console.log("Firma editor loaded successfully");
           },
         });
       } catch (err: any) {
@@ -217,7 +230,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
       }
     }
 
-    const timer = setTimeout(initEditor, 100);
+    const timer = setTimeout(initEditor, 300);
 
     return () => {
       destroyed = true;
@@ -226,8 +239,11 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
         editorRef.current.destroy();
         editorRef.current = null;
       }
+      if (editorContainerRef.current) {
+        editorContainerRef.current.innerHTML = "";
+      }
     };
-  }, [showEditorDialog, activeSigningRequestId, toast, queryKey]);
+  }, [showEditorDialog, activeSigningRequestId, editorKey, toast, queryKey]);
 
   useEffect(() => {
     const handler = (ev: MessageEvent) => {
@@ -423,7 +439,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
         }
       }}>
         <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0">
-          <div ref={editorContainerRef} className="w-full h-full" />
+          <div key={editorKey} ref={editorContainerRef} className="w-full h-full" />
         </DialogContent>
       </Dialog>
     </div>
