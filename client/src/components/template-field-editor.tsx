@@ -177,6 +177,114 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
     renderPage();
   }, [renderPage]);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const getTouchCoords = (touch: Touch) => {
+      const rect = canvas.getBoundingClientRect();
+      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+    };
+
+    const findFieldAtCoords = (cx: number, cy: number): number | null => {
+      const pf = fields.filter((f) => f.page === currentPage);
+      for (let i = pf.length - 1; i >= 0; i--) {
+        const f = pf[i];
+        const fx = f.x * scale, fy = f.y * scale, fw = f.width * scale, fh = f.height * scale;
+        if (cx >= fx && cx <= fx + fw && cy >= fy && cy <= fy + fh) return fields.indexOf(pf[i]);
+      }
+      return null;
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        pinchRef.current = { initialDistance: Math.sqrt(dx * dx + dy * dy), initialScale: scale };
+        return;
+      }
+      if (e.touches.length === 1) {
+        const coords = getTouchCoords(e.touches[0]);
+        if (placingType) {
+          e.preventDefault();
+          const defaults = FIELD_DEFAULTS[placingType] || { width: 150, height: 40 };
+          const newField: TemplateField = {
+            id: `field_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            type: placingType, label: placingType, page: currentPage,
+            x: coords.x / scale, y: coords.y / scale,
+            width: defaults.width, height: defaults.height, required: true, role: placingRole,
+          };
+          setFields((prev) => [...prev, newField]);
+          setSelectedFieldIdx(fields.length);
+          setPlacingType(null);
+          if (isMobile) setMobileDrawerOpen(true);
+          return;
+        }
+        const hitIdx = findFieldAtCoords(coords.x, coords.y);
+        setSelectedFieldIdx(hitIdx);
+        if (hitIdx !== null) {
+          e.preventDefault();
+          if (isMobile) setMobileDrawerOpen(true);
+          const f = fields[hitIdx];
+          const hx = (f.x + f.width) * scale, hy = (f.y + f.height) * scale;
+          if (Math.abs(coords.x - hx) < 16 && Math.abs(coords.y - hy) < 16) {
+            resizeRef.current = { fieldIdx: hitIdx, startX: coords.x, startY: coords.y, startW: f.width, startH: f.height };
+          } else {
+            dragRef.current = { fieldIdx: hitIdx, startX: coords.x, startY: coords.y, offsetX: coords.x - f.x * scale, offsetY: coords.y - f.y * scale };
+          }
+        }
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchRef.current) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const newScale = Math.min(3, Math.max(0.2, pinchRef.current.initialScale * (dist / pinchRef.current.initialDistance)));
+        setScale(newScale);
+        return;
+      }
+      if (e.touches.length === 1 && (dragRef.current || resizeRef.current)) {
+        e.preventDefault();
+        const coords = getTouchCoords(e.touches[0]);
+        if (dragRef.current) {
+          const { fieldIdx, offsetX, offsetY } = dragRef.current;
+          setFields((prev) => {
+            const copy = [...prev];
+            copy[fieldIdx] = { ...copy[fieldIdx], x: Math.max(0, (coords.x - offsetX) / scale), y: Math.max(0, (coords.y - offsetY) / scale) };
+            return copy;
+          });
+        } else if (resizeRef.current) {
+          const { fieldIdx, startX, startY, startW, startH } = resizeRef.current;
+          setFields((prev) => {
+            const copy = [...prev];
+            copy[fieldIdx] = { ...copy[fieldIdx], width: Math.max(20, startW + (coords.x - startX) / scale), height: Math.max(15, startH + (coords.y - startY) / scale) };
+            return copy;
+          });
+        }
+      }
+    };
+
+    const onTouchEnd = () => {
+      dragRef.current = null;
+      resizeRef.current = null;
+      pinchRef.current = null;
+    };
+
+    canvas.addEventListener("touchstart", onTouchStart, { passive: false });
+    canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+    canvas.addEventListener("touchend", onTouchEnd);
+
+    return () => {
+      canvas.removeEventListener("touchstart", onTouchStart);
+      canvas.removeEventListener("touchmove", onTouchMove);
+      canvas.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [fields, currentPage, scale, placingType, placingRole, isMobile]);
+
   const getCanvasCoords = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
@@ -292,120 +400,6 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
   const handlePointerUp = () => {
     dragRef.current = null;
     resizeRef.current = null;
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      pinchRef.current = {
-        initialDistance: Math.sqrt(dx * dx + dy * dy),
-        initialScale: scale,
-      };
-      return;
-    }
-
-    if (e.touches.length === 1) {
-      const coords = getCanvasCoords(e);
-
-      if (placingType) {
-        e.preventDefault();
-        const defaults = FIELD_DEFAULTS[placingType] || { width: 150, height: 40 };
-        const newField: TemplateField = {
-          id: `field_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          type: placingType,
-          label: placingType,
-          page: currentPage,
-          x: coords.x / scale,
-          y: coords.y / scale,
-          width: defaults.width,
-          height: defaults.height,
-          required: true,
-          role: placingRole,
-        };
-        setFields((prev) => [...prev, newField]);
-        setSelectedFieldIdx(fields.length);
-        setPlacingType(null);
-        if (isMobile) setMobileDrawerOpen(true);
-        return;
-      }
-
-      const hitIdx = findFieldAt(coords.x, coords.y);
-      setSelectedFieldIdx(hitIdx);
-
-      if (hitIdx !== null) {
-        e.preventDefault();
-        if (isMobile) setMobileDrawerOpen(true);
-        if (isOnResizeHandle(coords.x, coords.y, hitIdx)) {
-          resizeRef.current = {
-            fieldIdx: hitIdx,
-            startX: coords.x,
-            startY: coords.y,
-            startW: fields[hitIdx].width,
-            startH: fields[hitIdx].height,
-          };
-        } else {
-          dragRef.current = {
-            fieldIdx: hitIdx,
-            startX: coords.x,
-            startY: coords.y,
-            offsetX: coords.x - fields[hitIdx].x * scale,
-            offsetY: coords.y - fields[hitIdx].y * scale,
-          };
-        }
-      }
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && pinchRef.current) {
-      e.preventDefault();
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const ratio = dist / pinchRef.current.initialDistance;
-      const newScale = Math.min(3, Math.max(0.2, pinchRef.current.initialScale * ratio));
-      setScale(newScale);
-      return;
-    }
-
-    if (e.touches.length === 1 && (dragRef.current || resizeRef.current)) {
-      e.preventDefault();
-      const coords = getCanvasCoords(e);
-
-      if (dragRef.current) {
-        const { fieldIdx, offsetX, offsetY } = dragRef.current;
-        setFields((prev) => {
-          const copy = [...prev];
-          copy[fieldIdx] = {
-            ...copy[fieldIdx],
-            x: Math.max(0, (coords.x - offsetX) / scale),
-            y: Math.max(0, (coords.y - offsetY) / scale),
-          };
-          return copy;
-        });
-      } else if (resizeRef.current) {
-        const { fieldIdx, startX, startY, startW, startH } = resizeRef.current;
-        const dxMove = (coords.x - startX) / scale;
-        const dyMove = (coords.y - startY) / scale;
-        setFields((prev) => {
-          const copy = [...prev];
-          copy[fieldIdx] = {
-            ...copy[fieldIdx],
-            width: Math.max(20, startW + dxMove),
-            height: Math.max(15, startH + dyMove),
-          };
-          return copy;
-        });
-      }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    dragRef.current = null;
-    resizeRef.current = null;
-    pinchRef.current = null;
   };
 
   const deleteField = (idx: number) => {
@@ -641,14 +635,10 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
         <canvas
           ref={canvasRef}
           className={`shadow-lg ${placingType ? "cursor-crosshair" : "cursor-default"}`}
-          style={{ touchAction: "pinch-zoom" }}
           onMouseDown={handlePointerDown}
           onMouseMove={handlePointerMove}
           onMouseUp={handlePointerUp}
           onMouseLeave={handlePointerUp}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
         />
       )}
     </div>
