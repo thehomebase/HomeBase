@@ -11,14 +11,21 @@ const SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
 ];
 
-function getOAuth2Client() {
+function getOAuth2Client(requestHost?: string) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const domains = process.env.REPLIT_DOMAINS || "";
-  const domain = domains.split(",")[0];
-  const redirectUri = domain
-    ? `https://${domain}/api/gmail/callback`
-    : "http://localhost:5000/api/gmail/callback";
+
+  let redirectUri: string;
+  if (requestHost) {
+    const proto = requestHost.includes("localhost") ? "http" : "https";
+    redirectUri = `${proto}://${requestHost}/api/gmail/callback`;
+  } else {
+    const domains = process.env.REPLIT_DOMAINS || "";
+    const domain = domains.split(",")[0];
+    redirectUri = domain
+      ? `https://${domain}/api/gmail/callback`
+      : "http://localhost:5000/api/gmail/callback";
+  }
 
   if (!clientId || !clientSecret) {
     throw new Error("Google OAuth credentials not configured");
@@ -27,8 +34,8 @@ function getOAuth2Client() {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-export function getAuthUrl(state: string): string {
-  const oauth2Client = getOAuth2Client();
+export function getAuthUrl(state: string, requestHost?: string): string {
+  const oauth2Client = getOAuth2Client(requestHost);
   return oauth2Client.generateAuthUrl({
     access_type: "offline",
     scope: SCOPES,
@@ -37,8 +44,8 @@ export function getAuthUrl(state: string): string {
   });
 }
 
-export async function handleCallback(code: string, userId: number): Promise<{ email: string }> {
-  const oauth2Client = getOAuth2Client();
+export async function handleCallback(code: string, userId: number, requestHost?: string): Promise<{ email: string }> {
+  const oauth2Client = getOAuth2Client(requestHost);
   const { tokens } = await oauth2Client.getToken(code);
 
   if (!tokens.refresh_token) {

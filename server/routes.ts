@@ -3246,7 +3246,7 @@ export function registerRoutes(app: Express): Server {
       if (returnTo) {
         (req.session as any).gmailOAuthReturnTo = returnTo;
       }
-      const url = getAuthUrl(nonce);
+      const url = getAuthUrl(nonce, req.get("host"));
       res.json({ url });
     } catch (error: any) {
       console.error("Error generating Gmail auth URL:", error);
@@ -3257,9 +3257,9 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/gmail/callback", async (req, res) => {
     const code = req.query.code as string;
     const state = req.query.state as string;
-    const domains = process.env.REPLIT_DOMAINS || "";
-    const domain = domains.split(",")[0];
-    const baseUrl = domain ? `https://${domain}` : "http://localhost:5000";
+    const host = req.get("host") || "";
+    const proto = host.includes("localhost") ? "http" : "https";
+    const baseUrl = `${proto}://${host}`;
 
     if (!code || !state) {
       return res.redirect(`${baseUrl}/clients?gmail=error`);
@@ -3282,7 +3282,7 @@ export function registerRoutes(app: Express): Server {
     const returnPath = returnTo === "/settings" ? "/settings" : defaultReturn;
 
     try {
-      await handleCallback(code, userId);
+      await handleCallback(code, userId, req.get("host"));
       res.redirect(`${baseUrl}${returnPath}?gmail=connected`);
     } catch (error: any) {
       console.error("Gmail callback error:", error);
