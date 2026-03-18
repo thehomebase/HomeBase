@@ -129,6 +129,7 @@ export const transactions = pgTable("transactions", {
   financing: text("financing"),
   latitude: doublePrecision("latitude"),
   longitude: doublePrecision("longitude"),
+  requestClientReview: boolean("request_client_review").default(true),
   updatedAt: timestamp("updated_at").defaultNow()
 });
 

@@ -894,7 +894,7 @@ export function registerRoutes(app: Express): Server {
         }
       }
 
-      if (oldTransaction && oldTransaction.status !== "closed" && data.status === "closed" && transaction.clientId) {
+      if (oldTransaction && oldTransaction.status !== "closed" && data.status === "closed" && transaction.clientId && transaction.requestClientReview !== false) {
         try {
           const existing = await storage.getFeedbackRequestByTransaction(transaction.id, transaction.clientId);
           if (!existing) {

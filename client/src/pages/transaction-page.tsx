@@ -3,7 +3,8 @@ import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useTransactionLock } from "@/hooks/use-transaction-lock";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock, FileSignature } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock, FileSignature, Star } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -122,7 +123,19 @@ export default function TransactionPage() {
   });
 
   const isAgent = user?.role === 'agent' || user?.role === 'broker';
+  const isOwner = isAgent && transaction?.agentId === user?.id;
   const [showInviteLender, setShowInviteLender] = useState(false);
+
+  const toggleReviewMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const response = await apiRequest("PATCH", `/api/transactions/${parsedId}`, { requestClientReview: enabled });
+      if (!response.ok) throw new Error("Failed to update");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
+    },
+  });
   const [selectedLenderId, setSelectedLenderId] = useState<string>("");
 
   const { data: lenderStatus } = useQuery<{
@@ -428,6 +441,29 @@ export default function TransactionPage() {
           </div>
         </CardContent>
       </Card>
+
+      {isOwner && (
+        <Card className="mb-6">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Star className="h-4 w-4 text-amber-500" />
+                <div>
+                  <p className="text-sm font-semibold">Request Client Review on Close</p>
+                  <p className="text-xs text-muted-foreground">
+                    When this transaction closes, your client will be prompted to leave a review for you.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={transaction.requestClientReview !== false}
+                onCheckedChange={(checked) => toggleReviewMutation.mutate(checked)}
+                disabled={toggleReviewMutation.isPending || isReadOnly}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {isAgent && (
         <Card>
