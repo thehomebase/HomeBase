@@ -5548,6 +5548,7 @@ export function registerRoutes(app: Express): Server {
         if (!allowed) return res.status(403).json({ error: "Not authorized for this transaction" });
       }
       const result = await firmaCreateSR({ title, message, document: documentBase64 });
+      console.log("Firma create SR result:", JSON.stringify(result).substring(0, 500));
       const srId = result.id || result.signing_request_id || result.data?.id;
       if (srId) {
         await saveFirmaSigningRequest({
@@ -5644,10 +5645,14 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/firma/signing-requests/:id/jwt", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
+      console.log("JWT request for signing request:", req.params.id, "user:", req.user!.id);
       const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      console.log("Ownership check result:", owns);
       if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
       const result = await generateSigningRequestJWT(req.params.id);
-      res.json(result);
+      console.log("Firma JWT result keys:", Object.keys(result));
+      const token = result.token || result.jwt || result.data?.token || result.data?.jwt;
+      res.json({ token });
     } catch (error: any) {
       console.error("Firma JWT generation error:", error);
       res.status(500).json({ error: "Failed to generate JWT for editor" });
