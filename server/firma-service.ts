@@ -167,9 +167,13 @@ export async function recreateSigningRequestWithRecipients(
     const recipients = mobileData.signers.map((signer: any, idx: number) => {
       const tempId = `temp_${idx + 1}`;
       tempSignerIds[signer.name] = tempId;
+      const nameParts = (signer.name || "").trim().split(/\s+/);
+      const firstName = nameParts[0] || "Signer";
+      const lastName = nameParts.slice(1).join(" ") || `${idx + 1}`;
       return {
         id: tempId,
-        name: signer.name,
+        first_name: firstName,
+        last_name: lastName,
         email: signer.email,
         designation: "Signer",
         order: idx + 1,

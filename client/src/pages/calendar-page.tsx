@@ -47,8 +47,8 @@ export default function CalendarPage() {
     enabled: !!user,
   });
 
-  const { data: gmailStatus } = useQuery<{ connected: boolean; email?: string }>({
-    queryKey: ["/api/gmail/status"],
+  const { data: commStatus } = useQuery<{ gmail?: { connected: boolean; email?: string } }>({
+    queryKey: ["/api/communications/status"],
     enabled: !!user,
   });
 
@@ -194,7 +194,7 @@ export default function CalendarPage() {
               <SiGoogle className="h-4 w-4 text-red-500" />
               Subscribe
             </Button>
-            {gmailStatus?.connected && (
+            {commStatus?.gmail?.connected && (
               <Button
                 onClick={() => syncCalendarMutation.mutate()}
                 disabled={syncCalendarMutation.isPending}
