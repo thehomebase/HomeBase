@@ -825,7 +825,7 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const id = Number(req.params.id);
-      const allowedTxFields = ['status', 'type', 'streetName', 'city', 'state', 'zipCode', 'price', 'closingDate', 'contractExecutionDate', 'optionPeriodExpiration', 'notes', 'buyerName', 'sellerName', 'titleCompany', 'escrowOfficer', 'lenderName', 'propertyType', 'mlsNumber', 'earnestMoney', 'optionMoney', 'commission', 'clientId'];
+      const allowedTxFields = ['status', 'type', 'streetName', 'city', 'state', 'zipCode', 'price', 'closingDate', 'contractExecutionDate', 'optionPeriodExpiration', 'notes', 'buyerName', 'sellerName', 'titleCompany', 'escrowOfficer', 'lenderName', 'propertyType', 'mlsNumber', 'earnestMoney', 'optionMoney', 'commission', 'clientId', 'requestClientReview'];
       const data: Record<string, any> = {};
       for (const key of allowedTxFields) {
         if (req.body[key] !== undefined) data[key] = req.body[key];
