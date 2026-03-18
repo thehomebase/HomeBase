@@ -45,10 +45,10 @@ export default function VendorSyncPage() {
     },
   });
 
-  if (!user || (user.role !== "agent" && user.role !== "broker")) {
+  if (!user) {
     return (
       <div className="container max-w-2xl mx-auto p-6">
-        <p className="text-muted-foreground">Only agents and brokers can sync vendors.</p>
+        <p className="text-muted-foreground">Please log in to sync vendors.</p>
       </div>
     );
   }

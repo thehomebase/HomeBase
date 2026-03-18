@@ -7552,6 +7552,17 @@ export function registerRoutes(app: Express): Server {
   // ============ Vendor-to-Private-Contractor Matching ============
   const NAME_STOPWORDS = new Set(['the', 'and', 'inc', 'llc', 'corp', 'company', 'co', 'services', 'service', 'group', 'solutions', 'pro', 'pros', 'team']);
 
+  function fuzzyNameMatch(vendorName: string, privateName: string): boolean {
+    const vendorWords = vendorName.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/)
+      .filter(w => w.length > 2 && !NAME_STOPWORDS.has(w));
+    const privateWords = privateName.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/)
+      .filter(w => w.length > 2 && !NAME_STOPWORDS.has(w));
+    if (vendorWords.length === 0 || privateWords.length === 0) return false;
+    const commonWords = vendorWords.filter(w => privateWords.includes(w));
+    const similarity = commonWords.length / Math.max(vendorWords.length, privateWords.length);
+    return similarity >= 0.6 && commonWords.length >= 2;
+  }
+
   async function findMatchingPrivateContractors(
     vendor: { name: string; email?: string; phone?: string },
     vendorContractorId: number
@@ -7594,31 +7605,68 @@ export function registerRoutes(app: Express): Server {
     }
 
     if (vendor.name) {
-      const vendorWords = vendor.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/)
-        .filter(w => w.length > 2 && !NAME_STOPWORDS.has(w));
-      if (vendorWords.length > 0) {
-        const nameMatches: any = await db.execute(sql`
-          SELECT id, name, agent_id FROM contractors
-          WHERE agent_id IS NOT NULL AND vendor_user_id IS NULL
-            AND LOWER(name) != ''
-        `);
-        for (const row of (nameMatches.rows || nameMatches)) {
-          if (seen.has(row.id) || notifiedAgents.has(row.agent_id)) continue;
-          const privateWords = (row.name || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/)
-            .filter((w: string) => w.length > 2 && !NAME_STOPWORDS.has(w));
-          if (privateWords.length === 0) continue;
-          const commonWords = vendorWords.filter(w => privateWords.includes(w));
-          const similarity = commonWords.length / Math.max(vendorWords.length, privateWords.length);
-          if (similarity >= 0.6 && commonWords.length >= 2) {
-            seen.add(row.id);
-            notifiedAgents.add(row.agent_id);
-            matches.push({ id: row.id, name: row.name, agentId: row.agent_id, matchType: 'name' });
-          }
+      const nameMatches: any = await db.execute(sql`
+        SELECT id, name, agent_id FROM contractors
+        WHERE agent_id IS NOT NULL AND vendor_user_id IS NULL
+          AND LOWER(name) != ''
+      `);
+      for (const row of (nameMatches.rows || nameMatches)) {
+        if (seen.has(row.id) || notifiedAgents.has(row.agent_id)) continue;
+        if (fuzzyNameMatch(vendor.name, row.name)) {
+          seen.add(row.id);
+          notifiedAgents.add(row.agent_id);
+          matches.push({ id: row.id, name: row.name, agentId: row.agent_id, matchType: 'name' });
         }
       }
     }
 
     return matches;
+  }
+
+  async function findMatchingHomeTeamUsers(
+    vendor: { name: string; email?: string; phone?: string },
+    vendorContractorId: number
+  ): Promise<Array<{ userId: number; contractorId: number; contractorName: string; matchType: string }>> {
+    const results: Array<{ userId: number; contractorId: number; contractorName: string; matchType: string }> = [];
+    const notifiedUsers = new Set<number>();
+
+    const teamRows: any = await db.execute(sql`
+      SELECT htm.user_id, htm.contractor_id, c.name, c.email, c.phone
+      FROM home_team_members htm
+      JOIN contractors c ON c.id = htm.contractor_id
+      WHERE c.vendor_user_id IS NULL AND c.id != ${vendorContractorId}
+    `);
+    const rows = teamRows.rows || teamRows;
+
+    for (const row of rows) {
+      if (notifiedUsers.has(row.user_id)) continue;
+
+      let matchType: string | null = null;
+      if (vendor.email && row.email && vendor.email.toLowerCase() === row.email.toLowerCase()) {
+        matchType = 'email';
+      } else if (vendor.phone && row.phone) {
+        const vendorDigits = vendor.phone.replace(/\D/g, '').slice(-10);
+        const rowDigits = (row.phone || '').replace(/\D/g, '').slice(-10);
+        if (vendorDigits.length === 10 && vendorDigits === rowDigits) {
+          matchType = 'phone';
+        }
+      }
+      if (!matchType && vendor.name && row.name && fuzzyNameMatch(vendor.name, row.name)) {
+        matchType = 'name';
+      }
+
+      if (matchType) {
+        notifiedUsers.add(row.user_id);
+        results.push({
+          userId: row.user_id,
+          contractorId: row.contractor_id,
+          contractorName: row.name,
+          matchType,
+        });
+      }
+    }
+
+    return results;
   }
 
   // ============ Vendor Self-Registration ============
@@ -7639,12 +7687,15 @@ export function registerRoutes(app: Express): Server {
       });
 
       try {
+        const allNotifiedUsers = new Set<number>();
+
         const matchingPrivatePros = await findMatchingPrivateContractors(
           { name, email, phone },
           contractor.id
         );
         for (const match of matchingPrivatePros) {
-          if (match.agentId) {
+          if (match.agentId && !allNotifiedUsers.has(match.agentId)) {
+            allNotifiedUsers.add(match.agentId);
             await notify(
               match.agentId,
               'vendor_match',
@@ -7655,6 +7706,29 @@ export function registerRoutes(app: Express): Server {
             );
             console.log(`[Vendor Match] Notified agent ${match.agentId} about vendor ${name} matching private contractor "${match.name}" (match: ${match.matchType})`);
           }
+        }
+
+        const matchingTeamUsers = await findMatchingHomeTeamUsers(
+          { name, email, phone },
+          contractor.id
+        );
+        for (const match of matchingTeamUsers) {
+          if (!allNotifiedUsers.has(match.userId)) {
+            allNotifiedUsers.add(match.userId);
+            await notify(
+              match.userId,
+              'vendor_match',
+              `${name} just joined HomeBase Pros!`,
+              `A vendor matching "${match.contractorName}" on your team has registered on the platform. Would you like to sync their profile?`,
+              contractor.id,
+              'contractor'
+            );
+            console.log(`[Vendor Match] Notified user ${match.userId} about vendor ${name} matching team member "${match.contractorName}" (match: ${match.matchType})`);
+          }
+        }
+
+        if (allNotifiedUsers.size > 0) {
+          console.log(`[Vendor Match] Total users notified: ${allNotifiedUsers.size}`);
         }
       } catch (matchErr) {
         console.error('[Vendor Match] Error checking for matches:', matchErr);
@@ -7670,18 +7744,33 @@ export function registerRoutes(app: Express): Server {
   // ============ Vendor Sync (match private contractor to marketplace vendor) ============
   app.post("/api/vendor/sync-contractor", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const { privateContractorId, vendorContractorId } = req.body;
       if (!privateContractorId || !vendorContractorId) {
         return res.status(400).json({ error: 'Both privateContractorId and vendorContractorId are required' });
       }
 
-      const privateRow: any = await db.execute(sql`
-        SELECT id, name, agent_id FROM contractors WHERE id = ${privateContractorId} AND agent_id = ${req.user.id}
-      `);
-      const privatePro = (privateRow.rows || privateRow)[0];
-      if (!privatePro) return res.status(404).json({ error: 'Private contractor not found or not yours' });
+      const isAgent = req.user.role === 'agent' || req.user.role === 'broker';
+
+      let privatePro: any = null;
+      if (isAgent) {
+        const privateRow: any = await db.execute(sql`
+          SELECT id, name, agent_id FROM contractors WHERE id = ${privateContractorId} AND agent_id = ${req.user.id}
+        `);
+        privatePro = (privateRow.rows || privateRow)[0];
+      }
+      if (!privatePro) {
+        const teamRow: any = await db.execute(sql`
+          SELECT htm.contractor_id, c.name FROM home_team_members htm
+          JOIN contractors c ON c.id = htm.contractor_id
+          WHERE htm.user_id = ${req.user.id} AND htm.contractor_id = ${privateContractorId}
+        `);
+        const teamMatch = (teamRow.rows || teamRow)[0];
+        if (teamMatch) {
+          privatePro = { id: privateContractorId, name: teamMatch.name, fromTeam: true };
+        }
+      }
+      if (!privatePro) return res.status(404).json({ error: 'Contractor not found or not on your team' });
 
       const vendorRow: any = await db.execute(sql`
         SELECT id, name, vendor_user_id FROM contractors WHERE id = ${vendorContractorId} AND vendor_user_id IS NOT NULL
@@ -7699,11 +7788,16 @@ export function registerRoutes(app: Express): Server {
       await db.execute(sql`
         INSERT INTO home_team_members (user_id, contractor_id, category, notes, added_at)
         SELECT ${req.user.id}, ${vendorContractorId}, category, 
-          ${'Synced from private pro: ' + privatePro.name}, NOW()
+          ${'Synced from: ' + privatePro.name}, NOW()
         FROM contractors WHERE id = ${vendorContractorId}
       `);
 
-      if (privatePro.agent_id) {
+      if (privatePro.fromTeam) {
+        await db.execute(sql`
+          UPDATE home_team_members SET notes = COALESCE(notes, '') || ${'\n[Synced to verified vendor: ' + vendorPro.name + ']'}
+          WHERE user_id = ${req.user.id} AND contractor_id = ${privateContractorId}
+        `);
+      } else if (privatePro.agent_id) {
         await db.execute(sql`
           UPDATE contractors 
           SET agent_notes = COALESCE(agent_notes, '') || ${'\n[Synced to vendor: ' + vendorPro.name + ']'}
@@ -7711,7 +7805,7 @@ export function registerRoutes(app: Express): Server {
         `);
       }
 
-      console.log(`[Vendor Sync] Agent ${req.user.id} synced private contractor ${privateContractorId} with vendor ${vendorContractorId}`);
+      console.log(`[Vendor Sync] User ${req.user.id} synced contractor ${privateContractorId} with vendor ${vendorContractorId}`);
       res.json({ success: true, message: `${vendorPro.name} has been added to your team` });
     } catch (error) {
       console.error('Error syncing vendor:', error);
@@ -7721,7 +7815,6 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/vendor/match-candidates", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
     try {
       const vendorContractorId = Number(req.query.vendorContractorId);
       if (!vendorContractorId) return res.status(400).json({ error: 'vendorContractorId required' });
@@ -7742,11 +7835,29 @@ export function registerRoutes(app: Express): Server {
       const vendor = (vendorRow.rows || vendorRow)[0];
       if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
 
-      const privatePros: any = await db.execute(sql`
-        SELECT id, name, email, phone, category FROM contractors
-        WHERE agent_id = ${req.user.id} AND vendor_user_id IS NULL
+      const isAgent = req.user.role === 'agent' || req.user.role === 'broker';
+      let myPros: any[] = [];
+
+      if (isAgent) {
+        const privatePros: any = await db.execute(sql`
+          SELECT id, name, email, phone, category FROM contractors
+          WHERE agent_id = ${req.user.id} AND vendor_user_id IS NULL
+        `);
+        myPros = [...(privatePros.rows || privatePros)];
+      }
+
+      const teamPros: any = await db.execute(sql`
+        SELECT c.id, c.name, c.email, c.phone, c.category FROM home_team_members htm
+        JOIN contractors c ON c.id = htm.contractor_id
+        WHERE htm.user_id = ${req.user.id} AND c.vendor_user_id IS NULL AND c.id != ${vendorContractorId}
       `);
-      const myPros = privatePros.rows || privatePros;
+      const teamRows = teamPros.rows || teamPros;
+      const existingIds = new Set(myPros.map((p: any) => p.id));
+      for (const row of teamRows) {
+        if (!existingIds.has(row.id)) {
+          myPros.push(row);
+        }
+      }
 
       res.json({ vendor, privatePros: myPros });
     } catch (error) {
