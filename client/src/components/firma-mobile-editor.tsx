@@ -70,6 +70,7 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
   const [newSignerEmail, setNewSignerEmail] = useState("");
   const [scale, setScale] = useState(1);
   const [pdfDims, setPdfDims] = useState<{ width: number; height: number }[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; fieldIdx: number } | null>(null);
 
   useEffect(() => {
@@ -81,12 +82,15 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
     try {
       setLoading(true);
       const res = await fetch(`/api/firma/signing-requests/${signingRequestId}/document`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load document");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || `Failed to load document (${res.status})`);
+      }
       const blob = await res.blob();
       const arrayBuffer = await blob.arrayBuffer();
 
       const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = "/node_modules/pdfjs-dist/build/pdf.worker.mjs";
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const pages: ImageBitmap[] = [];
@@ -109,6 +113,7 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
       setPdfDims(dims);
     } catch (err: any) {
       console.error("Failed to load PDF:", err);
+      setLoadError(err.message || "Failed to load document");
       toast({ title: "Failed to load document", variant: "destructive" });
     } finally {
       setLoading(false);
@@ -411,6 +416,24 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
       <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center" style={{ colorScheme: "light" }}>
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         <p className="text-sm text-gray-500 mt-2">Loading document...</p>
+      </div>
+    );
+  }
+
+  if (loadError && pdfPages.length === 0) {
+    return (
+      <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center gap-3 px-6" style={{ colorScheme: "light" }}>
+        <X className="h-10 w-10 text-red-400" />
+        <p className="text-sm font-medium text-gray-700 text-center">Failed to load document</p>
+        <p className="text-xs text-gray-500 text-center">{loadError}</p>
+        <div className="flex gap-2 mt-2">
+          <Button size="sm" variant="outline" onClick={() => { setLoadError(null); loadDocument(); }}>
+            Try Again
+          </Button>
+          <Button size="sm" variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </div>
       </div>
     );
   }

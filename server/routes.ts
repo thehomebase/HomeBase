@@ -5735,13 +5735,25 @@ export function registerRoutes(app: Express): Server {
       if (!sr?.document_url) {
         return res.status(404).json({ error: "No document found" });
       }
+
+      const allowedHosts = ["ielmshcswdhuacyjlpiy.supabase.co", "api.firma.dev"];
+      try {
+        const parsed = new URL(sr.document_url);
+        if (!allowedHosts.includes(parsed.host)) {
+          return res.status(403).json({ error: "Document URL not from allowed host" });
+        }
+      } catch {
+        return res.status(400).json({ error: "Invalid document URL" });
+      }
+
       const response = await fetch(sr.document_url);
       if (!response.ok) {
-        return res.status(response.status).json({ error: "Failed to fetch document" });
+        console.error("Firma document fetch failed:", response.status, await response.text().catch(() => ""));
+        return res.status(502).json({ error: "Failed to fetch document from storage" });
       }
       const buffer = Buffer.from(await response.arrayBuffer());
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Cache-Control", "private, max-age=300");
+      res.setHeader("Cache-Control", "private, max-age=60");
       res.send(buffer);
     } catch (error: any) {
       console.error("Firma get document error:", error);
