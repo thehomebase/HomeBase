@@ -7813,6 +7813,42 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/vendor/sync-review", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { contractorId, rating, comment } = req.body;
+      if (!contractorId || !rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: 'contractorId and rating (1-5) are required' });
+      }
+
+      const vendorRow: any = await db.execute(sql`
+        SELECT id, name, vendor_user_id FROM contractors WHERE id = ${contractorId} AND vendor_user_id IS NOT NULL
+      `);
+      const vendor = (vendorRow.rows || vendorRow)[0];
+      if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+      const existing: any = await db.execute(sql`
+        SELECT id FROM contractor_reviews 
+        WHERE contractor_id = ${contractorId} AND reviewer_name = ${req.user.firstName + ' ' + req.user.lastName}
+      `);
+      if ((existing.rows || existing).length > 0) {
+        return res.status(409).json({ error: 'You have already reviewed this vendor' });
+      }
+
+      const reviewerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
+      await db.execute(sql`
+        INSERT INTO contractor_reviews (contractor_id, reviewer_name, rating, comment, created_at)
+        VALUES (${contractorId}, ${reviewerName}, ${rating}, ${comment || null}, NOW())
+      `);
+
+      console.log(`[Vendor Review] User ${req.user.id} reviewed vendor ${contractorId} with ${rating} stars`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error submitting vendor review:', error);
+      res.status(500).json({ error: 'Failed to submit review' });
+    }
+  });
+
   app.get("/api/vendor/match-candidates", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {

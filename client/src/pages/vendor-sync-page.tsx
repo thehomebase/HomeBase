@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -5,14 +6,37 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Link2, Building2, Phone, Mail, ArrowLeft, CheckCircle2, X, Loader2 } from "lucide-react";
+import { Link2, Building2, Phone, Mail, ArrowLeft, CheckCircle2, X, Loader2, Star, Send } from "lucide-react";
+
+function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange(star)}
+          className="p-0.5 transition-colors"
+        >
+          <Star
+            className={`h-6 w-6 ${star <= value ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function VendorSyncPage() {
   const { vendorContractorId } = useParams<{ vendorContractorId: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [synced, setSynced] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [reviewText, setReviewText] = useState("");
 
   const { data, isLoading } = useQuery<{
     vendor: { id: number; name: string; email: string; phone: string; category: string };
@@ -38,10 +62,30 @@ export default function VendorSyncPage() {
     onSuccess: (data) => {
       toast({ title: "Synced!", description: data.message || "Vendor added to your team." });
       queryClient.invalidateQueries({ queryKey: ["/api/vendor/match-candidates"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/home-team"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-team"] });
+      setSynced(true);
     },
     onError: (err: any) => {
       toast({ title: "Sync failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/vendor/sync-review", {
+        contractorId: Number(vendorContractorId),
+        rating,
+        comment: reviewText.trim(),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Review submitted!", description: "Thank you for your feedback." });
+      queryClient.invalidateQueries({ queryKey: ["/api/contractors"] });
+      setLocation("/homebase-pros");
+    },
+    onError: (err: any) => {
+      toast({ title: "Review failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -73,6 +117,62 @@ export default function VendorSyncPage() {
   }
 
   const { vendor, privatePros } = data;
+
+  if (synced) {
+    return (
+      <div className="container max-w-2xl mx-auto p-6 space-y-6">
+        <div className="flex items-center gap-3 mb-2">
+          <CheckCircle2 className="h-6 w-6 text-green-500" />
+          <h1 className="text-2xl font-bold">Synced with {vendor.name}!</h1>
+        </div>
+
+        <Card className="border-amber-200 bg-amber-50/30 dark:bg-amber-950/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Star className="h-5 w-5 text-amber-500" />
+              Leave a Review
+            </CardTitle>
+            <CardDescription>
+              How was your experience with {vendor.name}? Your review helps others make informed decisions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Rating</label>
+              <StarRating value={rating} onChange={setRating} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Your Review (optional)</label>
+              <Textarea
+                placeholder={`Share your experience working with ${vendor.name}...`}
+                value={reviewText}
+                onChange={(e) => setReviewText(e.target.value)}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => reviewMutation.mutate()}
+                disabled={rating === 0 || reviewMutation.isPending}
+                className="bg-amber-600 hover:bg-amber-700"
+              >
+                {reviewMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Submit Review
+              </Button>
+              <Button variant="outline" onClick={() => setLocation("/homebase-pros")}>
+                Skip
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-2xl mx-auto p-6 space-y-6">
@@ -111,7 +211,7 @@ export default function VendorSyncPage() {
       <div>
         <h2 className="text-lg font-semibold mb-3">Select the matching team member to sync</h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Choose which of your private team members is the same business as this new vendor. 
+          Choose which of your team members is the same business as this new vendor.
           Syncing will add their verified marketplace profile to your team.
         </p>
       </div>
@@ -119,7 +219,7 @@ export default function VendorSyncPage() {
       {privatePros.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground">
-            No private team members found. You can still add this vendor from the HomeBase Pros marketplace.
+            No matching team members found. You can still add this vendor from the HomeBase Pros marketplace.
           </CardContent>
         </Card>
       ) : (
