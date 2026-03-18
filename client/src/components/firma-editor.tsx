@@ -190,8 +190,9 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
 
     window.fetch = async function patchedFetch(input: RequestInfo | URL, init?: RequestInit) {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
+      const method = (init?.method || "GET").toUpperCase();
 
-      if (url.includes(SUPABASE_HOST) && activeFirmaJwtRef.current) {
+      if (url.includes(SUPABASE_HOST) && activeFirmaJwtRef.current && method === "POST" && url.includes("/functions/v1/")) {
         try {
           const body = init?.body ? JSON.parse(init.body as string) : {};
           const proxyRes = await originalFetch("/api/firma/proxy/supabase", {
