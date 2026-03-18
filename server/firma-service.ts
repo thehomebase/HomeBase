@@ -141,57 +141,80 @@ export function getEditorScriptUrl(): string {
   return FIRMA_EMBED_EDITOR_JS;
 }
 
-export async function syncMobileDataToFirma(signingRequestId: string, mobileData: any): Promise<{ synced: boolean; errors: string[] }> {
-  const errors: string[] = [];
-
+export async function recreateSigningRequestWithRecipients(
+  originalSrId: string,
+  mobileData: any,
+  title: string
+): Promise<{ newSrId: string | null; error?: string }> {
   if (!mobileData?.signers?.length) {
-    return { synced: false, errors: ["No signers to sync"] };
+    return { newSrId: null, error: "No signers to sync" };
   }
 
-  const signerNameToFirmaId: Record<string, string> = {};
+  try {
+    const originalSr = await getSigningRequest(originalSrId);
+    if (!originalSr?.document_url) {
+      return { newSrId: null, error: "Original signing request has no document" };
+    }
 
-  for (const signer of mobileData.signers) {
-    try {
-      const result = await addSigningRequestUser(signingRequestId, {
+    const docRes = await fetch(originalSr.document_url);
+    if (!docRes.ok) {
+      return { newSrId: null, error: "Failed to fetch original document" };
+    }
+    const docBuffer = Buffer.from(await docRes.arrayBuffer());
+    const documentBase64 = docBuffer.toString("base64");
+
+    const tempSignerIds: Record<string, string> = {};
+    const recipients = mobileData.signers.map((signer: any, idx: number) => {
+      const tempId = `temp_${idx + 1}`;
+      tempSignerIds[signer.name] = tempId;
+      return {
+        id: tempId,
         name: signer.name,
         email: signer.email,
-      });
-      if (result?.id) {
-        signerNameToFirmaId[signer.name] = result.id;
-      }
-      console.log(`[Firma Sync] Added signer ${signer.name} (${signer.email}) -> Firma user ${result?.id}`);
-    } catch (err: any) {
-      const msg = `Failed to add signer ${signer.name}: ${err?.message}`;
-      console.error(`[Firma Sync] ${msg}`);
-      errors.push(msg);
-    }
-  }
+        designation: "Signer",
+        order: idx + 1,
+      };
+    });
 
-  if (mobileData.fields?.length) {
-    for (const field of mobileData.fields) {
-      try {
-        const assignedName = field.assignedTo || field.signerId;
-        const firmaUserId = assignedName ? signerNameToFirmaId[assignedName] : undefined;
-        await addSigningRequestField(signingRequestId, {
-          type: field.type || "signature",
-          page: field.page || 1,
-          x: Math.round(field.x),
-          y: Math.round(field.y),
-          width: Math.round(field.width || 200),
-          height: Math.round(field.height || 50),
-          ...(firmaUserId ? { user_id: firmaUserId } : {}),
-        });
-        console.log(`[Firma Sync] Added field type=${field.type} on page ${field.page} for ${assignedName || "unassigned"}`);
-      } catch (err: any) {
-        const msg = `Failed to add field: ${err?.message}`;
-        console.error(`[Firma Sync] ${msg}`);
-        errors.push(msg);
-      }
-    }
-  }
+    const fields = (mobileData.fields || []).map((field: any) => {
+      const assignedName = field.assignedTo || field.signerId;
+      const recipientId = assignedName ? tempSignerIds[assignedName] : recipients[0]?.id;
+      return {
+        type: field.type || "signature",
+        recipient_id: recipientId,
+        page_number: field.page || 1,
+        x_position: Math.round(field.x),
+        y_position: Math.round(field.y),
+        width: Math.round(field.width || 200),
+        height: Math.round(field.height || 50),
+        required: field.required !== false,
+      };
+    });
 
-  const synced = errors.length === 0;
-  return { synced, errors };
+    const payload: any = {
+      name: title,
+      document: documentBase64,
+      recipients,
+      fields,
+    };
+
+    console.log(`[Firma Recreate] Creating new SR with ${recipients.length} recipients and ${fields.length} fields`);
+    const result = await firmaFetch("/signing-requests", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    const newId = result?.id || result?.signing_request_id;
+    if (!newId) {
+      return { newSrId: null, error: "Firma returned no ID for new signing request" };
+    }
+
+    console.log(`[Firma Recreate] New SR created: ${newId}`);
+    return { newSrId: newId };
+  } catch (err: any) {
+    console.error("[Firma Recreate] Error:", err?.message);
+    return { newSrId: null, error: err?.message || "Failed to recreate signing request" };
+  }
 }
 
 export async function logFirmaAction(userId: number, action: string, details: Record<string, any> = {}): Promise<void> {

@@ -15,7 +15,7 @@ import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailE
 import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured, logSignNowAction } from "./signnow-service";
 import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, createDraftEnvelope, createSenderView, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction, generatePKCE } from "./docusign-service";
 import { isDropboxConfigured, generateDropboxState, getDropboxAuthUrl, handleDropboxCallback, getDropboxConnectionStatus, disconnectDropbox, listDropboxFiles, downloadDropboxFile, searchDropboxFiles } from "./dropbox-service";
-import { isFirmaConfigured, createSigningRequest as firmaCreateSR, getSigningRequest as firmaGetSR, listSigningRequests as firmaListSR, sendSigningRequest as firmaSendSR, cancelSigningRequest as firmaCancelSR, updateSigningRequest as firmaUpdateSR, generateSigningRequestJWT, getEditorScriptUrl, logFirmaAction, saveFirmaSigningRequest, getUserSigningRequests, getTransactionSigningRequests, updateSigningRequestStatus, verifySigningRequestOwnership, getSigningRequestFields as firmaGetFields, getSigningRequestUsers as firmaGetUsers, addSigningRequestField as firmaAddField, updateSigningRequestField as firmaUpdateField, deleteSigningRequestField as firmaDeleteField, addSigningRequestUser as firmaAddUser, deleteSigningRequestUser as firmaDeleteUser, getSigningRequestRecord, syncMobileDataToFirma } from "./firma-service";
+import { isFirmaConfigured, createSigningRequest as firmaCreateSR, getSigningRequest as firmaGetSR, listSigningRequests as firmaListSR, sendSigningRequest as firmaSendSR, cancelSigningRequest as firmaCancelSR, updateSigningRequest as firmaUpdateSR, generateSigningRequestJWT, getEditorScriptUrl, logFirmaAction, saveFirmaSigningRequest, getUserSigningRequests, getTransactionSigningRequests, updateSigningRequestStatus, verifySigningRequestOwnership, getSigningRequestFields as firmaGetFields, getSigningRequestUsers as firmaGetUsers, addSigningRequestField as firmaAddField, updateSigningRequestField as firmaUpdateField, deleteSigningRequestField as firmaDeleteField, addSigningRequestUser as firmaAddUser, deleteSigningRequestUser as firmaDeleteUser, getSigningRequestRecord, recreateSigningRequestWithRecipients } from "./firma-service";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { notify } from "./notification-helper";
@@ -5787,18 +5787,29 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Add at least one signer first" });
       }
 
-      const syncResult = await syncMobileDataToFirma(req.params.id, mobileData);
-      console.log(`[Firma Mobile Send] Sync result: synced=${syncResult.synced}, errors=${syncResult.errors.length}`);
-
+      const title = (record as any).title || "Signing Request";
       let sentViaFirma = false;
-      if (syncResult.synced) {
+      let activeSrId = req.params.id;
+
+      const recreateResult = await recreateSigningRequestWithRecipients(req.params.id, mobileData, title);
+
+      if (recreateResult.newSrId) {
         try {
-          await firmaSendSR(req.params.id);
+          await firmaSendSR(recreateResult.newSrId);
           sentViaFirma = true;
-          console.log(`[Firma Mobile Send] Sent via Firma API with full audit trail`);
+          activeSrId = recreateResult.newSrId;
+          console.log(`[Firma Mobile Send] Sent via Firma with full audit trail (new SR: ${recreateResult.newSrId})`);
+
+          await db.execute(sql`
+            UPDATE firma_signing_requests
+            SET firma_signing_request_id = ${recreateResult.newSrId}, updated_at = NOW()
+            WHERE firma_signing_request_id = ${req.params.id}
+          `);
         } catch (sendErr: any) {
-          console.error(`[Firma Mobile Send] Firma send failed after sync:`, sendErr?.message);
+          console.error(`[Firma Mobile Send] Firma send failed after recreate:`, sendErr?.message);
         }
+      } else {
+        console.log(`[Firma Mobile Send] Recreate failed: ${recreateResult.error}`);
       }
 
       let emailsSent = 0;
@@ -5806,7 +5817,6 @@ export function registerRoutes(app: Express): Server {
         console.log("[Firma Mobile Send] Falling back to direct email (no Firma audit trail)");
         const { sendSigningEmail } = await import("./email-service");
         const sr = await firmaGetSR(req.params.id);
-        const title = (record as any).title || "Signing Request";
         const senderName = req.user!.firstName ? `${req.user!.firstName} ${req.user!.lastName || ""}`.trim() : req.user!.username;
         for (const signer of mobileData.signers) {
           if (signer.email) {
@@ -5821,19 +5831,20 @@ export function registerRoutes(app: Express): Server {
         }
 
         if (emailsSent === 0) {
-          return res.status(500).json({ error: "Failed to deliver signing request — no emails were sent. Please try again or use the desktop editor." });
+          return res.status(500).json({ error: "Failed to deliver signing request. Please try again or use the desktop editor." });
         }
       }
 
-      await updateSigningRequestStatus(req.params.id, "sent");
+      await updateSigningRequestStatus(activeSrId, "sent");
       await logFirmaAction(req.user!.id, "mobile_signing_request_sent", {
-        signingRequestId: req.params.id,
+        signingRequestId: activeSrId,
+        originalSrId: req.params.id,
         sentViaFirma,
         emailsFallback: !sentViaFirma,
         emailsSent,
         signerCount: mobileData.signers.length,
         fieldCount: mobileData.fields?.length || 0,
-        syncErrors: syncResult.errors,
+        recreateError: recreateResult.error || null,
       });
       res.json({ success: true, sentViaFirma });
     } catch (error: any) {
