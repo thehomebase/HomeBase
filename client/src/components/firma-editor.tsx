@@ -280,13 +280,12 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
           },
           onSend: async () => {
             try {
-              await apiRequest("POST", `/api/firma/signing-requests/${activeSigningRequestId}/send`);
-              queryClient.invalidateQueries({ queryKey: queryKeyRef.current });
-              toastRef.current({ title: "Signing request sent!" });
+              await apiRequest("POST", `/api/firma/signing-requests/${activeSigningRequestId}/mark-sent`);
             } catch (err: any) {
-              console.error("Failed to send signing request via API:", err);
-              toastRef.current({ title: "Failed to send", description: err.message || "Please try again", variant: "destructive" });
+              console.error("Failed to update signing request status:", err);
             }
+            queryClient.invalidateQueries({ queryKey: queryKeyRef.current });
+            toastRef.current({ title: "Signing request sent!" });
             setShowEditorDialog(false);
           },
           onClose: () => {

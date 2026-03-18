@@ -5612,6 +5612,20 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/firma/signing-requests/:id/mark-sent", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      await updateSigningRequestStatus(req.params.id, "sent");
+      await logFirmaAction(req.user!.id, "signing_request_sent", { signingRequestId: req.params.id });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Firma mark-sent error:", error);
+      res.status(500).json({ error: "Failed to update signing request status" });
+    }
+  });
+
   app.post("/api/firma/signing-requests/:id/send", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
