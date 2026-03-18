@@ -5,7 +5,7 @@ import { db } from "./db";
 import { sql } from "drizzle-orm/sql";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema, insertVendorRatingSchema, listingPhotos } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema, insertVendorRatingSchema, listingPhotos, formTemplates } from "@shared/schema";
 import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -12074,6 +12074,183 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Error emailing scanned document:", error);
       res.status(500).json({ error: "Failed to email document" });
+    }
+  });
+
+  // ============ FORM TEMPLATES / FORMS LIBRARY ============
+
+  app.get("/api/form-templates", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const result: any = await db.execute(sql`
+        SELECT id, user_id, title, description, category, form_state, file_name, mime_type, file_size,
+               field_positions, is_shared, usage_count, created_at, updated_at
+        FROM form_templates
+        WHERE user_id = ${req.user.id}
+           OR (is_shared = true AND user_id IN (
+             SELECT au.owner_id FROM authorized_users au WHERE au.authorized_user_id = ${req.user.id} AND au.status = 'active'
+             UNION
+             SELECT u.id FROM users u WHERE u.role = 'broker' AND u.id IN (
+               SELECT au2.owner_id FROM authorized_users au2 WHERE au2.authorized_user_id = ${req.user.id} AND au2.status = 'active'
+             )
+           ))
+        ORDER BY updated_at DESC
+      `);
+      const templates = (result.rows || result).map((t: any) => ({
+        id: t.id,
+        userId: t.user_id,
+        title: t.title,
+        description: t.description,
+        category: t.category,
+        formState: t.form_state,
+        fileName: t.file_name,
+        mimeType: t.mime_type,
+        fileSize: t.file_size,
+        fieldPositions: t.field_positions,
+        isShared: t.is_shared,
+        usageCount: t.usage_count,
+        createdAt: t.created_at,
+        updatedAt: t.updated_at,
+        isOwner: t.user_id === req.user.id,
+      }));
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching form templates:", error);
+      res.status(500).json({ error: "Failed to fetch templates" });
+    }
+  });
+
+  app.post("/api/form-templates", upload.single("file"), async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      if (!req.file) return res.status(400).json({ error: "PDF file is required" });
+      if (req.file.mimetype !== "application/pdf") return res.status(400).json({ error: "Only PDF files are allowed" });
+
+      const { title, description, category, formState, isShared } = req.body;
+      if (!title) return res.status(400).json({ error: "Title is required" });
+
+      const fileData = req.file.buffer.toString("base64");
+      const result: any = await db.execute(sql`
+        INSERT INTO form_templates (user_id, title, description, category, form_state, file_name, file_data, mime_type, file_size, is_shared, created_at, updated_at)
+        VALUES (${req.user.id}, ${title}, ${description || null}, ${category || 'other'}, ${formState || null},
+                ${req.file.originalname}, ${fileData}, ${req.file.mimetype}, ${req.file.size},
+                ${(isShared === 'true' || isShared === true) && req.user.role === 'broker'}, NOW(), NOW())
+        RETURNING id, user_id, title, description, category, form_state, file_name, mime_type, file_size, is_shared, usage_count, created_at, updated_at
+      `);
+      const template = (result.rows || result)[0];
+      console.log(`[Forms] User ${req.user.id} created template "${title}" (id: ${template.id})`);
+      res.json(template);
+    } catch (error) {
+      console.error("Error creating form template:", error);
+      res.status(500).json({ error: "Failed to create template" });
+    }
+  });
+
+  async function canAccessTemplate(userId: number, template: any): Promise<boolean> {
+    if (template.user_id === userId) return true;
+    if (!template.is_shared) return false;
+    const teamCheck: any = await db.execute(sql`
+      SELECT 1 FROM authorized_users
+      WHERE authorized_user_id = ${userId} AND owner_id = ${template.user_id} AND status = 'active'
+      LIMIT 1
+    `);
+    return (teamCheck.rows || teamCheck).length > 0;
+  }
+
+  app.get("/api/form-templates/:id/file", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = parseInt(req.params.id);
+      const result: any = await db.execute(sql`
+        SELECT file_data, mime_type, file_name, user_id, is_shared FROM form_templates WHERE id = ${id}
+      `);
+      const template = (result.rows || result)[0];
+      if (!template) return res.status(404).json({ error: "Template not found" });
+      if (!(await canAccessTemplate(req.user.id, template))) return res.sendStatus(403);
+
+      const buffer = Buffer.from(template.file_data, "base64");
+      res.setHeader("Content-Type", template.mime_type);
+      res.setHeader("Content-Disposition", `inline; filename="${template.file_name}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error serving template file:", error);
+      res.status(500).json({ error: "Failed to serve file" });
+    }
+  });
+
+  app.patch("/api/form-templates/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = parseInt(req.params.id);
+      const ownerCheck: any = await db.execute(sql`SELECT user_id FROM form_templates WHERE id = ${id}`);
+      const template = (ownerCheck.rows || ownerCheck)[0];
+      if (!template) return res.status(404).json({ error: "Template not found" });
+      if (template.user_id !== req.user.id) return res.sendStatus(403);
+
+      const { title, description, category, formState, isShared, fieldPositions } = req.body;
+      const resolvedIsShared = isShared !== undefined && req.user.role === 'broker' ? isShared : null;
+      const result: any = await db.execute(sql`
+        UPDATE form_templates SET
+          title = COALESCE(${title || null}, title),
+          description = COALESCE(${description !== undefined ? description : null}, description),
+          category = COALESCE(${category || null}, category),
+          form_state = COALESCE(${formState || null}, form_state),
+          is_shared = COALESCE(${resolvedIsShared}, is_shared),
+          field_positions = COALESCE(${fieldPositions ? JSON.stringify(fieldPositions) : null}::json, field_positions),
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING id, title, description, category, form_state, is_shared, usage_count, updated_at
+      `);
+      res.json((result.rows || result)[0]);
+    } catch (error) {
+      console.error("Error updating form template:", error);
+      res.status(500).json({ error: "Failed to update template" });
+    }
+  });
+
+  app.delete("/api/form-templates/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = parseInt(req.params.id);
+      const ownerCheck: any = await db.execute(sql`SELECT user_id FROM form_templates WHERE id = ${id}`);
+      const template = (ownerCheck.rows || ownerCheck)[0];
+      if (!template) return res.status(404).json({ error: "Template not found" });
+      if (template.user_id !== req.user.id) return res.sendStatus(403);
+
+      await db.execute(sql`DELETE FROM form_templates WHERE id = ${id}`);
+      console.log(`[Forms] User ${req.user.id} deleted template id: ${id}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting form template:", error);
+      res.status(500).json({ error: "Failed to delete template" });
+    }
+  });
+
+  app.post("/api/form-templates/:id/use", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const id = parseInt(req.params.id);
+      const result: any = await db.execute(sql`
+        SELECT id, file_data, file_name, title, user_id, is_shared FROM form_templates WHERE id = ${id}
+      `);
+      const template = (result.rows || result)[0];
+      if (!template) return res.status(404).json({ error: "Template not found" });
+      if (!(await canAccessTemplate(req.user.id, template))) return res.sendStatus(403);
+
+      await db.execute(sql`UPDATE form_templates SET usage_count = usage_count + 1 WHERE id = ${id}`);
+
+      res.json({
+        templateId: template.id,
+        title: template.title,
+        fileName: template.file_name,
+        documentBase64: template.file_data,
+      });
+    } catch (error) {
+      console.error("Error using form template:", error);
+      res.status(500).json({ error: "Failed to use template" });
     }
   });
 

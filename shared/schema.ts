@@ -1381,6 +1381,46 @@ export const insertScannedDocumentSchema = createInsertSchema(scannedDocuments).
 export type ScannedDocument = typeof scannedDocuments.$inferSelect;
 export type InsertScannedDocument = z.infer<typeof insertScannedDocumentSchema>;
 
+export const formTemplates = pgTable("form_templates", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category", {
+    enum: ["contract", "addendum", "disclosure", "inspection", "amendment", "notice", "agreement", "other"]
+  }).notNull().default("other"),
+  formState: text("form_state"),
+  fileName: text("file_name").notNull(),
+  fileData: text("file_data").notNull(),
+  mimeType: text("mime_type").notNull().default("application/pdf"),
+  fileSize: integer("file_size").notNull(),
+  fieldPositions: json("field_positions").$type<Array<{
+    id: string;
+    type: string;
+    page: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    recipientIndex: number;
+    label?: string;
+  }>>(),
+  isShared: boolean("is_shared").default(false),
+  usageCount: integer("usage_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFormTemplateSchema = createInsertSchema(formTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  usageCount: true,
+});
+
+export type FormTemplate = typeof formTemplates.$inferSelect;
+export type InsertFormTemplate = z.infer<typeof insertFormTemplateSchema>;
+
 export const apiKeys = pgTable("api_keys", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),

@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { FileSignature, Plus, Send, X, Eye, Loader2, Clock, CheckCircle, XCircle, RefreshCw, Upload } from "lucide-react";
+import { FileSignature, Plus, Send, X, Eye, Loader2, Clock, CheckCircle, XCircle, RefreshCw, Upload, FolderOpen } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const FirmaMobileEditor = lazy(() => import("./firma-mobile-editor"));
 
@@ -89,6 +90,27 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
   const { data: status } = useQuery<{ configured: boolean }>({
     queryKey: ["/api/firma/status"],
   });
+
+  const { data: formTemplates } = useQuery<any[]>({
+    queryKey: ["/api/form-templates"],
+    enabled: showCreateDialog,
+  });
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem("firma_template_data");
+    if (stored) {
+      sessionStorage.removeItem("firma_template_data");
+      try {
+        const data = JSON.parse(stored);
+        if (data.documentBase64) {
+          setDocumentBase64(data.documentBase64);
+          setDocumentFile(new File([], data.fileName || "template.pdf", { type: "application/pdf" }));
+          setNewTitle(data.title || "");
+          setShowCreateDialog(true);
+        }
+      } catch (_) {}
+    }
+  }, []);
 
   const queryKey = useMemo(() => transactionId
     ? ["/api/firma/signing-requests", { transactionId }]
@@ -514,6 +536,36 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">PDF Document</label>
+              {formTemplates && formTemplates.length > 0 && (
+                <Select onValueChange={async (templateId) => {
+                  if (templateId === "upload") return;
+                  try {
+                    const res = await apiRequest("POST", `/api/form-templates/${templateId}/use`);
+                    const data = await res.json();
+                    if (data.documentBase64) {
+                      setDocumentBase64(data.documentBase64);
+                      setDocumentFile(new File([], data.fileName || "template.pdf", { type: "application/pdf" }));
+                      if (!newTitle) setNewTitle(data.title || "");
+                    }
+                  } catch (e: any) {
+                    toast({ title: "Failed to load template", variant: "destructive" });
+                  }
+                }}>
+                  <SelectTrigger className="mb-2">
+                    <SelectValue placeholder="Choose from Forms Library..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formTemplates.map((t: any) => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        <div className="flex items-center gap-2">
+                          <FolderOpen className="h-3 w-3" />
+                          <span>{t.title}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -528,11 +580,11 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                {documentFile ? documentFile.name : "Choose PDF file..."}
+                {documentFile ? documentFile.name : "Or upload a PDF file..."}
               </Button>
               {documentFile && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  {(documentFile.size / 1024).toFixed(0)} KB
+                  {documentFile.size > 0 ? `${(documentFile.size / 1024).toFixed(0)} KB` : "From template library"}
                 </p>
               )}
             </div>

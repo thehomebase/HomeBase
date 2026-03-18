@@ -24,6 +24,7 @@ import TransactionsPage from "@/pages/transactions-page";
 import ClientsPage from "@/pages/clients-page";
 import TransactionPage from "@/pages/transaction-page";
 import CalendarPage from "@/pages/calendar-page";
+import FormsLibraryPage from "@/pages/forms-library-page";
 import DataPage from "./pages/data-page";
 import PrivacyPolicyPage from "@/pages/privacy-policy-page";
 import TermsPage from "@/pages/terms-page";
@@ -62,6 +63,7 @@ import {
   ChevronDown,
   Phone,
   ScanLine,
+  FolderOpen,
   Zap,
   Key,
   User as UserIcon,
@@ -549,6 +551,16 @@ function Layout({ children }: { children: React.ReactNode }) {
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
+                        {isAgentOrBroker && (
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Forms Library">
+                            <Link href="/forms-library" className="flex items-center gap-2">
+                              <FolderOpen className="h-4 w-4" />
+                              <span>Forms Library</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        )}
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="MyHome">
                             <Link href="/my-home" className="flex items-center gap-2">
@@ -810,6 +822,9 @@ function Router() {
       </Route>
       <Route path="/calendar">
         <ProtectedRoute path="/calendar" component={CalendarPage} />
+      </Route>
+      <Route path="/forms-library">
+        <ProtectedRoute path="/forms-library" component={FormsLibraryPage} />
       </Route>
       <Route path="/settings/biometric">
         <ProtectedRoute path="/settings/biometric" component={BiometricSettingsPage} />
