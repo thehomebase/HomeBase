@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import {
   FileSignature, Type, Calendar, CheckSquare, Hash, Trash2,
-  ChevronLeft, ChevronRight, Loader2, X, Save, ZoomIn, ZoomOut, GripVertical
+  ChevronLeft, ChevronRight, Loader2, X, Save, ZoomIn, ZoomOut, GripVertical,
+  PanelLeftOpen, PanelLeftClose, ChevronUp, ChevronDown
 } from "lucide-react";
 
 export interface TemplateField {
@@ -56,8 +57,19 @@ interface TemplateFieldEditorProps {
   saving?: boolean;
 }
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return isMobile;
+}
+
 export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onClose, saving }: TemplateFieldEditorProps) {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
@@ -70,8 +82,10 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
   const [placingType, setPlacingType] = useState<string | null>(null);
   const [placingRole, setPlacingRole] = useState<string>("buyer");
   const [scale, setScale] = useState(1);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; fieldIdx: number; offsetX: number; offsetY: number } | null>(null);
   const resizeRef = useRef<{ fieldIdx: number; startX: number; startY: number; startW: number; startH: number } | null>(null);
+  const pinchRef = useRef<{ initialDistance: number; initialScale: number } | null>(null);
 
   useEffect(() => {
     loadPdf();
@@ -280,6 +294,119 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
     resizeRef.current = null;
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchRef.current = {
+        initialDistance: Math.sqrt(dx * dx + dy * dy),
+        initialScale: scale,
+      };
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      const coords = getCanvasCoords(e);
+
+      if (placingType) {
+        e.preventDefault();
+        const defaults = FIELD_DEFAULTS[placingType] || { width: 150, height: 40 };
+        const newField: TemplateField = {
+          id: `field_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          type: placingType,
+          label: placingType,
+          page: currentPage,
+          x: coords.x / scale,
+          y: coords.y / scale,
+          width: defaults.width,
+          height: defaults.height,
+          required: true,
+          role: placingRole,
+        };
+        setFields((prev) => [...prev, newField]);
+        setSelectedFieldIdx(fields.length);
+        setPlacingType(null);
+        if (isMobile) setMobileDrawerOpen(true);
+        return;
+      }
+
+      const hitIdx = findFieldAt(coords.x, coords.y);
+      setSelectedFieldIdx(hitIdx);
+
+      if (hitIdx !== null) {
+        e.preventDefault();
+        if (isOnResizeHandle(coords.x, coords.y, hitIdx)) {
+          resizeRef.current = {
+            fieldIdx: hitIdx,
+            startX: coords.x,
+            startY: coords.y,
+            startW: fields[hitIdx].width,
+            startH: fields[hitIdx].height,
+          };
+        } else {
+          dragRef.current = {
+            fieldIdx: hitIdx,
+            startX: coords.x,
+            startY: coords.y,
+            offsetX: coords.x - fields[hitIdx].x * scale,
+            offsetY: coords.y - fields[hitIdx].y * scale,
+          };
+        }
+      }
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const ratio = dist / pinchRef.current.initialDistance;
+      const newScale = Math.min(3, Math.max(0.2, pinchRef.current.initialScale * ratio));
+      setScale(newScale);
+      return;
+    }
+
+    if (e.touches.length === 1 && (dragRef.current || resizeRef.current)) {
+      e.preventDefault();
+      const coords = getCanvasCoords(e);
+
+      if (dragRef.current) {
+        const { fieldIdx, offsetX, offsetY } = dragRef.current;
+        setFields((prev) => {
+          const copy = [...prev];
+          copy[fieldIdx] = {
+            ...copy[fieldIdx],
+            x: Math.max(0, (coords.x - offsetX) / scale),
+            y: Math.max(0, (coords.y - offsetY) / scale),
+          };
+          return copy;
+        });
+      } else if (resizeRef.current) {
+        const { fieldIdx, startX, startY, startW, startH } = resizeRef.current;
+        const dxMove = (coords.x - startX) / scale;
+        const dyMove = (coords.y - startY) / scale;
+        setFields((prev) => {
+          const copy = [...prev];
+          copy[fieldIdx] = {
+            ...copy[fieldIdx],
+            width: Math.max(20, startW + dxMove),
+            height: Math.max(15, startH + dyMove),
+          };
+          return copy;
+        });
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    dragRef.current = null;
+    resizeRef.current = null;
+    pinchRef.current = null;
+  };
+
   const deleteField = (idx: number) => {
     setFields((prev) => prev.filter((_, i) => i !== idx));
     setSelectedFieldIdx(null);
@@ -287,43 +414,116 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
 
   const getRoleColor = (role: string) => SIGNER_ROLES.find((r) => r.value === role)?.color || "#666";
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-background flex flex-col" style={{ colorScheme: "light" }}>
-      <div className="flex items-center justify-between p-3 border-b bg-card shadow-sm">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </Button>
-          <h2 className="font-semibold text-sm sm:text-base">Template Field Editor</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="hidden sm:flex">
-            {fields.length} field{fields.length !== 1 ? "s" : ""}
-          </Badge>
-          <Button
-            size="sm"
-            onClick={() => onSave(fields, pdfDims)}
-            disabled={saving}
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-            Save Fields
-          </Button>
-        </div>
+  const sidebarContent = (
+    <>
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Assign To Role</p>
+        <Select value={placingRole} onValueChange={setPlacingRole}>
+          <SelectTrigger className="h-8 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="z-[10001]">
+            {SIGNER_ROLES.map((r) => (
+              <SelectItem key={r.value} value={r.value}>
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ background: r.color }} />
+                  {r.label}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-56 lg:w-64 border-r flex flex-col overflow-y-auto bg-card p-3 gap-3 shrink-0">
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Add Field</p>
+        <div className={`grid gap-1.5 ${isMobile ? "grid-cols-3" : "grid-cols-1"}`}>
+          {FIELD_TYPES.map((ft) => {
+            const Icon = ft.icon;
+            const isActive = placingType === ft.type;
+            return (
+              <Button
+                key={ft.type}
+                variant={isActive ? "default" : "outline"}
+                size="sm"
+                className="justify-start h-8 text-xs"
+                onClick={() => {
+                  setPlacingType(isActive ? null : ft.type);
+                  if (!isActive && isMobile) setMobileDrawerOpen(false);
+                }}
+              >
+                <Icon className="h-3.5 w-3.5 mr-1" />
+                {ft.label}
+              </Button>
+            );
+          })}
+        </div>
+        {placingType && (
+          <p className="text-xs text-primary mt-2 animate-pulse">
+            Tap on the PDF to place a {placingType} field for {SIGNER_ROLES.find(r => r.value === placingRole)?.label}
+          </p>
+        )}
+      </div>
+
+      <div className="border-t pt-3">
+        <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Placed Fields</p>
+        {fields.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No fields placed yet. Select a field type above and tap on the PDF.</p>
+        ) : (
+          <div className="space-y-1">
+            {fields.map((field, idx) => {
+              const roleColor = getRoleColor(field.role);
+              const isSelected = idx === selectedFieldIdx;
+              return (
+                <div
+                  key={field.id}
+                  className={`flex items-center gap-1.5 p-1.5 rounded text-xs cursor-pointer border ${isSelected ? "bg-accent border-primary" : "border-transparent hover:bg-muted"}`}
+                  onClick={() => {
+                    setSelectedFieldIdx(idx);
+                    setCurrentPage(field.page);
+                  }}
+                >
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: roleColor }} />
+                  <span className="truncate flex-1 capitalize">{field.type}</span>
+                  <span className="text-muted-foreground shrink-0">p{field.page + 1}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 shrink-0"
+                    onClick={(e) => { e.stopPropagation(); deleteField(idx); }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {selectedFieldIdx !== null && fields[selectedFieldIdx] && (
+        <div className="border-t pt-3 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase">Selected Field</p>
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Assign To Role</p>
-            <Select value={placingRole} onValueChange={setPlacingRole}>
-              <SelectTrigger className="h-8 text-sm">
+            <label className="text-xs text-muted-foreground">Role</label>
+            <Select
+              value={fields[selectedFieldIdx].role}
+              onValueChange={(v) => {
+                setFields((prev) => {
+                  const copy = [...prev];
+                  copy[selectedFieldIdx!] = { ...copy[selectedFieldIdx!], role: v };
+                  return copy;
+                });
+              }}
+            >
+              <SelectTrigger className="h-7 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="z-[10001]">
                 {SIGNER_ROLES.map((r) => (
                   <SelectItem key={r.value} value={r.value}>
                     <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: r.color }} />
+                      <div className="w-2 h-2 rounded-full" style={{ background: r.color }} />
                       {r.label}
                     </div>
                   </SelectItem>
@@ -331,209 +531,192 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
               </SelectContent>
             </Select>
           </div>
-
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Add Field</p>
-            <div className="grid grid-cols-1 gap-1.5">
-              {FIELD_TYPES.map((ft) => {
-                const Icon = ft.icon;
-                const isActive = placingType === ft.type;
-                return (
-                  <Button
-                    key={ft.type}
-                    variant={isActive ? "default" : "outline"}
-                    size="sm"
-                    className="justify-start h-8 text-xs"
-                    onClick={() => setPlacingType(isActive ? null : ft.type)}
-                  >
-                    <Icon className="h-3.5 w-3.5 mr-2" />
-                    {ft.label}
-                  </Button>
-                );
-              })}
-            </div>
-            {placingType && (
-              <p className="text-xs text-primary mt-2 animate-pulse">
-                Click on the PDF to place a {placingType} field for {SIGNER_ROLES.find(r => r.value === placingRole)?.label}
-              </p>
-            )}
+            <label className="text-xs text-muted-foreground">Type</label>
+            <Select
+              value={fields[selectedFieldIdx].type}
+              onValueChange={(v) => {
+                setFields((prev) => {
+                  const copy = [...prev];
+                  copy[selectedFieldIdx!] = { ...copy[selectedFieldIdx!], type: v, label: v };
+                  return copy;
+                });
+              }}
+            >
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="z-[10001]">
+                {FIELD_TYPES.map((ft) => (
+                  <SelectItem key={ft.type} value={ft.type}>{ft.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="w-full h-7 text-xs"
+            onClick={() => deleteField(selectedFieldIdx)}
+          >
+            <Trash2 className="h-3 w-3 mr-1" /> Delete Field
+          </Button>
+        </div>
+      )}
 
-          <div className="border-t pt-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Placed Fields</p>
-            {fields.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No fields placed yet. Select a field type above and click on the PDF.</p>
-            ) : (
-              <div className="space-y-1">
-                {fields.map((field, idx) => {
-                  const roleColor = getRoleColor(field.role);
-                  const isSelected = idx === selectedFieldIdx;
-                  return (
-                    <div
-                      key={field.id}
-                      className={`flex items-center gap-1.5 p-1.5 rounded text-xs cursor-pointer border ${isSelected ? "bg-accent border-primary" : "border-transparent hover:bg-muted"}`}
-                      onClick={() => {
-                        setSelectedFieldIdx(idx);
-                        setCurrentPage(field.page);
-                      }}
-                    >
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: roleColor }} />
-                      <span className="truncate flex-1 capitalize">{field.type}</span>
-                      <span className="text-muted-foreground shrink-0">p{field.page + 1}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 shrink-0"
-                        onClick={(e) => { e.stopPropagation(); deleteField(idx); }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+      {!isMobile && (
+        <div className="border-t pt-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Role Legend</p>
+          <div className="space-y-1">
+            {SIGNER_ROLES.map((r) => {
+              const count = fields.filter((f) => f.role === r.value).length;
+              return (
+                <div key={r.value} className="flex items-center gap-2 text-xs">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ background: r.color }} />
+                  <span>{r.label}</span>
+                  <span className="text-muted-foreground ml-auto">{count} field{count !== 1 ? "s" : ""}</span>
+                </div>
+              );
+            })}
           </div>
+        </div>
+      )}
+    </>
+  );
 
-          {selectedFieldIdx !== null && fields[selectedFieldIdx] && (
-            <div className="border-t pt-3 space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase">Selected Field</p>
-              <div>
-                <label className="text-xs text-muted-foreground">Role</label>
-                <Select
-                  value={fields[selectedFieldIdx].role}
-                  onValueChange={(v) => {
-                    setFields((prev) => {
-                      const copy = [...prev];
-                      copy[selectedFieldIdx!] = { ...copy[selectedFieldIdx!], role: v };
-                      return copy;
-                    });
-                  }}
-                >
-                  <SelectTrigger className="h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="z-[10001]">
-                    {SIGNER_ROLES.map((r) => (
-                      <SelectItem key={r.value} value={r.value}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ background: r.color }} />
-                          {r.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Type</label>
-                <Select
-                  value={fields[selectedFieldIdx].type}
-                  onValueChange={(v) => {
-                    setFields((prev) => {
-                      const copy = [...prev];
-                      copy[selectedFieldIdx!] = { ...copy[selectedFieldIdx!], type: v, label: v };
-                      return copy;
-                    });
-                  }}
-                >
-                  <SelectTrigger className="h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="z-[10001]">
-                    {FIELD_TYPES.map((ft) => (
-                      <SelectItem key={ft.type} value={ft.type}>{ft.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="w-full h-7 text-xs"
-                onClick={() => deleteField(selectedFieldIdx)}
-              >
-                <Trash2 className="h-3 w-3 mr-1" /> Delete Field
-              </Button>
+  const pageControls = (
+    <div className="flex items-center justify-center gap-2 sm:gap-3 p-2 border-b bg-muted/30">
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-7 w-7"
+        disabled={currentPage === 0}
+        onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <span className="text-xs sm:text-sm font-medium min-w-[60px] sm:min-w-[80px] text-center">
+        {currentPage + 1} / {pdfPages.length}
+      </span>
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-7 w-7"
+        disabled={currentPage >= pdfPages.length - 1}
+        onClick={() => setCurrentPage((p) => Math.min(pdfPages.length - 1, p + 1))}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+      <div className="border-l pl-2 sm:pl-3 flex items-center gap-1">
+        <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setScale((s) => Math.max(0.2, s - 0.15))}>
+          <ZoomOut className="h-4 w-4" />
+        </Button>
+        <span className="text-xs w-10 text-center">{Math.round(scale * 100)}%</span>
+        <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setScale((s) => Math.min(3, s + 0.15))}>
+          <ZoomIn className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  const pdfViewer = (
+    <div
+      ref={containerRef}
+      className="flex-1 overflow-auto bg-muted/50 flex items-start justify-center p-2 sm:p-4"
+      style={{ touchAction: "pan-x pan-y" }}
+    >
+      {loading ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Loading PDF...</p>
+          </div>
+        </div>
+      ) : loadError ? (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-sm text-destructive">{loadError}</p>
+        </div>
+      ) : (
+        <canvas
+          ref={canvasRef}
+          className={`shadow-lg ${placingType ? "cursor-crosshair" : "cursor-default"}`}
+          style={{ touchAction: "none" }}
+          onMouseDown={handlePointerDown}
+          onMouseMove={handlePointerMove}
+          onMouseUp={handlePointerUp}
+          onMouseLeave={handlePointerUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        />
+      )}
+    </div>
+  );
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-background flex flex-col" style={{ colorScheme: "light" }}>
+      <div className="flex items-center justify-between p-2 sm:p-3 border-b bg-card shadow-sm pt-safe">
+        <div className="flex items-center gap-1 sm:gap-2">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+            <X className="h-5 w-5" />
+          </Button>
+          <h2 className="font-semibold text-sm">Field Editor</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs">
+            {fields.length} field{fields.length !== 1 ? "s" : ""}
+          </Badge>
+          <Button
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => onSave(fields, pdfDims)}
+            disabled={saving}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+            Save
+          </Button>
+        </div>
+      </div>
+
+      {isMobile ? (
+        <div className="flex flex-col flex-1 overflow-hidden">
+          {pageControls}
+          {pdfViewer}
+
+          {placingType && (
+            <div className="bg-primary text-primary-foreground text-center py-2 text-xs animate-pulse">
+              Tap on the PDF to place a {placingType} field for {SIGNER_ROLES.find(r => r.value === placingRole)?.label}
             </div>
           )}
 
-          <div className="border-t pt-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Role Legend</p>
-            <div className="space-y-1">
-              {SIGNER_ROLES.map((r) => {
-                const count = fields.filter((f) => f.role === r.value).length;
-                return (
-                  <div key={r.value} className="flex items-center gap-2 text-xs">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: r.color }} />
-                    <span>{r.label}</span>
-                    <span className="text-muted-foreground ml-auto">{count} field{count !== 1 ? "s" : ""}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex items-center justify-center gap-3 p-2 border-b bg-muted/30">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              disabled={currentPage === 0}
-              onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+          <div className={`border-t bg-card transition-all duration-200 ${mobileDrawerOpen ? "max-h-[55vh]" : "max-h-12"} flex flex-col`}>
+            <button
+              className="flex items-center justify-between px-4 py-2.5 w-full shrink-0"
+              onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
             >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-medium min-w-[80px] text-center">
-              Page {currentPage + 1} / {pdfPages.length}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              disabled={currentPage >= pdfPages.length - 1}
-              onClick={() => setCurrentPage((p) => Math.min(pdfPages.length - 1, p + 1))}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <div className="border-l pl-3 flex items-center gap-1">
-              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setScale((s) => Math.max(0.25, s - 0.15))}>
-                <ZoomOut className="h-4 w-4" />
-              </Button>
-              <span className="text-xs w-10 text-center">{Math.round(scale * 100)}%</span>
-              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setScale((s) => Math.min(2, s + 0.15))}>
-                <ZoomIn className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          <div ref={containerRef} className="flex-1 overflow-auto bg-muted/50 flex items-start justify-center p-4">
-            {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="flex flex-col items-center gap-2">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Loading PDF...</p>
-                </div>
+              <span className="text-xs font-semibold text-muted-foreground uppercase">
+                Tools & Fields ({fields.length})
+              </span>
+              {mobileDrawerOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </button>
+            {mobileDrawerOpen && (
+              <div className="overflow-y-auto px-3 pb-3 space-y-3 pb-safe">
+                {sidebarContent}
               </div>
-            ) : loadError ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-sm text-destructive">{loadError}</p>
-              </div>
-            ) : (
-              <canvas
-                ref={canvasRef}
-                className={`shadow-lg ${placingType ? "cursor-crosshair" : "cursor-default"}`}
-                onMouseDown={handlePointerDown}
-                onMouseMove={handlePointerMove}
-                onMouseUp={handlePointerUp}
-                onMouseLeave={handlePointerUp}
-              />
             )}
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex flex-1 overflow-hidden">
+          <div className="w-56 lg:w-64 border-r flex flex-col overflow-y-auto bg-card p-3 gap-3 shrink-0">
+            {sidebarContent}
+          </div>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {pageControls}
+            {pdfViewer}
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );
