@@ -7549,6 +7549,78 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // ============ Vendor-to-Private-Contractor Matching ============
+  const NAME_STOPWORDS = new Set(['the', 'and', 'inc', 'llc', 'corp', 'company', 'co', 'services', 'service', 'group', 'solutions', 'pro', 'pros', 'team']);
+
+  async function findMatchingPrivateContractors(
+    vendor: { name: string; email?: string; phone?: string },
+    vendorContractorId: number
+  ): Promise<Array<{ id: number; name: string; agentId: number; matchType: string }>> {
+    const matches: Array<{ id: number; name: string; agentId: number; matchType: string }> = [];
+    const seen = new Set<number>();
+    const notifiedAgents = new Set<number>();
+
+    if (vendor.email) {
+      const emailMatches: any = await db.execute(sql`
+        SELECT id, name, agent_id FROM contractors
+        WHERE agent_id IS NOT NULL AND vendor_user_id IS NULL
+          AND LOWER(email) = LOWER(${vendor.email})
+      `);
+      for (const row of (emailMatches.rows || emailMatches)) {
+        if (!seen.has(row.id)) {
+          seen.add(row.id);
+          notifiedAgents.add(row.agent_id);
+          matches.push({ id: row.id, name: row.name, agentId: row.agent_id, matchType: 'email' });
+        }
+      }
+    }
+
+    if (vendor.phone) {
+      const digits = vendor.phone.replace(/\D/g, '').slice(-10);
+      if (digits.length === 10) {
+        const phoneMatches: any = await db.execute(sql`
+          SELECT id, name, agent_id FROM contractors
+          WHERE agent_id IS NOT NULL AND vendor_user_id IS NULL
+            AND RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 10) = ${digits}
+        `);
+        for (const row of (phoneMatches.rows || phoneMatches)) {
+          if (!seen.has(row.id) && !notifiedAgents.has(row.agent_id)) {
+            seen.add(row.id);
+            notifiedAgents.add(row.agent_id);
+            matches.push({ id: row.id, name: row.name, agentId: row.agent_id, matchType: 'phone' });
+          }
+        }
+      }
+    }
+
+    if (vendor.name) {
+      const vendorWords = vendor.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/)
+        .filter(w => w.length > 2 && !NAME_STOPWORDS.has(w));
+      if (vendorWords.length > 0) {
+        const nameMatches: any = await db.execute(sql`
+          SELECT id, name, agent_id FROM contractors
+          WHERE agent_id IS NOT NULL AND vendor_user_id IS NULL
+            AND LOWER(name) != ''
+        `);
+        for (const row of (nameMatches.rows || nameMatches)) {
+          if (seen.has(row.id) || notifiedAgents.has(row.agent_id)) continue;
+          const privateWords = (row.name || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/)
+            .filter((w: string) => w.length > 2 && !NAME_STOPWORDS.has(w));
+          if (privateWords.length === 0) continue;
+          const commonWords = vendorWords.filter(w => privateWords.includes(w));
+          const similarity = commonWords.length / Math.max(vendorWords.length, privateWords.length);
+          if (similarity >= 0.6 && commonWords.length >= 2) {
+            seen.add(row.id);
+            notifiedAgents.add(row.agent_id);
+            matches.push({ id: row.id, name: row.name, agentId: row.agent_id, matchType: 'name' });
+          }
+        }
+      }
+    }
+
+    return matches;
+  }
+
   // ============ Vendor Self-Registration ============
   app.post("/api/vendor/profile", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "vendor") return res.sendStatus(401);
@@ -7565,10 +7637,121 @@ export function registerRoutes(app: Express): Server {
         name, category, phone, email, website, address, city, state, zipCode, description, googleMapsUrl, yelpUrl, bbbUrl,
         vendorUserId: req.user.id
       });
+
+      try {
+        const matchingPrivatePros = await findMatchingPrivateContractors(
+          { name, email, phone },
+          contractor.id
+        );
+        for (const match of matchingPrivatePros) {
+          if (match.agentId) {
+            await notify(
+              match.agentId,
+              'vendor_match',
+              `${name} just joined HomeBase Pros!`,
+              `A vendor matching "${match.name}" on your team has registered on the platform. Would you like to sync their profile?`,
+              contractor.id,
+              'contractor'
+            );
+            console.log(`[Vendor Match] Notified agent ${match.agentId} about vendor ${name} matching private contractor "${match.name}" (match: ${match.matchType})`);
+          }
+        }
+      } catch (matchErr) {
+        console.error('[Vendor Match] Error checking for matches:', matchErr);
+      }
+
       res.status(201).json(contractor);
     } catch (error) {
       console.error('Error creating vendor profile:', error);
       res.status(500).json({ error: 'Failed to create vendor profile' });
+    }
+  });
+
+  // ============ Vendor Sync (match private contractor to marketplace vendor) ============
+  app.post("/api/vendor/sync-contractor", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const { privateContractorId, vendorContractorId } = req.body;
+      if (!privateContractorId || !vendorContractorId) {
+        return res.status(400).json({ error: 'Both privateContractorId and vendorContractorId are required' });
+      }
+
+      const privateRow: any = await db.execute(sql`
+        SELECT id, name, agent_id FROM contractors WHERE id = ${privateContractorId} AND agent_id = ${req.user.id}
+      `);
+      const privatePro = (privateRow.rows || privateRow)[0];
+      if (!privatePro) return res.status(404).json({ error: 'Private contractor not found or not yours' });
+
+      const vendorRow: any = await db.execute(sql`
+        SELECT id, name, vendor_user_id FROM contractors WHERE id = ${vendorContractorId} AND vendor_user_id IS NOT NULL
+      `);
+      const vendorPro = (vendorRow.rows || vendorRow)[0];
+      if (!vendorPro) return res.status(404).json({ error: 'Vendor profile not found' });
+
+      const existingTeam: any = await db.execute(sql`
+        SELECT id FROM home_team_members WHERE user_id = ${req.user.id} AND contractor_id = ${vendorContractorId}
+      `);
+      if ((existingTeam.rows || existingTeam).length > 0) {
+        return res.status(409).json({ error: 'This vendor is already on your team' });
+      }
+
+      await db.execute(sql`
+        INSERT INTO home_team_members (user_id, contractor_id, category, notes, added_at)
+        SELECT ${req.user.id}, ${vendorContractorId}, category, 
+          ${'Synced from private pro: ' + privatePro.name}, NOW()
+        FROM contractors WHERE id = ${vendorContractorId}
+      `);
+
+      if (privatePro.agent_id) {
+        await db.execute(sql`
+          UPDATE contractors 
+          SET agent_notes = COALESCE(agent_notes, '') || ${'\n[Synced to vendor: ' + vendorPro.name + ']'}
+          WHERE id = ${privateContractorId}
+        `);
+      }
+
+      console.log(`[Vendor Sync] Agent ${req.user.id} synced private contractor ${privateContractorId} with vendor ${vendorContractorId}`);
+      res.json({ success: true, message: `${vendorPro.name} has been added to your team` });
+    } catch (error) {
+      console.error('Error syncing vendor:', error);
+      res.status(500).json({ error: 'Failed to sync vendor' });
+    }
+  });
+
+  app.get("/api/vendor/match-candidates", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const vendorContractorId = Number(req.query.vendorContractorId);
+      if (!vendorContractorId) return res.status(400).json({ error: 'vendorContractorId required' });
+
+      const hasNotification: any = await db.execute(sql`
+        SELECT id FROM notifications
+        WHERE user_id = ${req.user.id} AND type = 'vendor_match'
+          AND related_id = ${vendorContractorId} AND related_type = 'contractor'
+        LIMIT 1
+      `);
+      if ((hasNotification.rows || hasNotification).length === 0) {
+        return res.status(403).json({ error: 'No matching notification found for this vendor' });
+      }
+
+      const vendorRow: any = await db.execute(sql`
+        SELECT id, name, email, phone, category FROM contractors WHERE id = ${vendorContractorId} AND vendor_user_id IS NOT NULL
+      `);
+      const vendor = (vendorRow.rows || vendorRow)[0];
+      if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+      const privatePros: any = await db.execute(sql`
+        SELECT id, name, email, phone, category FROM contractors
+        WHERE agent_id = ${req.user.id} AND vendor_user_id IS NULL
+      `);
+      const myPros = privatePros.rows || privatePros;
+
+      res.json({ vendor, privatePros: myPros });
+    } catch (error) {
+      console.error('Error fetching match candidates:', error);
+      res.status(500).json({ error: 'Failed to fetch match candidates' });
     }
   });
 

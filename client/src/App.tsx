@@ -105,6 +105,7 @@ import LeadSubmitPage from "@/pages/lead-submit-page";
 import LenderLeadSubmitPage from "@/pages/lender-lead-submit-page";
 import FindContractorPage from "@/pages/find-contractor-page";
 import VendorRatingsPage from "@/pages/vendor-ratings-page";
+import VendorSyncPage from "@/pages/vendor-sync-page";
 import BiometricSettingsPage from "@/pages/biometric-settings-page";
 import SettingsPage from "@/pages/settings-page";
 import LandingPage from "@/pages/landing-page";
@@ -838,6 +839,9 @@ function Router() {
           </Route>
           <Route path="/vendor-ratings">
             <ProtectedRoute path="/vendor-ratings" component={VendorRatingsPage} />
+          </Route>
+          <Route path="/vendor-sync/:vendorContractorId">
+            <ProtectedRoute path="/vendor-sync/:vendorContractorId" component={VendorSyncPage} />
           </Route>
           <Route path="/billing">
             <ProtectedRoute path="/billing" component={BillingPage} />

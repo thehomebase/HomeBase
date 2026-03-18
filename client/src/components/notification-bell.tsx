@@ -1,4 +1,4 @@
-import { Bell, MessageSquare, Target, FileText, Gavel, ArrowRightLeft, UserPlus, Clock, CheckCheck, Info } from "lucide-react";
+import { Bell, MessageSquare, Target, FileText, Gavel, ArrowRightLeft, UserPlus, Clock, CheckCheck, Info, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,6 +17,7 @@ const typeConfig: Record<string, { icon: any; color: string; route?: (n: any) =>
   bid_received: { icon: Gavel, color: 'text-purple-500', route: (n: any) => n.relatedId ? `/transactions/${n.relatedId}` : '/transactions' },
   transaction_update: { icon: ArrowRightLeft, color: 'text-primary', route: (n: any) => n.relatedId ? `/transactions/${n.relatedId}` : '/transactions' },
   client_invited: { icon: UserPlus, color: 'text-teal-500', route: () => '/clients' },
+  vendor_match: { icon: Link2, color: 'text-violet-500', route: (n: any) => n.relatedId ? `/vendor-sync/${n.relatedId}` : '/homebase-pros' },
   reminder: { icon: Clock, color: 'text-orange-500' },
   general: { icon: Info, color: 'text-muted-foreground' },
 };
