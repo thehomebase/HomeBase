@@ -601,7 +601,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
 
       {showMobileEditor && activeSigningRequestId && (
         <Suspense fallback={
-          <div className="fixed inset-0 z-50 bg-white flex items-center justify-center" style={{ colorScheme: "light" }}>
+          <div className="fixed inset-0 z-[1200] bg-white flex items-center justify-center" style={{ colorScheme: "light" }}>
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           </div>
         }>
