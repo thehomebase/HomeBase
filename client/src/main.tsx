@@ -7,42 +7,6 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { AuthProvider } from "@/hooks/use-auth";
 
-const origConsoleError = console.error;
-console.error = function (...args: unknown[]) {
-  if (args.length === 1 && args[0] && typeof args[0] === "object" && !(args[0] instanceof Error) && Object.keys(args[0] as object).length === 0) {
-    return;
-  }
-  origConsoleError.apply(console, args);
-};
-
-window.addEventListener("unhandledrejection", (event) => {
-  const err = event.reason;
-  if (!err || (typeof err === "object" && !(err instanceof Error) && Object.keys(err).length === 0)) {
-    event.preventDefault();
-  }
-}, true);
-
-window.addEventListener("error", (event) => {
-  if (!event.error || (typeof event.error === "object" && !(event.error instanceof Error))) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  }
-}, true);
-
-const origOnerror = window.onerror;
-window.onerror = function (message, source, lineno, colno, error) {
-  if (!error || (typeof error === "object" && !(error instanceof Error))) {
-    return true;
-  }
-  if (typeof message === "string" && message.includes("not an error object")) {
-    return true;
-  }
-  if (origOnerror) {
-    return origOnerror(message, source, lineno, colno, error) as boolean;
-  }
-  return false;
-};
-
 const root = ReactDOM.createRoot(document.getElementById("root")!);
 
 function render() {

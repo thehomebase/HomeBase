@@ -29,6 +29,34 @@
         if (t === 'dark') {
           document.documentElement.classList.add('dark');
         }
+
+        var _ce = console.error;
+        console.error = function() {
+          if (arguments.length === 1 && arguments[0] && typeof arguments[0] === 'object' && !(arguments[0] instanceof Error) && Object.keys(arguments[0]).length === 0) {
+            return;
+          }
+          return _ce.apply(console, arguments);
+        };
+
+        window.onerror = function(msg, src, line, col, err) {
+          if (!err || (typeof err === 'object' && !(err instanceof Error))) return true;
+          if (typeof msg === 'string' && msg.indexOf('not an error object') !== -1) return true;
+          return false;
+        };
+
+        window.addEventListener('error', function(e) {
+          if (!e.error || (typeof e.error === 'object' && !(e.error instanceof Error))) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(e) {
+          var r = e.reason;
+          if (!r || (typeof r === 'object' && !(r instanceof Error) && Object.keys(r).length === 0)) {
+            e.preventDefault();
+          }
+        }, true);
       })();
     </script>
     <div id="root"></div>
