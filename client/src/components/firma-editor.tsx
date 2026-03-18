@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -74,9 +74,9 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
     queryKey: ["/api/firma/status"],
   });
 
-  const queryKey = transactionId
+  const queryKey = useMemo(() => transactionId
     ? ["/api/firma/signing-requests", { transactionId }]
-    : ["/api/firma/signing-requests"];
+    : ["/api/firma/signing-requests"], [transactionId]);
 
   const { data: signingRequests, isLoading } = useQuery<any[]>({
     queryKey,
@@ -177,6 +177,11 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
   const [editorLoading, setEditorLoading] = useState(false);
   const [editorError, setEditorError] = useState<string | null>(null);
 
+  const queryKeyRef = useRef(queryKey);
+  queryKeyRef.current = queryKey;
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
+
   useEffect(() => {
     if (!showEditorDialog || !activeSigningRequestId) return;
 
@@ -212,12 +217,12 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
           signingRequestId: activeSigningRequestId,
           theme: document.documentElement.classList.contains("dark") ? "dark" : "light",
           onSave: () => {
-            queryClient.invalidateQueries({ queryKey });
-            toast({ title: "Changes saved" });
+            queryClient.invalidateQueries({ queryKey: queryKeyRef.current });
+            toastRef.current({ title: "Changes saved" });
           },
           onSend: () => {
-            queryClient.invalidateQueries({ queryKey });
-            toast({ title: "Signing request sent!" });
+            queryClient.invalidateQueries({ queryKey: queryKeyRef.current });
+            toastRef.current({ title: "Signing request sent!" });
             setShowEditorDialog(false);
           },
           onClose: () => {
@@ -258,7 +263,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
         editorContainerRef.current.innerHTML = "";
       }
     };
-  }, [showEditorDialog, activeSigningRequestId, editorKey, toast, queryKey]);
+  }, [showEditorDialog, activeSigningRequestId, editorKey]);
 
   useEffect(() => {
     const handler = (ev: MessageEvent) => {
