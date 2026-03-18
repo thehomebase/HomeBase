@@ -220,6 +220,31 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
   }, []);
 
   useEffect(() => {
+    if (!showEditorDialog) return;
+    const handler = (event: PromiseRejectionEvent) => {
+      const err = event.reason;
+      if (err && typeof err === "object" && Object.keys(err).length === 0) {
+        event.preventDefault();
+        return;
+      }
+      if (err?.message?.includes?.("signing request") || err?.message?.includes?.("Firma")) {
+        event.preventDefault();
+      }
+    };
+    const errHandler = (event: ErrorEvent) => {
+      if (event.message?.includes?.("not an error object")) {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("unhandledrejection", handler);
+    window.addEventListener("error", errHandler);
+    return () => {
+      window.removeEventListener("unhandledrejection", handler);
+      window.removeEventListener("error", errHandler);
+    };
+  }, [showEditorDialog]);
+
+  useEffect(() => {
     if (!showEditorDialog || !activeSigningRequestId) return;
 
     let destroyed = false;
@@ -268,10 +293,16 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
             setShowEditorDialog(false);
           },
           onError: (error: any) => {
+            if (error && typeof error === "object" && !error.message && Object.keys(error).length === 0) {
+              return;
+            }
             console.error("Firma editor error:", error);
             if (!destroyed) {
-              setEditorError(String(error?.message || error));
-              setEditorLoading(false);
+              const msg = error?.message || (typeof error === "string" ? error : "");
+              if (msg) {
+                setEditorError(msg);
+                setEditorLoading(false);
+              }
             }
           },
           onLoad: () => {
