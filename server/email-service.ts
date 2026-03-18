@@ -208,3 +208,45 @@ function getDomain(): string {
   const domain = domains.split(",")[0];
   return domain ? `https://${domain}` : "http://localhost:5000";
 }
+
+export async function sendSigningEmail(
+  to: string,
+  recipientName: string,
+  documentTitle: string,
+  senderName: string,
+  signingLink: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!ensureInitialized()) {
+    return { success: false, error: "Email service not configured" };
+  }
+
+  const msg = {
+    to,
+    from: { email: getFromEmail(), name: "HomeBase Signatures" },
+    subject: `${senderName} has sent you a document to sign: ${documentTitle}`,
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: #7c3aed; color: white; padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+          <h1 style="margin: 0; font-size: 24px;">📝 Document Ready to Sign</h1>
+        </div>
+        <div style="background: white; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+          <p style="font-size: 16px; color: #374151;">Hi ${recipientName},</p>
+          <p style="font-size: 16px; color: #374151;"><strong>${senderName}</strong> has sent you <strong>"${documentTitle}"</strong> for your signature.</p>
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${signingLink}" style="background: #7c3aed; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600; display: inline-block;">Review & Sign Document</a>
+          </div>
+          <p style="font-size: 14px; color: #6b7280; text-align: center;">Powered by HomeBase</p>
+        </div>
+      </div>
+    `,
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log(`Signing email sent to ${to} for "${documentTitle}"`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("SendGrid signing email error:", error?.response?.body || error.message);
+    return { success: false, error: error.message || "Failed to send signing email" };
+  }
+}

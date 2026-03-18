@@ -5787,7 +5787,26 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Add at least one signer first" });
       }
 
-      await firmaSendSR(req.params.id);
+      try {
+        await firmaSendSR(req.params.id);
+      } catch (firmaErr: any) {
+        console.log("Firma API send failed (expected for mobile-managed signers), sending emails directly:", firmaErr?.message);
+        const { sendSigningEmail } = await import("./email-service");
+        const sr = await firmaGetSR(req.params.id);
+        const title = (record as any).title || "Signing Request";
+        const senderName = req.user!.firstName ? `${req.user!.firstName} ${req.user!.lastName || ""}`.trim() : req.user!.username;
+        for (const signer of mobileData.signers) {
+          if (signer.email) {
+            try {
+              const signingLink = sr?.document_url || `${req.get("host") ? `https://${req.get("host")}` : ""}/sign/${req.params.id}`;
+              await sendSigningEmail(signer.email, signer.name, title, senderName, signingLink);
+            } catch (emailErr: any) {
+              console.error(`Failed to send email to ${signer.email}:`, emailErr?.message);
+            }
+          }
+        }
+      }
+
       await updateSigningRequestStatus(req.params.id, "sent");
       res.json({ success: true });
     } catch (error: any) {

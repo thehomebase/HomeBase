@@ -72,7 +72,12 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
   const [scale, setScale] = useState(1);
   const [pdfDims, setPdfDims] = useState<{ width: number; height: number }[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; fieldIdx: number } | null>(null);
+  const pinchRef = useRef<{ startDist: number; startScale: number } | null>(null);
+  const panRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number } | null>(null);
+  const gestureRef = useRef<"none" | "drag" | "pinch" | "pan">("none");
 
   useEffect(() => {
     loadDocument();
@@ -272,8 +277,25 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
     setSelectedFieldIdx(tappedIdx >= 0 ? tappedIdx : null);
   };
 
+  const getTouchDist = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) return 0;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      gestureRef.current = "pinch";
+      pinchRef.current = { startDist: getTouchDist(e), startScale: scale };
+      dragRef.current = null;
+      panRef.current = null;
+      e.preventDefault();
+      return;
+    }
+
     if (placingType) return;
+
     const coords = getCanvasCoords(e);
     if (!coords) return;
 
@@ -285,34 +307,64 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
         const idx = fields.indexOf(pageFields[i]);
         setSelectedFieldIdx(idx);
         dragRef.current = { startX: coords.x - f.x, startY: coords.y - f.y, fieldIdx: idx };
+        gestureRef.current = "drag";
         e.preventDefault();
         return;
       }
     }
+
+    if (scale > 1) {
+      const t = e.touches[0];
+      panRef.current = { startX: t.clientX, startY: t.clientY, startPanX: panOffset.x, startPanY: panOffset.y };
+      gestureRef.current = "pan";
+    }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!dragRef.current) return;
-    const coords = getCanvasCoords(e);
-    if (!coords) return;
-    e.preventDefault();
+    if (e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const dist = getTouchDist(e);
+      const newScale = Math.min(4, Math.max(0.5, pinchRef.current.startScale * (dist / pinchRef.current.startDist)));
+      setScale(newScale);
+      return;
+    }
 
-    const { startX, startY, fieldIdx } = dragRef.current;
-    setFields(prev => prev.map((f, i) => {
-      if (i !== fieldIdx) return f;
-      const dim = pdfDims[f.page];
-      const maxX = dim ? dim.width - f.width : Infinity;
-      const maxY = dim ? dim.height - f.height : Infinity;
-      return {
-        ...f,
-        x: Math.min(Math.max(0, coords.x - startX), maxX),
-        y: Math.min(Math.max(0, coords.y - startY), maxY),
-      };
-    }));
+    if (gestureRef.current === "drag" && dragRef.current) {
+      const coords = getCanvasCoords(e);
+      if (!coords) return;
+      e.preventDefault();
+      const { startX, startY, fieldIdx } = dragRef.current;
+      setFields(prev => prev.map((f, i) => {
+        if (i !== fieldIdx) return f;
+        const dim = pdfDims[f.page];
+        const maxX = dim ? dim.width - f.width : Infinity;
+        const maxY = dim ? dim.height - f.height : Infinity;
+        return {
+          ...f,
+          x: Math.min(Math.max(0, coords.x - startX), maxX),
+          y: Math.min(Math.max(0, coords.y - startY), maxY),
+        };
+      }));
+      return;
+    }
+
+    if (gestureRef.current === "pan" && panRef.current) {
+      const t = e.touches[0];
+      const dx = t.clientX - panRef.current.startX;
+      const dy = t.clientY - panRef.current.startY;
+      setPanOffset({ x: panRef.current.startPanX + dx, y: panRef.current.startPanY + dy });
+      return;
+    }
   };
 
   const handleTouchEnd = () => {
+    if (gestureRef.current === "pinch" && scale <= 1) {
+      setPanOffset({ x: 0, y: 0 });
+    }
     dragRef.current = null;
+    pinchRef.current = null;
+    panRef.current = null;
+    gestureRef.current = "none";
   };
 
   const deleteSelectedField = () => {
@@ -324,21 +376,34 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
   const handleSave = async (silent = false): Promise<boolean> => {
     setSaving(true);
     try {
-      await apiRequest("POST", `/api/firma/signing-requests/${signingRequestId}/mobile-save`, {
-        fields: fields.map(f => ({
-          type: f.type,
-          label: f.label,
-          page: f.page,
-          x: Math.round(f.x),
-          y: Math.round(f.y),
-          width: Math.round(f.width),
-          height: Math.round(f.height),
-          required: f.required,
-          assignedTo: f.assignedTo,
-        })),
-        signers: signers.map(s => ({ name: s.name, email: s.email })),
+      const res = await fetch(`/api/firma/signing-requests/${signingRequestId}/mobile-save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          fields: fields.map(f => ({
+            type: f.type,
+            label: f.label,
+            page: f.page,
+            x: Math.round(f.x),
+            y: Math.round(f.y),
+            width: Math.round(f.width),
+            height: Math.round(f.height),
+            required: f.required,
+            assignedTo: f.assignedTo,
+          })),
+          signers: signers.map(s => ({ name: s.name, email: s.email })),
+        }),
       });
-      if (!silent) toast({ title: "Saved" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Save failed" }));
+        throw new Error(err.error || "Save failed");
+      }
+      if (!silent) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2000);
+        toast({ title: "Saved successfully" });
+      }
       return true;
     } catch (err: any) {
       console.error("Save failed:", err);
@@ -354,6 +419,10 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
       toast({ title: "Add at least one signer first", variant: "destructive" });
       return;
     }
+    if (fields.length === 0) {
+      toast({ title: "Add at least one field first", variant: "destructive" });
+      return;
+    }
     setSending(true);
     try {
       const saved = await handleSave(true);
@@ -361,8 +430,20 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
         setSending(false);
         return;
       }
-      await apiRequest("POST", `/api/firma/signing-requests/${signingRequestId}/mobile-send`);
-      await apiRequest("POST", `/api/firma/signing-requests/${signingRequestId}/mark-sent`);
+      const sendRes = await fetch(`/api/firma/signing-requests/${signingRequestId}/mobile-send`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!sendRes.ok) {
+        const err = await sendRes.json().catch(() => ({ error: "Send failed" }));
+        throw new Error(err.error || "Send failed");
+      }
+      try {
+        await fetch(`/api/firma/signing-requests/${signingRequestId}/mark-sent`, {
+          method: "POST",
+          credentials: "include",
+        });
+      } catch {}
       toast({ title: "Signing request sent!" });
       onSent();
     } catch (err: any) {
@@ -427,9 +508,9 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
           <X className="h-5 w-5 text-gray-700" />
         </button>
         <div className="flex items-center gap-1">
-          <Button size="sm" variant="outline" onClick={handleSave} disabled={saving} className="h-8 text-xs">
-            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-            <span className="ml-1">Save</span>
+          <Button size="sm" variant="outline" onClick={() => handleSave(false)} disabled={saving} className={`h-8 text-xs ${saveSuccess ? "border-green-500 text-green-600" : ""}`}>
+            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : saveSuccess ? <CheckSquare className="h-3 w-3 text-green-600" /> : <Save className="h-3 w-3" />}
+            <span className="ml-1">{saveSuccess ? "Saved!" : "Save"}</span>
           </Button>
           <Button size="sm" onClick={handleSend} disabled={sending} className="h-8 text-xs bg-violet-600 hover:bg-violet-700 text-white">
             {sending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
@@ -449,11 +530,13 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
           </button>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={() => setScale(s => Math.max(0.5, s - 0.25))} className="p-1">
+          <button onClick={() => { setScale(s => { const ns = Math.max(0.5, s - 0.25); if (ns <= 1) setPanOffset({ x: 0, y: 0 }); return ns; }); }} className="p-1">
             <ZoomOut className="h-4 w-4 text-gray-600" />
           </button>
-          <span className="text-xs text-gray-500 w-10 text-center">{Math.round(scale * 100)}%</span>
-          <button onClick={() => setScale(s => Math.min(3, s + 0.25))} className="p-1">
+          <button onClick={() => { setScale(1); setPanOffset({ x: 0, y: 0 }); }} className="px-1">
+            <span className="text-xs text-gray-500 w-10 text-center">{Math.round(scale * 100)}%</span>
+          </button>
+          <button onClick={() => setScale(s => Math.min(4, s + 0.25))} className="p-1">
             <ZoomIn className="h-4 w-4 text-gray-600" />
           </button>
         </div>
@@ -501,16 +584,28 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
         </div>
       )}
 
-      <div ref={containerRef} className="flex-1 overflow-auto bg-gray-100 relative" style={{ WebkitOverflowScrolling: "touch" }}>
-        <canvas
-          ref={canvasRef}
-          onClick={handleCanvasTap}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          className="block mx-auto"
-          style={{ touchAction: placingType || dragRef.current ? "none" : "pan-x pan-y" }}
-        />
+      <div ref={containerRef} className="flex-1 overflow-hidden bg-gray-100 relative">
+        <div
+          style={{
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            overflow: scale > 1 ? "visible" : "auto",
+          }}
+        >
+          <canvas
+            ref={canvasRef}
+            onClick={handleCanvasTap}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            className="block"
+            style={{ touchAction: "none" }}
+          />
+        </div>
       </div>
 
       {selectedFieldIdx !== null && fields[selectedFieldIdx] && (
