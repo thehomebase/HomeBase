@@ -5726,6 +5726,47 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/firma/proxy/storage", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { url: targetUrl, jwt } = req.query as { url?: string; jwt?: string };
+      if (!targetUrl || !jwt) {
+        return res.status(400).json({ error: "url and jwt are required" });
+      }
+      const allowedHost = "ielmshcswdhuacyjlpiy.supabase.co";
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(targetUrl);
+      } catch {
+        return res.status(400).json({ error: "Invalid target URL" });
+      }
+      if (parsedUrl.host !== allowedHost) {
+        return res.status(403).json({ error: "Target URL not allowed" });
+      }
+      const response = await fetch(targetUrl, {
+        headers: {
+          "Authorization": `Bearer ${jwt}`,
+        },
+      });
+      if (!response.ok) {
+        return res.status(response.status).send("Failed to fetch file");
+      }
+      const contentType = response.headers.get("content-type");
+      if (contentType) {
+        res.setHeader("Content-Type", contentType);
+      }
+      const contentDisposition = response.headers.get("content-disposition");
+      if (contentDisposition) {
+        res.setHeader("Content-Disposition", contentDisposition);
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Firma storage proxy error:", error);
+      res.status(500).json({ error: "Storage proxy request failed" });
+    }
+  });
+
   app.post("/api/firma/webhook", async (req, res) => {
     try {
       const event = req.body;

@@ -192,23 +192,37 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
       const method = (init?.method || "GET").toUpperCase();
 
-      if (url.includes(SUPABASE_HOST) && activeFirmaJwtRef.current && method === "POST" && url.includes("/functions/v1/")) {
-        try {
-          const body = init?.body ? JSON.parse(init.body as string) : {};
-          const proxyRes = await originalFetch("/api/firma/proxy/supabase", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              targetUrl: url,
-              jwt: activeFirmaJwtRef.current,
-              payload: body,
-            }),
-          });
-          return proxyRes;
-        } catch (err) {
-          console.error("Firma proxy fetch failed, falling back to direct:", err);
-          return originalFetch(input, init);
+      if (url.includes(SUPABASE_HOST) && activeFirmaJwtRef.current) {
+        if (method === "POST" && url.includes("/functions/v1/")) {
+          try {
+            const body = init?.body ? JSON.parse(init.body as string) : {};
+            const proxyRes = await originalFetch("/api/firma/proxy/supabase", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                targetUrl: url,
+                jwt: activeFirmaJwtRef.current,
+                payload: body,
+              }),
+            });
+            return proxyRes;
+          } catch (err) {
+            console.error("Firma proxy fetch failed, falling back to direct:", err);
+            return originalFetch(input, init);
+          }
+        }
+
+        if (method === "GET") {
+          try {
+            const proxyRes = await originalFetch("/api/firma/proxy/storage?" + new URLSearchParams({ url, jwt: activeFirmaJwtRef.current }), {
+              credentials: "include",
+            });
+            return proxyRes;
+          } catch (err) {
+            console.error("Firma storage proxy failed, falling back to direct:", err);
+            return originalFetch(input, init);
+          }
         }
       }
 
