@@ -894,26 +894,34 @@ export function registerRoutes(app: Express): Server {
         }
       }
 
-      if (oldTransaction && oldTransaction.status !== "closed" && data.status === "closed" && transaction.clientId && transaction.requestClientReview !== false) {
-        try {
-          const existing = await storage.getFeedbackRequestByTransaction(transaction.id, transaction.clientId);
-          if (!existing) {
-            const client = await storage.getClient(transaction.clientId);
-            if (client) {
-              const token = randomUUID();
-              await storage.createFeedbackRequest({
-                transactionId: transaction.id,
-                agentId: req.user.id,
-                clientId: transaction.clientId,
-                token,
-              });
+      if (oldTransaction && oldTransaction.status !== "closed" && data.status === "closed" && transaction.requestClientReview !== false) {
+        const clientIds = [transaction.clientId, transaction.secondaryClientId].filter(Boolean) as number[];
+        const agentName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'your agent';
+        const address = [transaction.streetName, transaction.city].filter(Boolean).join(', ') || 'your property';
+        const baseUrl = getAppBaseUrl(req);
+        const signupUrl = `${baseUrl}/auth`;
 
-              const agentName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'your agent';
-              const address = [transaction.streetName, transaction.city].filter(Boolean).join(', ') || 'your property';
-              const feedbackUrl = `${getAppBaseUrl(req)}/feedback/${token}`;
-              const deliveredVia: string[] = [];
+        for (const cId of clientIds) {
+          try {
+            const existing = await storage.getFeedbackRequestByTransaction(transaction.id, cId);
+            if (existing) continue;
+            const client = await storage.getClient(cId);
+            if (!client) continue;
 
-              if (client.phone) {
+            const token = randomUUID();
+            await storage.createFeedbackRequest({
+              transactionId: transaction.id,
+              agentId: req.user.id,
+              clientId: cId,
+              token,
+            });
+
+            const feedbackUrl = `${baseUrl}/feedback/${token}`;
+            const clientName = client.firstName || 'there';
+            const deliveredVia: string[] = [];
+
+            if (client.phone) {
+              try {
                 const agentPhone = await storage.getAgentPhoneNumber(req.user.id);
                 const smsMessage = `Congratulations on closing on ${address}! ${agentName} would love to hear about your experience. Please leave a review here: ${feedbackUrl}`;
                 const smsResult = agentPhone
@@ -921,49 +929,77 @@ export function registerRoutes(app: Express): Server {
                   : await sendSMS(client.phone, smsMessage);
                 if (smsResult.success) deliveredVia.push('sms');
                 else console.error("Failed to send feedback SMS:", smsResult.error);
+              } catch (smsErr) {
+                console.error("Failed to send feedback SMS:", smsErr);
               }
-
-              if (client.email) {
-                try {
-                  const gmailStatus = await getGmailStatus(req.user.id);
-                  if (gmailStatus.connected) {
-                    const subject = `How was your experience? — ${address}`;
-                    const emailBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
-                      <h2 style="color:#333;">Congratulations on your closing!</h2>
-                      <p>Hi ${client.firstName || 'there'},</p>
-                      <p>${agentName} would love to hear about your experience with the transaction at <strong>${address}</strong>.</p>
-                      <p style="margin:24px 0;"><a href="${feedbackUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">Leave a Review</a></p>
-                      <p style="color:#666;font-size:13px;">Or copy this link: ${feedbackUrl}</p>
-                    </div>`;
-                    const emailResult = await sendGmailEmail(req.user.id, client.email, subject, emailBody);
-                    if (emailResult.success) deliveredVia.push('email');
-                  }
-                } catch (emailErr) {
-                  console.error("Failed to send feedback email:", emailErr);
-                }
-              }
-
-              if (client.email) {
-                try {
-                  const clientUser = await storage.getUserByEmail(client.email);
-                  if (clientUser) {
-                    await storage.createPrivateMessage({
-                      senderId: req.user.id,
-                      recipientId: clientUser.id,
-                      content: `Congratulations on closing on ${address}! I'd love to hear about your experience. Please leave a review here: ${feedbackUrl}`,
-                    });
-                    deliveredVia.push('message');
-                  }
-                } catch (msgErr) {
-                  console.error("Failed to send feedback private message:", msgErr);
-                }
-              }
-
-              console.log(`[Feedback] Created feedback request for transaction ${transaction.id}, client ${client.firstName} ${client.lastName}, delivered via: ${deliveredVia.join(', ') || 'none (no contact info)'}`);
             }
+
+            let emailSent = false;
+            const clientUser = client.email ? await storage.getUserByEmail(client.email) : null;
+            const isExistingMember = !!clientUser;
+
+            if (client.email) {
+              try {
+                const gmailStatus = await getGmailStatus(req.user.id);
+                if (gmailStatus.connected) {
+                  const subject = `How was your experience? — ${address}`;
+                  const emailBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+                    <h2 style="color:#333;">Congratulations on your closing!</h2>
+                    <p>Hi ${clientName},</p>
+                    <p>${agentName} would love to hear about your experience with the transaction at <strong>${address}</strong>.</p>
+                    <p style="margin:24px 0;"><a href="${feedbackUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">Leave a Review</a></p>
+                    <p style="color:#666;font-size:13px;">Or copy this link: ${feedbackUrl}</p>
+                    ${!isExistingMember ? `<div style="margin:24px 0;padding:16px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;">
+                      <p style="color:#166534;font-weight:600;margin:0 0 4px;">New to HomeBase?</p>
+                      <p style="color:#15803d;font-size:13px;margin:0 0 8px;">Create a free account to track your home details, access closing documents, and find trusted contractors.</p>
+                      <a href="${signupUrl}" style="display:inline-block;background:#16a34a;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">Create Your Free Account</a>
+                    </div>` : ''}
+                  </div>`;
+                  const emailResult = await sendGmailEmail(req.user.id, client.email, subject, emailBody);
+                  if (emailResult.success) { deliveredVia.push('email-gmail'); emailSent = true; }
+                }
+              } catch (emailErr) {
+                console.error("Failed to send feedback email via Gmail:", emailErr);
+              }
+            }
+
+            if (client.email && !emailSent) {
+              try {
+                const { sendReviewRequestEmail } = await import("./email-service");
+                const sgResult = await sendReviewRequestEmail(
+                  client.email, clientName, agentName, address,
+                  feedbackUrl, signupUrl, isExistingMember
+                );
+                if (sgResult.success) deliveredVia.push('email-sendgrid');
+              } catch (sgErr) {
+                console.error("Failed to send feedback email via SendGrid:", sgErr);
+              }
+            }
+
+            if (clientUser) {
+              try {
+                await storage.createPrivateMessage({
+                  senderId: req.user.id,
+                  recipientId: clientUser.id,
+                  content: `Congratulations on closing on ${address}! I'd love to hear about your experience. Please leave a review here: ${feedbackUrl}`,
+                });
+                deliveredVia.push('message');
+              } catch (msgErr) {
+                console.error("Failed to send feedback private message:", msgErr);
+              }
+              try {
+                await notify(clientUser.id, 'review_request', 'Review Request',
+                  `${agentName} would love your feedback on ${address}`, transaction.id, 'feedback');
+                deliveredVia.push('notification');
+              } catch (notifyErr) {
+                console.error("Failed to send review notification:", notifyErr);
+              }
+            }
+
+            console.log(`[Feedback] Created feedback request for transaction ${transaction.id}, client ${client.firstName} ${client.lastName}, delivered via: ${deliveredVia.join(', ') || 'none (no contact info)'}`);
+          } catch (feedbackErr) {
+            console.error(`Error creating feedback request for client ${cId}:`, feedbackErr);
           }
-        } catch (feedbackErr) {
-          console.error("Error creating feedback request:", feedbackErr);
         }
 
         if (transaction.contractPrice) {

@@ -209,6 +209,101 @@ function getDomain(): string {
   return domain ? `https://${domain}` : "http://localhost:5000";
 }
 
+export async function sendReviewRequestEmail(
+  to: string,
+  clientName: string,
+  agentName: string,
+  address: string,
+  feedbackUrl: string,
+  signupUrl: string,
+  isExistingMember: boolean
+): Promise<{ success: boolean; error?: string }> {
+  if (!ensureInitialized()) {
+    return { success: false, error: "Email service not configured" };
+  }
+
+  const signupSection = !isExistingMember ? `
+    <tr><td style="height:16px;"></td></tr>
+    <tr>
+      <td style="padding:20px 32px;background-color:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;">
+        <p style="margin:0 0 8px;color:#166534;font-size:14px;font-weight:600;">New to HomeBase?</p>
+        <p style="margin:0 0 12px;color:#15803d;font-size:13px;line-height:1.5;">
+          Create a free account to track your home details, access your closing documents, find trusted contractors, and more.
+        </p>
+        <a href="${signupUrl}" style="display:inline-block;background:#16a34a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">Create Your Free Account</a>
+      </td>
+    </tr>` : '';
+
+  const msg = {
+    to,
+    from: { email: getFromEmail(), name: "HomeBase" },
+    subject: `How was your experience? — ${address}`,
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="background-color:#1a1a2e;padding:32px 40px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:700;">HomeBase</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:40px;">
+              <h2 style="margin:0 0 16px;color:#1a1a2e;font-size:22px;">Congratulations on your closing!</h2>
+              <p style="margin:0 0 16px;color:#4a4a68;font-size:15px;line-height:1.6;">
+                Hi ${clientName},
+              </p>
+              <p style="margin:0 0 24px;color:#4a4a68;font-size:15px;line-height:1.6;">
+                <strong>${agentName}</strong> would love to hear about your experience with the transaction at <strong>${address}</strong>. Your review helps other buyers and sellers find great agents.
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+                <tr>
+                  <td style="background-color:#4338ca;border-radius:8px;">
+                    <a href="${feedbackUrl}" style="display:inline-block;padding:14px 32px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;">
+                      Leave a Review
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0;color:#8e8ea0;font-size:13px;text-align:center;">
+                Or copy this link: ${feedbackUrl}
+              </p>
+              ${signupSection}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 40px;background-color:#f9f9fb;border-top:1px solid #e5e5ea;text-align:center;">
+              <p style="margin:0;color:#8e8ea0;font-size:12px;">
+                &copy; ${new Date().getFullYear()} HomeBase. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log(`Review request email sent to ${to} for ${address}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("SendGrid review request email error:", error?.response?.body || error.message);
+    return { success: false, error: error.message || "Failed to send review request email" };
+  }
+}
+
 export async function sendSigningEmail(
   to: string,
   recipientName: string,
