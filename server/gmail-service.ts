@@ -9,6 +9,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/gmail.modify",
   "https://www.googleapis.com/auth/gmail.settings.basic",
   "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/calendar.events",
 ];
 
 function getOAuth2Client(requestHost?: string) {
@@ -509,5 +510,69 @@ export async function getGmailMessages(
   } catch (error: any) {
     console.error("Gmail fetch error:", error);
     return { messages: [], error: error.message || "Failed to fetch Gmail messages" };
+  }
+}
+
+export async function syncTransactionToGoogleCalendar(
+  userId: number,
+  transaction: {
+    id: number;
+    streetName?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zipCode?: string | null;
+    closingDate?: string | null;
+    optionPeriodExpiration?: string | null;
+  }
+): Promise<{ synced: boolean; error?: string }> {
+  try {
+    const auth = await getAuthenticatedClient(userId);
+    if (!auth) {
+      return { synced: false, error: "Google account not connected" };
+    }
+
+    const calendar = google.calendar({ version: "v3", auth: auth.client });
+    const address = [transaction.streetName, transaction.city, transaction.state, transaction.zipCode].filter(Boolean).join(", ") || "TBD";
+    const txnIdStr = String(transaction.id);
+
+    const toDateStr = (d: string) => new Date(d).toISOString().split("T")[0];
+
+    const upsertEvent = async (rawId: string, event: any) => {
+      const safeId = rawId.replace(/[^a-v0-9]/g, "").slice(0, 32).padEnd(5, "0");
+      event.id = safeId;
+      try {
+        await calendar.events.get({ calendarId: "primary", eventId: safeId });
+        await calendar.events.update({ calendarId: "primary", eventId: safeId, requestBody: event });
+      } catch {
+        await calendar.events.insert({ calendarId: "primary", requestBody: event });
+      }
+    };
+
+    if (transaction.closingDate) {
+      const dateStr = toDateStr(transaction.closingDate);
+      await upsertEvent(`homebaseclosing${txnIdStr}`, {
+        summary: `Closing - ${address}`,
+        description: `Closing for property at ${address}\n\nManaged by HomeBase`,
+        location: address,
+        start: { date: dateStr },
+        end: { date: dateStr },
+      });
+    }
+
+    if (transaction.optionPeriodExpiration) {
+      const dateStr = toDateStr(transaction.optionPeriodExpiration);
+      await upsertEvent(`homebaseoption${txnIdStr}`, {
+        summary: `Option Expiration - ${address}`,
+        description: `Option period expiration for property at ${address}\n\nManaged by HomeBase`,
+        location: address,
+        start: { date: dateStr },
+        end: { date: dateStr },
+      });
+    }
+
+    return { synced: true };
+  } catch (error: any) {
+    console.error("Google Calendar sync error:", error?.message);
+    return { synced: false, error: error?.message || "Calendar sync failed" };
   }
 }
