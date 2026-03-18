@@ -5688,6 +5688,44 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/firma/proxy/supabase", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { targetUrl, jwt, payload } = req.body;
+      if (!targetUrl || !jwt) {
+        return res.status(400).json({ error: "targetUrl and jwt are required" });
+      }
+      const allowedHost = "ielmshcswdhuacyjlpiy.supabase.co";
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(targetUrl);
+      } catch {
+        return res.status(400).json({ error: "Invalid target URL" });
+      }
+      if (parsedUrl.host !== allowedHost) {
+        return res.status(403).json({ error: "Target URL not allowed" });
+      }
+      const response = await fetch(targetUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${jwt}`,
+        },
+        body: JSON.stringify(payload || {}),
+      });
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const data = await response.json();
+        return res.status(response.status).json(data);
+      }
+      const text = await response.text();
+      res.status(response.status).send(text);
+    } catch (error: any) {
+      console.error("Firma supabase proxy error:", error);
+      res.status(500).json({ error: "Proxy request failed" });
+    }
+  });
+
   app.post("/api/firma/webhook", async (req, res) => {
     try {
       const event = req.body;

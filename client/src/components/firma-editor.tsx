@@ -186,22 +186,22 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
 
   useEffect(() => {
     const originalFetch = window.fetch.bind(window);
-    const SUPABASE_URL = "https://ielmshcswdhuacyjlpiy.supabase.co/functions/v1/get-embedded-signing-request-data";
+    const SUPABASE_HOST = "ielmshcswdhuacyjlpiy.supabase.co";
 
     window.fetch = async function patchedFetch(input: RequestInfo | URL, init?: RequestInit) {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
 
-      if (url === SUPABASE_URL && activeFirmaJwtRef.current) {
+      if (url.includes(SUPABASE_HOST) && activeFirmaJwtRef.current) {
         try {
           const body = init?.body ? JSON.parse(init.body as string) : {};
-          const proxyRes = await originalFetch("/api/firma/proxy/embedded-data", {
+          const proxyRes = await originalFetch("/api/firma/proxy/supabase", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({
-              signingRequestId: body.signingRequestId,
+              targetUrl: url,
               jwt: activeFirmaJwtRef.current,
-              validate_only: body.validate_only || false,
+              payload: body,
             }),
           });
           return proxyRes;
@@ -254,7 +254,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
           container: freshDiv,
           jwt: token,
           signingRequestId: activeSigningRequestId,
-          theme: document.documentElement.classList.contains("dark") ? "dark" : "light",
+          theme: "light",
           onSave: () => {
             queryClient.invalidateQueries({ queryKey: queryKeyRef.current });
             toastRef.current({ title: "Changes saved" });
@@ -283,9 +283,37 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
           onLoad: () => {
             if (!destroyed) {
               setEditorLoading(false);
+              setTimeout(() => {
+                const shadowRoot = freshDiv.querySelector("*")?.shadowRoot || freshDiv.shadowRoot;
+                if (shadowRoot) {
+                  const fixStyle = document.createElement("style");
+                  fixStyle.textContent = `
+                    :host, *, *::before, *::after {
+                      color-scheme: light !important;
+                    }
+                    label, h1, h2, h3, h4, h5, h6, p, span, div {
+                      color: inherit;
+                    }
+                  `;
+                  shadowRoot.appendChild(fixStyle);
+                }
+              }, 500);
             }
           },
         });
+
+        setTimeout(() => {
+          const shadowRoot = freshDiv.querySelector("*")?.shadowRoot || freshDiv.shadowRoot;
+          if (shadowRoot) {
+            const fixStyle = document.createElement("style");
+            fixStyle.textContent = `
+              :host {
+                color-scheme: light !important;
+              }
+            `;
+            shadowRoot.appendChild(fixStyle);
+          }
+        }, 1000);
       } catch (err: any) {
         console.error("Failed to init Firma editor:", err);
         if (!destroyed) {
@@ -504,17 +532,17 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
           }
         }
       }}>
-        <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0">
+        <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0 bg-white text-black" style={{ colorScheme: "light" }} data-theme="light">
           {editorLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+            <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
               <div className="flex flex-col items-center gap-2">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Loading signature editor...</p>
+                <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+                <p className="text-sm text-gray-500">Loading signature editor...</p>
               </div>
             </div>
           )}
           {editorError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
+            <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
               <div className="flex flex-col items-center gap-3 max-w-md text-center">
                 <XCircle className="h-10 w-10 text-destructive" />
                 <p className="font-semibold">Failed to load editor</p>
@@ -528,7 +556,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
               </div>
             </div>
           )}
-          <div ref={editorContainerRef} className="w-full h-full" />
+          <div ref={editorContainerRef} className="w-full h-full" style={{ colorScheme: "light", backgroundColor: "white" }} />
         </DialogContent>
       </Dialog>
     </div>
