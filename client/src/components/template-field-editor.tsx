@@ -336,6 +336,7 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
 
       if (hitIdx !== null) {
         e.preventDefault();
+        if (isMobile) setMobileDrawerOpen(true);
         if (isOnResizeHandle(coords.x, coords.y, hitIdx)) {
           resizeRef.current = {
             fieldIdx: hitIdx,
@@ -640,7 +641,7 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
         <canvas
           ref={canvasRef}
           className={`shadow-lg ${placingType ? "cursor-crosshair" : "cursor-default"}`}
-          style={{ touchAction: "none" }}
+          style={{ touchAction: "pinch-zoom" }}
           onMouseDown={handlePointerDown}
           onMouseMove={handlePointerMove}
           onMouseUp={handlePointerUp}
@@ -689,18 +690,21 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
             </div>
           )}
 
-          <div className={`border-t bg-card transition-all duration-200 ${mobileDrawerOpen ? "max-h-[55vh]" : "max-h-12"} flex flex-col`}>
+          <div className={`border-t bg-card shadow-[0_-2px_10px_rgba(0,0,0,0.1)] transition-all duration-200 pb-safe flex flex-col ${mobileDrawerOpen ? "max-h-[60vh]" : ""}`}>
             <button
-              className="flex items-center justify-between px-4 py-2.5 w-full shrink-0"
+              className="flex items-center justify-center gap-2 px-4 py-3 w-full shrink-0 active:bg-muted"
               onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
             >
-              <span className="text-xs font-semibold text-muted-foreground uppercase">
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mb-1" />
+            </button>
+            <div className="flex items-center justify-between px-4 pb-2 shrink-0">
+              <span className="text-xs font-semibold uppercase">
                 Tools & Fields ({fields.length})
               </span>
               {mobileDrawerOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-            </button>
+            </div>
             {mobileDrawerOpen && (
-              <div className="overflow-y-auto px-3 pb-3 space-y-3 pb-safe">
+              <div className="overflow-y-auto px-3 pb-3 space-y-3">
                 {sidebarContent}
               </div>
             )}
