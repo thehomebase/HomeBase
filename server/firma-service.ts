@@ -36,13 +36,18 @@ async function firmaFetch(path: string, options: RequestInit = {}): Promise<any>
 export async function createSigningRequest(data: {
   title: string;
   message?: string;
+  document?: string;
 }): Promise<any> {
+  const payload: any = {
+    name: data.title,
+    message: data.message || "",
+  };
+  if (data.document) {
+    payload.document = data.document;
+  }
   return firmaFetch("/signing-requests", {
     method: "POST",
-    body: JSON.stringify({
-      name: data.title,
-      message: data.message || "",
-    }),
+    body: JSON.stringify(payload),
   });
 }
 

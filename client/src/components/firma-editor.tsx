@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { FileSignature, Plus, Send, X, Eye, Loader2, Clock, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { FileSignature, Plus, Send, X, Eye, Loader2, Clock, CheckCircle, XCircle, RefreshCw, Upload } from "lucide-react";
 
 declare global {
   interface Window {
@@ -63,6 +63,9 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
   const [activeSigningRequestId, setActiveSigningRequestId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newMessage, setNewMessage] = useState("");
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [documentBase64, setDocumentBase64] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<any>(null);
 
@@ -87,12 +90,34 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
     enabled: !!status?.configured,
   });
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast({ title: "Please select a PDF file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      toast({ title: "File too large (max 25MB)", variant: "destructive" });
+      return;
+    }
+    setDocumentFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1];
+      setDocumentBase64(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/firma/signing-requests", {
         title: newTitle,
         message: newMessage,
         transactionId,
+        document: documentBase64,
       });
       return res.json();
     },
@@ -101,6 +126,8 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
       setShowCreateDialog(false);
       setNewTitle("");
       setNewMessage("");
+      setDocumentFile(null);
+      setDocumentBase64("");
       toast({ title: "Signing request created" });
       const srId = data.id || data.signing_request_id || data.data?.id;
       if (srId) {
@@ -336,6 +363,30 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
               />
             </div>
             <div>
+              <label className="text-sm font-medium mb-1 block">PDF Document</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {documentFile ? documentFile.name : "Choose PDF file..."}
+              </Button>
+              {documentFile && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {(documentFile.size / 1024).toFixed(0)} KB
+                </p>
+              )}
+            </div>
+            <div>
               <label className="text-sm font-medium mb-1 block">Message (optional)</label>
               <Textarea
                 placeholder="Add a message for the signers..."
@@ -346,10 +397,10 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowCreateDialog(false); setDocumentFile(null); setDocumentBase64(""); }}>Cancel</Button>
             <Button
               onClick={() => createMutation.mutate()}
-              disabled={!newTitle.trim() || createMutation.isPending}
+              disabled={!newTitle.trim() || !documentBase64 || createMutation.isPending}
             >
               {createMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-1" />

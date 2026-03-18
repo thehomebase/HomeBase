@@ -5540,13 +5540,14 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/firma/signing-requests", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      const { title, message, transactionId } = req.body;
+      const { title, message, transactionId, document: documentBase64 } = req.body;
       if (!title || typeof title !== "string") return res.status(400).json({ error: "Title is required" });
+      if (!documentBase64 || typeof documentBase64 !== "string") return res.status(400).json({ error: "A PDF document is required" });
       if (transactionId) {
         const { allowed } = await verifyTransactionAccess(transactionId, req.user!.id, req.user!.role);
         if (!allowed) return res.status(403).json({ error: "Not authorized for this transaction" });
       }
-      const result = await firmaCreateSR({ title, message });
+      const result = await firmaCreateSR({ title, message, document: documentBase64 });
       const srId = result.id || result.signing_request_id || result.data?.id;
       if (srId) {
         await saveFirmaSigningRequest({
