@@ -15,7 +15,7 @@ import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailE
 import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured, logSignNowAction } from "./signnow-service";
 import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, createDraftEnvelope, createSenderView, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction, generatePKCE } from "./docusign-service";
 import { isDropboxConfigured, generateDropboxState, getDropboxAuthUrl, handleDropboxCallback, getDropboxConnectionStatus, disconnectDropbox, listDropboxFiles, downloadDropboxFile, searchDropboxFiles } from "./dropbox-service";
-import { isFirmaConfigured, createSigningRequest as firmaCreateSR, getSigningRequest as firmaGetSR, listSigningRequests as firmaListSR, sendSigningRequest as firmaSendSR, cancelSigningRequest as firmaCancelSR, updateSigningRequest as firmaUpdateSR, generateSigningRequestJWT, getEditorScriptUrl, logFirmaAction, saveFirmaSigningRequest, getUserSigningRequests, getTransactionSigningRequests, updateSigningRequestStatus, verifySigningRequestOwnership, getSigningRequestFields as firmaGetFields, getSigningRequestUsers as firmaGetUsers, addSigningRequestField as firmaAddField, updateSigningRequestField as firmaUpdateField, deleteSigningRequestField as firmaDeleteField, addSigningRequestUser as firmaAddUser, deleteSigningRequestUser as firmaDeleteUser, getSigningRequestRecord } from "./firma-service";
+import { isFirmaConfigured, createSigningRequest as firmaCreateSR, getSigningRequest as firmaGetSR, listSigningRequests as firmaListSR, sendSigningRequest as firmaSendSR, cancelSigningRequest as firmaCancelSR, updateSigningRequest as firmaUpdateSR, generateSigningRequestJWT, getEditorScriptUrl, logFirmaAction, saveFirmaSigningRequest, getUserSigningRequests, getTransactionSigningRequests, updateSigningRequestStatus, verifySigningRequestOwnership, getSigningRequestFields as firmaGetFields, getSigningRequestUsers as firmaGetUsers, addSigningRequestField as firmaAddField, updateSigningRequestField as firmaUpdateField, deleteSigningRequestField as firmaDeleteField, addSigningRequestUser as firmaAddUser, deleteSigningRequestUser as firmaDeleteUser, getSigningRequestRecord, syncMobileDataToFirma } from "./firma-service";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { notify } from "./notification-helper";
@@ -5787,10 +5787,23 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Add at least one signer first" });
       }
 
-      try {
-        await firmaSendSR(req.params.id);
-      } catch (firmaErr: any) {
-        console.log("Firma API send failed (expected for mobile-managed signers), sending emails directly:", firmaErr?.message);
+      const syncResult = await syncMobileDataToFirma(req.params.id, mobileData);
+      console.log(`[Firma Mobile Send] Sync result: synced=${syncResult.synced}, errors=${syncResult.errors.length}`);
+
+      let sentViaFirma = false;
+      if (syncResult.synced) {
+        try {
+          await firmaSendSR(req.params.id);
+          sentViaFirma = true;
+          console.log(`[Firma Mobile Send] Sent via Firma API with full audit trail`);
+        } catch (sendErr: any) {
+          console.error(`[Firma Mobile Send] Firma send failed after sync:`, sendErr?.message);
+        }
+      }
+
+      let emailsSent = 0;
+      if (!sentViaFirma) {
+        console.log("[Firma Mobile Send] Falling back to direct email (no Firma audit trail)");
         const { sendSigningEmail } = await import("./email-service");
         const sr = await firmaGetSR(req.params.id);
         const title = (record as any).title || "Signing Request";
@@ -5799,16 +5812,30 @@ export function registerRoutes(app: Express): Server {
           if (signer.email) {
             try {
               const signingLink = sr?.document_url || `${req.get("host") ? `https://${req.get("host")}` : ""}/sign/${req.params.id}`;
-              await sendSigningEmail(signer.email, signer.name, title, senderName, signingLink);
+              const result = await sendSigningEmail(signer.email, signer.name, title, senderName, signingLink);
+              if (result.success) emailsSent++;
             } catch (emailErr: any) {
               console.error(`Failed to send email to ${signer.email}:`, emailErr?.message);
             }
           }
         }
+
+        if (emailsSent === 0) {
+          return res.status(500).json({ error: "Failed to deliver signing request — no emails were sent. Please try again or use the desktop editor." });
+        }
       }
 
       await updateSigningRequestStatus(req.params.id, "sent");
-      res.json({ success: true });
+      await logFirmaAction(req.user!.id, "mobile_signing_request_sent", {
+        signingRequestId: req.params.id,
+        sentViaFirma,
+        emailsFallback: !sentViaFirma,
+        emailsSent,
+        signerCount: mobileData.signers.length,
+        fieldCount: mobileData.fields?.length || 0,
+        syncErrors: syncResult.errors,
+      });
+      res.json({ success: true, sentViaFirma });
     } catch (error: any) {
       console.error("Firma mobile send error:", error);
       res.status(500).json({ error: error.message || "Failed to send" });

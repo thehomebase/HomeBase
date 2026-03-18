@@ -438,13 +438,13 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
         const err = await sendRes.json().catch(() => ({ error: "Send failed" }));
         throw new Error(err.error || "Send failed");
       }
-      try {
-        await fetch(`/api/firma/signing-requests/${signingRequestId}/mark-sent`, {
-          method: "POST",
-          credentials: "include",
-        });
-      } catch {}
-      toast({ title: "Signing request sent!" });
+      const sendData = await sendRes.json().catch(() => ({}));
+      toast({
+        title: "Signing request sent!",
+        description: sendData.sentViaFirma
+          ? "Sent via Firma with full e-signature audit trail"
+          : "Sent via email — signers will receive a link to the document",
+      });
       onSent();
     } catch (err: any) {
       console.error("Send failed:", err);

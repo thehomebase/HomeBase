@@ -141,6 +141,59 @@ export function getEditorScriptUrl(): string {
   return FIRMA_EMBED_EDITOR_JS;
 }
 
+export async function syncMobileDataToFirma(signingRequestId: string, mobileData: any): Promise<{ synced: boolean; errors: string[] }> {
+  const errors: string[] = [];
+
+  if (!mobileData?.signers?.length) {
+    return { synced: false, errors: ["No signers to sync"] };
+  }
+
+  const signerNameToFirmaId: Record<string, string> = {};
+
+  for (const signer of mobileData.signers) {
+    try {
+      const result = await addSigningRequestUser(signingRequestId, {
+        name: signer.name,
+        email: signer.email,
+      });
+      if (result?.id) {
+        signerNameToFirmaId[signer.name] = result.id;
+      }
+      console.log(`[Firma Sync] Added signer ${signer.name} (${signer.email}) -> Firma user ${result?.id}`);
+    } catch (err: any) {
+      const msg = `Failed to add signer ${signer.name}: ${err?.message}`;
+      console.error(`[Firma Sync] ${msg}`);
+      errors.push(msg);
+    }
+  }
+
+  if (mobileData.fields?.length) {
+    for (const field of mobileData.fields) {
+      try {
+        const assignedName = field.assignedTo || field.signerId;
+        const firmaUserId = assignedName ? signerNameToFirmaId[assignedName] : undefined;
+        await addSigningRequestField(signingRequestId, {
+          type: field.type || "signature",
+          page: field.page || 1,
+          x: Math.round(field.x),
+          y: Math.round(field.y),
+          width: Math.round(field.width || 200),
+          height: Math.round(field.height || 50),
+          ...(firmaUserId ? { user_id: firmaUserId } : {}),
+        });
+        console.log(`[Firma Sync] Added field type=${field.type} on page ${field.page} for ${assignedName || "unassigned"}`);
+      } catch (err: any) {
+        const msg = `Failed to add field: ${err?.message}`;
+        console.error(`[Firma Sync] ${msg}`);
+        errors.push(msg);
+      }
+    }
+  }
+
+  const synced = errors.length === 0;
+  return { synced, errors };
+}
+
 export async function logFirmaAction(userId: number, action: string, details: Record<string, any> = {}): Promise<void> {
   try {
     await db.execute(sql`
