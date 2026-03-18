@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -391,17 +392,18 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
   };
 
   if (loading) {
-    return (
-      <div className="fixed inset-0 z-[1200] bg-white flex flex-col items-center justify-center" style={{ colorScheme: "light" }}>
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] bg-white flex flex-col items-center justify-center" style={{ colorScheme: "light" }}>
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         <p className="text-sm text-gray-500 mt-2">Loading document...</p>
-      </div>
+      </div>,
+      document.body
     );
   }
 
   if (loadError && pdfPages.length === 0) {
-    return (
-      <div className="fixed inset-0 z-[1200] bg-white flex flex-col items-center justify-center gap-3 px-6" style={{ colorScheme: "light" }}>
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] bg-white flex flex-col items-center justify-center gap-3 px-6" style={{ colorScheme: "light" }}>
         <X className="h-10 w-10 text-red-400" />
         <p className="text-sm font-medium text-gray-700 text-center">Failed to load document</p>
         <p className="text-xs text-gray-500 text-center">{loadError}</p>
@@ -413,12 +415,13 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
             Close
           </Button>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
-  return (
-    <div className="fixed inset-0 z-[1200] bg-white flex flex-col" style={{ colorScheme: "light" }}>
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-white flex flex-col" style={{ colorScheme: "light" }}>
       <div className="flex items-center justify-between px-3 py-2 border-b bg-white shrink-0">
         <button onClick={onClose} className="p-1">
           <X className="h-5 w-5 text-gray-700" />
@@ -571,6 +574,7 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

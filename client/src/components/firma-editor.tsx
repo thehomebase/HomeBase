@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -599,9 +600,9 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
         </DialogContent>
       </Dialog>
 
-      {showMobileEditor && activeSigningRequestId && (
+      {showMobileEditor && activeSigningRequestId && createPortal(
         <Suspense fallback={
-          <div className="fixed inset-0 z-[1200] bg-white flex items-center justify-center" style={{ colorScheme: "light" }}>
+          <div className="fixed inset-0 z-[9999] bg-white flex items-center justify-center" style={{ colorScheme: "light" }}>
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           </div>
         }>
@@ -617,7 +618,8 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
               queryClient.invalidateQueries({ queryKey: queryKeyRef.current });
             }}
           />
-        </Suspense>
+        </Suspense>,
+        document.body
       )}
     </div>
   );
