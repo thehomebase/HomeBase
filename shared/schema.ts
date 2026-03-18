@@ -497,6 +497,26 @@ export const insertSignnowTokenSchema = createInsertSchema(signnowTokens).omit({
 export type SignnowToken = typeof signnowTokens.$inferSelect;
 export type InsertSignnowToken = z.infer<typeof insertSignnowTokenSchema>;
 
+export const firmaSigningRequests = pgTable("firma_signing_requests", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  transactionId: integer("transaction_id"),
+  firmaSigningRequestId: text("firma_signing_request_id").notNull().unique(),
+  title: text("title").notNull(),
+  status: text("status").notNull().default("draft"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFirmaSigningRequestSchema = createInsertSchema(firmaSigningRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type FirmaSigningRequest = typeof firmaSigningRequests.$inferSelect;
+export type InsertFirmaSigningRequest = z.infer<typeof insertFirmaSigningRequestSchema>;
+
 export const emailSnippets = pgTable("email_snippets", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),

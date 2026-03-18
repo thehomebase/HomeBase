@@ -15,6 +15,7 @@ import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailE
 import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured, logSignNowAction } from "./signnow-service";
 import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, createDraftEnvelope, createSenderView, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction, generatePKCE } from "./docusign-service";
 import { isDropboxConfigured, generateDropboxState, getDropboxAuthUrl, handleDropboxCallback, getDropboxConnectionStatus, disconnectDropbox, listDropboxFiles, downloadDropboxFile, searchDropboxFiles } from "./dropbox-service";
+import { isFirmaConfigured, createSigningRequest as firmaCreateSR, getSigningRequest as firmaGetSR, listSigningRequests as firmaListSR, sendSigningRequest as firmaSendSR, cancelSigningRequest as firmaCancelSR, updateSigningRequest as firmaUpdateSR, generateSigningRequestJWT, getEditorScriptUrl, logFirmaAction, saveFirmaSigningRequest, getUserSigningRequests, getTransactionSigningRequests, updateSigningRequestStatus, verifySigningRequestOwnership } from "./firma-service";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { notify } from "./notification-helper";
@@ -5518,6 +5519,153 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error("SignNow download error:", error);
       console.error("Server error:", error); res.status(500).json({ error: "Failed to download document" });
+    }
+  });
+
+  // ============ Firma e-Signature (Embedded) ============
+  app.get("/api/firma/status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      res.json({ configured: isFirmaConfigured() });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to get Firma status" });
+    }
+  });
+
+  app.get("/api/firma/editor-script", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    res.json({ url: getEditorScriptUrl() });
+  });
+
+  app.post("/api/firma/signing-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { title, message, transactionId } = req.body;
+      if (!title || typeof title !== "string") return res.status(400).json({ error: "Title is required" });
+      if (transactionId) {
+        const { allowed } = await verifyTransactionAccess(transactionId, req.user!.id, req.user!.role);
+        if (!allowed) return res.status(403).json({ error: "Not authorized for this transaction" });
+      }
+      const result = await firmaCreateSR({ title, message });
+      const srId = result.id || result.signing_request_id || result.data?.id;
+      if (srId) {
+        await saveFirmaSigningRequest({
+          userId: req.user!.id,
+          transactionId: transactionId || undefined,
+          firmaSigningRequestId: srId,
+          title,
+          status: "draft",
+        });
+        await logFirmaAction(req.user!.id, "signing_request_created", { signingRequestId: srId, title, transactionId });
+      }
+      res.json(result);
+    } catch (error: any) {
+      console.error("Firma create SR error:", error);
+      res.status(500).json({ error: "Failed to create signing request" });
+    }
+  });
+
+  app.get("/api/firma/signing-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const transactionId = req.query.transactionId ? parseInt(req.query.transactionId as string) : undefined;
+      if (transactionId) {
+        const { allowed } = await verifyTransactionAccess(transactionId, req.user!.id, req.user!.role);
+        if (!allowed && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+        const local = await getTransactionSigningRequests(transactionId);
+        return res.json(local);
+      }
+      const local = await getUserSigningRequests(req.user!.id);
+      res.json(local);
+    } catch (error: any) {
+      console.error("Firma list SR error:", error);
+      res.status(500).json({ error: "Failed to list signing requests" });
+    }
+  });
+
+  app.get("/api/firma/signing-requests/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const result = await firmaGetSR(req.params.id);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Firma get SR error:", error);
+      res.status(500).json({ error: "Failed to get signing request" });
+    }
+  });
+
+  app.put("/api/firma/signing-requests/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const result = await firmaUpdateSR(req.params.id, req.body);
+      await logFirmaAction(req.user!.id, "signing_request_updated", { signingRequestId: req.params.id });
+      res.json(result);
+    } catch (error: any) {
+      console.error("Firma update SR error:", error);
+      res.status(500).json({ error: "Failed to update signing request" });
+    }
+  });
+
+  app.post("/api/firma/signing-requests/:id/send", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const result = await firmaSendSR(req.params.id);
+      await updateSigningRequestStatus(req.params.id, "sent");
+      await logFirmaAction(req.user!.id, "signing_request_sent", { signingRequestId: req.params.id });
+      res.json(result);
+    } catch (error: any) {
+      console.error("Firma send SR error:", error);
+      res.status(500).json({ error: "Failed to send signing request" });
+    }
+  });
+
+  app.post("/api/firma/signing-requests/:id/cancel", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const result = await firmaCancelSR(req.params.id);
+      await updateSigningRequestStatus(req.params.id, "cancelled");
+      await logFirmaAction(req.user!.id, "signing_request_cancelled", { signingRequestId: req.params.id });
+      res.json(result);
+    } catch (error: any) {
+      console.error("Firma cancel SR error:", error);
+      res.status(500).json({ error: "Failed to cancel signing request" });
+    }
+  });
+
+  app.post("/api/firma/signing-requests/:id/jwt", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const result = await generateSigningRequestJWT(req.params.id);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Firma JWT generation error:", error);
+      res.status(500).json({ error: "Failed to generate JWT for editor" });
+    }
+  });
+
+  app.post("/api/firma/webhook", async (req, res) => {
+    try {
+      const event = req.body;
+      if (event?.payload?.signing_request_id) {
+        const status = event.payload.status || event.event?.replace("signing_request.", "");
+        if (status && typeof status === "string" && status.length < 50) {
+          await updateSigningRequestStatus(event.payload.signing_request_id, status);
+        }
+      }
+      res.sendStatus(200);
+    } catch (error: any) {
+      console.error("Firma webhook error:", error);
+      res.sendStatus(200);
     }
   });
 

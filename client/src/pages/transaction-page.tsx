@@ -3,7 +3,7 @@ import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useTransactionLock } from "@/hooks/use-transaction-lock";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock, FileSignature } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ import { DocumentChecklist } from "@/components/document-checklist";
 import { TransactionContacts } from "@/components/transaction-contacts";
 import { ContractUpload } from "@/components/contract-upload";
 import { TransactionTimeline } from "@/components/transaction-timeline";
+import FirmaEditor from "@/components/firma-editor";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -535,6 +536,10 @@ export default function TransactionPage() {
             <Upload className="h-4 w-4 mr-2" />
             Contract Upload
           </TabsTrigger>
+          <TabsTrigger value="signatures" className="shrink-0">
+            <FileSignature className="h-4 w-4 mr-2" />
+            Signatures
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="progress">
@@ -557,6 +562,10 @@ export default function TransactionPage() {
           {parsedId && transaction && (
             <ContractUpload transactionId={parsedId} transaction={transaction} readOnly={isReadOnly} />
           )}
+        </TabsContent>
+
+        <TabsContent value="signatures">
+          <FirmaEditor transactionId={parsedId} />
         </TabsContent>
       </Tabs>
 

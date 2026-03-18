@@ -83,6 +83,7 @@ import {
   Users,
   Gift,
   CloudUpload,
+  FileSignature,
 } from "lucide-react";
 import {
   SiMailchimp,
@@ -1502,6 +1503,47 @@ function SignNowIntegrationCard() {
   );
 }
 
+function FirmaIntegrationCard() {
+  const { data: status } = useQuery<{ configured: boolean }>({
+    queryKey: ["/api/firma/status"],
+  });
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+              <FileSignature className="h-6 w-6 text-green-600" />
+            </div>
+            <div>
+              <p className="font-medium">Firma e-Signatures</p>
+              <p className="text-sm text-muted-foreground">
+                Built-in document signing powered by Firma
+              </p>
+            </div>
+          </div>
+          {status?.configured ? (
+            <Badge variant="default" className="bg-green-600">Active</Badge>
+          ) : (
+            <Badge variant="secondary">Not Configured</Badge>
+          )}
+        </div>
+        {status?.configured ? (
+          <p className="text-sm text-muted-foreground">
+            Firma is active. You can send documents for e-signature directly from any transaction.
+            Recipients sign documents right inside HomeBase — no external accounts needed.
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Firma e-signatures are not yet configured. Contact your administrator to add the Firma API key.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function DocuSignIntegrationCard() {
   const { toast } = useToast();
 
@@ -1981,6 +2023,7 @@ function IntegrationsSection() {
       </Card>
 
       <GmailIntegrationCard />
+      <FirmaIntegrationCard />
       <SignNowIntegrationCard />
       <DocuSignIntegrationCard />
       <DropboxIntegrationCard />

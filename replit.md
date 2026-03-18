@@ -34,7 +34,7 @@ Preferred communication style: Simple, everyday language.
 - **Client Management**: Client invitation, automated feedback, smart reminders, client linking.
 - **HomeBase Pros (Unified Vendor/Contractor Hub)**: Public marketplace for verified vendors, agent/broker "My Team" tab for private contractors, inspection bid system, vendor self-registration.
 - **Communication Tools**: Encrypted private messaging (AES-256-GCM), SMS via Twilio, email integration via Google OAuth, call logging, communication metrics dashboard, snippet management.
-- **e-Signatures**: SignNow and DocuSign integrations via OAuth2 for sending and managing signing requests.
+- **e-Signatures**: Firma (embedded, built-in signing), SignNow and DocuSign integrations via OAuth2 for sending and managing signing requests. Firma is the primary embedded option — no user accounts needed; signing happens inside the app. Transaction detail page has a "Signatures" tab powered by Firma.
 - **Team Access / Authorized Users**: Agents/brokers can add other agents/brokers with configurable permission levels, account switcher, and extended transaction access.
 - **Client Portal**: Mobile-first "My Transaction" page with stage tracker, closing countdown, "Action Required" cards, key dates grid, interactive document hub, financial details, "Your Team" section, and multi-transaction support.
 - **Post-Close Engagement**: "MyHome" hub for homeowners.
@@ -68,5 +68,6 @@ Preferred communication style: Simple, everyday language.
 - **Census Bureau ACS API**: Median home values by ZIP code.
 - **@imgly/background-removal-node**: Local AI-based background removal for profile photos.
 - **Dropbox API**: OAuth2-based cloud file integration for file browsing, search, and download into transaction checklists.
+- **Firma API**: Embedded e-signature API (pay-per-envelope). Service: `server/firma-service.ts`. Component: `client/src/components/firma-editor.tsx`. Env vars: `FIRMA_API_KEY`. Editor JS loaded from `api.firma.dev`. JWT-based embedded editor for signing request creation and management.
 - **SignNow API**: OAuth2-based e-signature integration.
 - **DocuSign API**: OAuth2-based e-signature integration for sending and managing signing processes.
