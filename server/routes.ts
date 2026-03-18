@@ -15,7 +15,7 @@ import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailE
 import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured, logSignNowAction } from "./signnow-service";
 import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, createDraftEnvelope, createSenderView, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction, generatePKCE } from "./docusign-service";
 import { isDropboxConfigured, generateDropboxState, getDropboxAuthUrl, handleDropboxCallback, getDropboxConnectionStatus, disconnectDropbox, listDropboxFiles, downloadDropboxFile, searchDropboxFiles } from "./dropbox-service";
-import { isFirmaConfigured, createSigningRequest as firmaCreateSR, getSigningRequest as firmaGetSR, listSigningRequests as firmaListSR, sendSigningRequest as firmaSendSR, cancelSigningRequest as firmaCancelSR, updateSigningRequest as firmaUpdateSR, generateSigningRequestJWT, getEditorScriptUrl, logFirmaAction, saveFirmaSigningRequest, getUserSigningRequests, getTransactionSigningRequests, updateSigningRequestStatus, verifySigningRequestOwnership } from "./firma-service";
+import { isFirmaConfigured, createSigningRequest as firmaCreateSR, getSigningRequest as firmaGetSR, listSigningRequests as firmaListSR, sendSigningRequest as firmaSendSR, cancelSigningRequest as firmaCancelSR, updateSigningRequest as firmaUpdateSR, generateSigningRequestJWT, getEditorScriptUrl, logFirmaAction, saveFirmaSigningRequest, getUserSigningRequests, getTransactionSigningRequests, updateSigningRequestStatus, verifySigningRequestOwnership, getSigningRequestFields as firmaGetFields, getSigningRequestUsers as firmaGetUsers, addSigningRequestField as firmaAddField, updateSigningRequestField as firmaUpdateField, deleteSigningRequestField as firmaDeleteField, addSigningRequestUser as firmaAddUser, deleteSigningRequestUser as firmaDeleteUser } from "./firma-service";
 import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { notify } from "./notification-helper";
@@ -5609,6 +5609,143 @@ export function registerRoutes(app: Express): Server {
     } catch (error: any) {
       console.error("Firma update SR error:", error);
       res.status(500).json({ error: "Failed to update signing request" });
+    }
+  });
+
+  app.get("/api/firma/signing-requests/:id/fields", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const fields = await firmaGetFields(req.params.id);
+      res.json(fields);
+    } catch (error: any) {
+      console.error("Firma get fields error:", error);
+      res.status(500).json({ error: "Failed to get fields" });
+    }
+  });
+
+  const firmaFieldSchema = z.object({
+    type: z.enum(["signature", "text", "date", "checkbox", "initials"]),
+    label: z.string().max(100).optional(),
+    page: z.number().int().min(0),
+    x: z.number().min(0),
+    y: z.number().min(0),
+    width: z.number().min(1).max(2000),
+    height: z.number().min(1).max(2000),
+    required: z.boolean().optional(),
+    assigned_to: z.string().max(200).optional(),
+  });
+
+  const firmaUserSchema = z.object({
+    name: z.string().min(1).max(200),
+    email: z.string().email().max(200),
+  });
+
+  app.post("/api/firma/signing-requests/:id/fields", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const parsed = firmaFieldSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Invalid field data", details: parsed.error.issues });
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const field = await firmaAddField(req.params.id, parsed.data);
+      res.json(field);
+    } catch (error: any) {
+      console.error("Firma add field error:", error);
+      res.status(500).json({ error: error.message || "Failed to add field" });
+    }
+  });
+
+  app.put("/api/firma/signing-requests/:id/fields/:fieldId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const parsed = firmaFieldSchema.partial().safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Invalid field data", details: parsed.error.issues });
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const field = await firmaUpdateField(req.params.id, req.params.fieldId, parsed.data);
+      res.json(field);
+    } catch (error: any) {
+      console.error("Firma update field error:", error);
+      res.status(500).json({ error: error.message || "Failed to update field" });
+    }
+  });
+
+  app.delete("/api/firma/signing-requests/:id/fields/:fieldId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      await firmaDeleteField(req.params.id, req.params.fieldId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Firma delete field error:", error);
+      res.status(500).json({ error: error.message || "Failed to delete field" });
+    }
+  });
+
+  app.get("/api/firma/signing-requests/:id/users", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const users = await firmaGetUsers(req.params.id);
+      res.json(users);
+    } catch (error: any) {
+      console.error("Firma get users error:", error);
+      res.status(500).json({ error: "Failed to get users" });
+    }
+  });
+
+  app.post("/api/firma/signing-requests/:id/users", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const parsed = firmaUserSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Invalid signer data", details: parsed.error.issues });
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const user = await firmaAddUser(req.params.id, parsed.data);
+      res.json(user);
+    } catch (error: any) {
+      console.error("Firma add user error:", error);
+      res.status(500).json({ error: error.message || "Failed to add signer" });
+    }
+  });
+
+  app.delete("/api/firma/signing-requests/:id/users/:userId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      await firmaDeleteUser(req.params.id, req.params.userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Firma delete user error:", error);
+      res.status(500).json({ error: error.message || "Failed to remove signer" });
+    }
+  });
+
+  app.get("/api/firma/signing-requests/:id/document", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const sr = await firmaGetSR(req.params.id);
+      if (!sr?.document_url) {
+        return res.status(404).json({ error: "No document found" });
+      }
+      const response = await fetch(sr.document_url);
+      if (!response.ok) {
+        return res.status(response.status).json({ error: "Failed to fetch document" });
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Cache-Control", "private, max-age=300");
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Firma get document error:", error);
+      res.status(500).json({ error: "Failed to get document" });
     }
   });
 

@@ -104,6 +104,39 @@ export async function getSigningRequestUsers(signingRequestId: string): Promise<
   return firmaFetch(`/signing-requests/${signingRequestId}/users`);
 }
 
+export async function addSigningRequestField(signingRequestId: string, field: any): Promise<any> {
+  return firmaFetch(`/signing-requests/${signingRequestId}/fields`, {
+    method: "POST",
+    body: JSON.stringify(field),
+  });
+}
+
+export async function updateSigningRequestField(signingRequestId: string, fieldId: string, field: any): Promise<any> {
+  return firmaFetch(`/signing-requests/${signingRequestId}/fields/${fieldId}`, {
+    method: "PUT",
+    body: JSON.stringify(field),
+  });
+}
+
+export async function deleteSigningRequestField(signingRequestId: string, fieldId: string): Promise<any> {
+  return firmaFetch(`/signing-requests/${signingRequestId}/fields/${fieldId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function addSigningRequestUser(signingRequestId: string, user: { name: string; email: string }): Promise<any> {
+  return firmaFetch(`/signing-requests/${signingRequestId}/users`, {
+    method: "POST",
+    body: JSON.stringify(user),
+  });
+}
+
+export async function deleteSigningRequestUser(signingRequestId: string, usrId: string): Promise<any> {
+  return firmaFetch(`/signing-requests/${signingRequestId}/users/${usrId}`, {
+    method: "DELETE",
+  });
+}
+
 export function getEditorScriptUrl(): string {
   return FIRMA_EMBED_EDITOR_JS;
 }

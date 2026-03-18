@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,19 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { FileSignature, Plus, Send, X, Eye, Loader2, Clock, CheckCircle, XCircle, RefreshCw, Upload } from "lucide-react";
+
+const FirmaMobileEditor = lazy(() => import("./firma-mobile-editor"));
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+}
 
 declare global {
   interface Window {
@@ -58,8 +71,10 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditorDialog, setShowEditorDialog] = useState(false);
+  const [showMobileEditor, setShowMobileEditor] = useState(false);
   const [activeSigningRequestId, setActiveSigningRequestId] = useState<string | null>(null);
   const [editorKey, setEditorKey] = useState(0);
   const [newTitle, setNewTitle] = useState("");
@@ -171,8 +186,12 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
   const openEditor = useCallback(async (signingRequestId: string) => {
     setActiveSigningRequestId(signingRequestId);
     setEditorKey(k => k + 1);
-    setShowEditorDialog(true);
-  }, []);
+    if (isMobile) {
+      setShowMobileEditor(true);
+    } else {
+      setShowEditorDialog(true);
+    }
+  }, [isMobile]);
 
   const [editorLoading, setEditorLoading] = useState(false);
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -579,6 +598,27 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
           <div ref={editorContainerRef} className="w-full h-full overflow-auto touch-pan-x touch-pan-y" style={{ colorScheme: "light", backgroundColor: "white", WebkitOverflowScrolling: "touch" }} />
         </DialogContent>
       </Dialog>
+
+      {showMobileEditor && activeSigningRequestId && (
+        <Suspense fallback={
+          <div className="fixed inset-0 z-50 bg-white flex items-center justify-center" style={{ colorScheme: "light" }}>
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          </div>
+        }>
+          <FirmaMobileEditor
+            signingRequestId={activeSigningRequestId}
+            onClose={() => {
+              setShowMobileEditor(false);
+              setActiveSigningRequestId(null);
+            }}
+            onSent={() => {
+              setShowMobileEditor(false);
+              setActiveSigningRequestId(null);
+              queryClient.invalidateQueries({ queryKey: queryKeyRef.current });
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
