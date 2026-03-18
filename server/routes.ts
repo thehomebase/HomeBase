@@ -11,7 +11,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
-import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, syncTransactionToGoogleCalendar, type EmailAttachment } from "./gmail-service";
+import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, syncTransactionToGoogleCalendar, syncAllTransactionsToGoogleCalendar, type EmailAttachment } from "./gmail-service";
 import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured, logSignNowAction } from "./signnow-service";
 import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, createDraftEnvelope, createSenderView, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction, generatePKCE } from "./docusign-service";
 import { isDropboxConfigured, generateDropboxState, getDropboxAuthUrl, handleDropboxCallback, getDropboxConnectionStatus, disconnectDropbox, listDropboxFiles, downloadDropboxFile, searchDropboxFiles } from "./dropbox-service";
@@ -5369,6 +5369,36 @@ export function registerRoutes(app: Express): Server {
     const result = await getGmailLabels(req.user.id);
     if (result.error) return res.status(400).json({ error: result.error });
     res.json(result.labels);
+  });
+
+  app.post("/api/gmail/sync-calendar", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const userTransactions = await storage.getTransactionsByUser(req.user.id);
+      const transactionsWithDates = userTransactions.filter(
+        (t: any) => t.closingDate || t.optionPeriodExpiration
+      );
+
+      if (transactionsWithDates.length === 0) {
+        return res.json({ synced: 0, errors: 0, message: "No transactions with dates to sync" });
+      }
+
+      const result = await syncAllTransactionsToGoogleCalendar(req.user.id, transactionsWithDates);
+      if (result.error) {
+        if (result.error.includes("expired") || result.error.includes("reconnect")) {
+          return res.status(400).json({ error: "Your Google connection needs to be refreshed. Please disconnect and reconnect your Google account in Settings to grant calendar permissions." });
+        }
+        return res.status(400).json({ error: result.error });
+      }
+      res.json(result);
+    } catch (error: any) {
+      console.error("Calendar sync endpoint error:", error?.message);
+      const msg = error.message || "Calendar sync failed";
+      if (msg.includes("insufficient") || msg.includes("scope") || msg.includes("403") || msg.includes("calendar")) {
+        return res.status(400).json({ error: "Calendar permissions not granted. Please disconnect and reconnect your Google account in Settings to enable calendar sync." });
+      }
+      res.status(500).json({ error: msg });
+    }
   });
 
   // ============ SignNow e-Signature ============

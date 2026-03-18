@@ -1,9 +1,9 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { type Transaction } from "@shared/schema";
 import { format } from "date-fns";
-import { List, Calendar as CalendarIcon, Copy, Check, ExternalLink, Mail } from "lucide-react";
+import { List, Calendar as CalendarIcon, Copy, Check, ExternalLink, Mail, RefreshCw } from "lucide-react";
 import { SiGoogle, SiApple } from "react-icons/si";
 import { Timeline } from "@/components/ui/timeline";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { useState } from "react";
 import { Scheduler } from "@aldabil/react-scheduler";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 const calendarTheme = createTheme({
   palette: {
@@ -44,6 +45,35 @@ export default function CalendarPage() {
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
     enabled: !!user,
+  });
+
+  const { data: gmailStatus } = useQuery<{ connected: boolean; email?: string }>({
+    queryKey: ["/api/gmail/status"],
+    enabled: !!user,
+  });
+
+  const syncCalendarMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/gmail/sync-calendar");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.error) {
+        toast({ title: "Sync failed", description: data.error, variant: "destructive" });
+      } else {
+        toast({
+          title: "Google Calendar synced!",
+          description: `${data.synced} event${data.synced !== 1 ? "s" : ""} pushed to your Google Calendar${data.errors ? ` (${data.errors} failed)` : ""}`,
+        });
+      }
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Sync failed",
+        description: err.message || "Could not sync to Google Calendar. Make sure your Google account is connected.",
+        variant: "destructive",
+      });
+    },
   });
 
   const getSubscribeUrl = () => {
@@ -162,8 +192,20 @@ export default function CalendarPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={handleGoogleCalendar} variant="outline" size="sm" className="gap-2">
               <SiGoogle className="h-4 w-4 text-red-500" />
-              Google Calendar
+              Subscribe
             </Button>
+            {gmailStatus?.connected && (
+              <Button
+                onClick={() => syncCalendarMutation.mutate()}
+                disabled={syncCalendarMutation.isPending}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 text-green-600 ${syncCalendarMutation.isPending ? "animate-spin" : ""}`} />
+                {syncCalendarMutation.isPending ? "Syncing..." : "Push to Google Calendar"}
+              </Button>
+            )}
             <Button onClick={handleAppleCalendar} variant="outline" size="sm" className="gap-2">
               <SiApple className="h-4 w-4" />
               Apple Calendar
