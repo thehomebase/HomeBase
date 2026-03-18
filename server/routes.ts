@@ -5636,6 +5636,32 @@ export function registerRoutes(app: Express): Server {
           title,
           status: "draft",
         });
+        const { templateFields, templateRecipients } = req.body;
+        if (templateFields?.length || templateRecipients?.length) {
+          const mobileData = {
+            fields: (templateFields || []).map((f: any) => ({
+              type: f.type || "signature",
+              label: f.label || f.type || "signature",
+              page: f.page || 0,
+              x: f.x || 0,
+              y: f.y || 0,
+              width: f.width || 200,
+              height: f.height || 60,
+              required: f.required !== false,
+              assignedTo: f.assignedTo,
+            })),
+            signers: (templateRecipients || []).map((r: any) => ({
+              name: `${r.first_name || r.firstName || ""} ${r.last_name || r.lastName || ""}`.trim(),
+              email: r.email || "",
+            })).filter((s: any) => s.name && s.email),
+            pageDims: [],
+          };
+          await db.execute(sql`
+            UPDATE firma_signing_requests 
+            SET mobile_data = ${JSON.stringify(mobileData)}::json
+            WHERE firma_signing_request_id = ${srId}
+          `);
+        }
         await logFirmaAction(req.user!.id, "signing_request_created", { signingRequestId: srId, title, transactionId });
       }
       res.json(result);
@@ -12252,6 +12278,8 @@ export function registerRoutes(app: Express): Server {
 
       const { transactionId } = req.body || {};
       if (transactionId) {
+        const { allowed } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+        if (!allowed) return res.status(403).json({ error: "Not authorized for this transaction" });
         try {
           const txResult: any = await db.execute(sql`
             SELECT t.id, t.property_address, t.buyer_name, t.seller_name, t.type,

@@ -161,12 +161,19 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/firma/signing-requests", {
+      const payload: any = {
         title: newTitle,
         message: newMessage,
         transactionId,
         document: documentBase64,
-      });
+      };
+      if (templateFieldPositions?.fields?.length) {
+        payload.templateFields = templateFieldPositions.fields;
+      }
+      if (templateRecipients?.length) {
+        payload.templateRecipients = templateRecipients;
+      }
+      const res = await apiRequest("POST", "/api/firma/signing-requests", payload);
       return res.json();
     },
     onSuccess: (data) => {
@@ -176,6 +183,8 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
       setNewMessage("");
       setDocumentFile(null);
       setDocumentBase64("");
+      setTemplateFieldPositions(null);
+      setTemplateRecipients([]);
       toast({ title: "Signing request created" });
       const srId = data.id || data.signing_request_id || data.data?.id;
       if (srId) {
@@ -549,12 +558,14 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
                 <Select onValueChange={async (templateId) => {
                   if (templateId === "upload") return;
                   try {
-                    const res = await apiRequest("POST", `/api/form-templates/${templateId}/use`);
+                    const res = await apiRequest("POST", `/api/form-templates/${templateId}/use`, { transactionId });
                     const data = await res.json();
                     if (data.documentBase64) {
                       setDocumentBase64(data.documentBase64);
                       setDocumentFile(new File([], data.fileName || "template.pdf", { type: "application/pdf" }));
                       if (!newTitle) setNewTitle(data.title || "");
+                      if (data.fieldPositions) setTemplateFieldPositions(data.fieldPositions);
+                      if (data.transactionRecipients) setTemplateRecipients(data.transactionRecipients);
                     }
                   } catch (e: any) {
                     toast({ title: "Failed to load template", variant: "destructive" });

@@ -569,13 +569,17 @@ export default function FirmaMobileEditor({ signingRequestId, onClose, onSent }:
               )}
             </div>
           ))}
-          <div className="flex gap-1 mt-2">
-            <Input placeholder="First Name" value={newSignerFirstName} onChange={e => setNewSignerFirstName(e.target.value)} className="h-7 text-xs flex-1 bg-white" />
-            <Input placeholder="Last Name" value={newSignerLastName} onChange={e => setNewSignerLastName(e.target.value)} className="h-7 text-xs flex-1 bg-white" />
-            <Input placeholder="Email" value={newSignerEmail} onChange={e => setNewSignerEmail(e.target.value)} className="h-7 text-xs flex-1 bg-white" />
-            <Button size="sm" variant="outline" onClick={addSigner} className="h-7 px-2">
-              <UserPlus className="h-3 w-3" />
-            </Button>
+          <div className="space-y-1.5 mt-2">
+            <div className="flex gap-1">
+              <Input placeholder="First Name" value={newSignerFirstName} onChange={e => setNewSignerFirstName(e.target.value)} className="h-7 text-xs flex-1 bg-white" />
+              <Input placeholder="Last Name" value={newSignerLastName} onChange={e => setNewSignerLastName(e.target.value)} className="h-7 text-xs flex-1 bg-white" />
+            </div>
+            <div className="flex gap-1">
+              <Input placeholder="Email address" value={newSignerEmail} onChange={e => setNewSignerEmail(e.target.value)} className="h-7 text-xs flex-1 bg-white" />
+              <Button size="sm" variant="outline" onClick={addSigner} className="h-7 px-2 shrink-0">
+                <UserPlus className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
         </div>
       )}
