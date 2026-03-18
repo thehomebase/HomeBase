@@ -177,9 +177,13 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
     renderPage();
   }, [renderPage]);
 
+  const touchMovedRef = useRef(false);
+  const touchHitIdxRef = useRef<number | null>(null);
+
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
 
     const getTouchCoords = (touch: Touch) => {
       const rect = canvas.getBoundingClientRect();
@@ -198,6 +202,8 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
 
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
+        dragRef.current = null;
+        resizeRef.current = null;
         e.preventDefault();
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -205,7 +211,9 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
         return;
       }
       if (e.touches.length === 1) {
+        touchMovedRef.current = false;
         const coords = getTouchCoords(e.touches[0]);
+
         if (placingType) {
           e.preventDefault();
           const defaults = FIELD_DEFAULTS[placingType] || { width: 150, height: 40 };
@@ -218,14 +226,17 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
           setFields((prev) => [...prev, newField]);
           setSelectedFieldIdx(fields.length);
           setPlacingType(null);
+          touchHitIdxRef.current = null;
           if (isMobile) setMobileDrawerOpen(true);
           return;
         }
+
         const hitIdx = findFieldAtCoords(coords.x, coords.y);
+        touchHitIdxRef.current = hitIdx;
         setSelectedFieldIdx(hitIdx);
+
         if (hitIdx !== null) {
           e.preventDefault();
-          if (isMobile) setMobileDrawerOpen(true);
           const f = fields[hitIdx];
           const hx = (f.x + f.width) * scale, hy = (f.y + f.height) * scale;
           if (Math.abs(coords.x - hx) < 16 && Math.abs(coords.y - hy) < 16) {
@@ -248,6 +259,7 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
         return;
       }
       if (e.touches.length === 1 && (dragRef.current || resizeRef.current)) {
+        touchMovedRef.current = true;
         e.preventDefault();
         const coords = getTouchCoords(e.touches[0]);
         if (dragRef.current) {
@@ -269,19 +281,57 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
     };
 
     const onTouchEnd = () => {
+      if (!touchMovedRef.current && isMobile) {
+        if (touchHitIdxRef.current !== null) {
+          setMobileDrawerOpen(true);
+        } else if (!placingType) {
+          setMobileDrawerOpen(false);
+        }
+      }
       dragRef.current = null;
       resizeRef.current = null;
       pinchRef.current = null;
+      touchHitIdxRef.current = null;
+    };
+
+    const onContainerTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        pinchRef.current = { initialDistance: Math.sqrt(dx * dx + dy * dy), initialScale: scale };
+      }
+    };
+
+    const onContainerTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchRef.current) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const newScale = Math.min(3, Math.max(0.2, pinchRef.current.initialScale * (dist / pinchRef.current.initialDistance)));
+        setScale(newScale);
+      }
+    };
+
+    const onContainerTouchEnd = () => {
+      if (pinchRef.current) pinchRef.current = null;
     };
 
     canvas.addEventListener("touchstart", onTouchStart, { passive: false });
     canvas.addEventListener("touchmove", onTouchMove, { passive: false });
     canvas.addEventListener("touchend", onTouchEnd);
+    container.addEventListener("touchstart", onContainerTouchStart, { passive: false });
+    container.addEventListener("touchmove", onContainerTouchMove, { passive: false });
+    container.addEventListener("touchend", onContainerTouchEnd);
 
     return () => {
       canvas.removeEventListener("touchstart", onTouchStart);
       canvas.removeEventListener("touchmove", onTouchMove);
       canvas.removeEventListener("touchend", onTouchEnd);
+      container.removeEventListener("touchstart", onContainerTouchStart);
+      container.removeEventListener("touchmove", onContainerTouchMove);
+      container.removeEventListener("touchend", onContainerTouchEnd);
     };
   }, [fields, currentPage, scale, placingType, placingRole, isMobile]);
 
