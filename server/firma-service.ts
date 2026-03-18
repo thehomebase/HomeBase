@@ -20,7 +20,7 @@ async function firmaFetch(path: string, options: RequestInit = {}): Promise<any>
   const res = await fetch(url, {
     ...options,
     headers: {
-      "x-api-key": apiKey,
+      "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       ...options.headers,
     },
