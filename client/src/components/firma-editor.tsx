@@ -182,6 +182,43 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
   const toastRef = useRef(toast);
   toastRef.current = toast;
 
+  const activeFirmaJwtRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const originalFetch = window.fetch.bind(window);
+    const SUPABASE_URL = "https://ielmshcswdhuacyjlpiy.supabase.co/functions/v1/get-embedded-signing-request-data";
+
+    window.fetch = async function patchedFetch(input: RequestInfo | URL, init?: RequestInit) {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
+
+      if (url === SUPABASE_URL && activeFirmaJwtRef.current) {
+        try {
+          const body = init?.body ? JSON.parse(init.body as string) : {};
+          const proxyRes = await originalFetch("/api/firma/proxy/embedded-data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              signingRequestId: body.signingRequestId,
+              jwt: activeFirmaJwtRef.current,
+              validate_only: body.validate_only || false,
+            }),
+          });
+          return proxyRes;
+        } catch (err) {
+          console.error("Firma proxy fetch failed, falling back to direct:", err);
+          return originalFetch(input, init);
+        }
+      }
+
+      return originalFetch(input, init);
+    } as typeof window.fetch;
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
+
   useEffect(() => {
     if (!showEditorDialog || !activeSigningRequestId) return;
 
@@ -200,6 +237,8 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
         if (!token) {
           throw new Error("No JWT token received from server");
         }
+
+        activeFirmaJwtRef.current = token;
 
         const container = editorContainerRef.current;
         if (!container) return;
@@ -231,7 +270,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
           onError: (error: any) => {
             console.error("Firma editor error:", error);
             if (!destroyed) {
-              setEditorError(String(error));
+              setEditorError(String(error?.message || error));
               setEditorLoading(false);
             }
           },
@@ -255,6 +294,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
     return () => {
       destroyed = true;
       clearTimeout(timer);
+      activeFirmaJwtRef.current = null;
       if (editorRef.current?.destroy) {
         try { editorRef.current.destroy(); } catch (_e) {}
         editorRef.current = null;

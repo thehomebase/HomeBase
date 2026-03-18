@@ -5657,6 +5657,37 @@ export function registerRoutes(app: Express): Server {
   });
 
 
+  app.post("/api/firma/proxy/embedded-data", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { signingRequestId, jwt, validate_only } = req.body;
+      if (!signingRequestId || !jwt) {
+        return res.status(400).json({ error: "signingRequestId and jwt are required" });
+      }
+      const payload: any = { signingRequestId };
+      if (validate_only) payload.validate_only = true;
+      const response = await fetch(
+        "https://ielmshcswdhuacyjlpiy.supabase.co/functions/v1/get-embedded-signing-request-data",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${jwt}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        return res.status(response.status).json(data);
+      }
+      res.json(data);
+    } catch (error: any) {
+      console.error("Firma proxy error:", error);
+      res.status(500).json({ error: "Failed to fetch signing request data" });
+    }
+  });
+
   app.post("/api/firma/webhook", async (req, res) => {
     try {
       const event = req.body;
