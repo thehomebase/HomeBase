@@ -5617,13 +5617,15 @@ export function registerRoutes(app: Express): Server {
     try {
       const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
       if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      console.log(`[Firma Send] Attempting to send signing request: ${req.params.id}`);
       const result = await firmaSendSR(req.params.id);
+      console.log(`[Firma Send] Success:`, JSON.stringify(result));
       await updateSigningRequestStatus(req.params.id, "sent");
       await logFirmaAction(req.user!.id, "signing_request_sent", { signingRequestId: req.params.id });
       res.json(result);
     } catch (error: any) {
-      console.error("Firma send SR error:", error);
-      res.status(500).json({ error: "Failed to send signing request" });
+      console.error("[Firma Send] Error sending SR:", error.message || error);
+      res.status(500).json({ error: error.message || "Failed to send signing request" });
     }
   });
 
