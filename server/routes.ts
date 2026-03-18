@@ -5695,21 +5695,28 @@ export function registerRoutes(app: Express): Server {
       if (!targetUrl || !jwt) {
         return res.status(400).json({ error: "targetUrl and jwt are required" });
       }
-      const allowedHost = "ielmshcswdhuacyjlpiy.supabase.co";
+      const allowedHosts = ["ielmshcswdhuacyjlpiy.supabase.co", "api.firma.dev"];
       let parsedUrl: URL;
       try {
         parsedUrl = new URL(targetUrl);
       } catch {
         return res.status(400).json({ error: "Invalid target URL" });
       }
-      if (parsedUrl.host !== allowedHost) {
+      if (!allowedHosts.includes(parsedUrl.host)) {
         return res.status(403).json({ error: "Target URL not allowed" });
+      }
+      let authHeader = `Bearer ${jwt}`;
+      if (parsedUrl.host === "api.firma.dev") {
+        const firmaKey = process.env.FIRMA_API_KEY;
+        if (firmaKey) {
+          authHeader = `Bearer ${firmaKey}`;
+        }
       }
       const response = await fetch(targetUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${jwt}`,
+          "Authorization": authHeader,
         },
         body: JSON.stringify(payload || {}),
       });
@@ -5733,14 +5740,14 @@ export function registerRoutes(app: Express): Server {
       if (!targetUrl || !jwt) {
         return res.status(400).json({ error: "url and jwt are required" });
       }
-      const allowedHost = "ielmshcswdhuacyjlpiy.supabase.co";
+      const allowedHosts = ["ielmshcswdhuacyjlpiy.supabase.co", "api.firma.dev"];
       let parsedUrl: URL;
       try {
         parsedUrl = new URL(targetUrl);
       } catch {
         return res.status(400).json({ error: "Invalid target URL" });
       }
-      if (parsedUrl.host !== allowedHost) {
+      if (!allowedHosts.includes(parsedUrl.host)) {
         return res.status(403).json({ error: "Target URL not allowed" });
       }
       const response = await fetch(targetUrl, {

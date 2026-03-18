@@ -186,16 +186,20 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
 
   useEffect(() => {
     const originalFetch = window.fetch.bind(window);
-    const SUPABASE_HOST = "ielmshcswdhuacyjlpiy.supabase.co";
+    const FIRMA_HOSTS = ["ielmshcswdhuacyjlpiy.supabase.co", "api.firma.dev"];
 
     window.fetch = async function patchedFetch(input: RequestInfo | URL, init?: RequestInit) {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : (input as Request).url;
       const method = (init?.method || "GET").toUpperCase();
+      const isFirmaHost = FIRMA_HOSTS.some(h => url.includes(h));
 
-      if (url.includes(SUPABASE_HOST) && activeFirmaJwtRef.current) {
-        if (method === "POST" && url.includes("/functions/v1/")) {
+      if (isFirmaHost && activeFirmaJwtRef.current) {
+        if (method === "POST") {
           try {
-            const body = init?.body ? JSON.parse(init.body as string) : {};
+            let body = {};
+            if (init?.body) {
+              try { body = JSON.parse(init.body as string); } catch { body = {}; }
+            }
             const proxyRes = await originalFetch("/api/firma/proxy/supabase", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
