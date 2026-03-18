@@ -174,29 +174,43 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
     setShowEditorDialog(true);
   }, []);
 
+  const [editorLoading, setEditorLoading] = useState(false);
+  const [editorError, setEditorError] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!showEditorDialog || !activeSigningRequestId || !editorContainerRef.current) return;
+    if (!showEditorDialog || !activeSigningRequestId) return;
 
     let destroyed = false;
+    setEditorLoading(true);
+    setEditorError(null);
 
-    async function initEditor(attempt = 1) {
+    async function initEditor() {
       try {
         await loadFirmaScript();
         const res = await apiRequest("POST", `/api/firma/signing-requests/${activeSigningRequestId}/jwt`);
         const { token } = await res.json();
 
-        if (destroyed || !editorContainerRef.current) return;
+        if (destroyed) return;
 
         if (!token) {
           throw new Error("No JWT token received from server");
         }
 
+        const container = editorContainerRef.current;
+        if (!container) return;
+
+        container.innerHTML = "";
+
+        const freshDiv = document.createElement("div");
+        freshDiv.style.width = "100%";
+        freshDiv.style.height = "100%";
+        container.appendChild(freshDiv);
+
         editorRef.current = new window.FirmaSigningRequestEditor({
-          container: editorContainerRef.current,
+          container: freshDiv,
           jwt: token,
           signingRequestId: activeSigningRequestId,
           theme: document.documentElement.classList.contains("dark") ? "dark" : "light",
-          showCloseButton: true,
           onSave: () => {
             queryClient.invalidateQueries({ queryKey });
             toast({ title: "Changes saved" });
@@ -211,32 +225,33 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
           },
           onError: (error: any) => {
             console.error("Firma editor error:", error);
-            if (attempt < 3 && !destroyed && String(error).includes("Network error")) {
-              if (editorContainerRef.current) {
-                editorContainerRef.current.innerHTML = "";
-              }
-              setTimeout(() => initEditor(attempt + 1), 1500);
-              return;
+            if (!destroyed) {
+              setEditorError(String(error));
+              setEditorLoading(false);
             }
-            toast({ title: "Editor error", description: String(error), variant: "destructive" });
           },
           onLoad: () => {
-            console.log("Firma editor loaded successfully");
+            if (!destroyed) {
+              setEditorLoading(false);
+            }
           },
         });
       } catch (err: any) {
         console.error("Failed to init Firma editor:", err);
-        toast({ title: "Failed to load editor", description: err.message, variant: "destructive" });
+        if (!destroyed) {
+          setEditorError(err.message);
+          setEditorLoading(false);
+        }
       }
     }
 
-    const timer = setTimeout(initEditor, 300);
+    const timer = setTimeout(initEditor, 200);
 
     return () => {
       destroyed = true;
       clearTimeout(timer);
       if (editorRef.current?.destroy) {
-        editorRef.current.destroy();
+        try { editorRef.current.destroy(); } catch (_e) {}
         editorRef.current = null;
       }
       if (editorContainerRef.current) {
@@ -439,7 +454,30 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
         }
       }}>
         <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0">
-          <div key={editorKey} ref={editorContainerRef} className="w-full h-full" />
+          {editorLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Loading signature editor...</p>
+              </div>
+            </div>
+          )}
+          {editorError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
+              <div className="flex flex-col items-center gap-3 max-w-md text-center">
+                <XCircle className="h-10 w-10 text-destructive" />
+                <p className="font-semibold">Failed to load editor</p>
+                <p className="text-sm text-muted-foreground">{editorError}</p>
+                <Button size="sm" variant="outline" onClick={() => {
+                  setEditorError(null);
+                  setEditorKey(k => k + 1);
+                }}>
+                  <RefreshCw className="h-4 w-4 mr-1" /> Try Again
+                </Button>
+              </div>
+            </div>
+          )}
+          <div ref={editorContainerRef} className="w-full h-full" />
         </DialogContent>
       </Dialog>
     </div>

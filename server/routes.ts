@@ -5645,17 +5645,72 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/firma/signing-requests/:id/jwt", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      console.log("JWT request for signing request:", req.params.id, "user:", req.user!.id);
       const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
-      console.log("Ownership check result:", owns);
       if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
       const result = await generateSigningRequestJWT(req.params.id);
-      console.log("Firma JWT result keys:", Object.keys(result));
       const token = result.token || result.jwt || result.data?.token || result.data?.jwt;
       res.json({ token });
     } catch (error: any) {
       console.error("Firma JWT generation error:", error);
       res.status(500).json({ error: "Failed to generate JWT for editor" });
+    }
+  });
+
+  app.get("/api/firma/editor-page/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const owns = await verifySigningRequestOwnership(req.params.id, req.user!.id);
+      if (!owns && req.user!.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+      const result = await generateSigningRequestJWT(req.params.id);
+      const token = (result as any).token || (result as any).jwt || (result as any).data?.token || (result as any).data?.jwt;
+      if (!token) return res.status(500).json({ error: "Failed to generate JWT" });
+      const isDark = req.query.theme === "dark";
+      const html = `<!DOCTYPE html>
+<html lang="en" style="margin:0;padding:0;height:100%;overflow:hidden;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firma Editor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; background: ${isDark ? '#1a1a2e' : '#ffffff'}; }
+    #editor-root { width: 100%; height: 100%; }
+    .loading { display: flex; align-items: center; justify-content: center; height: 100%; color: ${isDark ? '#ccc' : '#666'}; font-family: system-ui, sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="editor-root"><div class="loading">Loading editor...</div></div>
+  <script src="https://api.firma.dev/functions/v1/embed-proxy/signing-request-editor.js"></script>
+  <script>
+    (function() {
+      var jwt = ${JSON.stringify(token)};
+      var signingRequestId = ${JSON.stringify(req.params.id)};
+      var theme = ${JSON.stringify(isDark ? "dark" : "light")};
+
+      function postToParent(type, data) {
+        try { window.parent.postMessage({ type: 'firma.' + type, ...data }, '*'); } catch(e) {}
+      }
+
+      var editor = new FirmaSigningRequestEditor({
+        container: document.getElementById('editor-root'),
+        jwt: jwt,
+        signingRequestId: signingRequestId,
+        theme: theme,
+        onSave: function() { postToParent('save', {}); },
+        onSend: function() { postToParent('send', { signingRequestId: signingRequestId }); },
+        onClose: function() { postToParent('close', {}); },
+        onError: function(err) { postToParent('error', { error: String(err) }); },
+        onLoad: function() { postToParent('load', {}); }
+      });
+    })();
+  </script>
+</body>
+</html>`;
+      res.setHeader("Content-Type", "text/html");
+      res.send(html);
+    } catch (error: any) {
+      console.error("Firma editor page error:", error);
+      res.status(500).send("Failed to load editor");
     }
   });
 
