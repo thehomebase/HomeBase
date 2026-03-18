@@ -1636,16 +1636,22 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/calendar/:userId/:type", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (Number(req.params.userId) !== req.user!.id) return res.sendStatus(403);
+    const userId = Number(req.params.userId);
+    const isSubscription = req.params.type === 'subscribe';
+
+    if (isSubscription) {
+      const user = await storage.getUser(userId);
+      if (!user) return res.sendStatus(404);
+    } else {
+      if (!req.isAuthenticated()) return res.sendStatus(401);
+      if (userId !== req.user!.id) return res.sendStatus(403);
+    }
 
     try {
       const [transactions, documents] = await Promise.all([
-        storage.getTransactionsByUser(Number(req.params.userId)),
-        storage.getAllDocumentsByUser(Number(req.params.userId))
+        storage.getTransactionsByUser(userId),
+        storage.getAllDocumentsByUser(userId)
       ]);
-
-      const isSubscription = req.params.type === 'subscribe';
 
       const calendar = ical({ 
         name: "Real Estate Calendar",

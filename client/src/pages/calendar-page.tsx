@@ -65,8 +65,8 @@ export default function CalendarPage() {
   };
 
   const handleGoogleCalendar = () => {
-    const url = getSubscribeUrl();
-    const googleUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(url)}`;
+    const webcalUrl = getWebcalUrl();
+    const googleUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`;
     window.open(googleUrl, '_blank');
   };
 
