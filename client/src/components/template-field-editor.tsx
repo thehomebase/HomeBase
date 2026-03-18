@@ -24,7 +24,9 @@ export interface TemplateField {
 
 const SIGNER_ROLES = [
   { value: "buyer", label: "Buyer", color: "#7c3aed" },
+  { value: "buyer_2", label: "Buyer 2", color: "#9333ea" },
   { value: "seller", label: "Seller", color: "#2563eb" },
+  { value: "seller_2", label: "Seller 2", color: "#3b82f6" },
   { value: "agent", label: "Agent", color: "#059669" },
   { value: "co_agent", label: "Co-Agent", color: "#d97706" },
   { value: "other", label: "Other", color: "#dc2626" },
@@ -317,7 +319,7 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
               <SelectTrigger className="h-8 text-sm">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[10001]">
                 {SIGNER_ROLES.map((r) => (
                   <SelectItem key={r.value} value={r.value}>
                     <div className="flex items-center gap-2">
@@ -411,7 +413,7 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
                   <SelectTrigger className="h-7 text-xs">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[10001]">
                     {SIGNER_ROLES.map((r) => (
                       <SelectItem key={r.value} value={r.value}>
                         <div className="flex items-center gap-2">
@@ -438,7 +440,7 @@ export default function TemplateFieldEditor({ pdfUrl, initialFields, onSave, onC
                   <SelectTrigger className="h-7 text-xs">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[10001]">
                     {FIELD_TYPES.map((ft) => (
                       <SelectItem key={ft.type} value={ft.type}>{ft.label}</SelectItem>
                     ))}
