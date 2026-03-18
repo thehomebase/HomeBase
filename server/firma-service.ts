@@ -217,9 +217,8 @@ export async function recreateSigningRequestWithRecipients(
     };
 
     console.log(`[Firma Recreate] Creating new SR with ${recipients.length} recipients and ${fields.length} fields`);
-    if (fields.length > 0) {
-      console.log(`[Firma Recreate] Field 1: x=${fields[0].position.x}%, y=${fields[0].position.y}%, w=${fields[0].position.width}%, h=${fields[0].position.height}%`);
-    }
+    console.log(`[Firma Recreate] Recipients:`, JSON.stringify(recipients));
+    console.log(`[Firma Recreate] Fields:`, JSON.stringify(fields));
     const result = await firmaFetch("/signing-requests", {
       method: "POST",
       body: JSON.stringify(payload),
