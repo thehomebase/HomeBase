@@ -40,7 +40,7 @@ export async function createSigningRequest(data: {
   return firmaFetch("/signing-requests", {
     method: "POST",
     body: JSON.stringify({
-      title: data.title,
+      name: data.title,
       message: data.message || "",
     }),
   });

@@ -11516,7 +11516,7 @@ export function registerRoutes(app: Express): Server {
         const deadlineResult = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE agent_id = ${userId} AND status = 'active' AND closing_date IS NOT NULL AND closing_date <= NOW() + INTERVAL '7 days' AND closing_date > NOW()`);
         upcomingDeadlines = Number(deadlineResult.rows[0]?.count || 0);
 
-        const leadResult = await db.execute(sql`SELECT COUNT(*) as count FROM leads WHERE agent_id = ${userId} AND status = 'new'`);
+        const leadResult = await db.execute(sql`SELECT COUNT(*) as count FROM leads WHERE assigned_agent_id = ${userId} AND status = 'new'`);
         newLeads = Number(leadResult.rows[0]?.count || 0);
       }
 

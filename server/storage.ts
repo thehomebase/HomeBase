@@ -1478,7 +1478,7 @@ export class DatabaseStorage implements IStorage {
 
     const pmHourlyResult = contactId
       ? await db.execute(sql`
-          SELECT EXTRACT(HOUR FROM timestamp)::int as hour, COUNT(*)::int as count
+          SELECT EXTRACT(HOUR FROM timestamp::timestamp)::int as hour, COUNT(*)::int as count
           FROM private_messages
           WHERE ((sender_id = ${userId} AND recipient_id = ${contactId})
               OR (sender_id = ${contactId} AND recipient_id = ${userId}))
@@ -1486,7 +1486,7 @@ export class DatabaseStorage implements IStorage {
           GROUP BY hour
         `)
       : await db.execute(sql`
-          SELECT EXTRACT(HOUR FROM timestamp)::int as hour, COUNT(*)::int as count
+          SELECT EXTRACT(HOUR FROM timestamp::timestamp)::int as hour, COUNT(*)::int as count
           FROM private_messages
           WHERE sender_id = ${userId} AND timestamp >= ${todayStart}
           GROUP BY hour
