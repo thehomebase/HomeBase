@@ -199,10 +199,14 @@ export async function recreateSigningRequestWithRecipients(
         type: field.type || "signature",
         recipient_id: recipientId,
         page_number: field.page || 1,
-        x_position: Math.round(xPct * 100) / 100,
-        y_position: Math.round(yPct * 100) / 100,
-        width: Math.round(wPct * 100) / 100,
-        height: Math.round(hPct * 100) / 100,
+        position: {
+          x: Math.round(xPct * 100) / 100,
+          y: Math.round(yPct * 100) / 100,
+        },
+        size: {
+          width: Math.round(wPct * 100) / 100,
+          height: Math.round(hPct * 100) / 100,
+        },
         required: field.required !== false,
       };
     });
@@ -216,7 +220,7 @@ export async function recreateSigningRequestWithRecipients(
 
     console.log(`[Firma Recreate] Creating new SR with ${recipients.length} recipients and ${fields.length} fields`);
     if (fields.length > 0) {
-      console.log(`[Firma Recreate] Field 1 position: x=${fields[0].x_position}%, y=${fields[0].y_position}%, w=${fields[0].width}%, h=${fields[0].height}%`);
+      console.log(`[Firma Recreate] Field 1 position: x=${fields[0].position.x}%, y=${fields[0].position.y}%, size: ${fields[0].size.width}%x${fields[0].size.height}%`);
     }
     const result = await firmaFetch("/signing-requests", {
       method: "POST",
