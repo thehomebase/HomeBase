@@ -307,7 +307,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
           onLoad: () => {
             if (!destroyed) {
               setEditorLoading(false);
-              setTimeout(() => {
+              const injectMobileStyles = () => {
                 const shadowRoot = freshDiv.querySelector("*")?.shadowRoot || freshDiv.shadowRoot;
                 if (shadowRoot) {
                   const fixStyle = document.createElement("style");
@@ -318,26 +318,22 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
                     label, h1, h2, h3, h4, h5, h6, p, span, div {
                       color: inherit;
                     }
+                    @media (max-width: 768px) {
+                      :host {
+                        touch-action: pan-x pan-y !important;
+                        overflow: auto !important;
+                        -webkit-overflow-scrolling: touch !important;
+                      }
+                    }
                   `;
                   shadowRoot.appendChild(fixStyle);
                 }
-              }, 500);
+              };
+              setTimeout(injectMobileStyles, 500);
+              setTimeout(injectMobileStyles, 2000);
             }
           },
         });
-
-        setTimeout(() => {
-          const shadowRoot = freshDiv.querySelector("*")?.shadowRoot || freshDiv.shadowRoot;
-          if (shadowRoot) {
-            const fixStyle = document.createElement("style");
-            fixStyle.textContent = `
-              :host {
-                color-scheme: light !important;
-              }
-            `;
-            shadowRoot.appendChild(fixStyle);
-          }
-        }, 1000);
       } catch (err: any) {
         console.error("Failed to init Firma editor:", err);
         if (!destroyed) {
@@ -556,7 +552,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
           }
         }
       }}>
-        <DialogContent className="max-w-[95vw] w-full h-[90vh] p-0 bg-white text-black" style={{ colorScheme: "light" }} data-theme="light">
+        <DialogContent className="max-w-[100vw] md:max-w-[95vw] w-[100vw] md:w-full h-[100dvh] md:h-[90vh] p-0 bg-white text-black rounded-none md:rounded-lg border-0 md:border translate-x-[-50%] translate-y-[-50%]" style={{ colorScheme: "light", maxHeight: "100dvh" }} data-theme="light">
           {editorLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
               <div className="flex flex-col items-center gap-2">
@@ -580,7 +576,7 @@ export default function FirmaEditor({ transactionId }: FirmaEditorProps) {
               </div>
             </div>
           )}
-          <div ref={editorContainerRef} className="w-full h-full" style={{ colorScheme: "light", backgroundColor: "white" }} />
+          <div ref={editorContainerRef} className="w-full h-full overflow-auto touch-pan-x touch-pan-y" style={{ colorScheme: "light", backgroundColor: "white", WebkitOverflowScrolling: "touch" }} />
         </DialogContent>
       </Dialog>
     </div>
