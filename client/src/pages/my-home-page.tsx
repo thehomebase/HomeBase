@@ -449,20 +449,9 @@ function ExpensesTab({ homeId }: { homeId: number }) {
       </div>
 
       {expenses.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Monthly Recurring</p><p className="text-2xl font-bold">${monthlyTotal.toLocaleString()}</p></CardContent></Card>
-          <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Entries</p><p className="text-2xl font-bold">{expenses.length}</p></CardContent></Card>
-          {categoryTotals.length > 0 && (
-            <Card className="col-span-2"><CardContent className="p-4">
-              <p className="text-sm text-muted-foreground mb-2">Top Categories</p>
-              <div className="flex flex-wrap gap-2">
-                {categoryTotals.slice(0, 4).map(([cat, total]) => {
-                  const catInfo = EXPENSE_CATEGORIES.find(c => c.value === cat);
-                  return <Badge key={cat} variant="secondary" className="gap-1">{catInfo?.label || cat}: ${total.toLocaleString()}</Badge>;
-                })}
-              </div>
-            </CardContent></Card>
-          )}
+        <div className="grid grid-cols-2 gap-3">
+          <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">Monthly Recurring</p><p className="text-xl font-bold">${monthlyTotal.toLocaleString()}</p></CardContent></Card>
+          <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">Total Entries</p><p className="text-xl font-bold">{expenses.length}</p></CardContent></Card>
         </div>
       )}
 
@@ -474,32 +463,36 @@ function ExpensesTab({ homeId }: { homeId: number }) {
           <Button variant="outline" className="mt-4" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add First Expense</Button>
         </CardContent></Card>
       ) : (
-        <Card><CardContent className="p-0">
-          <Table>
-            <TableHeader><TableRow><TableHead>Category</TableHead><TableHead>Provider</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>Type</TableHead><TableHead className="w-[80px]"></TableHead></TableRow></TableHeader>
-            <TableBody>
-              {expenses.map((e) => {
-                const catInfo = EXPENSE_CATEGORIES.find(c => c.value === e.category);
-                const Icon = catInfo?.icon || MoreHorizontal;
-                return (
-                  <TableRow key={e.id}>
-                    <TableCell><div className="flex items-center gap-2"><Icon className="h-4 w-4 text-muted-foreground" />{catInfo?.label || e.category}</div></TableCell>
-                    <TableCell className="text-muted-foreground">{e.provider || "—"}</TableCell>
-                    <TableCell className="whitespace-nowrap">{e.billingDate ? new Date(e.billingDate).toLocaleDateString() : "—"}</TableCell>
-                    <TableCell className="text-right font-medium">${(e.amount || 0).toLocaleString()}</TableCell>
-                    <TableCell><Badge variant={e.isRecurring ? "default" : "secondary"} className="text-xs">{e.isRecurring ? e.frequency : "one-time"}</Badge></TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(e); setShowDialog(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteMutation.mutate(e.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+        <div className="space-y-2">
+          {expenses.map((e) => {
+            const catInfo = EXPENSE_CATEGORIES.find(c => c.value === e.category);
+            const Icon = catInfo?.icon || MoreHorizontal;
+            return (
+              <Card key={e.id}>
+                <CardContent className="p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="font-medium text-sm">{catInfo?.label || e.category}</span>
+                        <span className="text-base font-bold ml-auto">${(e.amount || 0).toLocaleString()}</span>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent></Card>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        {e.provider && <span className="text-xs text-muted-foreground">{e.provider}</span>}
+                        {e.billingDate && <span className="text-xs text-muted-foreground">{new Date(e.billingDate).toLocaleDateString()}</span>}
+                        <Badge variant={e.isRecurring ? "default" : "secondary"} className="text-[10px] h-5">{e.isRecurring ? e.frequency : "one-time"}</Badge>
+                      </div>
+                    </div>
+                    <div className="flex gap-0.5 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(e); setShowDialog(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteMutation.mutate(e.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
       <ExpenseDialog open={showDialog} onOpenChange={setShowDialog} homeId={homeId} expense={editing} />
     </div>
@@ -688,26 +681,26 @@ function EquityTab({ homeId, home }: { homeId: number; home: HomeownerHome }) {
 
       {equity && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card><CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Estimated Equity</p>
-              <p className="text-2xl font-bold text-green-600">${equity.equityAmount.toLocaleString()}</p>
-              <Progress value={Math.min(equity.equityPercent, 100)} className="mt-2 h-2" />
-              <p className="text-xs text-muted-foreground mt-1">{equity.equityPercent}% equity</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Card><CardContent className="p-3">
+              <p className="text-xs text-muted-foreground">Estimated Equity</p>
+              <p className="text-lg md:text-2xl font-bold text-green-600">${equity.equityAmount.toLocaleString()}</p>
+              <Progress value={Math.min(equity.equityPercent, 100)} className="mt-1.5 h-1.5" />
+              <p className="text-[11px] text-muted-foreground mt-1">{equity.equityPercent}% equity</p>
             </CardContent></Card>
-            <Card><CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Remaining Balance</p>
-              <p className="text-2xl font-bold">${equity.balance.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground mt-1">{equity.monthsElapsed} months paid</p>
+            <Card><CardContent className="p-3">
+              <p className="text-xs text-muted-foreground">Remaining Balance</p>
+              <p className="text-lg md:text-2xl font-bold">${equity.balance.toLocaleString()}</p>
+              <p className="text-[11px] text-muted-foreground mt-1">{equity.monthsElapsed} months paid</p>
             </CardContent></Card>
-            <Card><CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Monthly Payment</p>
-              <p className="text-2xl font-bold">${equity.monthlyPayment.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground mt-1">P&I at {profile.interestRate}%</p>
+            <Card><CardContent className="p-3">
+              <p className="text-xs text-muted-foreground">Monthly Payment</p>
+              <p className="text-lg md:text-2xl font-bold">${equity.monthlyPayment.toLocaleString()}</p>
+              <p className="text-[11px] text-muted-foreground mt-1">P&I at {profile.interestRate}%</p>
             </CardContent></Card>
-            <Card><CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Estimated Value</p>
-              <p className="text-2xl font-bold">${equity.estimatedValue.toLocaleString()}</p>
+            <Card><CardContent className="p-3">
+              <p className="text-xs text-muted-foreground">Estimated Value</p>
+              <p className="text-lg md:text-2xl font-bold">${equity.estimatedValue.toLocaleString()}</p>
               <Button size="sm" variant="link" className="p-0 h-auto text-xs" onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending}>
                 <RefreshCw className={`h-3 w-3 mr-1 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
                 Refresh Estimate
@@ -716,16 +709,16 @@ function EquityTab({ homeId, home }: { homeId: number; home: HomeownerHome }) {
           </div>
 
           {rates && (
-            <Card><CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold flex items-center gap-2"><Percent className="h-4 w-4 text-primary" />Current Mortgage Rates</h4>
-                <Badge variant="outline" className="text-xs">{rates.source === 'freddie_mac' ? 'Freddie Mac PMMS' : 'Estimated'}</Badge>
+            <Card><CardContent className="p-3 md:p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-sm flex items-center gap-1.5"><Percent className="h-3.5 w-3.5 text-primary" />Current Rates</h4>
+                <Badge variant="outline" className="text-[10px]">{rates.source === 'freddie_mac' ? 'PMMS' : 'Est.'}</Badge>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div><p className="text-sm text-muted-foreground">30-Year Fixed</p><p className="text-lg font-bold">{rates.rate30yr}%</p></div>
-                <div><p className="text-sm text-muted-foreground">15-Year Fixed</p><p className="text-lg font-bold">{rates.rate15yr}%</p></div>
-                <div><p className="text-sm text-muted-foreground">Your Rate</p><p className="text-lg font-bold">{profile.interestRate}%</p></div>
-                <div><p className="text-sm text-muted-foreground">Difference</p><p className={`text-lg font-bold ${equity.rateDiff && equity.rateDiff > 0 ? 'text-green-600' : 'text-muted-foreground'}`}>{equity.rateDiff !== null ? `${equity.rateDiff > 0 ? '+' : ''}${equity.rateDiff.toFixed(2)}%` : '—'}</p></div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div><p className="text-xs text-muted-foreground">30-Yr Fixed</p><p className="text-base font-bold">{rates.rate30yr}%</p></div>
+                <div><p className="text-xs text-muted-foreground">15-Yr Fixed</p><p className="text-base font-bold">{rates.rate15yr}%</p></div>
+                <div><p className="text-xs text-muted-foreground">Your Rate</p><p className="text-base font-bold">{profile.interestRate}%</p></div>
+                <div><p className="text-xs text-muted-foreground">Difference</p><p className={`text-base font-bold ${equity.rateDiff && equity.rateDiff > 0 ? 'text-green-600' : 'text-muted-foreground'}`}>{equity.rateDiff !== null ? `${equity.rateDiff > 0 ? '+' : ''}${equity.rateDiff.toFixed(2)}%` : '—'}</p></div>
               </div>
             </CardContent></Card>
           )}
@@ -964,94 +957,124 @@ function HomeDetail({ homeId }: { homeId: number }) {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><CardTitle>{homeData.address}</CardTitle></div>
-              {(homeData.city || homeData.state) && <CardDescription className="mt-1">{[homeData.city, homeData.state, homeData.zipCode].filter(Boolean).join(", ")}</CardDescription>}
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary shrink-0" />
+                <h2 className="font-semibold text-base truncate">{homeData.address}</h2>
+              </div>
+              {(homeData.city || homeData.state) && <p className="text-sm text-muted-foreground mt-0.5 ml-6">{[homeData.city, homeData.state, homeData.zipCode].filter(Boolean).join(", ")}</p>}
             </div>
-            <Button variant="ghost" size="icon" onClick={() => deleteHomeMutation.mutate()} className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => deleteHomeMutation.mutate()} className="text-destructive hover:text-destructive h-8 w-8 shrink-0"><Trash2 className="h-3.5 w-3.5" /></Button>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {homeData.purchasePrice && <div><p className="text-sm text-muted-foreground">Purchase Price</p><p className="text-lg font-semibold">${homeData.purchasePrice.toLocaleString()}</p></div>}
-            {homeData.purchaseDate && <div><p className="text-sm text-muted-foreground">Purchase Date</p><p className="text-lg font-semibold">{new Date(homeData.purchaseDate).toLocaleDateString()}</p></div>}
-            <div><p className="text-sm text-muted-foreground">Service Records</p><p className="text-lg font-semibold">{maintenance.length}</p></div>
-            {maintenance.length > 0 && <div><p className="text-sm text-muted-foreground">Total Spent</p><p className="text-lg font-semibold">${maintenance.reduce((sum, r) => sum + (r.cost || 0), 0).toLocaleString()}</p></div>}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+            {homeData.purchasePrice && <div className="bg-muted/50 rounded-lg p-2.5"><p className="text-xs text-muted-foreground">Purchase Price</p><p className="text-base font-semibold">${homeData.purchasePrice.toLocaleString()}</p></div>}
+            {homeData.purchaseDate && <div className="bg-muted/50 rounded-lg p-2.5"><p className="text-xs text-muted-foreground">Purchase Date</p><p className="text-base font-semibold">{new Date(homeData.purchaseDate).toLocaleDateString()}</p></div>}
+            <div className="bg-muted/50 rounded-lg p-2.5"><p className="text-xs text-muted-foreground">Service Records</p><p className="text-base font-semibold">{maintenance.length}</p></div>
+            {maintenance.length > 0 && <div className="bg-muted/50 rounded-lg p-2.5"><p className="text-xs text-muted-foreground">Total Spent</p><p className="text-base font-semibold">${maintenance.reduce((sum, r) => sum + (r.cost || 0), 0).toLocaleString()}</p></div>}
           </div>
         </CardContent>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full flex overflow-x-auto">
-          <TabsTrigger value="overview" className="flex-1 min-w-0">Overview</TabsTrigger>
-          <TabsTrigger value="expenses" className="flex-1 min-w-0">Expenses</TabsTrigger>
-          <TabsTrigger value="reminders" className="flex-1 min-w-0">Reminders</TabsTrigger>
-          <TabsTrigger value="equity" className="flex-1 min-w-0">Equity</TabsTrigger>
-          <TabsTrigger value="warranty" className="flex-1 min-w-0">Warranty</TabsTrigger>
-          <TabsTrigger value="improvements" className="flex-1 min-w-0">Projects</TabsTrigger>
-          <TabsTrigger value="documents" className="flex-1 min-w-0">Docs</TabsTrigger>
-        </TabsList>
+      <div className="space-y-1">
+        <Select value={activeTab} onValueChange={setActiveTab}>
+          <SelectTrigger className="w-full md:hidden">
+            <SelectValue>
+              {[
+                { value: "overview", label: "Overview", icon: ClipboardList },
+                { value: "expenses", label: "Expenses", icon: DollarSign },
+                { value: "reminders", label: "Reminders", icon: Bell },
+                { value: "equity", label: "Equity Tracker", icon: TrendingUp },
+                { value: "warranty", label: "Warranty", icon: Shield },
+                { value: "improvements", label: "Projects", icon: Hammer },
+                { value: "documents", label: "Documents", icon: FolderOpen },
+              ].map(t => activeTab === t.value ? <span key={t.value} className="flex items-center gap-2"><t.icon className="h-4 w-4" />{t.label}</span> : null)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {[
+              { value: "overview", label: "Overview", icon: ClipboardList },
+              { value: "expenses", label: "Expenses", icon: DollarSign },
+              { value: "reminders", label: "Reminders", icon: Bell },
+              { value: "equity", label: "Equity Tracker", icon: TrendingUp },
+              { value: "warranty", label: "Warranty", icon: Shield },
+              { value: "improvements", label: "Projects", icon: Hammer },
+              { value: "documents", label: "Documents", icon: FolderOpen },
+            ].map(t => (
+              <SelectItem key={t.value} value={t.value}>
+                <span className="flex items-center gap-2"><t.icon className="h-4 w-4" />{t.label}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        <TabsContent value="overview" className="mt-6">
-          <div className="space-y-6">
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={() => { setEditingRecord(null); setShowMaintenanceDialog(true); }}><Plus className="h-4 w-4 mr-2" />Add Maintenance Record</Button>
-              <Link href="/marketplace"><Button variant="outline"><Search className="h-4 w-4 mr-2" />Find a Pro</Button></Link>
-              <Link href="/my-team"><Button variant="outline"><Users className="h-4 w-4 mr-2" />My Team</Button></Link>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="hidden md:flex w-full">
+            <TabsTrigger value="overview" className="flex-1 gap-1.5"><ClipboardList className="h-3.5 w-3.5" />Overview</TabsTrigger>
+            <TabsTrigger value="expenses" className="flex-1 gap-1.5"><DollarSign className="h-3.5 w-3.5" />Expenses</TabsTrigger>
+            <TabsTrigger value="reminders" className="flex-1 gap-1.5"><Bell className="h-3.5 w-3.5" />Reminders</TabsTrigger>
+            <TabsTrigger value="equity" className="flex-1 gap-1.5"><TrendingUp className="h-3.5 w-3.5" />Equity</TabsTrigger>
+            <TabsTrigger value="warranty" className="flex-1 gap-1.5"><Shield className="h-3.5 w-3.5" />Warranty</TabsTrigger>
+            <TabsTrigger value="improvements" className="flex-1 gap-1.5"><Hammer className="h-3.5 w-3.5" />Projects</TabsTrigger>
+            <TabsTrigger value="documents" className="flex-1 gap-1.5"><FolderOpen className="h-3.5 w-3.5" />Docs</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="mt-4">
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Button size="sm" className="flex-1 md:flex-none" onClick={() => { setEditingRecord(null); setShowMaintenanceDialog(true); }}><Plus className="h-4 w-4 mr-1.5" />Add Record</Button>
+                <Link href="/marketplace" className="flex-1 md:flex-none"><Button size="sm" variant="outline" className="w-full"><Search className="h-4 w-4 mr-1.5" />Find a Pro</Button></Link>
+                <Link href="/my-team" className="flex-1 md:flex-none"><Button size="sm" variant="outline" className="w-full"><Users className="h-4 w-4 mr-1.5" />My Team</Button></Link>
+              </div>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2"><ClipboardList className="h-4 w-4 text-primary" /><CardTitle className="text-base">Maintenance History</CardTitle></div>
+                    <Badge variant="secondary" className="text-xs">{maintenance.length}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {maintenance.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <Wrench className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                      <p className="font-medium text-sm">No maintenance records yet</p>
+                      <p className="text-xs mt-1">Track your home services and repairs here</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {maintenance.sort((a, b) => { if (!a.serviceDate && !b.serviceDate) return 0; if (!a.serviceDate) return 1; if (!b.serviceDate) return -1; return new Date(b.serviceDate).getTime() - new Date(a.serviceDate).getTime(); }).map((record) => (
+                        <div key={record.id} className="flex items-start justify-between p-3 rounded-lg border">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant="outline" className="text-xs shrink-0">{categoryLabel(record.category)}</Badge>
+                              {record.cost ? <span className="text-sm font-semibold">${record.cost.toLocaleString()}</span> : null}
+                            </div>
+                            <p className="text-sm mt-1 truncate">{record.description}</p>
+                            {record.serviceDate && <p className="text-xs text-muted-foreground mt-0.5">{new Date(record.serviceDate).toLocaleDateString()}</p>}
+                          </div>
+                          <div className="flex gap-0.5 ml-2 shrink-0">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingRecord(record); setShowMaintenanceDialog(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteMaintenanceMutation.mutate(record.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
+          </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-primary" /><CardTitle className="text-lg">Maintenance History</CardTitle></div>
-                  <Badge variant="secondary">{maintenance.length} record{maintenance.length !== 1 ? "s" : ""}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {maintenance.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Wrench className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p className="font-medium">No maintenance records yet</p>
-                    <p className="text-sm mt-1">Track your home services and repairs here</p>
-                    <Button variant="outline" className="mt-4" onClick={() => { setEditingRecord(null); setShowMaintenanceDialog(true); }}><Plus className="h-4 w-4 mr-2" />Add First Record</Button>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Cost</TableHead><TableHead className="w-[80px]"></TableHead></TableRow></TableHeader>
-                      <TableBody>
-                        {maintenance.sort((a, b) => { if (!a.serviceDate && !b.serviceDate) return 0; if (!a.serviceDate) return 1; if (!b.serviceDate) return -1; return new Date(b.serviceDate).getTime() - new Date(a.serviceDate).getTime(); }).map((record) => (
-                          <TableRow key={record.id}>
-                            <TableCell className="whitespace-nowrap">{record.serviceDate ? new Date(record.serviceDate).toLocaleDateString() : "—"}</TableCell>
-                            <TableCell><Badge variant="outline">{categoryLabel(record.category)}</Badge></TableCell>
-                            <TableCell className="max-w-[200px] truncate">{record.description}</TableCell>
-                            <TableCell className="text-right">{record.cost ? `$${record.cost.toLocaleString()}` : "—"}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-1">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingRecord(record); setShowMaintenanceDialog(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteMaintenanceMutation.mutate(record.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="expenses" className="mt-6"><ExpensesTab homeId={homeId} /></TabsContent>
-        <TabsContent value="reminders" className="mt-6"><RemindersTab homeId={homeId} /></TabsContent>
-        <TabsContent value="equity" className="mt-6"><EquityTab homeId={homeId} home={homeData} /></TabsContent>
-        <TabsContent value="warranty" className="mt-6"><WarrantyTab homeId={homeId} /></TabsContent>
-        <TabsContent value="improvements" className="mt-6"><ImprovementsTab homeId={homeId} /></TabsContent>
-        <TabsContent value="documents" className="mt-6"><DocumentsTab /></TabsContent>
-      </Tabs>
+          <TabsContent value="expenses" className="mt-4"><ExpensesTab homeId={homeId} /></TabsContent>
+          <TabsContent value="reminders" className="mt-4"><RemindersTab homeId={homeId} /></TabsContent>
+          <TabsContent value="equity" className="mt-4"><EquityTab homeId={homeId} home={homeData} /></TabsContent>
+          <TabsContent value="warranty" className="mt-4"><WarrantyTab homeId={homeId} /></TabsContent>
+          <TabsContent value="improvements" className="mt-4"><ImprovementsTab homeId={homeId} /></TabsContent>
+          <TabsContent value="documents" className="mt-4"><DocumentsTab /></TabsContent>
+        </Tabs>
+      </div>
 
       <MaintenanceDialog open={showMaintenanceDialog} onOpenChange={setShowMaintenanceDialog} homeId={homeId} record={editingRecord} />
     </div>
@@ -1072,13 +1095,13 @@ export default function MyHomePage() {
   const activeHomeId = selectedHomeId || (homes.length > 0 ? homes[0].id : null);
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Home className="h-6 w-6 text-primary" />MyHome</h1>
-          <p className="text-muted-foreground mt-1">Your complete homeowner hub</p>
+          <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2"><Home className="h-5 w-5 md:h-6 md:w-6 text-primary" />MyHome</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Your complete homeowner hub</p>
         </div>
-        <Button onClick={() => setShowAddHome(true)}><Plus className="h-4 w-4 mr-2" />Add Home</Button>
+        <Button size="sm" onClick={() => setShowAddHome(true)}><Plus className="h-4 w-4 mr-1.5" />Add Home</Button>
       </div>
 
       {isLoading ? (
