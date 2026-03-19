@@ -8400,17 +8400,18 @@ export function registerRoutes(app: Express): Server {
       }
 
       const contractorIds = contractors.map(c => c.id);
+      const idsArray = `{${contractorIds.join(',')}}`;
       const [teamCounts, trustedCounts] = await Promise.all([
         db.execute(sql`
           SELECT contractor_id, COUNT(DISTINCT user_id) as count 
           FROM home_team_members 
-          WHERE contractor_id = ANY(${contractorIds})
+          WHERE contractor_id = ANY(${idsArray}::int[])
           GROUP BY contractor_id
         `),
         db.execute(sql`
           SELECT contractor_id, COUNT(DISTINCT agent_id) as count 
           FROM vendor_ratings 
-          WHERE contractor_id = ANY(${contractorIds}) AND would_recommend = true
+          WHERE contractor_id = ANY(${idsArray}::int[]) AND would_recommend = true
           GROUP BY contractor_id
         `),
       ]);
