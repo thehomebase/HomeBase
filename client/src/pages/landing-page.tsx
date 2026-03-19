@@ -8,7 +8,7 @@ import {
   Zap, Phone, Mail, Home, Star, ChevronRight, CheckCircle2, Briefcase,
   Building2, TrendingUp, Clock, Target, Award, ExternalLink, ArrowRightLeft,
   Lock, BarChart2, ChevronDown, MapPin, Gift, DollarSign, Bell, Search,
-  Wrench, Hammer
+  Wrench, Hammer, PenTool
 } from "lucide-react";
 import { SiSlack, SiMailchimp, SiGooglesheets, SiCalendly, SiTrello, SiHubspot, SiSalesforce, SiZapier, SiAirtable, SiNotion, SiTwilio, SiGmail, SiDropbox } from "react-icons/si";
 import heroImage from "@/assets/landing-hero.png";
@@ -183,36 +183,34 @@ function AnimatedSignature() {
   );
 }
 
-function DocuSignIntegrationCard() {
+function FirmaIntegrationCard() {
   return (
-    <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-2 hover:border-[#4C2B8A]/30">
+    <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-2 hover:border-[#0F172A]/30">
       <CardContent className="p-0">
-        <div className="bg-gradient-to-br from-[#4C2B8A] to-[#6B3FA0] p-6 text-white">
+        <div className="bg-gradient-to-br from-[#0F172A] to-[#1E293B] p-6 text-white">
           <div className="flex items-center gap-3 mb-3">
             <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
-                <path d="M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10zM8.5 8.5v7h2v-2.5h1.5c1.933 0 3.5-1.12 3.5-2.25S13.933 8.5 12 8.5H8.5zm2 1.5H12c.828 0 1.5.448 1.5 1s-.672 1-1.5 1h-1.5V10z"/>
-              </svg>
+              <PenTool className="h-6 w-6" />
             </div>
             <div>
-              <h4 className="font-bold text-lg">DocuSign</h4>
-              <p className="text-white/70 text-xs">e-Signature Integration</p>
+              <h4 className="font-bold text-lg">Firma</h4>
+              <p className="text-white/70 text-xs">Built-in e-Signatures</p>
             </div>
           </div>
-          <p className="text-sm text-white/80 leading-relaxed">Send documents for signing directly from your transaction checklist. Embedded sending with auto-placed signature fields.</p>
+          <p className="text-sm text-white/80 leading-relaxed">Sign documents right inside HomeBase — no external accounts needed. Drag-and-drop field placement with role-based assignments.</p>
         </div>
         <div className="p-5 space-y-3">
           <div className="flex items-center gap-2 text-sm">
             <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-            <span>Embedded draft + sender view</span>
+            <span>Embedded signing — no redirects</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-            <span>Auto-placed signature fields</span>
+            <span>Drag-and-drop field editor</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-            <span>Status sync & audit logging</span>
+            <span>Pay-per-envelope — no subscription</span>
           </div>
         </div>
       </CardContent>
@@ -496,12 +494,12 @@ export default function LandingPage() {
               Sign, store, and manage — all built in
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Send documents for e-signature via DocuSign and import files from Dropbox — without ever leaving HomeBase. Everything syncs back to your transaction checklist automatically.
+              Sign documents with Firma's built-in e-signatures and import files from Dropbox — without ever leaving HomeBase. Everything syncs back to your transaction checklist automatically.
             </p>
           </div>
 
           <div className={`grid gap-8 items-start ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
-            <DocuSignIntegrationCard />
+            <FirmaIntegrationCard />
 
             <div className="flex flex-col items-center justify-center gap-6 py-8">
               <div className="relative bg-card border-2 rounded-2xl shadow-lg p-6 w-full max-w-sm">
