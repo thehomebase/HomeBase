@@ -277,7 +277,7 @@ export default function LandingPage() {
               </nav>
             )}
             <Button variant="ghost" size="sm" className="px-2 text-xs" onClick={() => setLocation("/auth")}>Log in</Button>
-            <Button size="sm" className="px-3 text-xs whitespace-nowrap" onClick={() => setLocation("/auth")}>Get Started</Button>
+            <Button size="sm" className="px-3 text-xs whitespace-nowrap" onClick={() => setLocation("/auth")}>Start Free Trial</Button>
           </div>
         </div>
       </nav>
@@ -297,12 +297,15 @@ export default function LandingPage() {
               </p>
               <div className={`flex gap-3 ${isMobile ? "justify-center flex-col" : ""}`}>
                 <Button size="lg" className="gap-2 text-base px-8" onClick={() => setLocation("/auth")}>
-                  Get Started for Free <ArrowRight className="h-4 w-4" />
+                  Start Your 7-Day Free Trial <ArrowRight className="h-4 w-4" />
                 </Button>
                 <Button size="lg" variant="outline" className="gap-2 text-base" asChild>
                   <a href="#features">See Features <ChevronRight className="h-4 w-4" /></a>
                 </Button>
               </div>
+              <p className={`text-xs text-muted-foreground mt-3 ${isMobile ? "text-center" : ""}`}>
+                No charge for 7 days. Cancel anytime.
+              </p>
             </div>
             <div className={`relative ${isMobile ? "mt-4" : ""}`}>
               <div className="relative rounded-2xl overflow-hidden shadow-2xl border">
@@ -785,10 +788,10 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-sm text-primary font-medium uppercase tracking-wider mb-2">Pricing</p>
           <h2 className={`font-bold tracking-tight mb-4 ${isMobile ? "text-3xl" : "text-4xl"}`}>
-            Simple, transparent pricing
+            Try HomeBase free for 7 days
           </h2>
           <p className="text-muted-foreground mb-10 max-w-xl mx-auto">
-            No hidden fees, no contracts. Cancel anytime.
+            Full access to every feature. No charge until your trial ends. Cancel anytime — no contracts, no hidden fees.
           </p>
           <div className={`grid gap-6 ${isMobile ? "grid-cols-1" : "grid-cols-2"} max-w-3xl mx-auto`}>
             <Card className="relative overflow-hidden hover:shadow-lg transition-shadow border-2 border-primary/20">
@@ -799,10 +802,11 @@ export default function LandingPage() {
                   <h3 className="font-bold text-lg">Agent Plan</h3>
                 </div>
                 <p className="text-sm text-muted-foreground mb-6">For real estate agents</p>
-                <div className="mb-6">
+                <div className="mb-2">
                   <span className="text-5xl font-bold">$49</span>
                   <span className="text-muted-foreground">/month</span>
                 </div>
+                <p className="text-xs text-muted-foreground mb-6">after 7-day free trial</p>
                 <Button className="w-full mb-6 gap-2" size="lg" onClick={() => setLocation("/auth")}>
                   Start Free Trial <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -822,10 +826,11 @@ export default function LandingPage() {
                   <h3 className="font-bold text-lg">Vendor Plan</h3>
                 </div>
                 <p className="text-sm text-muted-foreground mb-6">For home service vendors</p>
-                <div className="mb-6">
+                <div className="mb-2">
                   <span className="text-5xl font-bold">$29</span>
                   <span className="text-muted-foreground">/month</span>
                 </div>
+                <p className="text-xs text-muted-foreground mb-6">after 7-day free trial</p>
                 <Button className="w-full mb-6 gap-2" size="lg" variant="outline" onClick={() => setLocation("/auth")}>
                   Start Free Trial <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -848,7 +853,7 @@ export default function LandingPage() {
             Less paperwork. More handshakes.
           </h2>
           <p className="text-background/70 mb-8 text-lg max-w-xl mx-auto">
-            HomeBase is the CRM built to track, manage, and grow your real estate business. Start closing more deals today.
+            HomeBase is the CRM built to track, manage, and grow your real estate business. Try it free for 7 days.
           </p>
           <Button
             size="lg"
@@ -856,8 +861,9 @@ export default function LandingPage() {
             className="gap-2 text-base px-8 bg-background text-foreground hover:bg-background/90 border-0"
             onClick={() => setLocation("/auth")}
           >
-            Get Started <ArrowRight className="h-4 w-4" />
+            Start Your Free Trial <ArrowRight className="h-4 w-4" />
           </Button>
+          <p className="text-background/50 text-xs mt-3">No charge for 7 days. Cancel anytime.</p>
         </div>
       </section>
 
@@ -868,6 +874,8 @@ export default function LandingPage() {
             <span className="font-bold text-lg">HomeBase</span>
           </div>
           <div className="flex items-center gap-6">
+            <Link href="/faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">FAQ</Link>
+            <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Contact</Link>
             <Link href="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Terms</Link>
             <Link href="/privacy-policy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Privacy</Link>
             <Link href="/find-agent" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Find an Agent</Link>
