@@ -123,6 +123,7 @@ import OpenHouseSignInPage from "@/pages/open-house-sign-in-page";
 import AdminPage from "@/pages/admin-page";
 import TasksPage from "@/pages/tasks-page";
 import SponsoredAdsPage from "@/pages/sponsored-ads-page";
+import FaqContactPage from "@/pages/faq-contact-page";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { BiometricSetupButton } from "@/components/biometric-setup";
 import { useLeadAlerts } from "@/hooks/use-lead-alerts";
@@ -778,6 +779,8 @@ function Router() {
       <Route path="/integrations/zapier" component={ZapierPage} />
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsPage} />
+      <Route path="/faq" component={FaqContactPage} />
+      <Route path="/contact" component={FaqContactPage} />
       <Route path="/find-agent" component={LeadSubmitPage} />
       <Route path="/find-lender" component={LenderLeadSubmitPage} />
       <Route path="/find-contractor" component={FindContractorPage} />

@@ -50,7 +50,8 @@ Preferred communication style: Simple, everyday language.
 - **Admin Dashboard**: Redesigned with Recharts for analytics (users, revenue, leads, API usage), stat cards, recent signups feed, and tabbed management for users, verifications, reports, ads, financial, leads, geographic data, messages, and audit log.
 - **Notifications**: Real-time SMS and Web Push for new leads, WebSocket-based in-app notifications.
 - **Agent/Broker Verification**: Multi-level verification process with feature gating and history.
-- **Profile Pages**: Customizable agent/broker profiles with confirmed information, bio, contact details, social media, reviews, and MLS-verified active listings auto-discovered from RentCast.
+- **Profile Pages**: Customizable agent/broker profiles with confirmed information, bio, contact details, social media, reviews, MLS-verified active listings auto-discovered from RentCast, service areas (derived from transaction history), and a contact form for non-owners.
+- **FAQ & Contact Page**: Combined page at `/faq` and `/contact` with categorized FAQs, CRM comparison table, and platform contact form. Inquiries stored in `platform_inquiries` table with admin notification.
 - **Verified Listings**: Auto-discovered from RentCast API, with detail pages supporting marketing materials (videos, 3D tours, floorplans, photos, descriptions).
 
 ## External Dependencies

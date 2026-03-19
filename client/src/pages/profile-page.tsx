@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Camera, Shield, ShieldCheck, CheckCircle2, MapPin, Phone, Mail, Pencil,
   Building2, FileText, User as UserIcon, Star, ChevronLeft, ChevronRight,
-  Home, X, Eraser, CreditCard, ExternalLink, Loader2
+  Home, X, Eraser, CreditCard, ExternalLink, Loader2, Send, Globe
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiLinkedin } from "react-icons/si";
 import { PhotoTouchup } from "@/components/photo-touchup";
@@ -594,6 +594,201 @@ function VerifiedListingsSection({ profileId, profileName, isOwn }: { profileId:
   );
 }
 
+type ServiceAreaData = {
+  cities: Array<{ city: string; state: string; transactionCount: number }>;
+  licenseState: string | null;
+  totalTransactions: number;
+  closedTransactions: number;
+};
+
+function ServiceAreasSection({ profileId, profileName }: { profileId: number; profileName: string }) {
+  const { data } = useQuery<ServiceAreaData>({
+    queryKey: ["/api/profile", profileId, "service-areas"],
+    queryFn: async () => {
+      const res = await fetch(`/api/profile/${profileId}/service-areas`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  if (!data || (data.cities.length === 0 && !data.licenseState)) return null;
+
+  return (
+    <div>
+      <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+        <Globe className="h-5 w-5 text-primary" />
+        Service Areas
+      </h3>
+      <Card>
+        <CardContent className="p-5">
+          {data.totalTransactions > 0 && (
+            <div className="flex items-center gap-6 mb-4 pb-4 border-b">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary">{data.totalTransactions}</div>
+                <div className="text-xs text-muted-foreground">Transactions</div>
+              </div>
+              {data.closedTransactions > 0 && (
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{data.closedTransactions}</div>
+                  <div className="text-xs text-muted-foreground">Closed</div>
+                </div>
+              )}
+              {data.cities.length > 0 && (
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{data.cities.length}</div>
+                  <div className="text-xs text-muted-foreground">{data.cities.length === 1 ? "City" : "Cities"}</div>
+                </div>
+              )}
+            </div>
+          )}
+          {data.licenseState && (
+            <div className="flex items-center gap-2 mb-3">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">Licensed in <span className="font-semibold">{data.licenseState}</span></span>
+            </div>
+          )}
+          {data.cities.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {data.cities.map((c, i) => (
+                <Badge key={i} variant="secondary" className="gap-1 text-xs py-1 px-2.5">
+                  <MapPin className="h-3 w-3" />
+                  {c.city}{c.state ? `, ${c.state}` : ""}
+                  {c.transactionCount > 1 && (
+                    <span className="text-muted-foreground ml-0.5">({c.transactionCount})</span>
+                  )}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ContactFormSection({ profileId, profileName }: { profileId: number; profileName: string }) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({ name: "", email: "", phone: "", message: "" });
+  const [sent, setSent] = useState(false);
+
+  const contactMut = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      const res = await fetch(`/api/profile/${profileId}/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to send");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setSent(true);
+      toast({ title: "Message sent!" });
+    },
+    onError: (e: Error) => {
+      toast({ title: e.message, variant: "destructive" });
+    },
+  });
+
+  if (sent) {
+    return (
+      <div>
+        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+          <Send className="h-5 w-5 text-primary" />
+          Contact {profileName.split(" ")[0]}
+        </h3>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <CheckCircle2 className="h-10 w-10 text-green-500 mx-auto mb-3" />
+            <h4 className="font-semibold text-lg mb-1">Message Sent!</h4>
+            <p className="text-sm text-muted-foreground">
+              {profileName.split(" ")[0]} will receive your message and get back to you soon.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+        <Send className="h-5 w-5 text-primary" />
+        Contact {profileName.split(" ")[0]}
+      </h3>
+      <Card>
+        <CardContent className="p-5">
+          <p className="text-sm text-muted-foreground mb-4">
+            Interested in working with {profileName.split(" ")[0]}? Send a message to get started.
+          </p>
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              contactMut.mutate(formData);
+            }}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Your Name *</Label>
+                <Input
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+                  placeholder="John Doe"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Email *</Label>
+                <Input
+                  required
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+                  placeholder="john@example.com"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Phone (optional)</Label>
+              <Input
+                value={formData.phone}
+                onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))}
+                placeholder="(555) 123-4567"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Message *</Label>
+              <Textarea
+                required
+                value={formData.message}
+                onChange={(e) => setFormData((p) => ({ ...p, message: e.target.value }))}
+                placeholder="I'm interested in buying/selling a home..."
+                className="mt-1"
+                rows={3}
+              />
+            </div>
+            <Button type="submit" className="w-full gap-2" disabled={contactMut.isPending}>
+              {contactMut.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</>
+              ) : (
+                <><Send className="h-4 w-4" /> Send Message</>
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const [, params] = useRoute("/profile/:id");
   const { user } = useAuth();
@@ -816,8 +1011,10 @@ export default function ProfilePage() {
 
       {isAgentOrBroker && (
         <div className="space-y-8">
+          <ServiceAreasSection profileId={profile.id} profileName={profileName} />
           <ReviewsSection profileId={profile.id} profileName={profileName} />
           <VerifiedListingsSection profileId={profile.id} profileName={profileName} isOwn={isOwn} />
+          {!isOwn && <ContactFormSection profileId={profile.id} profileName={profileName} />}
         </div>
       )}
 

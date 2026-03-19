@@ -5341,6 +5341,124 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/profile/:id/service-areas", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+    const agentId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(agentId) || agentId <= 0) return res.status(400).json({ error: "Invalid ID" });
+    try {
+      const citiesResult = await db.execute(sql`
+        SELECT city, state, COUNT(*)::int as transaction_count
+        FROM transactions
+        WHERE agent_id = ${agentId} AND city IS NOT NULL AND city != ''
+        GROUP BY city, state
+        ORDER BY transaction_count DESC
+        LIMIT 10
+      `);
+      const agentResult = await db.execute(sql`
+        SELECT license_state FROM users WHERE id = ${agentId}
+      `);
+      const licenseState = agentResult.rows[0]?.license_state || null;
+      const totalResult = await db.execute(sql`
+        SELECT COUNT(*)::int as total,
+               COUNT(CASE WHEN status = 'closed' THEN 1 END)::int as closed
+        FROM transactions WHERE agent_id = ${agentId}
+      `);
+      res.json({
+        cities: citiesResult.rows.map((r: any) => ({
+          city: r.city,
+          state: r.state,
+          transactionCount: r.transaction_count,
+        })),
+        licenseState,
+        totalTransactions: totalResult.rows[0]?.total || 0,
+        closedTransactions: totalResult.rows[0]?.closed || 0,
+      });
+    } catch (error) {
+      console.error("Error fetching service areas:", error);
+      res.status(500).json({ error: "Failed to fetch service areas" });
+    }
+  });
+
+  app.post("/api/profile/:id/contact", async (req, res) => {
+    const agentId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(agentId) || agentId <= 0) return res.status(400).json({ error: "Invalid ID" });
+    const { name, email, phone, message } = req.body;
+    if (!name || !email || !message) {
+      return res.status(400).json({ error: "Name, email, and message are required" });
+    }
+    if (typeof name !== "string" || name.length > 100 ||
+        typeof email !== "string" || email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+        typeof message !== "string" || message.length > 2000) {
+      return res.status(400).json({ error: "Invalid input" });
+    }
+    try {
+      const agentResult = await db.execute(sql`
+        SELECT id, email, first_name, last_name FROM users WHERE id = ${agentId} AND role IN ('agent', 'broker')
+      `);
+      if (agentResult.rows.length === 0) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      const agent = agentResult.rows[0] as any;
+      await notify(agentId, "profile_contact", "New Contact Request",
+        `${name} (${email}${phone ? ', ' + phone : ''}) sent you a message from your profile: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`
+      );
+      res.json({ success: true, message: "Your message has been sent" });
+    } catch (error) {
+      console.error("Error sending profile contact:", error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  (async () => {
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS platform_inquiries (
+          id SERIAL PRIMARY KEY,
+          first_name TEXT NOT NULL,
+          last_name TEXT,
+          email TEXT NOT NULL,
+          phone TEXT,
+          topic TEXT DEFAULT 'general',
+          message TEXT NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+    } catch (e) {
+      console.error("Failed to ensure platform_inquiries table:", e);
+    }
+  })();
+
+  app.post("/api/platform/contact", async (req, res) => {
+    const { firstName, lastName, email, phone, message, topic } = req.body;
+    if (!firstName || !email || !message) {
+      return res.status(400).json({ error: "First name, email, and message are required" });
+    }
+    if (typeof firstName !== "string" || firstName.length > 100 ||
+        typeof email !== "string" || email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+        typeof message !== "string" || message.length > 2000) {
+      return res.status(400).json({ error: "Invalid input" });
+    }
+    try {
+      await db.execute(sql`
+        INSERT INTO platform_inquiries (first_name, last_name, email, phone, topic, message)
+        VALUES (${firstName}, ${lastName || ""}, ${email}, ${phone || ""}, ${topic || "general"}, ${message})
+      `);
+      const adminResult = await db.execute(sql`
+        SELECT id FROM users WHERE role = 'admin' LIMIT 1
+      `);
+      if (adminResult.rows.length > 0) {
+        const adminId = adminResult.rows[0].id as number;
+        await notify(adminId, "platform_contact", "New Platform Inquiry",
+          `${firstName} ${lastName || ""} (${email}) - ${topic || "general"}: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`
+        );
+      }
+      res.json({ success: true, message: "Your message has been sent" });
+    } catch (error) {
+      console.error("Error saving platform contact:", error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
   app.get("/api/profile/:id/reviews", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
     const agentId = parseInt(req.params.id, 10);
