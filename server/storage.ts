@@ -844,6 +844,7 @@ export class DatabaseStorage implements IStorage {
           contract_execution_date as "contractExecutionDate",
           mls_number as "mlsNumber",
           financing,
+          request_client_review as "requestClientReview",
           updated_at as "updatedAt"
         FROM transactions 
         WHERE id = ${id}
@@ -880,6 +881,7 @@ export class DatabaseStorage implements IStorage {
         contractExecutionDate: row.contractExecutionDate ? new Date(row.contractExecutionDate) : null,
         mlsNumber: row.mlsNumber || null,
         financing: row.financing || null,
+        requestClientReview: row.requestClientReview !== false,
         updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
       };
 
@@ -1048,7 +1050,8 @@ export class DatabaseStorage implements IStorage {
         contractExecutionDate: row.contract_execution_date ? new Date(row.contract_execution_date).toISOString() : null,
         optionPeriodExpiration: row.option_period_expiration ? new Date(row.option_period_expiration).toISOString() : null,
         mlsNumber: row.mls_number || null,
-        financing: row.financing || null
+        financing: row.financing || null,
+        requestClientReview: row.request_client_review !== false,
       };
     } catch (error) {
       console.error('Error in updateTransaction:', error);
