@@ -6,6 +6,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -84,12 +85,14 @@ function DraggableCard({
   transaction, 
   onDelete,
   onClick,
-  clients
+  clients,
+  isDragging,
 }: { 
   transaction: Transaction; 
   onDelete: (id: number) => Promise<void>;
   onClick: () => void;
   clients: Client[];
+  isDragging?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: transaction.id,
@@ -108,9 +111,14 @@ function DraggableCard({
     <Card
       ref={setNodeRef}
       style={style}
-      className="p-3 w-full cursor-move hover:shadow-md transition-shadow relative group dark:bg-neutral-600 dark:border-neutral-500 bg-background border border-neutral-300"
+      className={`p-3 w-full hover:shadow-md transition-shadow relative group dark:bg-neutral-600 dark:border-neutral-500 bg-background border border-neutral-300 ${isDragging ? 'opacity-50' : ''} cursor-pointer md:cursor-move`}
       {...attributes}
       {...listeners}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick();
+      }}
     >
       <Button
         variant="ghost"
@@ -123,13 +131,7 @@ function DraggableCard({
       >
         <Trash2 className="h-4 w-4" />
       </Button>
-      <div
-        className="flex flex-col gap-1"
-        onClick={(e) => {
-          e.preventDefault();
-          onClick();
-        }}
-      >
+      <div className="flex flex-col gap-1">
         <div className="font-medium text-sm truncate pr-8 flex items-center gap-1">
           {hasAddress ? (
             <Home className="h-3 w-3 shrink-0 text-muted-foreground" />
@@ -175,7 +177,8 @@ function KanbanColumn({
   transactions,
   onDelete,
   onTransactionClick,
-  clients
+  clients,
+  activeId,
 }: { 
   status: string; 
   droppableId: string;
@@ -184,6 +187,7 @@ function KanbanColumn({
   onDelete: (id: number) => void;
   onTransactionClick: (id: number) => void;
   clients: Client[];
+  activeId: number | null;
 }) {
   const { setNodeRef } = useDroppable({
     id: droppableId,
@@ -205,6 +209,7 @@ function KanbanColumn({
             onDelete={onDelete}
             onClick={() => onTransactionClick(transaction.id)}
             clients={clients}
+            isDragging={activeId === transaction.id}
           />
         ))}
       </div>
@@ -236,6 +241,12 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 500,
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor)
@@ -351,6 +362,7 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
           onDelete={onDeleteTransaction}
           onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
           clients={clientsData}
+          activeId={activeId}
         />
       ))}
     </div>
