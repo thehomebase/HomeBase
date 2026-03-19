@@ -302,6 +302,10 @@ export function setupAuth(app: Express) {
         ...(req.body.phone ? { profilePhone: req.body.phone } : {}),
       });
 
+      const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await storage.updateUser(user.id, { trialEndsAt });
+      user.trialEndsAt = trialEndsAt;
+
       if (isAgentOrBroker && req.body.licenseNumber && req.body.licenseState && req.body.brokerageName) {
         await storage.updateUser(user.id, {
           licenseNumber: req.body.licenseNumber,

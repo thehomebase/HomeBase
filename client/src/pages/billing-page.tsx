@@ -75,7 +75,7 @@ export default function BillingPage() {
   const isSetupSuccess = searchParams.get('setup_success') === 'true';
   const isCanceled = searchParams.get('canceled') === 'true';
 
-  const { data: subscription, isLoading: subLoading } = useQuery<{ subscription: any; hasPaymentMethod: boolean }>({
+  const { data: subscription, isLoading: subLoading } = useQuery<{ subscription: any; hasPaymentMethod: boolean; trialActive?: boolean; trialDaysLeft?: number; trialEndsAt?: string }>({
     queryKey: ["/api/stripe/subscription"],
   });
 
@@ -221,6 +221,44 @@ export default function BillingPage() {
             Everything you need to manage transactions, nurture client relationships, and grow your real estate business.
           </p>
         </div>
+
+        {!currentSub && subscription?.trialActive && (
+          <div className="mb-8">
+            <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+              <CardContent className="p-6">
+                <div className={`flex ${isMobile ? "flex-col gap-4" : "items-center justify-between"}`}>
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                      <Sparkles className="h-6 w-6 text-blue-600 dark:text-blue-300" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-lg">Free Trial Active</h3>
+                        <Badge className="border-0 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                          {subscription.trialDaysLeft} {subscription.trialDaysLeft === 1 ? "day" : "days"} left
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Full access to all features. Subscribe before {subscription.trialEndsAt ? new Date(subscription.trialEndsAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : "your trial ends"} to keep everything running.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {!currentSub && !subscription?.trialActive && subscription?.trialEndsAt && (
+          <div className="mb-8">
+            <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
+              <Clock className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-800 dark:text-orange-200">
+                Your free trial has ended. Subscribe now to continue using all features.
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
 
         {currentSub && (
           <div className="mb-8">

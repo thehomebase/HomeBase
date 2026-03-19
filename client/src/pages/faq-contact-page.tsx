@@ -394,8 +394,8 @@ export default function FaqContactPage() {
                 <p className="text-sm text-muted-foreground mb-1">
                   Interested in HomeBase for your brokerage? Talk to our team.
                 </p>
-                <a href="mailto:sales@homebase.com" className="text-sm text-primary hover:underline font-medium">
-                  sales@homebase.com
+                <a href="mailto:TheHomeBase.io@gmail.com" className="text-sm text-primary hover:underline font-medium">
+                  TheHomeBase.io@gmail.com
                 </a>
               </div>
 
@@ -407,8 +407,8 @@ export default function FaqContactPage() {
                 <p className="text-sm text-muted-foreground mb-1">
                   Need help? We typically respond within 24 hours.
                 </p>
-                <a href="mailto:support@homebase.com" className="text-sm text-primary hover:underline font-medium">
-                  support@homebase.com
+                <a href="mailto:TheHomeBase.io@gmail.com" className="text-sm text-primary hover:underline font-medium">
+                  TheHomeBase.io@gmail.com
                 </a>
               </div>
 

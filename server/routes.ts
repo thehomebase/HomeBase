@@ -8708,7 +8708,20 @@ export function registerRoutes(app: Express): Server {
         }
       }
 
-      res.json({ subscription: currentSubscription, hasPaymentMethod });
+      let trialActive = false;
+      let trialDaysLeft = 0;
+      let trialEndsAt = null;
+      if (user?.trialEndsAt) {
+        const now = new Date();
+        const ends = new Date(user.trialEndsAt);
+        trialEndsAt = ends.toISOString();
+        if (ends > now) {
+          trialActive = true;
+          trialDaysLeft = Math.ceil((ends.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        }
+      }
+
+      res.json({ subscription: currentSubscription, hasPaymentMethod, trialActive, trialDaysLeft, trialEndsAt });
     } catch (error) {
       console.error('Error fetching subscription:', error);
       res.status(500).json({ error: 'Failed to fetch subscription' });

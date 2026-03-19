@@ -1088,7 +1088,7 @@ function BillingSection() {
   const isSuccess = searchParams.get('success') === 'true';
   const isSetupSuccess = searchParams.get('setup_success') === 'true';
 
-  const { data: subscription, isLoading: subLoading } = useQuery<{ subscription: any; hasPaymentMethod: boolean }>({
+  const { data: subscription, isLoading: subLoading } = useQuery<{ subscription: any; hasPaymentMethod: boolean; trialActive?: boolean; trialDaysLeft?: number; trialEndsAt?: string }>({
     queryKey: ["/api/stripe/subscription"],
   });
 
@@ -1131,7 +1131,7 @@ function BillingSection() {
 
   if (subLoading) return <Skeleton className="h-64 w-full" />;
 
-  const hasActiveSubscription = subscription?.subscription?.status === 'active';
+  const hasActiveSubscription = subscription?.subscription?.status === 'active' || subscription?.trialActive === true;
   const availableCredits = referralCredits?.filter(c => c.status === 'available') || [];
 
   return (
@@ -1156,11 +1156,18 @@ function BillingSection() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="font-medium text-lg">Current Plan</p>
-              {hasActiveSubscription ? (
+              {subscription?.subscription?.status === 'active' ? (
                 <div className="flex items-center gap-2 mt-1">
                   <Badge className="bg-green-100 text-green-800 border-green-200">Active</Badge>
                   <span className="text-sm text-muted-foreground capitalize">
                     {subscription?.subscription?.plan || "Standard"} Plan
+                  </span>
+                </div>
+              ) : subscription?.trialActive ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge className="bg-blue-100 text-blue-800 border-blue-200">Trial</Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {subscription.trialDaysLeft} {subscription.trialDaysLeft === 1 ? "day" : "days"} remaining
                   </span>
                 </div>
               ) : (
