@@ -46,7 +46,7 @@ const FAQS: Record<string, Array<{ q: string; a: string }>> = {
     },
     {
       q: "Is there a free trial?",
-      a: "Yes! You can sign up and explore HomeBase's core features before committing to a paid plan. We want you to see the value before you invest."
+      a: "Yes! Every new account gets a free 7-day trial with full access to all features — no credit card required. We want you to see the value before you invest."
     },
     {
       q: "What payment methods do you accept?",
