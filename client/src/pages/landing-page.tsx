@@ -210,7 +210,7 @@ function FirmaIntegrationCard() {
           </div>
           <div className="flex items-center gap-2 text-sm">
             <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-            <span>Pay-per-envelope — no subscription</span>
+            <span>Unlimited signatures included</span>
           </div>
         </div>
       </CardContent>
