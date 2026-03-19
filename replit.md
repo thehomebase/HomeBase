@@ -61,7 +61,7 @@ Preferred communication style: Simple, everyday language.
 - **SendGrid**: Transactional email (welcome emails after account verification). Service: `server/email-service.ts`. Env vars: `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`.
 - **Google OAuth**: Gmail integration and authentication.
 - **Google Gemini Flash (via Replit AI Integrations)**: AI-powered document parsing fallback for non-TREC real estate documents. Service: `server/ai-document-parser.ts`. PII stripped before sending. Env vars: `AI_INTEGRATIONS_GEMINI_BASE_URL`, `AI_INTEGRATIONS_GEMINI_API_KEY`.
-- **RentCast API**: Property listing data.
+- **RentCast API**: Property listing data. Database-backed cache (`rentcast_cache` table) with 24h TTL for listings and 72h TTL for property details. Shared cache service (`server/rentcast-cache.ts`) used by both API routes and listing alert scheduler. In-memory cache layer on top for hot reads (capped at remaining DB TTL or 2h).
 - **iCal Generator**: Calendar event creation.
 - **Leaflet & leaflet-draw**: Mapping functionalities.
 - **pdf-parse**: PDF text extraction.

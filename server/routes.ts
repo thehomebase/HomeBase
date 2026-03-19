@@ -33,6 +33,7 @@ import type {
 import { notifyAgentOfNewLead, notifyVendorOfNewLead } from "./notification-service";
 import { apiKeyAuth as apiKeyAuthMiddleware, generateApiKey, hashApiKey } from "./api-key-auth";
 import { fireWebhook } from "./webhook-service";
+import { getCached, setCache, getCacheSize, getDbCacheSize, cleanExpiredCache, buildPropertyCacheKey, buildListingsCacheKey } from "./rentcast-cache";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -2946,8 +2947,6 @@ export function registerRoutes(app: Express): Server {
     console.log("[RentCast] ⛔ Development mode: all live RentCast API calls are BLOCKED. Set RENTCAST_ALLOW_DEV=true to override.");
   }
 
-  const rentcastCache = new Map<string, { data: any; timestamp: number }>();
-  const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
   const MONTHLY_LIMIT = 45; // leave buffer under 50
 
   async function getRentcastCallCount(): Promise<number> {
@@ -3014,13 +3013,15 @@ export function registerRoutes(app: Express): Server {
     const parsedLimit = Math.min(Math.max(parseInt(String(limit)) || 50, 1), 500);
     params.set("limit", String(parsedLimit));
 
-    const cacheKey = params.toString();
+    const cacheKey = buildListingsCacheKey(params);
     const forceRefresh = req.query.refresh === "true";
 
-    const cached = rentcastCache.get(cacheKey);
-    if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      const count = await getRentcastCallCount();
-      return res.json({ listings: cached.data, fromCache: true, apiCallsUsed: count, apiCallsLimit: MONTHLY_LIMIT });
+    if (!forceRefresh) {
+      const cached = await getCached(cacheKey);
+      if (cached) {
+        const count = await getRentcastCallCount();
+        return res.json({ listings: cached, fromCache: true, apiCallsUsed: count, apiCallsLimit: MONTHLY_LIMIT });
+      }
     }
 
     if (RENTCAST_DEV_BLOCK) {
@@ -3058,7 +3059,7 @@ export function registerRoutes(app: Express): Server {
       const newCount = await incrementRentcastCallCount();
       console.log(`RentCast returned ${Array.isArray(data) ? data.length : 'non-array'} listings for: ${cacheKey}`);
 
-      rentcastCache.set(cacheKey, { data, timestamp: Date.now() });
+      await setCache(cacheKey, data, "listings");
 
       res.json({ listings: data, fromCache: false, apiCallsUsed: newCount, apiCallsLimit: MONTHLY_LIMIT });
     } catch (error) {
@@ -3080,10 +3081,10 @@ export function registerRoutes(app: Express): Server {
     const stateStr = state ? String(state).trim() : "";
     const zipStr = zipCode ? String(zipCode).trim() : "";
 
-    const cacheKey = `property:${[addressStr, cityStr, stateStr, zipStr].join("|").toLowerCase()}`;
-    const cached = rentcastCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return res.json({ property: cached.data, fromCache: true });
+    const cacheKey = buildPropertyCacheKey(addressStr, cityStr, stateStr, zipStr);
+    const cached = await getCached(cacheKey);
+    if (cached) {
+      return res.json({ property: cached, fromCache: true });
     }
 
     if (RENTCAST_DEV_BLOCK) {
@@ -3148,7 +3149,7 @@ export function registerRoutes(app: Express): Server {
 
       const property = Array.isArray(data) && data.length > 0 ? data[0] : null;
       if (property) {
-        rentcastCache.set(cacheKey, { data: property, timestamp: Date.now() });
+        await setCache(cacheKey, property, "property");
       }
 
       res.json({ property, fromCache: false });
@@ -3162,10 +3163,12 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const statusCount = await getRentcastCallCount();
     const now = new Date();
+    const dbCacheEntries = await getDbCacheSize();
     res.json({
       apiCallsUsed: statusCount,
       apiCallsLimit: MONTHLY_LIMIT,
-      cacheEntries: rentcastCache.size,
+      cacheEntries: getCacheSize(),
+      dbCacheEntries,
       resetDate: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
     });
   });
@@ -4923,12 +4926,12 @@ export function registerRoutes(app: Express): Server {
           params.set("status", "Active");
           params.set("limit", "500");
 
-          const cacheKey = `verified-agent-${agentId}-${params.toString()}`;
-          const cached = rentcastCache.get(cacheKey);
+          const cacheKey = `verified:agent-${agentId}-${buildListingsCacheKey(params)}`;
+          const cachedVerified = await getCached(cacheKey);
           let listings: any[];
 
-          if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-            listings = cached.data;
+          if (cachedVerified) {
+            listings = cachedVerified;
           } else {
             try {
               const url = `https://api.rentcast.io/v1/listings/sale?${params.toString()}`;
@@ -4942,7 +4945,7 @@ export function registerRoutes(app: Express): Server {
               }
               listings = await response.json();
               await incrementRentcastCallCount();
-              rentcastCache.set(cacheKey, { data: listings, timestamp: Date.now() });
+              await setCache(cacheKey, listings, "verified");
             } catch (e) {
               console.error("[VerifiedListings] RentCast fetch error:", e);
               continue;

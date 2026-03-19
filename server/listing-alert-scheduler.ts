@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { sendSMS } from "./twilio-service";
 import { sendGmailEmail } from "./gmail-service";
 import { notify } from "./notification-helper";
+import { getCached, setCache, cleanExpiredCache, buildPropertyCacheKey, buildListingsCacheKey } from "./rentcast-cache";
 
 interface AlertRow {
   id: number;
@@ -92,15 +93,22 @@ function listingMatchesAlert(listing: RentCastListing, alert: AlertRow): boolean
   return true;
 }
 
-async function fetchListings(params: URLSearchParams): Promise<RentCastListing[]> {
+async function fetchListings(params: URLSearchParams): Promise<{ listings: RentCastListing[]; fromCache: boolean }> {
+  const cacheKey = buildListingsCacheKey(params);
+  const cached = await getCached(cacheKey);
+  if (cached) {
+    console.log(`[ListingAlerts] Cache hit for: ${cacheKey}`);
+    return { listings: Array.isArray(cached) ? cached : [], fromCache: true };
+  }
+
   if (process.env.NODE_ENV !== "production" && process.env.RENTCAST_ALLOW_DEV !== "true") {
     console.log("[ListingAlerts] RentCast API call blocked in development mode");
-    return [];
+    return { listings: [], fromCache: false };
   }
   const apiKey = process.env.RENTCAST_API_KEY;
   if (!apiKey) {
     console.error("[ListingAlerts] RentCast API key not configured");
-    return [];
+    return { listings: [], fromCache: false };
   }
 
   const url = `https://api.rentcast.io/v1/listings/sale?${params.toString()}`;
@@ -113,24 +121,33 @@ async function fetchListings(params: URLSearchParams): Promise<RentCastListing[]
 
     if (!response.ok) {
       console.error(`[ListingAlerts] API error: ${response.status} ${response.statusText}`);
-      return [];
+      return { listings: [], fromCache: false };
     }
 
     const data = await response.json();
-    return Array.isArray(data) ? data : [];
+    const listings = Array.isArray(data) ? data : [];
+    await setCache(cacheKey, listings, "listings");
+    return { listings, fromCache: false };
   } catch (error) {
     console.error("[ListingAlerts] Fetch error:", error);
-    return [];
+    return { listings: [], fromCache: false };
   }
 }
 
-async function fetchPropertyByAddress(address: string): Promise<RentCastListing | null> {
+async function fetchPropertyByAddress(address: string): Promise<{ property: RentCastListing | null; fromCache: boolean }> {
+  const cacheKey = buildPropertyCacheKey(address);
+  const cached = await getCached(cacheKey);
+  if (cached) {
+    console.log(`[ListingAlerts] Property cache hit for: ${address}`);
+    return { property: cached, fromCache: true };
+  }
+
   if (process.env.NODE_ENV !== "production" && process.env.RENTCAST_ALLOW_DEV !== "true") {
     console.log("[ListingAlerts] RentCast property fetch blocked in development mode");
-    return null;
+    return { property: null, fromCache: false };
   }
   const apiKey = process.env.RENTCAST_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) return { property: null, fromCache: false };
 
   try {
     const params = new URLSearchParams({ address });
@@ -138,13 +155,18 @@ async function fetchPropertyByAddress(address: string): Promise<RentCastListing 
     const response = await fetch(url, {
       headers: { "X-Api-Key": apiKey, "Accept": "application/json" }
     });
-    if (!response.ok) return null;
+    if (!response.ok) return { property: null, fromCache: false };
     const data = await response.json();
-    if (Array.isArray(data) && data.length > 0) return data[0];
-    if (data && data.id) return data;
-    return null;
+    let property: RentCastListing | null = null;
+    if (Array.isArray(data) && data.length > 0) property = data[0];
+    else if (data && data.id) property = data;
+
+    if (property) {
+      await setCache(cacheKey, property, "property");
+    }
+    return { property, fromCache: false };
   } catch {
-    return null;
+    return { property: null, fromCache: false };
   }
 }
 
@@ -310,8 +332,8 @@ async function processPriceChanges(): Promise<void> {
         const address = [prop.street_address, prop.city, prop.state, prop.zip_code].filter(Boolean).join(", ");
         if (!address) continue;
 
-        const listing = await fetchPropertyByAddress(address);
-        apiCallsUsed++;
+        const { property: listing, fromCache } = await fetchPropertyByAddress(address);
+        if (!fromCache) apiCallsUsed++;
 
         if (!listing || !listing.price) continue;
 
@@ -395,8 +417,8 @@ async function processNewListingAlerts(): Promise<void> {
         break;
       }
 
-      const allListings = await fetchListings(group.params);
-      apiCallsUsed++;
+      const { listings: allListings, fromCache: listingsFromCache } = await fetchListings(group.params);
+      if (!listingsFromCache) apiCallsUsed++;
 
       if (allListings.length === 0) {
         for (const alert of group.alerts) {
@@ -464,6 +486,8 @@ async function processAlerts(): Promise<void> {
   console.log("[ListingAlerts] Starting daily listing alert check...");
   await processNewListingAlerts();
   await processPriceChanges();
+  const cleaned = await cleanExpiredCache();
+  if (cleaned > 0) console.log(`[ListingAlerts] Cleaned ${cleaned} expired cache entries`);
   console.log("[ListingAlerts] Daily check complete.");
 }
 
