@@ -40,7 +40,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Pencil, X, ChevronRight, GripVertical } from "lucide-react";
+import { Pencil, X, ChevronRight, GripVertical, List, LayoutGrid, ArrowUpAZ, ArrowDownZA, Tag } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
@@ -198,6 +198,19 @@ const ClientCard = ({ client, onSelect, onEdit }: {
                 )}
               </span>
             </div>
+            {(client.labels || []).length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                {(client.labels || []).map((label, index) => (
+                  <span
+                    key={`${client.id}-${label}-${index}`}
+                    className={`${getLabelColor(label, index)} inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium`}
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="text-xs text-muted-foreground">
               Added {format(new Date(client.createdAt), 'MMM d, yyyy')}
             </div>
@@ -702,6 +715,175 @@ const ClientDetailsPanel = ({
   );
 };
 
+const MobileClientList = ({
+  clients,
+  sortConfig,
+  onSort,
+  onSelect,
+  onEdit,
+  onDelete,
+}: {
+  clients: Client[];
+  sortConfig: SortConfig;
+  onSort: (key: keyof Client) => void;
+  onSelect: (client: Client) => void;
+  onEdit: (client: Client) => void;
+  onDelete: (clientId: number) => void;
+}) => {
+  const [mobileView, setMobileView] = useState<'cards' | 'table'>('cards');
+
+  const isSortedBy = (key: keyof Client) => sortConfig?.key === key;
+  const sortDir = sortConfig?.direction;
+
+  return (
+    <div className="md:hidden">
+      <div className="flex items-center justify-between px-3 py-2">
+        <div className="flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8">
+                {sortConfig ? (
+                  sortConfig.direction === 'asc' ? <ArrowUpAZ className="h-3.5 w-3.5" /> : <ArrowDownZA className="h-3.5 w-3.5" />
+                ) : (
+                  <ArrowUpAZ className="h-3.5 w-3.5" />
+                )}
+                Sort
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                onClick={() => onSort('lastName')}
+                className={isSortedBy('lastName') ? 'font-medium' : ''}
+              >
+                Last Name {isSortedBy('lastName') && (sortDir === 'asc' ? '(A-Z)' : '(Z-A)')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onSort('firstName')}
+                className={isSortedBy('firstName') ? 'font-medium' : ''}
+              >
+                First Name {isSortedBy('firstName') && (sortDir === 'asc' ? '(A-Z)' : '(Z-A)')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onSort('city')}
+                className={isSortedBy('city') ? 'font-medium' : ''}
+              >
+                City {isSortedBy('city') && (sortDir === 'asc' ? '(A-Z)' : '(Z-A)')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onSort('zipCode')}
+                className={isSortedBy('zipCode') ? 'font-medium' : ''}
+              >
+                Zip Code {isSortedBy('zipCode') && (sortDir === 'asc' ? '(A-Z)' : '(Z-A)')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="flex items-center border rounded-md overflow-hidden">
+          <button
+            className={`p-1.5 ${mobileView === 'cards' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
+            onClick={() => setMobileView('cards')}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button
+            className={`p-1.5 ${mobileView === 'table' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground'}`}
+            onClick={() => setMobileView('table')}
+          >
+            <List className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {clients.length === 0 ? (
+        <div className="text-center text-muted-foreground py-8">
+          No clients found. Add your first client to get started!
+        </div>
+      ) : mobileView === 'cards' ? (
+        <div className="space-y-2 px-2">
+          {clients.map((client) => (
+            <ClientCard
+              key={client.id}
+              client={client}
+              onSelect={onSelect}
+              onEdit={onEdit}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th
+                  className="text-left px-3 py-2 font-medium cursor-pointer"
+                  onClick={() => onSort('lastName')}
+                >
+                  <span className="flex items-center gap-1">
+                    Name
+                    {isSortedBy('lastName') && (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                  </span>
+                </th>
+                <th className="text-left px-3 py-2 font-medium">Labels</th>
+                <th
+                  className="text-left px-3 py-2 font-medium cursor-pointer"
+                  onClick={() => onSort('city')}
+                >
+                  <span className="flex items-center gap-1">
+                    City
+                    {isSortedBy('city') && (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                  </span>
+                </th>
+                <th className="text-right px-3 py-2 font-medium w-10"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {clients.map((client, idx) => (
+                <tr
+                  key={client.id}
+                  className={`border-b cursor-pointer active:bg-muted/50 ${idx % 2 === 0 ? '' : 'bg-muted/20'}`}
+                  onClick={() => onSelect(client)}
+                >
+                  <td className="px-3 py-2.5">
+                    <div className="font-medium">{client.firstName} {client.lastName}</div>
+                    <div className="text-xs text-muted-foreground">{client.phone || client.email || ''}</div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex flex-wrap gap-0.5">
+                      {(client.labels || []).slice(0, 2).map((label, i) => (
+                        <span
+                          key={`${client.id}-${label}-${i}`}
+                          className={`${getLabelColor(label, i)} px-1.5 py-0 rounded-full text-[10px] font-medium`}
+                        >
+                          {label}
+                        </span>
+                      ))}
+                      {(client.labels || []).length > 2 && (
+                        <span className="text-[10px] text-muted-foreground">+{(client.labels || []).length - 2}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-muted-foreground text-xs">{client.city || '-'}</td>
+                  <td className="px-2 py-2.5 text-right">
+                    <button
+                      className="p-1 text-destructive/50 active:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(client.id);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SortableHeader = ({ 
   column, 
   sortConfig, 
@@ -944,23 +1126,15 @@ const TableContent = ({
         </DndContext>
       </div>
 
-      {/* Mobile view - Cards */}
-      <div className="md:hidden space-y-4">
-        {clients.length === 0 ? (
-          <div className="text-center text-muted-foreground py-8">
-            No clients found. Add your first client to get started!
-          </div>
-        ) : (
-          clients.map((client) => (
-            <ClientCard
-              key={client.id}
-              client={client}
-              onSelect={(client) => setSelectedClient(client)}
-              onEdit={(client) => setSelectedClient(client)}
-            />
-          ))
-        )}
-      </div>
+      {/* Mobile view */}
+      <MobileClientList
+        clients={sortData(clients, sortConfig)}
+        sortConfig={sortConfig}
+        onSort={requestSort}
+        onSelect={(client) => setSelectedClient(client)}
+        onEdit={(client) => setSelectedClient(client)}
+        onDelete={onDelete}
+      />
 
       {/* Client Details Panel */}
       <ClientDetailsPanel
