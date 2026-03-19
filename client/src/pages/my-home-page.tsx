@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -10,37 +10,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { type HomeownerHome, type MaintenanceRecord } from "@shared/schema";
+import { type HomeownerHome, type MaintenanceRecord, type HomeExpense, type HomeMaintenanceReminder, type HomeEquityProfile, type HomeWarrantyItem, type HomeImprovement } from "@shared/schema";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Home,
-  Plus,
-  Pencil,
-  Trash2,
-  DollarSign,
-  CalendarDays,
-  MapPin,
-  Wrench,
-  Search,
-  FileText,
-  Users,
-  ClipboardList,
-  Building2
+  Home, Plus, Pencil, Trash2, DollarSign, CalendarDays, MapPin, Wrench,
+  Search, FileText, Users, ClipboardList, Building2, Zap, Droplets, Flame,
+  Bug, Waves, Sparkles, Wifi, TreePine, Shield, MoreHorizontal,
+  Bell, Clock, CheckCircle2, AlertTriangle, TrendingUp, RefreshCw,
+  PiggyBank, Percent, ArrowUpRight, HelpCircle, Hammer, PaintBucket,
+  Thermometer, Package, FolderOpen
 } from "lucide-react";
 import { Link } from "wouter";
 
-type HomeWithMaintenance = HomeownerHome & {
-  maintenance?: MaintenanceRecord[];
-};
+type HomeWithMaintenance = HomeownerHome & { maintenance?: MaintenanceRecord[] };
 
 const MAINTENANCE_CATEGORIES = [
   { value: "plumbing", label: "Plumbing" },
@@ -61,87 +50,93 @@ const MAINTENANCE_CATEGORIES = [
   { value: "other", label: "Other" },
 ];
 
+const EXPENSE_CATEGORIES = [
+  { value: "electric", label: "Electric", icon: Zap },
+  { value: "gas", label: "Gas", icon: Flame },
+  { value: "water", label: "Water", icon: Droplets },
+  { value: "sewer", label: "Sewer", icon: Droplets },
+  { value: "trash", label: "Trash", icon: Package },
+  { value: "pest_control", label: "Pest Control", icon: Bug },
+  { value: "pool_maintenance", label: "Pool Maintenance", icon: Waves },
+  { value: "home_cleaning", label: "Home Cleaning", icon: Sparkles },
+  { value: "internet", label: "Internet", icon: Wifi },
+  { value: "lawn_care", label: "Lawn Care", icon: TreePine },
+  { value: "hoa", label: "HOA", icon: Building2 },
+  { value: "security", label: "Security", icon: Shield },
+  { value: "other", label: "Other", icon: MoreHorizontal },
+];
+
+const REMINDER_CATEGORIES = [
+  { value: "hvac", label: "HVAC" },
+  { value: "plumbing", label: "Plumbing" },
+  { value: "electrical", label: "Electrical" },
+  { value: "roofing", label: "Roofing" },
+  { value: "exterior", label: "Exterior" },
+  { value: "interior", label: "Interior" },
+  { value: "appliance", label: "Appliance" },
+  { value: "safety", label: "Safety" },
+  { value: "seasonal", label: "Seasonal" },
+  { value: "other", label: "Other" },
+];
+
+const IMPROVEMENT_CATEGORIES = [
+  { value: "kitchen", label: "Kitchen" },
+  { value: "bathroom", label: "Bathroom" },
+  { value: "bedroom", label: "Bedroom" },
+  { value: "living_area", label: "Living Area" },
+  { value: "exterior", label: "Exterior" },
+  { value: "landscaping", label: "Landscaping" },
+  { value: "roofing", label: "Roofing" },
+  { value: "flooring", label: "Flooring" },
+  { value: "painting", label: "Painting" },
+  { value: "plumbing", label: "Plumbing" },
+  { value: "electrical", label: "Electrical" },
+  { value: "hvac", label: "HVAC" },
+  { value: "addition", label: "Addition" },
+  { value: "other", label: "Other" },
+];
+
+const SEASONAL_REMINDERS = [
+  { title: "Change HVAC filters", category: "hvac" as const, frequency: "quarterly" as const, description: "Replace air filters to maintain efficiency and air quality" },
+  { title: "Clean gutters", category: "exterior" as const, frequency: "semi_annual" as const, description: "Clear debris from gutters and downspouts" },
+  { title: "Flush water heater", category: "plumbing" as const, frequency: "annual" as const, description: "Drain and flush sediment from water heater tank" },
+  { title: "Test smoke detectors", category: "safety" as const, frequency: "semi_annual" as const, description: "Test all smoke and carbon monoxide detectors, replace batteries" },
+  { title: "Inspect roof", category: "roofing" as const, frequency: "annual" as const, description: "Check for damaged or missing shingles, flashing issues" },
+  { title: "Service HVAC system", category: "hvac" as const, frequency: "annual" as const, description: "Professional tune-up before summer/winter season" },
+  { title: "Check caulking & weatherstripping", category: "exterior" as const, frequency: "annual" as const, description: "Inspect and replace around windows, doors, and foundation" },
+  { title: "Clean dryer vent", category: "appliance" as const, frequency: "annual" as const, description: "Clear lint buildup from dryer vent and exhaust duct" },
+  { title: "Test garage door safety", category: "safety" as const, frequency: "quarterly" as const, description: "Test auto-reverse feature and lubricate moving parts" },
+  { title: "Inspect plumbing for leaks", category: "plumbing" as const, frequency: "semi_annual" as const, description: "Check under sinks, around toilets, and water heater connections" },
+];
+
 function AddHomeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({
-    address: "",
-    city: "",
-    state: "",
-    zipCode: "",
-    purchaseDate: "",
-    purchasePrice: "",
-    notes: "",
-  });
-
+  const [form, setForm] = useState({ address: "", city: "", state: "", zipCode: "", purchaseDate: "", purchasePrice: "", notes: "" });
   const createHomeMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/my-homes", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-homes"] });
-      toast({ title: "Home added successfully" });
-      onOpenChange(false);
-      setForm({ address: "", city: "", state: "", zipCode: "", purchaseDate: "", purchasePrice: "", notes: "" });
-    },
-    onError: () => {
-      toast({ title: "Failed to add home", variant: "destructive" });
-    },
+    mutationFn: async (data: any) => { const res = await apiRequest("POST", "/api/my-homes", data); return res.json(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes"] }); toast({ title: "Home added successfully" }); onOpenChange(false); setForm({ address: "", city: "", state: "", zipCode: "", purchaseDate: "", purchasePrice: "", notes: "" }); },
+    onError: () => { toast({ title: "Failed to add home", variant: "destructive" }); },
   });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createHomeMutation.mutate({
-      ...form,
-      purchasePrice: form.purchasePrice ? parseInt(form.purchasePrice) : null,
-      userId: 0,
-    });
-  };
-
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); createHomeMutation.mutate({ ...form, purchasePrice: form.purchasePrice ? parseInt(form.purchasePrice) : null, userId: 0 }); };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Add a Home</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Add a Home</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="address">Address *</Label>
-            <Input id="address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} required />
+          <div className="space-y-2"><Label htmlFor="address">Address *</Label><Input id="address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} required /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label htmlFor="city">City</Label><Input id="city" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
+            <div className="space-y-2"><Label htmlFor="state">State</Label><Input id="state" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
-              <Input id="city" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="state">State</Label>
-              <Input id="state" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
-            </div>
+            <div className="space-y-2"><Label htmlFor="zipCode">Zip Code</Label><Input id="zipCode" value={form.zipCode} onChange={(e) => setForm({ ...form, zipCode: e.target.value })} /></div>
+            <div className="space-y-2"><Label htmlFor="purchaseDate">Purchase Date</Label><Input id="purchaseDate" type="date" value={form.purchaseDate} onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })} /></div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="zipCode">Zip Code</Label>
-              <Input id="zipCode" value={form.zipCode} onChange={(e) => setForm({ ...form, zipCode: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="purchaseDate">Purchase Date</Label>
-              <Input id="purchaseDate" type="date" value={form.purchaseDate} onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="purchasePrice">Purchase Price</Label>
-            <Input id="purchasePrice" type="number" placeholder="e.g. 350000" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
-          </div>
+          <div className="space-y-2"><Label htmlFor="purchasePrice">Purchase Price</Label><Input id="purchasePrice" type="number" placeholder="e.g. 350000" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} /></div>
+          <div className="space-y-2"><Label htmlFor="notes">Notes</Label><Textarea id="notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} /></div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={!form.address || createHomeMutation.isPending}>
-              {createHomeMutation.isPending ? "Adding..." : "Add Home"}
-            </Button>
+            <Button type="submit" disabled={!form.address || createHomeMutation.isPending}>{createHomeMutation.isPending ? "Adding..." : "Add Home"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -149,157 +144,790 @@ function AddHomeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
   );
 }
 
-function MaintenanceDialog({
-  open,
-  onOpenChange,
-  homeId,
-  record,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  homeId: number;
-  record?: MaintenanceRecord | null;
-}) {
+function ExpenseDialog({ open, onOpenChange, homeId, expense }: { open: boolean; onOpenChange: (open: boolean) => void; homeId: number; expense?: HomeExpense | null }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({
-    category: record?.category || "",
-    description: record?.description || "",
-    serviceDate: record?.serviceDate || "",
-    cost: record?.cost?.toString() || "",
-    notes: record?.notes || "",
-    contractorId: record?.contractorId || null,
-  });
-
-  useEffect(() => {
-    if (open) {
-      setForm({
-        category: record?.category || "",
-        description: record?.description || "",
-        serviceDate: record?.serviceDate || "",
-        cost: record?.cost?.toString() || "",
-        notes: record?.notes || "",
-        contractorId: record?.contractorId || null,
-      });
-    }
-  }, [open, record]);
-
-  const isEditing = !!record;
-
+  const [form, setForm] = useState({ category: "", description: "", amount: "", billingDate: "", isRecurring: true, frequency: "monthly", provider: "", notes: "" });
+  useEffect(() => { if (open) { setForm({ category: expense?.category || "", description: expense?.description || "", amount: expense?.amount?.toString() || "", billingDate: expense?.billingDate || "", isRecurring: expense?.isRecurring ?? true, frequency: expense?.frequency || "monthly", provider: expense?.provider || "", notes: expense?.notes || "" }); } }, [open, expense]);
+  const isEditing = !!expense;
   const mutation = useMutation({
-    mutationFn: async (data: any) => {
-      if (isEditing) {
-        const res = await apiRequest("PATCH", `/api/maintenance/${record!.id}`, data);
-        return res.json();
-      } else {
-        const res = await apiRequest("POST", `/api/my-homes/${homeId}/maintenance`, data);
-        return res.json();
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/my-homes"] });
-      toast({ title: isEditing ? "Record updated" : "Maintenance record added" });
-      onOpenChange(false);
-    },
-    onError: () => {
-      toast({ title: "Failed to save record", variant: "destructive" });
-    },
+    mutationFn: async (data: any) => { const res = isEditing ? await apiRequest("PATCH", `/api/expenses/${expense!.id}`, data) : await apiRequest("POST", `/api/my-homes/${homeId}/expenses`, data); return res.json(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "expenses"] }); toast({ title: isEditing ? "Expense updated" : "Expense added" }); onOpenChange(false); },
+    onError: () => { toast({ title: "Failed to save expense", variant: "destructive" }); },
   });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    mutation.mutate({
-      ...form,
-      homeId,
-      cost: form.cost ? parseInt(form.cost) : null,
-      contractorId: form.contractorId || null,
-    });
-  };
-
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); mutation.mutate({ ...form, homeId, amount: form.amount ? parseInt(form.amount) : 0 }); };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit" : "Add"} Maintenance Record</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>{isEditing ? "Edit" : "Add"} Expense</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="m-category">Category *</Label>
-            <Select value={form.category} onValueChange={(value) => setForm({ ...form, category: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {MAINTENANCE_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                ))}
-              </SelectContent>
+            <Label>Category *</Label>
+            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+              <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+              <SelectContent>{EXPENSE_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="m-description">Description *</Label>
-            <Textarea id="m-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required rows={2} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Amount ($) *</Label><Input type="number" placeholder="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
+            <div className="space-y-2"><Label>Billing Date *</Label><Input type="date" value={form.billingDate} onChange={(e) => setForm({ ...form, billingDate: e.target.value })} required /></div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="m-date">Service Date</Label>
-              <Input id="m-date" type="date" value={form.serviceDate} onChange={(e) => setForm({ ...form, serviceDate: e.target.value })} />
+          <div className="space-y-2"><Label>Provider</Label><Input placeholder="e.g. AT&T, TXU Energy" value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })} /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center gap-2">
+              <Switch checked={form.isRecurring} onCheckedChange={(v) => setForm({ ...form, isRecurring: v })} />
+              <Label>Recurring</Label>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="m-cost">Cost ($)</Label>
-              <Input id="m-cost" type="number" placeholder="0" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
-            </div>
+            {form.isRecurring && (
+              <Select value={form.frequency} onValueChange={(v) => setForm({ ...form, frequency: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="quarterly">Quarterly</SelectItem>
+                  <SelectItem value="annually">Annually</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="m-notes">Notes</Label>
-            <Textarea id="m-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
-          </div>
+          <div className="space-y-2"><Label>Description</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={!form.category || !form.description || mutation.isPending}>
-              {mutation.isPending ? "Saving..." : isEditing ? "Update" : "Add Record"}
-            </Button>
+            <Button type="submit" disabled={!form.category || !form.amount || mutation.isPending}>{mutation.isPending ? "Saving..." : isEditing ? "Update" : "Add Expense"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function MaintenanceDialog({ open, onOpenChange, homeId, record }: { open: boolean; onOpenChange: (open: boolean) => void; homeId: number; record?: MaintenanceRecord | null }) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ category: "", description: "", serviceDate: "", cost: "", notes: "", contractorId: null as number | null });
+  useEffect(() => { if (open) { setForm({ category: record?.category || "", description: record?.description || "", serviceDate: record?.serviceDate || "", cost: record?.cost?.toString() || "", notes: record?.notes || "", contractorId: record?.contractorId || null }); } }, [open, record]);
+  const isEditing = !!record;
+  const mutation = useMutation({
+    mutationFn: async (data: any) => { const res = isEditing ? await apiRequest("PATCH", `/api/maintenance/${record!.id}`, data) : await apiRequest("POST", `/api/my-homes/${homeId}/maintenance`, data); return res.json(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId] }); queryClient.invalidateQueries({ queryKey: ["/api/my-homes"] }); toast({ title: isEditing ? "Record updated" : "Maintenance record added" }); onOpenChange(false); },
+    onError: () => { toast({ title: "Failed to save record", variant: "destructive" }); },
+  });
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); mutation.mutate({ ...form, homeId, cost: form.cost ? parseInt(form.cost) : null, contractorId: form.contractorId || null }); };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>{isEditing ? "Edit" : "Add"} Maintenance Record</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Category *</Label>
+            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+              <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+              <SelectContent>{MAINTENANCE_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2"><Label>Description *</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required rows={2} /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Service Date</Label><Input type="date" value={form.serviceDate} onChange={(e) => setForm({ ...form, serviceDate: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Cost ($)</Label><Input type="number" placeholder="0" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></div>
+          </div>
+          <div className="space-y-2"><Label>Notes</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} /></div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={!form.category || !form.description || mutation.isPending}>{mutation.isPending ? "Saving..." : isEditing ? "Update" : "Add Record"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReminderDialog({ open, onOpenChange, homeId, reminder }: { open: boolean; onOpenChange: (open: boolean) => void; homeId: number; reminder?: HomeMaintenanceReminder | null }) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ title: "", description: "", category: "", frequency: "quarterly", nextDue: "", notifyViaSms: false, notifyViaPush: true, notes: "" });
+  useEffect(() => { if (open) { setForm({ title: reminder?.title || "", description: reminder?.description || "", category: reminder?.category || "", frequency: reminder?.frequency || "quarterly", nextDue: reminder?.nextDue || "", notifyViaSms: reminder?.notifyViaSms ?? false, notifyViaPush: reminder?.notifyViaPush ?? true, notes: reminder?.notes || "" }); } }, [open, reminder]);
+  const isEditing = !!reminder;
+  const mutation = useMutation({
+    mutationFn: async (data: any) => { const res = isEditing ? await apiRequest("PATCH", `/api/home-reminders/${reminder!.id}`, data) : await apiRequest("POST", `/api/my-homes/${homeId}/reminders`, data); return res.json(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "reminders"] }); toast({ title: isEditing ? "Reminder updated" : "Reminder added" }); onOpenChange(false); },
+    onError: () => { toast({ title: "Failed to save reminder", variant: "destructive" }); },
+  });
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); mutation.mutate({ ...form, homeId }); };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>{isEditing ? "Edit" : "Add"} Reminder</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2"><Label>Title *</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required placeholder="e.g. Change HVAC filters" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Category *</Label>
+              <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>{REMINDER_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Frequency *</Label>
+              <Select value={form.frequency} onValueChange={(v) => setForm({ ...form, frequency: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="quarterly">Quarterly</SelectItem>
+                  <SelectItem value="semi_annual">Semi-Annual</SelectItem>
+                  <SelectItem value="annual">Annual</SelectItem>
+                  <SelectItem value="one_time">One-Time</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2"><Label>Next Due Date *</Label><Input type="date" value={form.nextDue} onChange={(e) => setForm({ ...form, nextDue: e.target.value })} required /></div>
+          <div className="space-y-2"><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} /></div>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2"><Switch checked={form.notifyViaPush} onCheckedChange={(v) => setForm({ ...form, notifyViaPush: v })} /><Label>Push</Label></div>
+            <div className="flex items-center gap-2"><Switch checked={form.notifyViaSms} onCheckedChange={(v) => setForm({ ...form, notifyViaSms: v })} /><Label>SMS</Label></div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={!form.title || !form.category || !form.nextDue || mutation.isPending}>{mutation.isPending ? "Saving..." : isEditing ? "Update" : "Add Reminder"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function WarrantyDialog({ open, onOpenChange, homeId, item }: { open: boolean; onOpenChange: (open: boolean) => void; homeId: number; item?: HomeWarrantyItem | null }) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ itemName: "", brand: "", model: "", warrantyProvider: "", coverageDetails: "", purchaseDate: "", expirationDate: "", notes: "" });
+  useEffect(() => { if (open) { setForm({ itemName: item?.itemName || "", brand: item?.brand || "", model: item?.model || "", warrantyProvider: item?.warrantyProvider || "", coverageDetails: item?.coverageDetails || "", purchaseDate: item?.purchaseDate || "", expirationDate: item?.expirationDate || "", notes: item?.notes || "" }); } }, [open, item]);
+  const isEditing = !!item;
+  const mutation = useMutation({
+    mutationFn: async (data: any) => { const res = isEditing ? await apiRequest("PATCH", `/api/warranty/${item!.id}`, data) : await apiRequest("POST", `/api/my-homes/${homeId}/warranty`, data); return res.json(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "warranty"] }); toast({ title: isEditing ? "Warranty updated" : "Warranty added" }); onOpenChange(false); },
+    onError: () => { toast({ title: "Failed to save warranty", variant: "destructive" }); },
+  });
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); mutation.mutate({ ...form, homeId }); };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>{isEditing ? "Edit" : "Add"} Warranty Item</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2"><Label>Item Name *</Label><Input value={form.itemName} onChange={(e) => setForm({ ...form, itemName: e.target.value })} required placeholder="e.g. HVAC System, Dishwasher" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Brand</Label><Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Model</Label><Input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} /></div>
+          </div>
+          <div className="space-y-2"><Label>Warranty Provider</Label><Input value={form.warrantyProvider} onChange={(e) => setForm({ ...form, warrantyProvider: e.target.value })} placeholder="e.g. American Home Shield" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Purchase Date</Label><Input type="date" value={form.purchaseDate} onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Expiration Date</Label><Input type="date" value={form.expirationDate} onChange={(e) => setForm({ ...form, expirationDate: e.target.value })} /></div>
+          </div>
+          <div className="space-y-2"><Label>Coverage Details</Label><Textarea value={form.coverageDetails} onChange={(e) => setForm({ ...form, coverageDetails: e.target.value })} rows={2} placeholder="What's covered, deductible, etc." /></div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={!form.itemName || mutation.isPending}>{mutation.isPending ? "Saving..." : isEditing ? "Update" : "Add Warranty"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ImprovementDialog({ open, onOpenChange, homeId, item }: { open: boolean; onOpenChange: (open: boolean) => void; homeId: number; item?: HomeImprovement | null }) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ projectName: "", description: "", category: "", cost: "", startDate: "", completionDate: "", materials: "", notes: "" });
+  useEffect(() => { if (open) { setForm({ projectName: item?.projectName || "", description: item?.description || "", category: item?.category || "", cost: item?.cost?.toString() || "", startDate: item?.startDate || "", completionDate: item?.completionDate || "", materials: item?.materials || "", notes: item?.notes || "" }); } }, [open, item]);
+  const isEditing = !!item;
+  const mutation = useMutation({
+    mutationFn: async (data: any) => { const res = isEditing ? await apiRequest("PATCH", `/api/improvements/${item!.id}`, data) : await apiRequest("POST", `/api/my-homes/${homeId}/improvements`, data); return res.json(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "improvements"] }); toast({ title: isEditing ? "Project updated" : "Project added" }); onOpenChange(false); },
+    onError: () => { toast({ title: "Failed to save project", variant: "destructive" }); },
+  });
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); mutation.mutate({ ...form, homeId, cost: form.cost ? parseInt(form.cost) : null }); };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>{isEditing ? "Edit" : "Add"} Home Improvement</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2"><Label>Project Name *</Label><Input value={form.projectName} onChange={(e) => setForm({ ...form, projectName: e.target.value })} required placeholder="e.g. Kitchen Remodel" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Category *</Label>
+              <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>{IMPROVEMENT_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>Cost ($)</Label><Input type="number" placeholder="0" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Start Date</Label><Input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Completion Date</Label><Input type="date" value={form.completionDate} onChange={(e) => setForm({ ...form, completionDate: e.target.value })} /></div>
+          </div>
+          <div className="space-y-2"><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} /></div>
+          <div className="space-y-2"><Label>Materials Used</Label><Input value={form.materials} onChange={(e) => setForm({ ...form, materials: e.target.value })} placeholder="e.g. Sherwin-Williams Agreeable Gray SW 7029" /></div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={!form.projectName || !form.category || mutation.isPending}>{mutation.isPending ? "Saving..." : isEditing ? "Update" : "Add Project"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EquitySetupDialog({ open, onOpenChange, homeId, profile }: { open: boolean; onOpenChange: (open: boolean) => void; homeId: number; profile?: HomeEquityProfile | null }) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ loanAmount: "", interestRate: "", loanTermYears: "30", paymentFrequency: "monthly", loanStartDate: "" });
+  useEffect(() => { if (open) { setForm({ loanAmount: profile?.loanAmount?.toString() || "", interestRate: profile?.interestRate || "", loanTermYears: profile?.loanTermYears?.toString() || "30", paymentFrequency: profile?.paymentFrequency || "monthly", loanStartDate: profile?.loanStartDate || "" }); } }, [open, profile]);
+  const mutation = useMutation({
+    mutationFn: async (data: any) => { const res = await apiRequest("POST", `/api/my-homes/${homeId}/equity`, data); return res.json(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "equity"] }); toast({ title: "Equity profile saved" }); onOpenChange(false); },
+    onError: () => { toast({ title: "Failed to save equity profile", variant: "destructive" }); },
+  });
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); mutation.mutate({ ...form, homeId, loanAmount: parseInt(form.loanAmount), loanTermYears: parseInt(form.loanTermYears) }); };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>{profile ? "Update" : "Set Up"} Equity Tracker</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2"><Label>Original Loan Amount *</Label><Input type="number" placeholder="e.g. 320000" value={form.loanAmount} onChange={(e) => setForm({ ...form, loanAmount: e.target.value })} required /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Interest Rate (%) *</Label><Input placeholder="e.g. 6.5" value={form.interestRate} onChange={(e) => setForm({ ...form, interestRate: e.target.value })} required /></div>
+            <div className="space-y-2">
+              <Label>Loan Term *</Label>
+              <Select value={form.loanTermYears} onValueChange={(v) => setForm({ ...form, loanTermYears: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="15">15 years</SelectItem>
+                  <SelectItem value="20">20 years</SelectItem>
+                  <SelectItem value="30">30 years</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Loan Start Date *</Label><Input type="date" value={form.loanStartDate} onChange={(e) => setForm({ ...form, loanStartDate: e.target.value })} required /></div>
+            <div className="space-y-2">
+              <Label>Payment Frequency</Label>
+              <Select value={form.paymentFrequency} onValueChange={(v) => setForm({ ...form, paymentFrequency: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="biweekly">Biweekly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={!form.loanAmount || !form.interestRate || !form.loanStartDate || mutation.isPending}>{mutation.isPending ? "Saving..." : "Save"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ExpensesTab({ homeId }: { homeId: number }) {
+  const [showDialog, setShowDialog] = useState(false);
+  const [editing, setEditing] = useState<HomeExpense | null>(null);
+  const { data: expenses = [], isLoading } = useQuery<HomeExpense[]>({ queryKey: ["/api/my-homes", homeId, "expenses"], queryFn: async () => { const r = await fetch(`/api/my-homes/${homeId}/expenses`, { credentials: "include" }); return r.json(); } });
+  const deleteMutation = useMutation({ mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/expenses/${id}`); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "expenses"] }); } });
+
+  const monthlyTotal = useMemo(() => expenses.filter(e => e.isRecurring && e.frequency === 'monthly').reduce((s, e) => s + (e.amount || 0), 0), [expenses]);
+  const categoryTotals = useMemo(() => {
+    const map = new Map<string, number>();
+    expenses.forEach(e => { map.set(e.category, (map.get(e.category) || 0) + (e.amount || 0)); });
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [expenses]);
+
+  if (isLoading) return <Skeleton className="h-64 w-full" />;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold flex items-center gap-2"><DollarSign className="h-5 w-5 text-primary" />Home Expenses</h3>
+        <Button size="sm" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add Expense</Button>
+      </div>
+
+      {expenses.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Monthly Recurring</p><p className="text-2xl font-bold">${monthlyTotal.toLocaleString()}</p></CardContent></Card>
+          <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Entries</p><p className="text-2xl font-bold">{expenses.length}</p></CardContent></Card>
+          {categoryTotals.length > 0 && (
+            <Card className="col-span-2"><CardContent className="p-4">
+              <p className="text-sm text-muted-foreground mb-2">Top Categories</p>
+              <div className="flex flex-wrap gap-2">
+                {categoryTotals.slice(0, 4).map(([cat, total]) => {
+                  const catInfo = EXPENSE_CATEGORIES.find(c => c.value === cat);
+                  return <Badge key={cat} variant="secondary" className="gap-1">{catInfo?.label || cat}: ${total.toLocaleString()}</Badge>;
+                })}
+              </div>
+            </CardContent></Card>
+          )}
+        </div>
+      )}
+
+      {expenses.length === 0 ? (
+        <Card><CardContent className="text-center py-8">
+          <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">No expenses tracked yet</p>
+          <p className="text-sm text-muted-foreground mt-1">Track your recurring home costs like electric, water, internet, and more</p>
+          <Button variant="outline" className="mt-4" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add First Expense</Button>
+        </CardContent></Card>
+      ) : (
+        <Card><CardContent className="p-0">
+          <Table>
+            <TableHeader><TableRow><TableHead>Category</TableHead><TableHead>Provider</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>Type</TableHead><TableHead className="w-[80px]"></TableHead></TableRow></TableHeader>
+            <TableBody>
+              {expenses.map((e) => {
+                const catInfo = EXPENSE_CATEGORIES.find(c => c.value === e.category);
+                const Icon = catInfo?.icon || MoreHorizontal;
+                return (
+                  <TableRow key={e.id}>
+                    <TableCell><div className="flex items-center gap-2"><Icon className="h-4 w-4 text-muted-foreground" />{catInfo?.label || e.category}</div></TableCell>
+                    <TableCell className="text-muted-foreground">{e.provider || "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap">{e.billingDate ? new Date(e.billingDate).toLocaleDateString() : "—"}</TableCell>
+                    <TableCell className="text-right font-medium">${(e.amount || 0).toLocaleString()}</TableCell>
+                    <TableCell><Badge variant={e.isRecurring ? "default" : "secondary"} className="text-xs">{e.isRecurring ? e.frequency : "one-time"}</Badge></TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(e); setShowDialog(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteMutation.mutate(e.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent></Card>
+      )}
+      <ExpenseDialog open={showDialog} onOpenChange={setShowDialog} homeId={homeId} expense={editing} />
+    </div>
+  );
+}
+
+function RemindersTab({ homeId }: { homeId: number }) {
+  const { toast } = useToast();
+  const [showDialog, setShowDialog] = useState(false);
+  const [editing, setEditing] = useState<HomeMaintenanceReminder | null>(null);
+  const { data: reminders = [], isLoading } = useQuery<HomeMaintenanceReminder[]>({ queryKey: ["/api/my-homes", homeId, "reminders"], queryFn: async () => { const r = await fetch(`/api/my-homes/${homeId}/reminders`, { credentials: "include" }); return r.json(); } });
+  const deleteMutation = useMutation({ mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/home-reminders/${id}`); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "reminders"] }); } });
+  const completeMutation = useMutation({
+    mutationFn: async (r: HomeMaintenanceReminder) => {
+      const today = new Date().toISOString().split('T')[0];
+      let nextDue = r.nextDue;
+      const d = new Date(r.nextDue);
+      if (r.frequency === 'monthly') d.setMonth(d.getMonth() + 1);
+      else if (r.frequency === 'quarterly') d.setMonth(d.getMonth() + 3);
+      else if (r.frequency === 'semi_annual') d.setMonth(d.getMonth() + 6);
+      else if (r.frequency === 'annual') d.setFullYear(d.getFullYear() + 1);
+      nextDue = d.toISOString().split('T')[0];
+      const res = await apiRequest("PATCH", `/api/home-reminders/${r.id}`, { lastCompleted: today, nextDue, isCompleted: r.frequency === 'one_time' });
+      return res.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "reminders"] }); toast({ title: "Marked as complete" }); },
+  });
+
+  const addSeasonalReminders = useMutation({
+    mutationFn: async () => {
+      const today = new Date();
+      for (const r of SEASONAL_REMINDERS) {
+        const nextDue = new Date(today);
+        if (r.frequency === 'quarterly') nextDue.setMonth(nextDue.getMonth() + 3);
+        else if (r.frequency === 'semi_annual') nextDue.setMonth(nextDue.getMonth() + 6);
+        else nextDue.setFullYear(nextDue.getFullYear() + 1);
+        await apiRequest("POST", `/api/my-homes/${homeId}/reminders`, { ...r, homeId, nextDue: nextDue.toISOString().split('T')[0] });
+      }
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "reminders"] }); toast({ title: "Seasonal reminders added" }); },
+  });
+
+  const overdue = reminders.filter(r => !r.isCompleted && new Date(r.nextDue) < new Date());
+  const upcoming = reminders.filter(r => !r.isCompleted && new Date(r.nextDue) >= new Date());
+  const completed = reminders.filter(r => r.isCompleted);
+
+  if (isLoading) return <Skeleton className="h-64 w-full" />;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-lg font-semibold flex items-center gap-2"><Bell className="h-5 w-5 text-primary" />Maintenance Reminders</h3>
+        <div className="flex gap-2">
+          {reminders.length === 0 && <Button size="sm" variant="outline" onClick={() => addSeasonalReminders.mutate()} disabled={addSeasonalReminders.isPending}><Sparkles className="h-4 w-4 mr-1" />Add Seasonal Checklist</Button>}
+          <Button size="sm" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add Reminder</Button>
+        </div>
+      </div>
+
+      {overdue.length > 0 && (
+        <Card className="border-destructive/50"><CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2 text-destructive"><AlertTriangle className="h-4 w-4" />Overdue ({overdue.length})</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {overdue.map(r => (
+              <div key={r.id} className="flex items-center justify-between p-3 rounded-lg bg-destructive/5 border border-destructive/20">
+                <div><p className="font-medium text-sm">{r.title}</p><p className="text-xs text-muted-foreground">Due {new Date(r.nextDue).toLocaleDateString()} · {REMINDER_CATEGORIES.find(c => c.value === r.category)?.label}</p></div>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => completeMutation.mutate(r)}><CheckCircle2 className="h-3.5 w-3.5 mr-1" />Done</Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditing(r); setShowDialog(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {upcoming.length > 0 && (
+        <Card><CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Clock className="h-4 w-4 text-primary" />Upcoming ({upcoming.length})</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {upcoming.map(r => (
+              <div key={r.id} className="flex items-center justify-between p-3 rounded-lg border">
+                <div><p className="font-medium text-sm">{r.title}</p><p className="text-xs text-muted-foreground">Due {new Date(r.nextDue).toLocaleDateString()} · {REMINDER_CATEGORIES.find(c => c.value === r.category)?.label} · {r.frequency?.replace('_', '-')}</p></div>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => completeMutation.mutate(r)}><CheckCircle2 className="h-3.5 w-3.5 mr-1" />Done</Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditing(r); setShowDialog(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {reminders.length === 0 && (
+        <Card><CardContent className="text-center py-8">
+          <Bell className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">No reminders set</p>
+          <p className="text-sm text-muted-foreground mt-1">Stay on top of home maintenance with automated reminders</p>
+          <div className="flex gap-2 justify-center mt-4">
+            <Button variant="outline" onClick={() => addSeasonalReminders.mutate()} disabled={addSeasonalReminders.isPending}><Sparkles className="h-4 w-4 mr-1" />Add Seasonal Checklist</Button>
+            <Button variant="outline" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Custom Reminder</Button>
+          </div>
+        </CardContent></Card>
+      )}
+
+      <ReminderDialog open={showDialog} onOpenChange={setShowDialog} homeId={homeId} reminder={editing} />
+    </div>
+  );
+}
+
+function EquityTab({ homeId, home }: { homeId: number; home: HomeownerHome }) {
+  const { toast } = useToast();
+  const [showSetup, setShowSetup] = useState(false);
+  const { data: profile, isLoading } = useQuery<HomeEquityProfile | null>({ queryKey: ["/api/my-homes", homeId, "equity"], queryFn: async () => { const r = await fetch(`/api/my-homes/${homeId}/equity`, { credentials: "include" }); return r.json(); } });
+  const { data: rates } = useQuery<{ rate30yr: string; rate15yr: string; source: string; asOf: string }>({ queryKey: ["/api/mortgage-rates"] });
+  const { data: insights } = useQuery<{ medianValue: number | null; estimatedValue: number | null; disclaimer: string }>({ queryKey: ["/api/my-homes", homeId, "market-insights"], queryFn: async () => { const r = await fetch(`/api/my-homes/${homeId}/market-insights`, { credentials: "include" }); return r.json(); } });
+
+  const refreshMutation = useMutation({
+    mutationFn: async () => { const res = await apiRequest("POST", `/api/my-homes/${homeId}/equity/refresh-estimate`); return res.json(); },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "equity"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "market-insights"] });
+      if (data.estimatedValue) toast({ title: `Estimated value: $${data.estimatedValue.toLocaleString()}` });
+      else toast({ title: "Could not determine estimate", description: "Try again later", variant: "destructive" });
+    },
+    onError: (error: any) => {
+      if (error?.message?.includes('429')) toast({ title: "Recently refreshed", description: "You can refresh once per month" });
+      else toast({ title: "Failed to refresh estimate", variant: "destructive" });
+    },
+  });
+
+  const equity = useMemo(() => {
+    if (!profile) return null;
+    const loanAmount = profile.loanAmount;
+    const rate = parseFloat(profile.interestRate) / 100;
+    const monthlyRate = rate / 12;
+    const totalPayments = profile.loanTermYears * 12;
+    const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+    const startDate = new Date(profile.loanStartDate);
+    const now = new Date();
+    const monthsElapsed = Math.max(0, (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth()));
+    let balance = loanAmount;
+    let totalInterest = 0;
+    let totalPrincipal = 0;
+    for (let i = 0; i < Math.min(monthsElapsed, totalPayments); i++) {
+      const interest = balance * monthlyRate;
+      const principal = monthlyPayment - interest;
+      totalInterest += interest;
+      totalPrincipal += principal;
+      balance -= principal;
+    }
+    balance = Math.max(0, balance);
+    const purchasePrice = home.purchasePrice || loanAmount;
+    const estimatedValue = profile.estimatedValue || purchasePrice;
+    const equityAmount = estimatedValue - balance;
+    const equityPercent = (equityAmount / estimatedValue) * 100;
+    const currentRate = rates ? parseFloat(rates.rate30yr) : null;
+    const rateDiff = currentRate ? parseFloat(profile.interestRate) - currentRate : null;
+    const refinanceOpportunity = rateDiff !== null && rateDiff >= 0.5;
+    const helocAvailable = equityPercent > 20 ? Math.round((estimatedValue * 0.8) - balance) : 0;
+    return { balance: Math.round(balance), monthlyPayment: Math.round(monthlyPayment), equityAmount: Math.round(equityAmount), equityPercent: Math.round(equityPercent), totalInterest: Math.round(totalInterest), totalPrincipal: Math.round(totalPrincipal), monthsElapsed, estimatedValue, refinanceOpportunity, rateDiff, currentRate, helocAvailable };
+  }, [profile, home, rates]);
+
+  if (isLoading) return <Skeleton className="h-64 w-full" />;
+
+  if (!profile) {
+    return (
+      <div className="space-y-6">
+        <h3 className="text-lg font-semibold flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" />Equity Tracker</h3>
+        <Card><CardContent className="text-center py-8">
+          <PiggyBank className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">Set up your equity tracker</p>
+          <p className="text-sm text-muted-foreground mt-1">Enter your loan details to track your equity, get refinance alerts, and explore home equity options</p>
+          <Button className="mt-4" onClick={() => setShowSetup(true)}><Plus className="h-4 w-4 mr-1" />Set Up Equity Tracker</Button>
+        </CardContent></Card>
+        <EquitySetupDialog open={showSetup} onOpenChange={setShowSetup} homeId={homeId} profile={null} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-lg font-semibold flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" />Equity Tracker</h3>
+        <Button size="sm" variant="outline" onClick={() => setShowSetup(true)}><Pencil className="h-4 w-4 mr-1" />Edit Loan Details</Button>
+      </div>
+
+      {equity && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card><CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Estimated Equity</p>
+              <p className="text-2xl font-bold text-green-600">${equity.equityAmount.toLocaleString()}</p>
+              <Progress value={Math.min(equity.equityPercent, 100)} className="mt-2 h-2" />
+              <p className="text-xs text-muted-foreground mt-1">{equity.equityPercent}% equity</p>
+            </CardContent></Card>
+            <Card><CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Remaining Balance</p>
+              <p className="text-2xl font-bold">${equity.balance.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground mt-1">{equity.monthsElapsed} months paid</p>
+            </CardContent></Card>
+            <Card><CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Monthly Payment</p>
+              <p className="text-2xl font-bold">${equity.monthlyPayment.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground mt-1">P&I at {profile.interestRate}%</p>
+            </CardContent></Card>
+            <Card><CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Estimated Value</p>
+              <p className="text-2xl font-bold">${equity.estimatedValue.toLocaleString()}</p>
+              <Button size="sm" variant="link" className="p-0 h-auto text-xs" onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending}>
+                <RefreshCw className={`h-3 w-3 mr-1 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+                Refresh Estimate
+              </Button>
+            </CardContent></Card>
+          </div>
+
+          {rates && (
+            <Card><CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold flex items-center gap-2"><Percent className="h-4 w-4 text-primary" />Current Mortgage Rates</h4>
+                <Badge variant="outline" className="text-xs">{rates.source === 'freddie_mac' ? 'Freddie Mac PMMS' : 'Estimated'}</Badge>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div><p className="text-sm text-muted-foreground">30-Year Fixed</p><p className="text-lg font-bold">{rates.rate30yr}%</p></div>
+                <div><p className="text-sm text-muted-foreground">15-Year Fixed</p><p className="text-lg font-bold">{rates.rate15yr}%</p></div>
+                <div><p className="text-sm text-muted-foreground">Your Rate</p><p className="text-lg font-bold">{profile.interestRate}%</p></div>
+                <div><p className="text-sm text-muted-foreground">Difference</p><p className={`text-lg font-bold ${equity.rateDiff && equity.rateDiff > 0 ? 'text-green-600' : 'text-muted-foreground'}`}>{equity.rateDiff !== null ? `${equity.rateDiff > 0 ? '+' : ''}${equity.rateDiff.toFixed(2)}%` : '—'}</p></div>
+              </div>
+            </CardContent></Card>
+          )}
+
+          {equity.refinanceOpportunity && (
+            <Card className="border-green-500/50 bg-green-50 dark:bg-green-950/20"><CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <ArrowUpRight className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
+                <div>
+                  <h4 className="font-semibold text-green-800 dark:text-green-300">Refinance Opportunity</h4>
+                  <p className="text-sm text-green-700 dark:text-green-400 mt-1">Current rates are {equity.rateDiff?.toFixed(2)}% lower than your rate. Refinancing could save you approximately ${Math.round((equity.rateDiff || 0) / 100 * equity.balance / 12).toLocaleString()}/month.</p>
+                  <Link href="/marketplace"><Button size="sm" className="mt-3 gap-1">Talk to a Lender<ArrowUpRight className="h-3.5 w-3.5" /></Button></Link>
+                </div>
+              </div>
+            </CardContent></Card>
+          )}
+
+          {equity.helocAvailable > 0 && (
+            <Card><CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <PiggyBank className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <h4 className="font-semibold">Home Equity Options</h4>
+                  <p className="text-sm text-muted-foreground mt-1">With {equity.equityPercent}% equity, you may qualify for a HELOC or home equity loan up to approximately <span className="font-semibold text-foreground">${equity.helocAvailable.toLocaleString()}</span>. Use it for home improvements, debt consolidation, or major purchases.</p>
+                  <Link href="/marketplace"><Button size="sm" variant="outline" className="mt-3 gap-1">Find a Lender<ArrowUpRight className="h-3.5 w-3.5" /></Button></Link>
+                </div>
+              </div>
+            </CardContent></Card>
+          )}
+
+          {insights && (
+            <Card><CardContent className="p-4">
+              <h4 className="font-semibold flex items-center gap-2 mb-3"><MapPin className="h-4 w-4 text-primary" />Market Insights</h4>
+              <div className="grid grid-cols-2 gap-4">
+                {insights.medianValue && <div><p className="text-sm text-muted-foreground">ZIP Median Home Value</p><p className="text-lg font-bold">${insights.medianValue.toLocaleString()}</p><p className="text-xs text-muted-foreground">Census Bureau ACS</p></div>}
+                {insights.estimatedValue && <div><p className="text-sm text-muted-foreground">Your Property Estimate</p><p className="text-lg font-bold">${insights.estimatedValue.toLocaleString()}</p></div>}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1"><HelpCircle className="h-3 w-3" />{insights.disclaimer}</p>
+            </CardContent></Card>
+          )}
+        </>
+      )}
+
+      <EquitySetupDialog open={showSetup} onOpenChange={setShowSetup} homeId={homeId} profile={profile} />
+    </div>
+  );
+}
+
+function WarrantyTab({ homeId }: { homeId: number }) {
+  const [showDialog, setShowDialog] = useState(false);
+  const [editing, setEditing] = useState<HomeWarrantyItem | null>(null);
+  const { data: items = [], isLoading } = useQuery<HomeWarrantyItem[]>({ queryKey: ["/api/my-homes", homeId, "warranty"], queryFn: async () => { const r = await fetch(`/api/my-homes/${homeId}/warranty`, { credentials: "include" }); return r.json(); } });
+  const deleteMutation = useMutation({ mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/warranty/${id}`); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "warranty"] }); } });
+
+  const expiringSoon = items.filter(i => { if (!i.expirationDate) return false; const d = new Date(i.expirationDate); const diff = (d.getTime() - Date.now()) / (1000 * 60 * 60 * 24); return diff > 0 && diff <= 90; });
+  const expired = items.filter(i => i.expirationDate && new Date(i.expirationDate) < new Date());
+
+  if (isLoading) return <Skeleton className="h-64 w-full" />;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold flex items-center gap-2"><Shield className="h-5 w-5 text-primary" />Warranty Tracker</h3>
+        <Button size="sm" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add Warranty</Button>
+      </div>
+
+      {expiringSoon.length > 0 && (
+        <Card className="border-amber-500/50"><CardContent className="p-4">
+          <p className="font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-2"><AlertTriangle className="h-4 w-4" />Expiring Soon</p>
+          <div className="mt-2 space-y-1">{expiringSoon.map(i => <p key={i.id} className="text-sm">{i.itemName} — expires {new Date(i.expirationDate!).toLocaleDateString()}</p>)}</div>
+        </CardContent></Card>
+      )}
+
+      {items.length === 0 ? (
+        <Card><CardContent className="text-center py-8">
+          <Shield className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">No warranty items tracked</p>
+          <p className="text-sm text-muted-foreground mt-1">Keep track of warranties for your appliances, systems, and home components</p>
+          <Button variant="outline" className="mt-4" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add First Warranty</Button>
+        </CardContent></Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {items.map(i => {
+            const isExpired = i.expirationDate && new Date(i.expirationDate) < new Date();
+            return (
+              <Card key={i.id} className={isExpired ? "opacity-60" : ""}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold">{i.itemName}</p>
+                      {i.brand && <p className="text-sm text-muted-foreground">{i.brand} {i.model ? `· ${i.model}` : ''}</p>}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(i); setShowDialog(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteMutation.mutate(i.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  </div>
+                  {i.warrantyProvider && <p className="text-sm mt-1">Provider: {i.warrantyProvider}</p>}
+                  {i.expirationDate && <Badge variant={isExpired ? "destructive" : "secondary"} className="mt-2">{isExpired ? "Expired" : `Expires ${new Date(i.expirationDate).toLocaleDateString()}`}</Badge>}
+                  {i.coverageDetails && <p className="text-xs text-muted-foreground mt-2">{i.coverageDetails}</p>}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+      <WarrantyDialog open={showDialog} onOpenChange={setShowDialog} homeId={homeId} item={editing} />
+    </div>
+  );
+}
+
+function ImprovementsTab({ homeId }: { homeId: number }) {
+  const [showDialog, setShowDialog] = useState(false);
+  const [editing, setEditing] = useState<HomeImprovement | null>(null);
+  const { data: items = [], isLoading } = useQuery<HomeImprovement[]>({ queryKey: ["/api/my-homes", homeId, "improvements"], queryFn: async () => { const r = await fetch(`/api/my-homes/${homeId}/improvements`, { credentials: "include" }); return r.json(); } });
+  const deleteMutation = useMutation({ mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/improvements/${id}`); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "improvements"] }); } });
+
+  const totalSpent = useMemo(() => items.reduce((s, i) => s + (i.cost || 0), 0), [items]);
+
+  if (isLoading) return <Skeleton className="h-64 w-full" />;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold flex items-center gap-2"><Hammer className="h-5 w-5 text-primary" />Home Improvements</h3>
+        <Button size="sm" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add Project</Button>
+      </div>
+
+      {items.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Projects</p><p className="text-2xl font-bold">{items.length}</p></CardContent></Card>
+          <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Invested</p><p className="text-2xl font-bold">${totalSpent.toLocaleString()}</p></CardContent></Card>
+        </div>
+      )}
+
+      {items.length === 0 ? (
+        <Card><CardContent className="text-center py-8">
+          <Hammer className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">No improvements logged</p>
+          <p className="text-sm text-muted-foreground mt-1">Track renovations, paint colors, materials, and costs for resale or insurance</p>
+          <Button variant="outline" className="mt-4" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add First Project</Button>
+        </CardContent></Card>
+      ) : (
+        <div className="space-y-4">
+          {items.map(i => (
+            <Card key={i.id}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-semibold">{i.projectName}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline">{IMPROVEMENT_CATEGORIES.find(c => c.value === i.category)?.label || i.category}</Badge>
+                      {i.cost && <span className="text-sm font-medium">${i.cost.toLocaleString()}</span>}
+                      {i.completionDate && <span className="text-xs text-muted-foreground">Completed {new Date(i.completionDate).toLocaleDateString()}</span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(i); setShowDialog(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteMutation.mutate(i.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  </div>
+                </div>
+                {i.description && <p className="text-sm text-muted-foreground mt-2">{i.description}</p>}
+                {i.materials && <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><PaintBucket className="h-3 w-3" />{i.materials}</p>}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+      <ImprovementDialog open={showDialog} onOpenChange={setShowDialog} homeId={homeId} item={editing} />
+    </div>
+  );
+}
+
+function DocumentsTab() {
+  return (
+    <div className="space-y-6">
+      <h3 className="text-lg font-semibold flex items-center gap-2"><FolderOpen className="h-5 w-5 text-primary" />Document Vault</h3>
+      <Card><CardContent className="p-6">
+        <div className="text-center py-4">
+          <FolderOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">Connect your Dropbox</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">Store important home documents like insurance policies, title work, surveys, and appliance manuals securely in your Dropbox — accessible anytime from your MyHome hub.</p>
+          <Link href="/settings"><Button className="mt-4 gap-1">Connect Dropbox in Settings<ArrowUpRight className="h-3.5 w-3.5" /></Button></Link>
+        </div>
+      </CardContent></Card>
+    </div>
   );
 }
 
 function HomeCard({ home, onSelect, isSelected }: { home: HomeownerHome; onSelect: (id: number) => void; isSelected: boolean }) {
   return (
-    <Card
-      className={`cursor-pointer transition-all hover:shadow-md ${isSelected ? "ring-2 ring-primary" : ""}`}
-      onClick={() => onSelect(home.id)}
-    >
+    <Card className={`cursor-pointer transition-all hover:shadow-md ${isSelected ? "ring-2 ring-primary" : ""}`} onClick={() => onSelect(home.id)}>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <Home className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base">{home.address}</CardTitle>
-          </div>
+          <div className="flex items-center gap-2"><Home className="h-5 w-5 text-primary" /><CardTitle className="text-base">{home.address}</CardTitle></div>
         </div>
-        {(home.city || home.state) && (
-          <CardDescription className="flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
-            {[home.city, home.state, home.zipCode].filter(Boolean).join(", ")}
-          </CardDescription>
-        )}
+        {(home.city || home.state) && <CardDescription className="flex items-center gap-1"><MapPin className="h-3 w-3" />{[home.city, home.state, home.zipCode].filter(Boolean).join(", ")}</CardDescription>}
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          {home.purchasePrice && (
-            <div className="flex items-center gap-1">
-              <DollarSign className="h-3.5 w-3.5" />
-              <span>${home.purchasePrice.toLocaleString()}</span>
-            </div>
-          )}
-          {home.purchaseDate && (
-            <div className="flex items-center gap-1">
-              <CalendarDays className="h-3.5 w-3.5" />
-              <span>{new Date(home.purchaseDate).toLocaleDateString()}</span>
-            </div>
-          )}
+          {home.purchasePrice && <div className="flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" /><span>${home.purchasePrice.toLocaleString()}</span></div>}
+          {home.purchaseDate && <div className="flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" /><span>{new Date(home.purchaseDate).toLocaleDateString()}</span></div>}
         </div>
       </CardContent>
     </Card>
@@ -308,53 +936,26 @@ function HomeCard({ home, onSelect, isSelected }: { home: HomeownerHome; onSelec
 
 function HomeDetail({ homeId }: { homeId: number }) {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("overview");
   const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
 
   const { data: homeData, isLoading } = useQuery<HomeWithMaintenance>({
     queryKey: ["/api/my-homes", homeId],
-    queryFn: async () => {
-      const res = await fetch(`/api/my-homes/${homeId}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch home");
-      return res.json();
-    },
+    queryFn: async () => { const res = await fetch(`/api/my-homes/${homeId}`, { credentials: "include" }); if (!res.ok) throw new Error("Failed"); return res.json(); },
   });
 
   const deleteMaintenanceMutation = useMutation({
-    mutationFn: async (recordId: number) => {
-      await apiRequest("DELETE", `/api/maintenance/${recordId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId] });
-      toast({ title: "Record deleted" });
-    },
-    onError: () => {
-      toast({ title: "Failed to delete record", variant: "destructive" });
-    },
+    mutationFn: async (recordId: number) => { await apiRequest("DELETE", `/api/maintenance/${recordId}`); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId] }); toast({ title: "Record deleted" }); },
   });
 
   const deleteHomeMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("DELETE", `/api/my-homes/${homeId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-homes"] });
-      toast({ title: "Home removed" });
-    },
-    onError: () => {
-      toast({ title: "Failed to remove home", variant: "destructive" });
-    },
+    mutationFn: async () => { await apiRequest("DELETE", `/api/my-homes/${homeId}`); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes"] }); toast({ title: "Home removed" }); },
   });
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
-  }
-
+  if (isLoading) return <div className="space-y-4"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div>;
   if (!homeData) return null;
 
   const maintenance = homeData.maintenance || [];
@@ -366,170 +967,93 @@ function HomeDetail({ homeId }: { homeId: number }) {
         <CardHeader>
           <div className="flex items-start justify-between">
             <div>
-              <div className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-primary" />
-                <CardTitle>{homeData.address}</CardTitle>
-              </div>
-              {(homeData.city || homeData.state) && (
-                <CardDescription className="mt-1">
-                  {[homeData.city, homeData.state, homeData.zipCode].filter(Boolean).join(", ")}
-                </CardDescription>
-              )}
+              <div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><CardTitle>{homeData.address}</CardTitle></div>
+              {(homeData.city || homeData.state) && <CardDescription className="mt-1">{[homeData.city, homeData.state, homeData.zipCode].filter(Boolean).join(", ")}</CardDescription>}
             </div>
-            <Button variant="ghost" size="icon" onClick={() => deleteHomeMutation.mutate()} className="text-destructive hover:text-destructive">
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <Button variant="ghost" size="icon" onClick={() => deleteHomeMutation.mutate()} className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
           </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {homeData.purchasePrice && (
-              <div>
-                <p className="text-sm text-muted-foreground">Purchase Price</p>
-                <p className="text-lg font-semibold">${homeData.purchasePrice.toLocaleString()}</p>
-              </div>
-            )}
-            {homeData.purchaseDate && (
-              <div>
-                <p className="text-sm text-muted-foreground">Purchase Date</p>
-                <p className="text-lg font-semibold">{new Date(homeData.purchaseDate).toLocaleDateString()}</p>
-              </div>
-            )}
-            <div>
-              <p className="text-sm text-muted-foreground">Service Records</p>
-              <p className="text-lg font-semibold">{maintenance.length}</p>
-            </div>
-            {maintenance.length > 0 && (
-              <div>
-                <p className="text-sm text-muted-foreground">Total Spent</p>
-                <p className="text-lg font-semibold">
-                  ${maintenance.reduce((sum, r) => sum + (r.cost || 0), 0).toLocaleString()}
-                </p>
-              </div>
-            )}
+            {homeData.purchasePrice && <div><p className="text-sm text-muted-foreground">Purchase Price</p><p className="text-lg font-semibold">${homeData.purchasePrice.toLocaleString()}</p></div>}
+            {homeData.purchaseDate && <div><p className="text-sm text-muted-foreground">Purchase Date</p><p className="text-lg font-semibold">{new Date(homeData.purchaseDate).toLocaleDateString()}</p></div>}
+            <div><p className="text-sm text-muted-foreground">Service Records</p><p className="text-lg font-semibold">{maintenance.length}</p></div>
+            {maintenance.length > 0 && <div><p className="text-sm text-muted-foreground">Total Spent</p><p className="text-lg font-semibold">${maintenance.reduce((sum, r) => sum + (r.cost || 0), 0).toLocaleString()}</p></div>}
           </div>
-          {homeData.notes && (
-            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-              <p className="text-sm text-muted-foreground">{homeData.notes}</p>
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-3">
-        <Button onClick={() => { setEditingRecord(null); setShowMaintenanceDialog(true); }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Maintenance Record
-        </Button>
-        <Link href="/marketplace">
-          <Button variant="outline">
-            <Search className="h-4 w-4 mr-2" />
-            Find a Pro
-          </Button>
-        </Link>
-        <Link href="/my-team">
-          <Button variant="outline">
-            <Users className="h-4 w-4 mr-2" />
-            My Team
-          </Button>
-        </Link>
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="w-full flex overflow-x-auto">
+          <TabsTrigger value="overview" className="flex-1 min-w-0">Overview</TabsTrigger>
+          <TabsTrigger value="expenses" className="flex-1 min-w-0">Expenses</TabsTrigger>
+          <TabsTrigger value="reminders" className="flex-1 min-w-0">Reminders</TabsTrigger>
+          <TabsTrigger value="equity" className="flex-1 min-w-0">Equity</TabsTrigger>
+          <TabsTrigger value="warranty" className="flex-1 min-w-0">Warranty</TabsTrigger>
+          <TabsTrigger value="improvements" className="flex-1 min-w-0">Projects</TabsTrigger>
+          <TabsTrigger value="documents" className="flex-1 min-w-0">Docs</TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Maintenance History</CardTitle>
+        <TabsContent value="overview" className="mt-6">
+          <div className="space-y-6">
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={() => { setEditingRecord(null); setShowMaintenanceDialog(true); }}><Plus className="h-4 w-4 mr-2" />Add Maintenance Record</Button>
+              <Link href="/marketplace"><Button variant="outline"><Search className="h-4 w-4 mr-2" />Find a Pro</Button></Link>
+              <Link href="/my-team"><Button variant="outline"><Users className="h-4 w-4 mr-2" />My Team</Button></Link>
             </div>
-            <Badge variant="secondary">{maintenance.length} record{maintenance.length !== 1 ? "s" : ""}</Badge>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-primary" /><CardTitle className="text-lg">Maintenance History</CardTitle></div>
+                  <Badge variant="secondary">{maintenance.length} record{maintenance.length !== 1 ? "s" : ""}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {maintenance.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Wrench className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">No maintenance records yet</p>
+                    <p className="text-sm mt-1">Track your home services and repairs here</p>
+                    <Button variant="outline" className="mt-4" onClick={() => { setEditingRecord(null); setShowMaintenanceDialog(true); }}><Plus className="h-4 w-4 mr-2" />Add First Record</Button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Cost</TableHead><TableHead className="w-[80px]"></TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {maintenance.sort((a, b) => { if (!a.serviceDate && !b.serviceDate) return 0; if (!a.serviceDate) return 1; if (!b.serviceDate) return -1; return new Date(b.serviceDate).getTime() - new Date(a.serviceDate).getTime(); }).map((record) => (
+                          <TableRow key={record.id}>
+                            <TableCell className="whitespace-nowrap">{record.serviceDate ? new Date(record.serviceDate).toLocaleDateString() : "—"}</TableCell>
+                            <TableCell><Badge variant="outline">{categoryLabel(record.category)}</Badge></TableCell>
+                            <TableCell className="max-w-[200px] truncate">{record.description}</TableCell>
+                            <TableCell className="text-right">{record.cost ? `$${record.cost.toLocaleString()}` : "—"}</TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingRecord(record); setShowMaintenanceDialog(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteMaintenanceMutation.mutate(record.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </CardHeader>
-        <CardContent>
-          {maintenance.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Wrench className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No maintenance records yet</p>
-              <p className="text-sm mt-1">Track your home services and repairs here</p>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => { setEditingRecord(null); setShowMaintenanceDialog(true); }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add First Record
-              </Button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Cost</TableHead>
-                    <TableHead className="w-[80px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {maintenance
-                    .sort((a, b) => {
-                      if (!a.serviceDate && !b.serviceDate) return 0;
-                      if (!a.serviceDate) return 1;
-                      if (!b.serviceDate) return -1;
-                      return new Date(b.serviceDate).getTime() - new Date(a.serviceDate).getTime();
-                    })
-                    .map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell className="whitespace-nowrap">
-                          {record.serviceDate ? new Date(record.serviceDate).toLocaleDateString() : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{categoryLabel(record.category)}</Badge>
-                        </TableCell>
-                        <TableCell className="max-w-[200px] truncate">{record.description}</TableCell>
-                        <TableCell className="text-right">
-                          {record.cost ? `$${record.cost.toLocaleString()}` : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => {
-                                setEditingRecord(record);
-                                setShowMaintenanceDialog(true);
-                              }}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive"
-                              onClick={() => deleteMaintenanceMutation.mutate(record.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </TabsContent>
 
-      <MaintenanceDialog
-        open={showMaintenanceDialog}
-        onOpenChange={setShowMaintenanceDialog}
-        homeId={homeId}
-        record={editingRecord}
-      />
+        <TabsContent value="expenses" className="mt-6"><ExpensesTab homeId={homeId} /></TabsContent>
+        <TabsContent value="reminders" className="mt-6"><RemindersTab homeId={homeId} /></TabsContent>
+        <TabsContent value="equity" className="mt-6"><EquityTab homeId={homeId} home={homeData} /></TabsContent>
+        <TabsContent value="warranty" className="mt-6"><WarrantyTab homeId={homeId} /></TabsContent>
+        <TabsContent value="improvements" className="mt-6"><ImprovementsTab homeId={homeId} /></TabsContent>
+        <TabsContent value="documents" className="mt-6"><DocumentsTab /></TabsContent>
+      </Tabs>
+
+      <MaintenanceDialog open={showMaintenanceDialog} onOpenChange={setShowMaintenanceDialog} homeId={homeId} record={editingRecord} />
     </div>
   );
 }
@@ -539,9 +1063,7 @@ export default function MyHomePage() {
   const [selectedHomeId, setSelectedHomeId] = useState<number | null>(null);
   const [showAddHome, setShowAddHome] = useState(false);
 
-  const { data: homes = [], isLoading } = useQuery<HomeownerHome[]>({
-    queryKey: ["/api/my-homes"],
-  });
+  const { data: homes = [], isLoading } = useQuery<HomeownerHome[]>({ queryKey: ["/api/my-homes"] });
 
   if (selectedHomeId && !homes.find((h) => h.id === selectedHomeId) && homes.length > 0) {
     setSelectedHomeId(homes[0].id);
@@ -553,52 +1075,31 @@ export default function MyHomePage() {
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Home className="h-6 w-6 text-primary" />
-            MyHome
-          </h1>
-          <p className="text-muted-foreground mt-1">Manage your homes and track maintenance</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Home className="h-6 w-6 text-primary" />MyHome</h1>
+          <p className="text-muted-foreground mt-1">Your complete homeowner hub</p>
         </div>
-        <Button onClick={() => setShowAddHome(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Home
-        </Button>
+        <Button onClick={() => setShowAddHome(true)}><Plus className="h-4 w-4 mr-2" />Add Home</Button>
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-32" />
-          ))}
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-32" />)}</div>
       ) : homes.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <Home className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-30" />
-            <h3 className="text-lg font-semibold mb-2">No homes added yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Add your home to start tracking maintenance and managing your property.
-            </p>
-            <Button onClick={() => setShowAddHome(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Your First Home
-            </Button>
-          </CardContent>
-        </Card>
+        <Card><CardContent className="text-center py-12">
+          <Home className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-30" />
+          <h3 className="text-lg font-semibold mb-2">No homes added yet</h3>
+          <p className="text-muted-foreground mb-4">Add your home to start tracking expenses, maintenance, equity, and more.</p>
+          <Button onClick={() => setShowAddHome(true)}><Plus className="h-4 w-4 mr-2" />Add Your First Home</Button>
+        </CardContent></Card>
       ) : (
         <>
           {homes.length > 1 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {homes.map((home) => (
-                <HomeCard key={home.id} home={home} onSelect={setSelectedHomeId} isSelected={home.id === activeHomeId} />
-              ))}
+              {homes.map((home) => <HomeCard key={home.id} home={home} onSelect={setSelectedHomeId} isSelected={home.id === activeHomeId} />)}
             </div>
           )}
-
           {activeHomeId && <HomeDetail homeId={activeHomeId} />}
         </>
       )}
-
       <AddHomeDialog open={showAddHome} onOpenChange={setShowAddHome} />
     </div>
   );

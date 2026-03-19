@@ -645,6 +645,81 @@ export const homeMaintenanceRecords = pgTable("home_maintenance_records", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const homeExpenses = pgTable("home_expenses", {
+  id: serial("id").primaryKey(),
+  homeId: integer("home_id").notNull(),
+  category: text("category", { enum: ['electric', 'gas', 'water', 'sewer', 'trash', 'pest_control', 'pool_maintenance', 'home_cleaning', 'internet', 'lawn_care', 'hoa', 'security', 'other'] }).notNull(),
+  description: text("description"),
+  amount: integer("amount").notNull(),
+  billingDate: text("billing_date").notNull(),
+  isRecurring: boolean("is_recurring").default(true),
+  frequency: text("frequency", { enum: ['monthly', 'quarterly', 'annually'] }).default('monthly'),
+  provider: text("provider"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const homeMaintenanceReminders = pgTable("home_maintenance_reminders", {
+  id: serial("id").primaryKey(),
+  homeId: integer("home_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category", { enum: ['hvac', 'plumbing', 'electrical', 'roofing', 'exterior', 'interior', 'appliance', 'safety', 'seasonal', 'other'] }).notNull(),
+  frequency: text("frequency", { enum: ['monthly', 'quarterly', 'semi_annual', 'annual', 'one_time'] }).notNull(),
+  lastCompleted: text("last_completed"),
+  nextDue: text("next_due").notNull(),
+  isCompleted: boolean("is_completed").default(false),
+  notifyViaSms: boolean("notify_via_sms").default(false),
+  notifyViaPush: boolean("notify_via_push").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const homeEquityProfiles = pgTable("home_equity_profiles", {
+  id: serial("id").primaryKey(),
+  homeId: integer("home_id").notNull(),
+  loanAmount: integer("loan_amount").notNull(),
+  interestRate: text("interest_rate").notNull(),
+  loanTermYears: integer("loan_term_years").notNull(),
+  paymentFrequency: text("payment_frequency", { enum: ['monthly', 'biweekly'] }).default('monthly'),
+  loanStartDate: text("loan_start_date").notNull(),
+  estimatedValue: integer("estimated_value"),
+  estimatedValueUpdatedAt: timestamp("estimated_value_updated_at"),
+  lastRateCheckDate: text("last_rate_check_date"),
+  currentMarketRate: text("current_market_rate"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const homeWarrantyItems = pgTable("home_warranty_items", {
+  id: serial("id").primaryKey(),
+  homeId: integer("home_id").notNull(),
+  itemName: text("item_name").notNull(),
+  brand: text("brand"),
+  model: text("model"),
+  warrantyProvider: text("warranty_provider"),
+  coverageDetails: text("coverage_details"),
+  purchaseDate: text("purchase_date"),
+  expirationDate: text("expiration_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const homeImprovements = pgTable("home_improvements", {
+  id: serial("id").primaryKey(),
+  homeId: integer("home_id").notNull(),
+  projectName: text("project_name").notNull(),
+  description: text("description"),
+  category: text("category", { enum: ['kitchen', 'bathroom', 'bedroom', 'living_area', 'exterior', 'landscaping', 'roofing', 'flooring', 'painting', 'plumbing', 'electrical', 'hvac', 'addition', 'other'] }).notNull(),
+  cost: integer("cost"),
+  contractorId: integer("contractor_id"),
+  startDate: text("start_date"),
+  completionDate: text("completion_date"),
+  materials: text("materials"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const referralCodes = pgTable("referral_codes", {
   id: serial("id").primaryKey(),
   agentUserId: integer("agent_user_id").notNull(),
@@ -827,6 +902,28 @@ export const insertMaintenanceRecordSchema = createInsertSchema(homeMaintenanceR
   id: true,
   createdAt: true,
 });
+export const insertHomeExpenseSchema = createInsertSchema(homeExpenses).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertHomeMaintenanceReminderSchema = createInsertSchema(homeMaintenanceReminders).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertHomeEquityProfileSchema = createInsertSchema(homeEquityProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertHomeWarrantyItemSchema = createInsertSchema(homeWarrantyItems).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertHomeImprovementSchema = createInsertSchema(homeImprovements).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertReferralCodeSchema = createInsertSchema(referralCodes).omit({
   id: true,
   createdAt: true,
@@ -883,6 +980,16 @@ export type HomeownerHome = typeof homeownerHomes.$inferSelect;
 export type InsertHomeownerHome = z.infer<typeof insertHomeownerHomeSchema>;
 export type MaintenanceRecord = typeof homeMaintenanceRecords.$inferSelect;
 export type InsertMaintenanceRecord = z.infer<typeof insertMaintenanceRecordSchema>;
+export type HomeExpense = typeof homeExpenses.$inferSelect;
+export type InsertHomeExpense = z.infer<typeof insertHomeExpenseSchema>;
+export type HomeMaintenanceReminder = typeof homeMaintenanceReminders.$inferSelect;
+export type InsertHomeMaintenanceReminder = z.infer<typeof insertHomeMaintenanceReminderSchema>;
+export type HomeEquityProfile = typeof homeEquityProfiles.$inferSelect;
+export type InsertHomeEquityProfile = z.infer<typeof insertHomeEquityProfileSchema>;
+export type HomeWarrantyItem = typeof homeWarrantyItems.$inferSelect;
+export type InsertHomeWarrantyItem = z.infer<typeof insertHomeWarrantyItemSchema>;
+export type HomeImprovement = typeof homeImprovements.$inferSelect;
+export type InsertHomeImprovement = z.infer<typeof insertHomeImprovementSchema>;
 export type ReferralCode = typeof referralCodes.$inferSelect;
 export type InsertReferralCode = z.infer<typeof insertReferralCodeSchema>;
 export type ReferralCredit = typeof referralCredits.$inferSelect;

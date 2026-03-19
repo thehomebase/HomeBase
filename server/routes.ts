@@ -3,9 +3,10 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { sql } from "drizzle-orm/sql";
+import { eq, desc } from "drizzle-orm";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema, insertVendorRatingSchema, listingPhotos, formTemplates } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema, insertVendorRatingSchema, listingPhotos, formTemplates, homeExpenses, insertHomeExpenseSchema, homeMaintenanceReminders, insertHomeMaintenanceReminderSchema, homeEquityProfiles, insertHomeEquityProfileSchema, homeWarrantyItems, insertHomeWarrantyItemSchema, homeImprovements, insertHomeImprovementSchema } from "@shared/schema";
 import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -8604,6 +8605,432 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error deleting maintenance record:', error);
       res.status(500).json({ error: 'Failed to delete maintenance record' });
+    }
+  });
+
+  // ==================== Home Expenses Routes ====================
+
+  app.get("/api/my-homes/:id/expenses", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const expenses = await db.select().from(homeExpenses).where(eq(homeExpenses.homeId, homeId)).orderBy(desc(homeExpenses.billingDate));
+      res.json(expenses);
+    } catch (error) {
+      console.error('Error fetching expenses:', error);
+      res.status(500).json({ error: 'Failed to fetch expenses' });
+    }
+  });
+
+  app.post("/api/my-homes/:id/expenses", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const parsed = insertHomeExpenseSchema.safeParse({ ...req.body, homeId });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+      const [expense] = await db.insert(homeExpenses).values(parsed.data).returning();
+      res.status(201).json(expense);
+    } catch (error) {
+      console.error('Error creating expense:', error);
+      res.status(500).json({ error: 'Failed to create expense' });
+    }
+  });
+
+  app.patch("/api/expenses/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = parseInt(req.params.id);
+      const [expense] = await db.select().from(homeExpenses).where(eq(homeExpenses.id, id));
+      if (!expense) return res.status(404).json({ error: 'Not found' });
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === expense.homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const { id: _, createdAt: __, homeId: ___, ...updates } = req.body;
+      const [updated] = await db.update(homeExpenses).set(updates).where(eq(homeExpenses.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating expense:', error);
+      res.status(500).json({ error: 'Failed to update expense' });
+    }
+  });
+
+  app.delete("/api/expenses/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = parseInt(req.params.id);
+      const [expense] = await db.select().from(homeExpenses).where(eq(homeExpenses.id, id));
+      if (!expense) return res.status(404).json({ error: 'Not found' });
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === expense.homeId)) return res.status(403).json({ error: 'Not authorized' });
+      await db.delete(homeExpenses).where(eq(homeExpenses.id, id));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      res.status(500).json({ error: 'Failed to delete expense' });
+    }
+  });
+
+  // ==================== Home Maintenance Reminders Routes ====================
+
+  app.get("/api/my-homes/:id/reminders", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const reminders = await db.select().from(homeMaintenanceReminders).where(eq(homeMaintenanceReminders.homeId, homeId)).orderBy(homeMaintenanceReminders.nextDue);
+      res.json(reminders);
+    } catch (error) {
+      console.error('Error fetching reminders:', error);
+      res.status(500).json({ error: 'Failed to fetch reminders' });
+    }
+  });
+
+  app.post("/api/my-homes/:id/reminders", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const parsed = insertHomeMaintenanceReminderSchema.safeParse({ ...req.body, homeId });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+      const [reminder] = await db.insert(homeMaintenanceReminders).values(parsed.data).returning();
+      res.status(201).json(reminder);
+    } catch (error) {
+      console.error('Error creating reminder:', error);
+      res.status(500).json({ error: 'Failed to create reminder' });
+    }
+  });
+
+  app.patch("/api/home-reminders/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = parseInt(req.params.id);
+      const [reminder] = await db.select().from(homeMaintenanceReminders).where(eq(homeMaintenanceReminders.id, id));
+      if (!reminder) return res.status(404).json({ error: 'Not found' });
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === reminder.homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const { id: _, createdAt: __, homeId: ___, ...updates } = req.body;
+      const [updated] = await db.update(homeMaintenanceReminders).set(updates).where(eq(homeMaintenanceReminders.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating reminder:', error);
+      res.status(500).json({ error: 'Failed to update reminder' });
+    }
+  });
+
+  app.delete("/api/home-reminders/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = parseInt(req.params.id);
+      const [reminder] = await db.select().from(homeMaintenanceReminders).where(eq(homeMaintenanceReminders.id, id));
+      if (!reminder) return res.status(404).json({ error: 'Not found' });
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === reminder.homeId)) return res.status(403).json({ error: 'Not authorized' });
+      await db.delete(homeMaintenanceReminders).where(eq(homeMaintenanceReminders.id, id));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting reminder:', error);
+      res.status(500).json({ error: 'Failed to delete reminder' });
+    }
+  });
+
+  // ==================== Home Equity Profile Routes ====================
+
+  app.get("/api/my-homes/:id/equity", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const [profile] = await db.select().from(homeEquityProfiles).where(eq(homeEquityProfiles.homeId, homeId));
+      res.json(profile || null);
+    } catch (error) {
+      console.error('Error fetching equity profile:', error);
+      res.status(500).json({ error: 'Failed to fetch equity profile' });
+    }
+  });
+
+  app.post("/api/my-homes/:id/equity", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const existing = await db.select().from(homeEquityProfiles).where(eq(homeEquityProfiles.homeId, homeId));
+      if (existing.length > 0) {
+        const { id: _, createdAt: __, ...updates } = req.body;
+        const [updated] = await db.update(homeEquityProfiles).set({ ...updates, homeId, updatedAt: new Date() }).where(eq(homeEquityProfiles.homeId, homeId)).returning();
+        return res.json(updated);
+      }
+      const parsed = insertHomeEquityProfileSchema.safeParse({ ...req.body, homeId });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+      const [profile] = await db.insert(homeEquityProfiles).values(parsed.data).returning();
+      res.status(201).json(profile);
+    } catch (error) {
+      console.error('Error saving equity profile:', error);
+      res.status(500).json({ error: 'Failed to save equity profile' });
+    }
+  });
+
+  app.post("/api/my-homes/:id/equity/refresh-estimate", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      const home = homes.find(h => h.id === homeId);
+      if (!home) return res.status(403).json({ error: 'Not authorized' });
+      
+      const [profile] = await db.select().from(homeEquityProfiles).where(eq(homeEquityProfiles.homeId, homeId));
+      if (profile?.estimatedValueUpdatedAt) {
+        const daysSinceUpdate = (Date.now() - new Date(profile.estimatedValueUpdatedAt).getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceUpdate < 30) {
+          return res.status(429).json({ 
+            error: 'Estimate was recently refreshed', 
+            nextRefreshDate: new Date(new Date(profile.estimatedValueUpdatedAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            currentEstimate: profile.estimatedValue
+          });
+        }
+      }
+
+      const address = home.address;
+      const city = home.city || '';
+      const state = home.state || '';
+      
+      try {
+        const { getCachedOrFetch } = await import('./rentcast-cache.js');
+        const cacheKey = `property_${address}_${city}_${state}`;
+        const propertyData = await getCachedOrFetch(
+          cacheKey,
+          async () => {
+            const params = new URLSearchParams({ address });
+            if (city) params.append('city', city);
+            if (state) params.append('state', state);
+            const apiRes = await fetch(`https://api.rentcast.io/v1/properties?${params}`, {
+              headers: { 'X-Api-Key': process.env.RENTCAST_API_KEY || '', Accept: 'application/json' }
+            });
+            if (!apiRes.ok) throw new Error('RentCast API error');
+            return apiRes.json();
+          },
+          'property'
+        );
+        
+        let estimatedValue = null;
+        if (Array.isArray(propertyData) && propertyData.length > 0) {
+          estimatedValue = propertyData[0].price || propertyData[0].estimatedValue || propertyData[0].lastSalePrice;
+        } else if (propertyData?.price || propertyData?.estimatedValue) {
+          estimatedValue = propertyData.price || propertyData.estimatedValue;
+        }
+        
+        if (estimatedValue) {
+          await db.update(homeEquityProfiles).set({ 
+            estimatedValue: Math.round(estimatedValue), 
+            estimatedValueUpdatedAt: new Date(),
+            updatedAt: new Date()
+          }).where(eq(homeEquityProfiles.homeId, homeId));
+        }
+        
+        res.json({ estimatedValue: estimatedValue ? Math.round(estimatedValue) : null, updatedAt: new Date().toISOString() });
+      } catch (apiError) {
+        console.error('RentCast estimate error:', apiError);
+        res.json({ estimatedValue: null, error: 'Unable to fetch estimate at this time' });
+      }
+    } catch (error) {
+      console.error('Error refreshing estimate:', error);
+      res.status(500).json({ error: 'Failed to refresh estimate' });
+    }
+  });
+
+  app.get("/api/mortgage-rates", async (_req, res) => {
+    try {
+      const response = await fetch('https://www.freddiemac.com/pmms/docs/PMMS_history.csv');
+      if (!response.ok) {
+        return res.json({ rate30yr: '6.65', rate15yr: '5.89', source: 'fallback', asOf: new Date().toISOString() });
+      }
+      const text = await response.text();
+      const lines = text.trim().split('\n');
+      const lastLine = lines[lines.length - 1];
+      const parts = lastLine.split(',');
+      const rate30yr = parts[1] || '6.65';
+      const rate15yr = parts[2] || '5.89';
+      const dateStr = parts[0] || '';
+      res.json({ rate30yr, rate15yr, source: 'freddie_mac', asOf: dateStr });
+    } catch (error) {
+      console.error('Error fetching mortgage rates:', error);
+      res.json({ rate30yr: '6.65', rate15yr: '5.89', source: 'fallback', asOf: new Date().toISOString() });
+    }
+  });
+
+  // ==================== Home Warranty Items Routes ====================
+
+  app.get("/api/my-homes/:id/warranty", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const items = await db.select().from(homeWarrantyItems).where(eq(homeWarrantyItems.homeId, homeId)).orderBy(homeWarrantyItems.expirationDate);
+      res.json(items);
+    } catch (error) {
+      console.error('Error fetching warranty items:', error);
+      res.status(500).json({ error: 'Failed to fetch warranty items' });
+    }
+  });
+
+  app.post("/api/my-homes/:id/warranty", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const parsed = insertHomeWarrantyItemSchema.safeParse({ ...req.body, homeId });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+      const [item] = await db.insert(homeWarrantyItems).values(parsed.data).returning();
+      res.status(201).json(item);
+    } catch (error) {
+      console.error('Error creating warranty item:', error);
+      res.status(500).json({ error: 'Failed to create warranty item' });
+    }
+  });
+
+  app.patch("/api/warranty/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = parseInt(req.params.id);
+      const [item] = await db.select().from(homeWarrantyItems).where(eq(homeWarrantyItems.id, id));
+      if (!item) return res.status(404).json({ error: 'Not found' });
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === item.homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const { id: _, createdAt: __, homeId: ___, ...updates } = req.body;
+      const [updated] = await db.update(homeWarrantyItems).set(updates).where(eq(homeWarrantyItems.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating warranty item:', error);
+      res.status(500).json({ error: 'Failed to update warranty item' });
+    }
+  });
+
+  app.delete("/api/warranty/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = parseInt(req.params.id);
+      const [item] = await db.select().from(homeWarrantyItems).where(eq(homeWarrantyItems.id, id));
+      if (!item) return res.status(404).json({ error: 'Not found' });
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === item.homeId)) return res.status(403).json({ error: 'Not authorized' });
+      await db.delete(homeWarrantyItems).where(eq(homeWarrantyItems.id, id));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting warranty item:', error);
+      res.status(500).json({ error: 'Failed to delete warranty item' });
+    }
+  });
+
+  // ==================== Home Improvements Routes ====================
+
+  app.get("/api/my-homes/:id/improvements", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const items = await db.select().from(homeImprovements).where(eq(homeImprovements.homeId, homeId)).orderBy(desc(homeImprovements.completionDate));
+      res.json(items);
+    } catch (error) {
+      console.error('Error fetching improvements:', error);
+      res.status(500).json({ error: 'Failed to fetch improvements' });
+    }
+  });
+
+  app.post("/api/my-homes/:id/improvements", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const parsed = insertHomeImprovementSchema.safeParse({ ...req.body, homeId });
+      if (!parsed.success) return res.status(400).json(parsed.error);
+      const [item] = await db.insert(homeImprovements).values(parsed.data).returning();
+      res.status(201).json(item);
+    } catch (error) {
+      console.error('Error creating improvement:', error);
+      res.status(500).json({ error: 'Failed to create improvement' });
+    }
+  });
+
+  app.patch("/api/improvements/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = parseInt(req.params.id);
+      const [item] = await db.select().from(homeImprovements).where(eq(homeImprovements.id, id));
+      if (!item) return res.status(404).json({ error: 'Not found' });
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === item.homeId)) return res.status(403).json({ error: 'Not authorized' });
+      const { id: _, createdAt: __, homeId: ___, ...updates } = req.body;
+      const [updated] = await db.update(homeImprovements).set(updates).where(eq(homeImprovements.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating improvement:', error);
+      res.status(500).json({ error: 'Failed to update improvement' });
+    }
+  });
+
+  app.delete("/api/improvements/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = parseInt(req.params.id);
+      const [item] = await db.select().from(homeImprovements).where(eq(homeImprovements.id, id));
+      if (!item) return res.status(404).json({ error: 'Not found' });
+      const homes = await storage.getHomesByUser(req.user.id);
+      if (!homes.find(h => h.id === item.homeId)) return res.status(403).json({ error: 'Not authorized' });
+      await db.delete(homeImprovements).where(eq(homeImprovements.id, id));
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error deleting improvement:', error);
+      res.status(500).json({ error: 'Failed to delete improvement' });
+    }
+  });
+
+  // ==================== Market Insights Route ====================
+
+  app.get("/api/my-homes/:id/market-insights", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      const home = homes.find(h => h.id === homeId);
+      if (!home) return res.status(403).json({ error: 'Not authorized' });
+
+      const zipCode = home.zipCode;
+      const insights: any = { zipCode, medianValue: null, activeListings: 0, disclaimer: 'Estimated values are approximate and not an appraisal.' };
+
+      if (zipCode) {
+        try {
+          const censusRes = await fetch(`https://api.census.gov/data/2022/acs/acs5?get=B25077_001E&for=zip%20code%20tabulation%20area:${zipCode}`);
+          if (censusRes.ok) {
+            const data = await censusRes.json();
+            if (data.length > 1) {
+              insights.medianValue = parseInt(data[1][0]);
+            }
+          }
+        } catch (e) {
+          console.error('Census API error:', e);
+        }
+      }
+
+      const [equityProfile] = await db.select().from(homeEquityProfiles).where(eq(homeEquityProfiles.homeId, homeId));
+      if (equityProfile) {
+        insights.estimatedValue = equityProfile.estimatedValue;
+        insights.estimatedValueUpdatedAt = equityProfile.estimatedValueUpdatedAt;
+      }
+
+      res.json(insights);
+    } catch (error) {
+      console.error('Error fetching market insights:', error);
+      res.status(500).json({ error: 'Failed to fetch market insights' });
     }
   });
 
