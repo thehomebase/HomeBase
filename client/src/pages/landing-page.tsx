@@ -878,7 +878,6 @@ export default function LandingPage() {
             <Link href="/privacy-policy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Privacy</Link>
             <Link href="/find-agent" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Find an Agent</Link>
             <Link href="/find-lender" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Find a Lender</Link>
-            <Link href="/top-agents" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Top Agents</Link>
           </div>
           <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} HomeBase. All rights reserved.</p>
         </div>
