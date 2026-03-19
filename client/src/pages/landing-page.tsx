@@ -8,7 +8,7 @@ import {
   Zap, Phone, Mail, Home, Star, ChevronRight, CheckCircle2, Briefcase,
   Building2, TrendingUp, Clock, Target, Award, ExternalLink, ArrowRightLeft,
   Lock, BarChart2, ChevronDown, MapPin, Gift, DollarSign, Bell, Search,
-  Wrench, Hammer, PenTool
+  Wrench, Hammer, PenTool, Smartphone, Brain, Gavel, BadgeCheck, HomeIcon, Sparkles, ClipboardCheck
 } from "lucide-react";
 import { SiSlack, SiMailchimp, SiGooglesheets, SiCalendly, SiTrello, SiHubspot, SiSalesforce, SiZapier, SiAirtable, SiNotion, SiTwilio, SiGmail, SiDropbox } from "react-icons/si";
 import heroImage from "@/assets/landing-hero.png";
@@ -433,6 +433,105 @@ export default function LandingPage() {
       </section>
 
       <section className={`bg-muted/30 ${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
+        <div className="max-w-6xl mx-auto">
+          <div className={`grid gap-12 items-center ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+            <div className={isMobile ? "order-2" : ""}>
+              <div className="relative mx-auto" style={{ maxWidth: 340 }}>
+                <div className="rounded-[2.5rem] border-[6px] border-neutral-800 dark:border-neutral-600 bg-white dark:bg-neutral-900 shadow-2xl overflow-hidden">
+                  <div className="bg-neutral-800 dark:bg-neutral-700 h-6 flex items-center justify-center">
+                    <div className="w-20 h-4 bg-neutral-900 dark:bg-neutral-800 rounded-b-xl" />
+                  </div>
+                  <div className="px-4 pt-4 pb-3">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Home className="h-4 w-4 text-primary" />
+                      <span className="font-semibold text-sm text-neutral-900 dark:text-white">My Transaction</span>
+                    </div>
+                    <div className="rounded-xl bg-primary/10 p-3 mb-3">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Closing In</p>
+                      <p className="text-2xl font-bold text-primary">12 Days</p>
+                      <p className="text-[10px] text-muted-foreground">March 31, 2026</p>
+                    </div>
+                    <div className="flex items-center gap-1 mb-3">
+                      {["Listed", "Under Contract", "Option", "Pending", "Closed"].map((stage, i) => (
+                        <div key={stage} className="flex-1">
+                          <div className={`h-1.5 rounded-full ${i <= 2 ? "bg-primary" : "bg-neutral-200 dark:bg-neutral-700"}`} />
+                          <p className="text-[7px] text-muted-foreground mt-0.5 text-center truncate">{stage}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-2.5 flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center shrink-0">
+                          <ClipboardCheck className="h-3 w-3 text-amber-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold text-amber-800 dark:text-amber-300">Action Required</p>
+                          <p className="text-[9px] text-amber-600 dark:text-amber-400 truncate">Upload proof of homeowner's insurance</p>
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-2.5 flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
+                          <FileText className="h-3 w-3 text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold">Documents</p>
+                          <p className="text-[9px] text-muted-foreground truncate">6 uploaded · 2 awaiting signature</p>
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-2.5 flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center shrink-0">
+                          <Users className="h-3 w-3 text-green-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold">Your Team</p>
+                          <p className="text-[9px] text-muted-foreground truncate">Agent, Lender, Title Co., Inspector</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className={isMobile ? "order-1" : ""}>
+              <p className="text-sm text-primary font-medium uppercase tracking-wider mb-2">Client Portal</p>
+              <h2 className={`font-bold tracking-tight mb-4 ${isMobile ? "text-3xl" : "text-4xl"}`}>
+                Keep clients in the loop — automatically
+              </h2>
+              <p className="text-muted-foreground mb-6 leading-relaxed">
+                Give every client their own mobile-friendly portal with a live closing countdown, stage tracker, action items, and document access. They always know what's happening — and you spend less time fielding calls.
+              </p>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center gap-3 text-sm">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Smartphone className="h-4 w-4 text-primary" />
+                  </div>
+                  <span>Mobile-first design — works beautifully on any device</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm">
+                  <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <span>Live closing countdown & stage tracker</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm">
+                  <div className="h-8 w-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                    <ClipboardCheck className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <span>"Action Required" cards so nothing slips through</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm">
+                  <div className="h-8 w-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+                    <FileText className="h-4 w-4 text-green-600" />
+                  </div>
+                  <span>Document hub, key dates, and team contacts</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={`${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
         <div className="max-w-6xl mx-auto">
           <div className={`grid gap-12 items-center ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
             <div className={isMobile ? "order-2" : ""}>
