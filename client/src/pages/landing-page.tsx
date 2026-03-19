@@ -627,6 +627,82 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section className={`${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <p className="text-sm text-primary font-medium uppercase tracking-wider mb-2">AI-Powered Documents</p>
+            <h2 className={`font-bold tracking-tight mb-4 ${isMobile ? "text-3xl" : "text-4xl"}`}>
+              Upload a contract. Let AI do the rest.
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              HomeBase reads your contracts and inspection reports using AI — extracting dates, parties, and repair items automatically. No more manual data entry.
+            </p>
+          </div>
+          <div className={`grid gap-8 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+            <Card className="overflow-hidden hover:shadow-lg transition-shadow border-2 hover:border-primary/20">
+              <CardContent className="p-0">
+                <div className="bg-gradient-to-br from-violet-600 to-indigo-700 p-6 text-white">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
+                      <Brain className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg">Smart Contract Parsing</h4>
+                      <p className="text-white/70 text-xs">Powered by Gemini AI</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-white/80 leading-relaxed">Upload a TREC contract or any real estate document — AI extracts buyer, seller, dates, price, and more in seconds.</p>
+                </div>
+                <div className="p-5 space-y-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                    <span>Auto-fills transaction fields from PDFs</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                    <span>Works with any real estate contract format</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                    <span>PII stripped before processing</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="overflow-hidden hover:shadow-lg transition-shadow border-2 hover:border-primary/20">
+              <CardContent className="p-0">
+                <div className="bg-gradient-to-br from-amber-600 to-orange-700 p-6 text-white">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
+                      <Gavel className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg">Inspection Repair Bids</h4>
+                      <p className="text-white/70 text-xs">AI Parsing + Vendor Bidding</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-white/80 leading-relaxed">AI reads inspection reports, flags deficiencies (with photos), and lets you send bid requests to trusted vendors — all from one screen.</p>
+                </div>
+                <div className="p-5 space-y-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                    <span>Auto-detects repair items & photo evidence</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                    <span>Send bid requests to multiple vendors at once</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                    <span>Compare bids side-by-side before deciding</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       <section className={`bg-muted/30 ${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10">
@@ -645,7 +721,7 @@ export default function LandingPage() {
               className="w-full h-auto"
             />
           </div>
-          <div className={`grid gap-6 ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
+          <div className={`grid gap-6 ${isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-4"}`}>
             <Card className="hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
                 <div className="h-10 w-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-3">
@@ -657,20 +733,29 @@ export default function LandingPage() {
             </Card>
             <Card className="hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
+                <div className="h-10 w-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-3">
+                  <BadgeCheck className="h-5 w-5 text-amber-600" />
+                </div>
+                <h4 className="font-semibold mb-1">Reputation Badges</h4>
+                <p className="text-sm text-muted-foreground">Vendors earn "On X teams" badges as agents add them — building trust and visibility in the marketplace.</p>
+              </CardContent>
+            </Card>
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
                 <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-3">
                   <Search className="h-5 w-5 text-blue-600" />
                 </div>
-                <h4 className="font-semibold mb-1">Filter by Category</h4>
-                <p className="text-sm text-muted-foreground">Find the right pro instantly — filter by specialty, location, and availability across 10+ categories.</p>
+                <h4 className="font-semibold mb-1">Public Marketplace</h4>
+                <p className="text-sm text-muted-foreground">Find the right pro instantly — filter by specialty, location, ratings, and team count across 10+ categories.</p>
               </CardContent>
             </Card>
             <Card className="hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
                 <div className="h-10 w-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-3">
-                  <MessageSquare className="h-5 w-5 text-purple-600" />
+                  <Star className="h-5 w-5 text-purple-600" />
                 </div>
-                <h4 className="font-semibold mb-1">Direct Communication</h4>
-                <p className="text-sm text-muted-foreground">Call, message, or email your pros directly from their card. Coordinate repairs and bids seamlessly.</p>
+                <h4 className="font-semibold mb-1">Ratings & Reviews</h4>
+                <p className="text-sm text-muted-foreground">Leave star ratings and written reviews after syncing a vendor — helping the whole community find reliable pros.</p>
               </CardContent>
             </Card>
           </div>
@@ -787,6 +872,92 @@ export default function LandingPage() {
               <Button size="lg" variant="outline" className="gap-2" onClick={() => setLocation("/auth")}>
                 Start Referring <ArrowRight className="h-4 w-4" />
               </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={`bg-muted/30 ${isMobile ? "py-16 px-4" : "py-24 px-6"}`}>
+        <div className="max-w-6xl mx-auto">
+          <div className={`grid gap-12 items-center ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+            <div>
+              <p className="text-sm text-primary font-medium uppercase tracking-wider mb-2">Post-Close Engagement</p>
+              <h2 className={`font-bold tracking-tight mb-4 ${isMobile ? "text-3xl" : "text-4xl"}`}>
+                The deal closes. The relationship doesn't.
+              </h2>
+              <p className="text-muted-foreground mb-6 leading-relaxed">
+                MyHome gives every homeowner a personal hub after closing — with their home details, team contacts, and a direct line back to you. Stay top-of-mind for referrals and repeat business.
+              </p>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center gap-3 text-sm">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <HomeIcon className="h-4 w-4 text-primary" />
+                  </div>
+                  <span>Personal homeowner dashboard with property details</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm">
+                  <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                    <Users className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <span>Quick access to their agent, lender, and vendors</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm">
+                  <div className="h-8 w-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+                    <Sparkles className="h-4 w-4 text-green-600" />
+                  </div>
+                  <span>Keeps you top-of-mind for referrals & repeat business</span>
+                </li>
+              </ul>
+            </div>
+            <div className="relative mx-auto" style={{ maxWidth: 340 }}>
+              <div className="rounded-[2.5rem] border-[6px] border-neutral-800 dark:border-neutral-600 bg-white dark:bg-neutral-900 shadow-2xl overflow-hidden">
+                <div className="bg-neutral-800 dark:bg-neutral-700 h-6 flex items-center justify-center">
+                  <div className="w-20 h-4 bg-neutral-900 dark:bg-neutral-800 rounded-b-xl" />
+                </div>
+                <div className="px-4 pt-4 pb-3">
+                  <div className="flex items-center gap-2 mb-4">
+                    <HomeIcon className="h-4 w-4 text-primary" />
+                    <span className="font-semibold text-sm text-neutral-900 dark:text-white">MyHome</span>
+                  </div>
+                  <div className="rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 p-4 mb-3">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Your Home</p>
+                    <p className="font-bold text-sm text-neutral-900 dark:text-white">1234 Oak Meadow Lane</p>
+                    <p className="text-[10px] text-muted-foreground">Dallas, TX 75201</p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="text-[10px] text-muted-foreground">3 bed</span>
+                      <span className="text-[10px] text-muted-foreground">2 bath</span>
+                      <span className="text-[10px] text-muted-foreground">2,150 sqft</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="rounded-lg border p-2.5 flex items-center gap-2">
+                      <div className="h-7 w-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-semibold shrink-0">JM</div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold">Joel Martin</p>
+                        <p className="text-[9px] text-muted-foreground">Your Agent</p>
+                      </div>
+                      <div className="ml-auto flex gap-1">
+                        <div className="h-5 w-5 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center"><Phone className="h-2.5 w-2.5 text-muted-foreground" /></div>
+                        <div className="h-5 w-5 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center"><Mail className="h-2.5 w-2.5 text-muted-foreground" /></div>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border p-2.5 flex items-center gap-2">
+                      <div className="h-7 w-7 rounded-full bg-green-600 flex items-center justify-center text-white text-[10px] font-semibold shrink-0">HL</div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold">Heritage Lending</p>
+                        <p className="text-[9px] text-muted-foreground">Your Lender</p>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border p-2.5 flex items-center gap-2">
+                      <div className="h-7 w-7 rounded-full bg-purple-600 flex items-center justify-center text-white text-[10px] font-semibold shrink-0">AP</div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold">Ace Plumbing</p>
+                        <p className="text-[9px] text-muted-foreground">Recommended Vendor</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
