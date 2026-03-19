@@ -33,7 +33,7 @@ import type {
 import { notifyAgentOfNewLead, notifyVendorOfNewLead } from "./notification-service";
 import { apiKeyAuth as apiKeyAuthMiddleware, generateApiKey, hashApiKey } from "./api-key-auth";
 import { fireWebhook } from "./webhook-service";
-import { getCached, setCache, getCacheSize, getDbCacheSize, cleanExpiredCache, buildPropertyCacheKey, buildListingsCacheKey } from "./rentcast-cache";
+import { getCached, setCache, getCacheSize, getDbCacheSize, cleanExpiredCache, buildPropertyCacheKey, buildListingsCacheKey, findPropertyInCachedListings } from "./rentcast-cache";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -3085,6 +3085,11 @@ export function registerRoutes(app: Express): Server {
     const cached = await getCached(cacheKey);
     if (cached) {
       return res.json({ property: cached, fromCache: true });
+    }
+
+    const fromListings = await findPropertyInCachedListings(addressStr);
+    if (fromListings) {
+      return res.json({ property: fromListings, fromCache: true, source: "listings_cache" });
     }
 
     if (RENTCAST_DEV_BLOCK) {

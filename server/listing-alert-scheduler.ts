@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { sendSMS } from "./twilio-service";
 import { sendGmailEmail } from "./gmail-service";
 import { notify } from "./notification-helper";
-import { getCached, setCache, cleanExpiredCache, buildPropertyCacheKey, buildListingsCacheKey } from "./rentcast-cache";
+import { getCached, setCache, cleanExpiredCache, buildPropertyCacheKey, buildListingsCacheKey, findPropertyInCachedListings } from "./rentcast-cache";
 
 interface AlertRow {
   id: number;
@@ -332,8 +332,17 @@ async function processPriceChanges(): Promise<void> {
         const address = [prop.street_address, prop.city, prop.state, prop.zip_code].filter(Boolean).join(", ");
         if (!address) continue;
 
-        const { property: listing, fromCache } = await fetchPropertyByAddress(address);
-        if (!fromCache) apiCallsUsed++;
+        let listing: RentCastListing | null = null;
+
+        const cachedFromListings = await findPropertyInCachedListings(prop.street_address || address);
+        if (cachedFromListings && cachedFromListings.price) {
+          listing = cachedFromListings;
+          console.log(`[ListingAlerts] Found "${prop.street_address}" in cached listings data (no API call needed)`);
+        } else {
+          const { property, fromCache } = await fetchPropertyByAddress(address);
+          listing = property;
+          if (!fromCache) apiCallsUsed++;
+        }
 
         if (!listing || !listing.price) continue;
 

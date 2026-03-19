@@ -126,6 +126,52 @@ export async function getDbCacheSize(): Promise<number> {
   }
 }
 
+export async function findPropertyInCachedListings(address: string): Promise<any | null> {
+  const normalizedAddr = address.toLowerCase().trim();
+
+  if (!(await getTableReady())) {
+    for (const [key, val] of memoryCache.entries()) {
+      if (!key.startsWith("listings:") || Date.now() >= val.expiresAt) continue;
+      const match = searchListingsArray(val.data, normalizedAddr);
+      if (match) return match;
+    }
+    return null;
+  }
+
+  try {
+    const result = await db.execute(sql`
+      SELECT response_data FROM rentcast_cache 
+      WHERE cache_type = 'listings' AND expires_at > NOW()
+    `);
+    for (const row of result.rows) {
+      const listings = row.response_data;
+      if (!Array.isArray(listings)) continue;
+      const match = searchListingsArray(listings, normalizedAddr);
+      if (match) return match;
+    }
+  } catch (e) {
+    console.error("[RentCastCache] Error searching cached listings:", e);
+  }
+  return null;
+}
+
+function searchListingsArray(listings: any[], normalizedAddr: string): any | null {
+  if (!Array.isArray(listings)) return null;
+  for (const listing of listings) {
+    const formattedAddr = (listing.formattedAddress || "").toLowerCase().trim();
+    const addressLine = (listing.addressLine1 || "").toLowerCase().trim();
+    if (
+      (formattedAddr && normalizedAddr.includes(formattedAddr)) ||
+      (formattedAddr && formattedAddr.includes(normalizedAddr)) ||
+      (addressLine && normalizedAddr.includes(addressLine)) ||
+      (addressLine && addressLine.includes(normalizedAddr))
+    ) {
+      return listing;
+    }
+  }
+  return null;
+}
+
 export async function cleanExpiredCache(): Promise<number> {
   for (const [key, val] of memoryCache.entries()) {
     if (Date.now() >= val.expiresAt) memoryCache.delete(key);
