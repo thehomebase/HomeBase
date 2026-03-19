@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DndContext,
@@ -6,6 +6,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -19,9 +20,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Trash2, Home, User, ArrowRight, ChevronRight, X } from "lucide-react";
+import { Trash2, Home, User, GripVertical } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 
 interface Transaction {
   id: number;
@@ -81,37 +81,77 @@ function getCardTitle(transaction: Transaction, clients: Client[], hideAddress =
   return 'Untitled Transaction';
 }
 
-function getStageLabel(status: string, type: string): string {
-  const columns = type === 'buy' ? buyerColumns : sellerColumns;
-  return columns.find(c => c.id === status)?.title || status.replace(/_/g, ' ');
-}
-
-function MobileCard({
+function MobileDraggableCard({
   transaction,
   onDelete,
   onClick,
-  onMoveStage,
   clients,
+  isDragging,
 }: {
   transaction: Transaction;
   onDelete: (id: number) => Promise<void>;
   onClick: () => void;
-  onMoveStage: (transaction: Transaction) => void;
   clients: Client[];
+  isDragging?: boolean;
 }) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: transaction.id,
+  });
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const didDragRef = useRef(false);
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    zIndex: 999,
+  } : undefined;
+
   const client = clients.find((c) => c.id === transaction.clientId);
   const isBuyerEarlyStage = transaction.type === 'buy' && !BUYER_ADDRESS_STAGES.has(transaction.status);
   const hasAddress = !isBuyerEarlyStage && transaction.streetName && transaction.streetName.trim();
   const cardTitle = getCardTitle(transaction, clients, isBuyerEarlyStage);
 
+  useEffect(() => {
+    didDragRef.current = !!transform;
+  }, [transform]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    touchStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+    didDragRef.current = false;
+  }, []);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (didDragRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-drag-handle]') || target.closest('[data-delete-btn]')) {
+      return;
+    }
+    onClick();
+  }, [onClick]);
+
   return (
     <Card
-      className="p-3 w-full active:bg-muted/50 transition-colors relative bg-background border border-neutral-300 dark:bg-neutral-600 dark:border-neutral-500"
-      onClick={onClick}
+      ref={setNodeRef}
+      style={style}
+      className={`p-3 w-full transition-shadow relative bg-background border border-neutral-300 dark:bg-neutral-600 dark:border-neutral-500 ${isDragging ? 'opacity-40 shadow-lg scale-[1.02]' : ''}`}
+      onPointerDown={handlePointerDown}
+      onClick={handleClick}
     >
       <div className="flex items-start gap-2">
+        <div
+          data-drag-handle
+          className="flex items-center justify-center shrink-0 mt-1 text-muted-foreground/50 active:text-muted-foreground cursor-grab touch-none"
+          style={{ touchAction: 'none' }}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-5 w-5" />
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm truncate flex items-center gap-1">
+          <div className="font-medium text-sm truncate flex items-center gap-1 pr-6">
             {hasAddress ? (
               <Home className="h-3 w-3 shrink-0 text-muted-foreground" />
             ) : (
@@ -140,91 +180,18 @@ function MobileCard({
             )}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <button
-            className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-[11px] font-medium active:bg-primary/20"
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveStage(transaction);
-            }}
-          >
-            <ArrowRight className="h-3 w-3" />
-            Move
-          </button>
-          <button
-            className="p-1 rounded text-destructive/60 active:text-destructive active:bg-destructive/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(transaction.id);
-            }}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <button
+          data-delete-btn
+          className="absolute right-2 top-2 p-1 rounded text-destructive/40 active:text-destructive active:bg-destructive/10"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(transaction.id);
+          }}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       </div>
     </Card>
-  );
-}
-
-function MobileStagePicker({
-  transaction,
-  onSelect,
-  onClose,
-}: {
-  transaction: Transaction;
-  onSelect: (newStatus: string) => void;
-  onClose: () => void;
-}) {
-  const columns = transaction.type === 'buy' ? buyerColumns : sellerColumns;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
-      onClick={onClose}
-    >
-      <div className="absolute inset-0 bg-black/40" />
-      <div
-        className="relative w-full max-w-lg bg-background rounded-t-2xl shadow-xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <div>
-            <p className="font-semibold text-sm">Move Transaction</p>
-            <p className="text-xs text-muted-foreground truncate max-w-[250px]">
-              {transaction.streetName || `Transaction #${transaction.id}`}
-            </p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="px-4 pb-4 space-y-1" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
-          {columns.map((col) => {
-            const isCurrent = transaction.status === col.id;
-            return (
-              <button
-                key={col.id}
-                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors ${
-                  isCurrent
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'hover:bg-muted active:bg-muted'
-                }`}
-                onClick={() => {
-                  if (!isCurrent) onSelect(col.id);
-                }}
-                disabled={isCurrent}
-              >
-                <span>{col.title}</span>
-                {isCurrent && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Current</Badge>
-                )}
-                {!isCurrent && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -327,6 +294,8 @@ function KanbanColumn({
   onTransactionClick,
   clients,
   activeId,
+  isMobile,
+  isDropTarget,
 }: { 
   status: string; 
   droppableId: string;
@@ -336,13 +305,24 @@ function KanbanColumn({
   onTransactionClick: (id: number) => void;
   clients: Client[];
   activeId: number | null;
+  isMobile?: boolean;
+  isDropTarget?: boolean;
 }) {
-  const { setNodeRef } = useDroppable({
+  const { setNodeRef, isOver } = useDroppable({
     id: droppableId,
   });
 
+  const highlight = isOver || isDropTarget;
+
   return (
-    <div ref={setNodeRef} className="bg-muted/50 rounded-lg p-2 flex-1 border border-border">
+    <div
+      ref={setNodeRef}
+      className={`rounded-lg p-2 flex-1 border transition-colors ${
+        highlight
+          ? 'bg-primary/10 border-primary/40 ring-2 ring-primary/20'
+          : 'bg-muted/50 border-border'
+      } ${isMobile && transactions.length === 0 ? 'min-h-[60px]' : ''}`}
+    >
       <div className="flex justify-between items-center">
         <h3 className="font-semibold text-sm">{title}</h3>
         <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs">
@@ -351,55 +331,31 @@ function KanbanColumn({
       </div>
       <div className="flex flex-col gap-2 px-1 mt-1">
         {transactions.map((transaction) => (
-          <DraggableCard
-            key={transaction.id}
-            transaction={transaction}
-            onDelete={onDelete}
-            onClick={() => onTransactionClick(transaction.id)}
-            clients={clients}
-            isDragging={activeId === transaction.id}
-          />
+          isMobile ? (
+            <MobileDraggableCard
+              key={transaction.id}
+              transaction={transaction}
+              onDelete={onDelete}
+              onClick={() => onTransactionClick(transaction.id)}
+              clients={clients}
+              isDragging={activeId === transaction.id}
+            />
+          ) : (
+            <DraggableCard
+              key={transaction.id}
+              transaction={transaction}
+              onDelete={onDelete}
+              onClick={() => onTransactionClick(transaction.id)}
+              clients={clients}
+              isDragging={activeId === transaction.id}
+            />
+          )
         ))}
-      </div>
-    </div>
-  );
-}
-
-function MobileKanbanColumn({
-  title,
-  transactions,
-  onDelete,
-  onTransactionClick,
-  onMoveStage,
-  clients,
-}: {
-  title: string;
-  transactions: Transaction[];
-  onDelete: (id: number) => void;
-  onTransactionClick: (id: number) => void;
-  onMoveStage: (transaction: Transaction) => void;
-  clients: Client[];
-}) {
-  if (transactions.length === 0) return null;
-  return (
-    <div className="bg-muted/50 rounded-lg p-2 border border-border">
-      <div className="flex justify-between items-center mb-1.5">
-        <h3 className="font-semibold text-sm">{title}</h3>
-        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs">
-          {transactions.length}
-        </span>
-      </div>
-      <div className="flex flex-col gap-2 px-1">
-        {transactions.map((transaction) => (
-          <MobileCard
-            key={transaction.id}
-            transaction={transaction}
-            onDelete={onDelete}
-            onClick={() => onTransactionClick(transaction.id)}
-            onMoveStage={onMoveStage}
-            clients={clients}
-          />
-        ))}
+        {isMobile && transactions.length === 0 && (
+          <div className={`text-xs text-center py-2 rounded ${highlight ? 'text-primary font-medium' : 'text-muted-foreground/60'}`}>
+            {highlight ? 'Drop here' : 'Empty'}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -420,19 +376,32 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
   const [activeId, setActiveId] = useState<number | null>(null);
   const [localTransactions, setLocalTransactions] = useState<Transaction[]>(transactions);
   const [viewFilter, setViewFilter] = useState<'all' | 'buyer' | 'seller'>('all');
-  const [movingTransaction, setMovingTransaction] = useState<Transaction | null>(null);
 
   const { data: clientsData = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
   });
 
-  const sensors = useSensors(
+  const desktopSensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
       },
     }),
     useSensor(KeyboardSensor)
+  );
+
+  const mobileSensors = useSensors(
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    }),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 10,
+      },
+    })
   );
 
   const updateTransactionStatusMutation = useMutation({
@@ -467,29 +436,6 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
       setLocalTransactions(transactions);
     },
   });
-
-  const handleMoveStage = (newStatus: string) => {
-    if (!movingTransaction) return;
-    const id = movingTransaction.id;
-    const movingToEarlyBuyerStage = movingTransaction.type === 'buy' && !BUYER_ADDRESS_STAGES.has(newStatus);
-
-    setLocalTransactions(prev => prev.map(t =>
-      t.id === id
-        ? {
-            ...t,
-            status: newStatus.toLowerCase(),
-            ...(movingToEarlyBuyerStage ? { streetName: null, city: null, state: null, zipCode: null } : {})
-          }
-        : t
-    ));
-
-    if (movingToEarlyBuyerStage) {
-      updateTransactionStatusMutation.mutate({ id, status: newStatus, streetName: null, city: null, state: null, zipCode: null });
-    } else {
-      updateTransactionStatusMutation.mutate({ id, status: newStatus });
-    }
-    setMovingTransaction(null);
-  };
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(Number(event.active.id));
@@ -556,8 +502,8 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
     .filter(t => t.type === 'sell')
     .map(t => sellerStatusSet.has(t.status) ? t : { ...t, status: 'prospect' });
 
-  const renderDesktopColumns = (columns: typeof buyerColumns, filteredTransactions: Transaction[], prefix: string) => (
-    <div className="grid grid-cols-5 w-full gap-4 pb-4">
+  const renderColumns = (columns: typeof buyerColumns, filteredTransactions: Transaction[], prefix: string) => (
+    <div className={`${isMobile ? 'flex flex-col w-full gap-3' : 'grid grid-cols-5 w-full gap-4'} pb-4`}>
       {columns.map((column) => (
         <KanbanColumn 
           key={`${prefix}_${column.id}`} 
@@ -569,131 +515,70 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
           onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
           clients={clientsData}
           activeId={activeId}
+          isMobile={isMobile}
         />
       ))}
     </div>
   );
-
-  const renderMobileColumns = (columns: typeof buyerColumns, filteredTransactions: Transaction[]) => (
-    <div className="flex flex-col w-full gap-3">
-      {columns.map((column) => (
-        <MobileKanbanColumn
-          key={column.id}
-          title={column.title}
-          transactions={filteredTransactions.filter((t) => t.status === column.id)}
-          onDelete={onDeleteTransaction}
-          onTransactionClick={(id) => setLocation(`/transactions/${id}`)}
-          onMoveStage={(t) => setMovingTransaction(t)}
-          clients={clientsData}
-        />
-      ))}
-    </div>
-  );
-
-  const filterTabs = (
-    <div className="flex items-center gap-4 mb-4">
-      <Tabs value={viewFilter} onValueChange={(v) => setViewFilter(v as 'all' | 'buyer' | 'seller')}>
-        <TabsList>
-          <TabsTrigger value="all">
-            All ({localTransactions.length})
-          </TabsTrigger>
-          <TabsTrigger value="buyer">
-            Buyers ({buyerTransactions.length})
-          </TabsTrigger>
-          <TabsTrigger value="seller">
-            Sellers ({sellerTransactions.length})
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-    </div>
-  );
-
-  const emptyStates = (
-    <>
-      {viewFilter === 'buyer' && buyerTransactions.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">No buyer transactions yet</div>
-      )}
-      {viewFilter === 'seller' && sellerTransactions.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">No seller transactions yet</div>
-      )}
-      {viewFilter === 'all' && localTransactions.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">No transactions yet</div>
-      )}
-    </>
-  );
-
-  if (isMobile) {
-    return (
-      <div className="w-full min-w-0">
-        {filterTabs}
-
-        {(viewFilter === 'all' || viewFilter === 'buyer') && buyerTransactions.length > 0 && (
-          <div className="mb-6">
-            {viewFilter === 'all' && (
-              <h3 className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Buyer Pipeline</h3>
-            )}
-            {renderMobileColumns(buyerColumns, buyerTransactions)}
-          </div>
-        )}
-
-        {(viewFilter === 'all' || viewFilter === 'seller') && sellerTransactions.length > 0 && (
-          <div className="mb-6">
-            {viewFilter === 'all' && (
-              <h3 className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Seller Pipeline</h3>
-            )}
-            {renderMobileColumns(sellerColumns, sellerTransactions)}
-          </div>
-        )}
-
-        {emptyStates}
-
-        {movingTransaction && (
-          <MobileStagePicker
-            transaction={movingTransaction}
-            onSelect={handleMoveStage}
-            onClose={() => setMovingTransaction(null)}
-          />
-        )}
-      </div>
-    );
-  }
 
   return (
     <DndContext
-      sensors={sensors}
+      sensors={isMobile ? mobileSensors : desktopSensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
       <div className="w-full min-w-0">
-        {filterTabs}
+        <div className="flex items-center gap-4 mb-4">
+          <Tabs value={viewFilter} onValueChange={(v) => setViewFilter(v as 'all' | 'buyer' | 'seller')}>
+            <TabsList>
+              <TabsTrigger value="all">
+                All ({localTransactions.length})
+              </TabsTrigger>
+              <TabsTrigger value="buyer">
+                Buyers ({buyerTransactions.length})
+              </TabsTrigger>
+              <TabsTrigger value="seller">
+                Sellers ({sellerTransactions.length})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
-        {(viewFilter === 'all' || viewFilter === 'buyer') && buyerTransactions.length > 0 && (
+        {(viewFilter === 'all' || viewFilter === 'buyer') && (buyerTransactions.length > 0 || isMobile) && (
           <div className="mb-6">
-            {viewFilter === 'all' && (
+            {(viewFilter === 'all') && (
               <h3 className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Buyer Pipeline</h3>
             )}
-            {renderDesktopColumns(buyerColumns, buyerTransactions, 'buyer')}
+            {renderColumns(buyerColumns, buyerTransactions, 'buyer')}
           </div>
         )}
 
-        {(viewFilter === 'all' || viewFilter === 'seller') && sellerTransactions.length > 0 && (
+        {(viewFilter === 'all' || viewFilter === 'seller') && (sellerTransactions.length > 0 || isMobile) && (
           <div className="mb-6">
-            {viewFilter === 'all' && (
+            {(viewFilter === 'all') && (
               <h3 className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Seller Pipeline</h3>
             )}
-            {renderDesktopColumns(sellerColumns, sellerTransactions, 'seller')}
+            {renderColumns(sellerColumns, sellerTransactions, 'seller')}
           </div>
         )}
 
-        {emptyStates}
+        {viewFilter === 'buyer' && buyerTransactions.length === 0 && !isMobile && (
+          <div className="text-center py-12 text-muted-foreground">No buyer transactions yet</div>
+        )}
+        {viewFilter === 'seller' && sellerTransactions.length === 0 && !isMobile && (
+          <div className="text-center py-12 text-muted-foreground">No seller transactions yet</div>
+        )}
+        {viewFilter === 'all' && localTransactions.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">No transactions yet</div>
+        )}
       </div>
 
       <DragOverlay>
         {activeId && activeTransaction ? (() => {
           const isEarlyBuyer = activeTransaction.type === 'buy' && !BUYER_ADDRESS_STAGES.has(activeTransaction.status);
           return (
-            <Card className="p-3 w-[180px] shadow-lg cursor-grabbing dark:bg-neutral-600 dark:border-neutral-500">
+            <Card className="p-3 w-[200px] shadow-xl cursor-grabbing dark:bg-neutral-600 dark:border-neutral-500 border-primary/30">
               <div className="font-medium text-sm truncate">
                 {getCardTitle(activeTransaction, clientsData, isEarlyBuyer)}
               </div>
