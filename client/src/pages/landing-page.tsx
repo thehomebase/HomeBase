@@ -15,6 +15,11 @@ import heroImage from "@/assets/landing-hero.png";
 import myTeamDesktopImage from "@/assets/image_1773430206672.png";
 import zipCodeMapImage from "@/assets/image_1773428370460.png";
 import referralImage from "@/assets/image_1773428743920.png";
+import clientPortalScreenshot from "@/assets/IMG_3727_1773944389523.jpeg";
+import transactionDetailsScreenshot from "@/assets/IMG_3728_1773944389523.jpeg";
+import inspectionRepairsScreenshot from "@/assets/IMG_3729_1773944389523.jpeg";
+import transactionTimelineScreenshot from "@/assets/IMG_3730_1773944389523.jpeg";
+import vendorCardScreenshot from "@/assets/IMG_3732_1773944389523.jpeg";
 
 function useCountUp(end: number, duration: number = 2000, startTrigger: boolean = false) {
   const [count, setCount] = useState(0);
@@ -441,54 +446,11 @@ export default function LandingPage() {
                   <div className="bg-neutral-800 dark:bg-neutral-700 h-6 flex items-center justify-center">
                     <div className="w-20 h-4 bg-neutral-900 dark:bg-neutral-800 rounded-b-xl" />
                   </div>
-                  <div className="px-4 pt-4 pb-3">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Home className="h-4 w-4 text-primary" />
-                      <span className="font-semibold text-sm text-neutral-900 dark:text-white">My Transaction</span>
-                    </div>
-                    <div className="rounded-xl bg-primary/10 p-3 mb-3">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Closing In</p>
-                      <p className="text-2xl font-bold text-primary">12 Days</p>
-                      <p className="text-[10px] text-muted-foreground">March 31, 2026</p>
-                    </div>
-                    <div className="flex items-center gap-1 mb-3">
-                      {["Listed", "Under Contract", "Option", "Pending", "Closed"].map((stage, i) => (
-                        <div key={stage} className="flex-1">
-                          <div className={`h-1.5 rounded-full ${i <= 2 ? "bg-primary" : "bg-neutral-200 dark:bg-neutral-700"}`} />
-                          <p className="text-[7px] text-muted-foreground mt-0.5 text-center truncate">{stage}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="space-y-2">
-                      <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-2.5 flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center shrink-0">
-                          <ClipboardCheck className="h-3 w-3 text-amber-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-semibold text-amber-800 dark:text-amber-300">Action Required</p>
-                          <p className="text-[9px] text-amber-600 dark:text-amber-400 truncate">Upload proof of homeowner's insurance</p>
-                        </div>
-                      </div>
-                      <div className="rounded-lg border p-2.5 flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
-                          <FileText className="h-3 w-3 text-blue-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-semibold">Documents</p>
-                          <p className="text-[9px] text-muted-foreground truncate">6 uploaded · 2 awaiting signature</p>
-                        </div>
-                      </div>
-                      <div className="rounded-lg border p-2.5 flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center shrink-0">
-                          <Users className="h-3 w-3 text-green-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-semibold">Your Team</p>
-                          <p className="text-[9px] text-muted-foreground truncate">Agent, Lender, Title Co., Inspector</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <img
+                    src={clientPortalScreenshot}
+                    alt="Client Portal — stage tracker, closing countdown, and action required items"
+                    className="w-full h-auto"
+                  />
                 </div>
               </div>
             </div>
@@ -641,8 +603,8 @@ export default function LandingPage() {
           <div className={`grid gap-8 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
             <Card className="overflow-hidden hover:shadow-lg transition-shadow border-2 hover:border-primary/20">
               <CardContent className="p-0">
-                <div className="bg-gradient-to-br from-violet-600 to-indigo-700 p-6 text-white">
-                  <div className="flex items-center gap-3 mb-3">
+                <div className="bg-gradient-to-br from-violet-600 to-indigo-700 p-4 text-white">
+                  <div className="flex items-center gap-3 mb-2">
                     <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
                       <Brain className="h-6 w-6" />
                     </div>
@@ -653,26 +615,19 @@ export default function LandingPage() {
                   </div>
                   <p className="text-sm text-white/80 leading-relaxed">Upload a TREC contract or any real estate document — AI extracts buyer, seller, dates, price, and more in seconds.</p>
                 </div>
-                <div className="p-5 space-y-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                    <span>Auto-fills transaction fields from PDFs</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                    <span>Works with any real estate contract format</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                    <span>PII stripped before processing</span>
-                  </div>
+                <div className="bg-white dark:bg-card">
+                  <img
+                    src={transactionTimelineScreenshot}
+                    alt="Transaction Timeline — AI-extracted dates and milestones with risk alerts"
+                    className="w-full h-auto"
+                  />
                 </div>
               </CardContent>
             </Card>
             <Card className="overflow-hidden hover:shadow-lg transition-shadow border-2 hover:border-primary/20">
               <CardContent className="p-0">
-                <div className="bg-gradient-to-br from-amber-600 to-orange-700 p-6 text-white">
-                  <div className="flex items-center gap-3 mb-3">
+                <div className="bg-gradient-to-br from-amber-600 to-orange-700 p-4 text-white">
+                  <div className="flex items-center gap-3 mb-2">
                     <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center">
                       <Gavel className="h-6 w-6" />
                     </div>
@@ -683,19 +638,12 @@ export default function LandingPage() {
                   </div>
                   <p className="text-sm text-white/80 leading-relaxed">AI reads inspection reports, flags deficiencies (with photos), and lets you send bid requests to trusted vendors — all from one screen.</p>
                 </div>
-                <div className="p-5 space-y-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                    <span>Auto-detects repair items & photo evidence</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                    <span>Send bid requests to multiple vendors at once</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                    <span>Compare bids side-by-side before deciding</span>
-                  </div>
+                <div className="bg-white dark:bg-card">
+                  <img
+                    src={inspectionRepairsScreenshot}
+                    alt="Inspection Repairs — severity-coded issues with repair status tracking"
+                    className="w-full h-auto"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -714,12 +662,23 @@ export default function LandingPage() {
               Build and manage your go-to team of inspectors, lenders, contractors, and more. Every pro is verified, rated, and just a tap away.
             </p>
           </div>
-          <div className="relative rounded-2xl overflow-hidden shadow-2xl border mb-10">
-            <img
-              src={myTeamDesktopImage}
-              alt="HomeBase Pros — your trusted team of verified vendors and service providers"
-              className="w-full h-auto"
-            />
+          <div className={`grid gap-8 items-center mb-10 ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
+            <div className="col-span-1 md:col-span-2 relative rounded-2xl overflow-hidden shadow-2xl border">
+              <img
+                src={myTeamDesktopImage}
+                alt="HomeBase Pros — your trusted team of verified vendors and service providers"
+                className="w-full h-auto"
+              />
+            </div>
+            <div className="relative mx-auto" style={{ maxWidth: 340 }}>
+              <div className="rounded-2xl overflow-hidden shadow-2xl border">
+                <img
+                  src={vendorCardScreenshot}
+                  alt="Vendor profile card — verified electrician with ratings and team count"
+                  className="w-full h-auto"
+                />
+              </div>
+            </div>
           </div>
           <div className={`grid gap-6 ${isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-4"}`}>
             <Card className="hover:shadow-lg transition-shadow">
@@ -914,49 +873,11 @@ export default function LandingPage() {
                 <div className="bg-neutral-800 dark:bg-neutral-700 h-6 flex items-center justify-center">
                   <div className="w-20 h-4 bg-neutral-900 dark:bg-neutral-800 rounded-b-xl" />
                 </div>
-                <div className="px-4 pt-4 pb-3">
-                  <div className="flex items-center gap-2 mb-4">
-                    <HomeIcon className="h-4 w-4 text-primary" />
-                    <span className="font-semibold text-sm text-neutral-900 dark:text-white">MyHome</span>
-                  </div>
-                  <div className="rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 p-4 mb-3">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Your Home</p>
-                    <p className="font-bold text-sm text-neutral-900 dark:text-white">1234 Oak Meadow Lane</p>
-                    <p className="text-[10px] text-muted-foreground">Dallas, TX 75201</p>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-[10px] text-muted-foreground">3 bed</span>
-                      <span className="text-[10px] text-muted-foreground">2 bath</span>
-                      <span className="text-[10px] text-muted-foreground">2,150 sqft</span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="rounded-lg border p-2.5 flex items-center gap-2">
-                      <div className="h-7 w-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-semibold shrink-0">JM</div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold">Joel Martin</p>
-                        <p className="text-[9px] text-muted-foreground">Your Agent</p>
-                      </div>
-                      <div className="ml-auto flex gap-1">
-                        <div className="h-5 w-5 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center"><Phone className="h-2.5 w-2.5 text-muted-foreground" /></div>
-                        <div className="h-5 w-5 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center"><Mail className="h-2.5 w-2.5 text-muted-foreground" /></div>
-                      </div>
-                    </div>
-                    <div className="rounded-lg border p-2.5 flex items-center gap-2">
-                      <div className="h-7 w-7 rounded-full bg-green-600 flex items-center justify-center text-white text-[10px] font-semibold shrink-0">HL</div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold">Heritage Lending</p>
-                        <p className="text-[9px] text-muted-foreground">Your Lender</p>
-                      </div>
-                    </div>
-                    <div className="rounded-lg border p-2.5 flex items-center gap-2">
-                      <div className="h-7 w-7 rounded-full bg-purple-600 flex items-center justify-center text-white text-[10px] font-semibold shrink-0">AP</div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold">Ace Plumbing</p>
-                        <p className="text-[9px] text-muted-foreground">Recommended Vendor</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <img
+                  src={transactionDetailsScreenshot}
+                  alt="Transaction details — key dates, progress tracking, and document status"
+                  className="w-full h-auto"
+                />
               </div>
             </div>
           </div>
