@@ -46,7 +46,7 @@ const FAQS: Record<string, Array<{ q: string; a: string }>> = {
     },
     {
       q: "Is there a free trial?",
-      a: "Yes! Every new account gets a free 7-day trial with full access to all features — no credit card required. We want you to see the value before you invest."
+      a: "Yes! Every new account gets a 7-day free trial with full access to all features. You'll enter your payment info upfront, but you won't be charged until the trial ends — and you can cancel anytime during the trial period at no cost."
     },
     {
       q: "What payment methods do you accept?",

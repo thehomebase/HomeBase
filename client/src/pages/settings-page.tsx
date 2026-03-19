@@ -1131,7 +1131,7 @@ function BillingSection() {
 
   if (subLoading) return <Skeleton className="h-64 w-full" />;
 
-  const hasActiveSubscription = subscription?.subscription?.status === 'active' || subscription?.trialActive === true;
+  const hasActiveSubscription = subscription?.subscription?.status === 'active' || subscription?.subscription?.status === 'trialing' || subscription?.trialActive === true;
   const availableCredits = referralCredits?.filter(c => c.status === 'available') || [];
 
   return (
@@ -1184,19 +1184,29 @@ function BillingSection() {
 
           {!hasActiveSubscription && (user?.role === 'agent' || user?.role === 'broker') && (
             <div className="space-y-3">
-              <p className="text-sm font-medium">Get started with HomeBase</p>
+              <p className="text-sm font-medium">
+                {!subscription?.trialEndsAt ? "Start your 7-day free trial" : "Get started with HomeBase"}
+              </p>
               <Button onClick={() => subscribeMutation.mutate("agent")} disabled={subscribeMutation.isPending} className="w-full">
-                {subscribeMutation.isPending ? "Processing..." : "Subscribe to Agent Plan - $29/mo"}
+                {subscribeMutation.isPending ? "Processing..." : !subscription?.trialEndsAt ? "Start Free Trial — Agent Plan" : "Subscribe to Agent Plan - $29/mo"}
               </Button>
+              {!subscription?.trialEndsAt && (
+                <p className="text-xs text-muted-foreground text-center">7 days free, then $29/mo. Cancel anytime.</p>
+              )}
             </div>
           )}
 
           {!hasActiveSubscription && user?.role === 'vendor' && (
             <div className="space-y-3">
-              <p className="text-sm font-medium">Get started with HomeBase</p>
+              <p className="text-sm font-medium">
+                {!subscription?.trialEndsAt ? "Start your 7-day free trial" : "Get started with HomeBase"}
+              </p>
               <Button onClick={() => subscribeMutation.mutate("vendor")} disabled={subscribeMutation.isPending} className="w-full">
-                {subscribeMutation.isPending ? "Processing..." : "Subscribe to Vendor Plan - $19/mo"}
+                {subscribeMutation.isPending ? "Processing..." : !subscription?.trialEndsAt ? "Start Free Trial — Vendor Plan" : "Subscribe to Vendor Plan - $19/mo"}
               </Button>
+              {!subscription?.trialEndsAt && (
+                <p className="text-xs text-muted-foreground text-center">7 days free, then $19/mo. Cancel anytime.</p>
+              )}
             </div>
           )}
         </CardContent>

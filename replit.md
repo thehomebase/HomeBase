@@ -45,7 +45,7 @@ Preferred communication style: Simple, everyday language.
 - **Specialized Portals**: Lender Portal (loan pipelines, checklist sync), Broker Portal (agent oversight, sales competitions, lead routing).
 - **Zapier Integration**: API key authentication, webhook triggers for key events, public REST API for data access.
 - **Financial Calculators**: Mortgage, Affordability, Refinance, Rent vs Buy, Financing Guide, and Lender Comparison.
-- **Billing**: Stripe integration for subscriptions and sponsored ad billing. 7-day free trial automatically granted on registration (`trial_ends_at` column on users). Trial status shown on billing and settings pages. Feature gating recognizes active trials.
+- **Billing**: Stripe integration for subscriptions and sponsored ad billing. 7-day free trial via Stripe's native `trial_period_days` on first checkout (credit card required upfront, auto-converts after 7 days). Local `trial_ends_at` fallback on users table. Trial status shown on billing and settings pages. Feature gating recognizes both Stripe `trialing` status and local trial.
 - **Sponsored Ads**: Ad creation with image upload, live preview, admin review, and various ad types (marketplace, sidebar, banner).
 - **Admin Dashboard**: Redesigned with Recharts for analytics (users, revenue, leads, API usage), stat cards, recent signups feed, and tabbed management for users, verifications, reports, ads, financial, leads, geographic data, messages, and audit log.
 - **Notifications**: Real-time SMS and Web Push for new leads, WebSocket-based in-app notifications.

@@ -222,7 +222,7 @@ export default function BillingPage() {
           </p>
         </div>
 
-        {!currentSub && subscription?.trialActive && (
+        {subscription?.trialActive && (
           <div className="mb-8">
             <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
               <CardContent className="p-6">
@@ -239,24 +239,24 @@ export default function BillingPage() {
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Full access to all features. Subscribe before {subscription.trialEndsAt ? new Date(subscription.trialEndsAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : "your trial ends"} to keep everything running.
+                        You have full access to all features. {subscription.trialEndsAt ? `Your first charge will be on ${new Date(subscription.trialEndsAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}.` : ""} You can cancel anytime from this page.
                       </p>
                     </div>
                   </div>
+                  {currentSub && (
+                    <Button
+                      variant="outline"
+                      onClick={() => portalMutation.mutate()}
+                      disabled={portalMutation.isPending}
+                      className="gap-2 shrink-0"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      {portalMutation.isPending ? "Opening..." : "Manage Subscription"}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          </div>
-        )}
-
-        {!currentSub && !subscription?.trialActive && subscription?.trialEndsAt && (
-          <div className="mb-8">
-            <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
-              <Clock className="h-4 w-4 text-orange-600" />
-              <AlertDescription className="text-orange-800 dark:text-orange-200">
-                Your free trial has ended. Subscribe now to continue using all features.
-              </AlertDescription>
-            </Alert>
           </div>
         )}
 
@@ -319,6 +319,7 @@ export default function BillingPage() {
                 features={agentFeatures}
                 isCurrent={userRole === 'agent' && !!currentSub}
                 isRelevant={userRole === 'agent'}
+                isFirstTime={!currentSub && !subscription?.trialEndsAt}
                 formatPrice={formatPrice}
                 formatPriceCents={formatPriceCents}
                 onSubscribe={(priceId) => checkoutMutation.mutate(priceId)}
@@ -334,6 +335,7 @@ export default function BillingPage() {
                 features={vendorFeatures}
                 isCurrent={userRole === 'vendor' && !!currentSub}
                 isRelevant={userRole === 'vendor'}
+                isFirstTime={!currentSub && !subscription?.trialEndsAt}
                 formatPrice={formatPrice}
                 formatPriceCents={formatPriceCents}
                 onSubscribe={(priceId) => checkoutMutation.mutate(priceId)}
@@ -516,7 +518,9 @@ export default function BillingPage() {
           <div className="max-w-lg mx-auto">
             <h2 className="text-2xl font-bold mb-3">Ready to get started?</h2>
             <p className="text-muted-foreground mb-6">
-              Join thousands of real estate professionals who trust HomeBase to manage their business.
+              {!currentSub && !subscription?.trialEndsAt
+                ? "Start your 7-day free trial today. Cancel anytime — you won't be charged until your trial ends."
+                : "Join thousands of real estate professionals who trust HomeBase to manage their business."}
             </p>
             {!currentSub && (
               <Button
@@ -528,7 +532,7 @@ export default function BillingPage() {
                 }}
                 disabled={checkoutMutation.isPending}
               >
-                {checkoutMutation.isPending ? "Loading..." : "Get Started Today"}
+                {checkoutMutation.isPending ? "Loading..." : !subscription?.trialEndsAt ? "Start Free Trial" : "Subscribe Now"}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             )}
@@ -568,6 +572,7 @@ function PlanCard({
   features,
   isCurrent,
   isRelevant,
+  isFirstTime,
   formatPrice,
   formatPriceCents,
   onSubscribe,
@@ -582,6 +587,7 @@ function PlanCard({
   features: { icon: any; text: string }[];
   isCurrent: boolean;
   isRelevant: boolean;
+  isFirstTime?: boolean;
   formatPrice: (n: number) => string;
   formatPriceCents: (n: number) => string;
   onSubscribe: (priceId: string) => void;
@@ -633,14 +639,21 @@ function PlanCard({
               Current Plan
             </Button>
           ) : isRelevant && price ? (
-            <Button
-              className="w-full gap-2"
-              onClick={() => onSubscribe(price.id)}
-              disabled={isSubscribing}
-            >
-              <Sparkles className="h-4 w-4" />
-              {isSubscribing ? "Loading..." : `Get ${name}`}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                className="w-full gap-2"
+                onClick={() => onSubscribe(price.id)}
+                disabled={isSubscribing}
+              >
+                <Sparkles className="h-4 w-4" />
+                {isSubscribing ? "Loading..." : isFirstTime ? "Start 7-Day Free Trial" : `Get ${name}`}
+              </Button>
+              {isFirstTime && (
+                <p className="text-xs text-center text-muted-foreground">
+                  Cancel anytime during your trial — you won't be charged
+                </p>
+              )}
+            </div>
           ) : (
             <Button variant="outline" className="w-full" disabled>
               {isRelevant ? "No price available" : "Not available for your role"}

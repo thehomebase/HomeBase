@@ -8711,7 +8711,16 @@ export function registerRoutes(app: Express): Server {
       let trialActive = false;
       let trialDaysLeft = 0;
       let trialEndsAt = null;
-      if (user?.trialEndsAt) {
+
+      if (currentSubscription?.status === 'trialing' && currentSubscription?.trial_end) {
+        const now = new Date();
+        const ends = new Date(currentSubscription.trial_end * 1000);
+        trialEndsAt = ends.toISOString();
+        if (ends > now) {
+          trialActive = true;
+          trialDaysLeft = Math.ceil((ends.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        }
+      } else if (!currentSubscription && user?.trialEndsAt) {
         const now = new Date();
         const ends = new Date(user.trialEndsAt);
         trialEndsAt = ends.toISOString();
@@ -8797,6 +8806,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const hasExistingSub = !!req.user.stripeSubscriptionId;
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         payment_method_types: ['card'],
@@ -8806,6 +8816,7 @@ export function registerRoutes(app: Express): Server {
         cancel_url: `${baseUrl}/billing?canceled=true`,
         subscription_data: {
           metadata: { userId: String(req.user.id) },
+          ...(!hasExistingSub ? { trial_period_days: 7 } : {}),
         },
       });
 
