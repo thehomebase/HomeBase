@@ -170,7 +170,7 @@ function ExpenseDialog({ open, onOpenChange, homeId, expense }: { open: boolean;
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2"><Label>Amount ($) *</Label><Input type="number" placeholder="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
-            <div className="space-y-2"><Label>Billing Date *</Label><Input type="date" value={form.billingDate} onChange={(e) => setForm({ ...form, billingDate: e.target.value })} required /></div>
+            <div className="space-y-2"><Label>Billing Date *</Label><Input type="date" className="h-10" value={form.billingDate} onChange={(e) => setForm({ ...form, billingDate: e.target.value })} required /></div>
           </div>
           <div className="space-y-2"><Label>Provider</Label><Input placeholder="e.g. AT&T, TXU Energy" value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-4">
@@ -390,7 +390,7 @@ function EquitySetupDialog({ open, onOpenChange, homeId, profile }: { open: bool
         <DialogHeader><DialogTitle>{profile ? "Update" : "Set Up"} Equity Tracker</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2"><Label>Original Loan Amount *</Label><Input type="number" placeholder="e.g. 320000" value={form.loanAmount} onChange={(e) => setForm({ ...form, loanAmount: e.target.value })} required /></div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2"><Label>Interest Rate (%) *</Label><Input placeholder="e.g. 6.5" value={form.interestRate} onChange={(e) => setForm({ ...form, interestRate: e.target.value })} required /></div>
             <div className="space-y-2">
               <Label>Loan Term *</Label>
@@ -404,8 +404,8 @@ function EquitySetupDialog({ open, onOpenChange, homeId, profile }: { open: bool
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label>Loan Start Date *</Label><Input type="date" value={form.loanStartDate} onChange={(e) => setForm({ ...form, loanStartDate: e.target.value })} required /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Loan Start Date *</Label><Input type="date" className="h-10" value={form.loanStartDate} onChange={(e) => setForm({ ...form, loanStartDate: e.target.value })} required /></div>
             <div className="space-y-2">
               <Label>Payment Frequency</Label>
               <Select value={form.paymentFrequency} onValueChange={(v) => setForm({ ...form, paymentFrequency: v })}>
@@ -1446,11 +1446,11 @@ function HomeDetail({ homeId }: { homeId: number }) {
 
           <TabsContent value="overview" className="mt-4">
             <div className="space-y-4">
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-                <Button size="sm" variant="outline" className="shrink-0" onClick={() => setShowScan(true)}><ScanLine className="h-4 w-4 mr-1.5" />Scan</Button>
-                <Button size="sm" className="shrink-0" onClick={() => { setEditingRecord(null); setShowMaintenanceDialog(true); }}><Plus className="h-4 w-4 mr-1.5" />Add Record</Button>
-                <Link href="/marketplace" className="shrink-0"><Button size="sm" variant="outline" className="w-full"><Search className="h-4 w-4 mr-1.5" />Find a Pro</Button></Link>
-                <Link href="/my-team" className="shrink-0"><Button size="sm" variant="outline" className="w-full"><Users className="h-4 w-4 mr-1.5" />My Team</Button></Link>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <Button size="sm" variant="outline" className="w-full" onClick={() => setShowScan(true)}><ScanLine className="h-4 w-4 mr-1.5" />Scan</Button>
+                <Button size="sm" className="w-full" onClick={() => { setEditingRecord(null); setShowMaintenanceDialog(true); }}><Plus className="h-4 w-4 mr-1.5" />Add Record</Button>
+                <Link href="/marketplace" className="w-full"><Button size="sm" variant="outline" className="w-full"><Search className="h-4 w-4 mr-1.5" />Find a Pro</Button></Link>
+                <Link href="/my-team" className="w-full"><Button size="sm" variant="outline" className="w-full"><Users className="h-4 w-4 mr-1.5" />My Team</Button></Link>
               </div>
 
               <Card>
