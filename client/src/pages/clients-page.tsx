@@ -722,6 +722,10 @@ const MobileClientList = ({
   onSelect,
   onEdit,
   onDelete,
+  selectedIds,
+  onToggleSelect,
+  selectMode,
+  onEnterSelectMode,
 }: {
   clients: Client[];
   sortConfig: SortConfig;
@@ -729,16 +733,41 @@ const MobileClientList = ({
   onSelect: (client: Client) => void;
   onEdit: (client: Client) => void;
   onDelete: (clientId: number) => void;
+  selectedIds: Set<number>;
+  onToggleSelect: (id: number) => void;
+  selectMode: boolean;
+  onEnterSelectMode: () => void;
 }) => {
   const [mobileView, setMobileView] = useState<'cards' | 'table'>('cards');
 
   const isSortedBy = (key: keyof Client) => sortConfig?.key === key;
   const sortDir = sortConfig?.direction;
 
+  const handleCardClick = (client: Client) => {
+    if (selectMode) {
+      onToggleSelect(client.id);
+    } else {
+      onSelect(client);
+    }
+  };
+
+  const handleLongPress = (client: Client) => {
+    if (!selectMode) {
+      onEnterSelectMode();
+    }
+    onToggleSelect(client.id);
+  };
+
   return (
     <div className="md:hidden">
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-1">
+          {!selectMode && (
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8 mr-1" onClick={onEnterSelectMode}>
+              <CheckSquare className="h-3.5 w-3.5" />
+              Select
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8">
@@ -801,12 +830,27 @@ const MobileClientList = ({
       ) : mobileView === 'cards' ? (
         <div className="space-y-2 px-2">
           {clients.map((client) => (
-            <ClientCard
-              key={client.id}
-              client={client}
-              onSelect={onSelect}
-              onEdit={onEdit}
-            />
+            <div key={client.id} className="flex items-start gap-1">
+              {selectMode && (
+                <button
+                  className="mt-3 ml-1 flex-shrink-0"
+                  onClick={() => onToggleSelect(client.id)}
+                >
+                  {selectedIds.has(client.id) ? (
+                    <CheckSquare className="h-5 w-5 text-primary" />
+                  ) : (
+                    <Square className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </button>
+              )}
+              <div className="flex-1" onClick={() => handleCardClick(client)} onContextMenu={(e) => { e.preventDefault(); handleLongPress(client); }}>
+                <ClientCard
+                  client={client}
+                  onSelect={selectMode ? () => onToggleSelect(client.id) : onSelect}
+                  onEdit={onEdit}
+                />
+              </div>
+            </div>
           ))}
         </div>
       ) : (
@@ -814,6 +858,25 @@ const MobileClientList = ({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
+                {selectMode && (
+                  <th className="w-8 px-2 py-2">
+                    <button onClick={() => {
+                      if (selectedIds.size === clients.length) {
+                        clients.forEach(c => onToggleSelect(c.id));
+                      } else {
+                        clients.forEach(c => { if (!selectedIds.has(c.id)) onToggleSelect(c.id); });
+                      }
+                    }}>
+                      {selectedIds.size === clients.length && clients.length > 0 ? (
+                        <CheckSquare className="h-4 w-4 text-primary" />
+                      ) : selectedIds.size > 0 ? (
+                        <div className="h-4 w-4 border-2 border-primary rounded-sm bg-primary/20" />
+                      ) : (
+                        <Square className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </button>
+                  </th>
+                )}
                 <th
                   className="text-left px-3 py-2 font-medium cursor-pointer"
                   onClick={() => onSort('lastName')}
@@ -840,9 +903,23 @@ const MobileClientList = ({
               {clients.map((client, idx) => (
                 <tr
                   key={client.id}
-                  className={`border-b cursor-pointer active:bg-muted/50 ${idx % 2 === 0 ? '' : 'bg-muted/20'}`}
-                  onClick={() => onSelect(client)}
+                  className={`border-b cursor-pointer active:bg-muted/50 ${
+                    selectedIds.has(client.id) ? 'bg-primary/5' :
+                    idx % 2 === 0 ? '' : 'bg-muted/20'
+                  }`}
+                  onClick={() => selectMode ? onToggleSelect(client.id) : onSelect(client)}
                 >
+                  {selectMode && (
+                    <td className="px-2 py-2.5">
+                      <button onClick={(e) => { e.stopPropagation(); onToggleSelect(client.id); }}>
+                        {selectedIds.has(client.id) ? (
+                          <CheckSquare className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Square className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
+                    </td>
+                  )}
                   <td className="px-3 py-2.5">
                     <div className="font-medium">{client.firstName} {client.lastName}</div>
                     <div className="text-xs text-muted-foreground">{client.phone || client.email || ''}</div>
@@ -1025,19 +1102,6 @@ const BulkActionBar = ({ selectedIds, clients, onClear, allExistingLabels }: { s
           <Tag className="h-3 w-3" /> Remove Label
         </Button>
       )}
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="secondary" size="sm" className="h-7 text-xs gap-1">
-            Set Status
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuItem onClick={() => bulkMutation.mutate({ action: 'set_status', value: 'active' })}>Active</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => bulkMutation.mutate({ action: 'set_status', value: 'inactive' })}>Inactive</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => bulkMutation.mutate({ action: 'set_status', value: 'pending' })}>Pending</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
 
       <Button variant="secondary" size="sm" className="h-7 text-xs gap-1 text-red-200 hover:text-red-100" onClick={() => { if (confirm(`Delete ${selectedIds.size} client${selectedIds.size > 1 ? 's' : ''}? This cannot be undone.`)) bulkMutation.mutate({ action: 'delete' }); }}>
         <Trash2 className="h-3 w-3" /> Delete
@@ -1314,12 +1378,16 @@ const TableContent = ({
 
       {/* Mobile view */}
       <MobileClientList
-        clients={sortData(clients, sortConfig)}
+        clients={sortedClients}
         sortConfig={sortConfig}
         onSort={requestSort}
         onSelect={(client) => setSelectedClient(client)}
         onEdit={(client) => setSelectedClient(client)}
         onDelete={onDelete}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelect}
+        selectMode={someSelected}
+        onEnterSelectMode={() => {}}
       />
 
       {/* Client Details Panel */}
