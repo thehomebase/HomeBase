@@ -3045,7 +3045,7 @@ export class DatabaseStorage implements IStorage {
   async getAllContractors(): Promise<Contractor[]> {
     try {
       const result = await db.execute(sql`
-        SELECT * FROM contractors WHERE created_by_user_id IS NULL ORDER BY name
+        SELECT * FROM contractors WHERE created_by_user_id IS NULL AND vendor_user_id IS NOT NULL ORDER BY name
       `);
       return result.rows.map((row: any) => this.mapContractorRow(row));
     } catch (error) {
