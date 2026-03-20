@@ -1186,11 +1186,9 @@ export default function MarketplacePage() {
                   {rating > 0 && (
                     <div className="flex items-center gap-2">
                       <StarRating rating={rating} />
-                      {(contractor.reviewCount ?? 0) > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          ({contractor.reviewCount})
-                        </span>
-                      )}
+                      <span className="text-xs text-muted-foreground">
+                        ({(contractor.reviewCount ?? 0) > 0 ? contractor.reviewCount : 1} {(contractor.reviewCount ?? 0) > 1 ? "reviews" : "review"})
+                      </span>
                     </div>
                   )}
 
@@ -1320,9 +1318,7 @@ export default function MarketplacePage() {
                         <div className="flex items-center gap-1">
                           <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
                           <span>{rating.toFixed(1)}</span>
-                          {(contractor.reviewCount ?? 0) > 0 && (
-                            <span className="text-muted-foreground text-xs">({contractor.reviewCount})</span>
-                          )}
+                          <span className="text-muted-foreground text-xs">({(contractor.reviewCount ?? 0) > 0 ? contractor.reviewCount : 1})</span>
                         </div>
                       ) : (
                         <span className="text-muted-foreground">-</span>
