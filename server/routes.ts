@@ -1912,15 +1912,31 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/contractors", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
-      return res.sendStatus(401);
-    }
+    if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      const parsed = insertContractorSchema.safeParse({
-        ...req.body,
-        agentId: req.user.id
-      });
+      const isAgentOrBroker = req.user.role === "agent" || req.user.role === "broker";
+      const safeBody = isAgentOrBroker
+        ? { ...req.body, agentId: req.user.id }
+        : {
+            name: req.body.name,
+            category: req.body.category,
+            phone: req.body.phone || null,
+            email: req.body.email || null,
+            website: req.body.website || null,
+            address: req.body.address || null,
+            city: req.body.city || null,
+            state: req.body.state || null,
+            zipCode: req.body.zipCode || null,
+            description: req.body.description || null,
+            agentId: null,
+            vendorUserId: null,
+            agentRating: null,
+            agentNotes: null,
+            latitude: null,
+            longitude: null,
+          };
+      const parsed = insertContractorSchema.safeParse(safeBody);
       if (!parsed.success) {
         return res.status(400).json(parsed.error);
       }

@@ -546,22 +546,31 @@ function AddVendorToTeamPrompt({ vendor, onDismiss }: { vendor: ScanResult["vend
 
   if (!vendor || !vendor.name) return null;
 
-  const handleAdd = async () => {
+  const handleAddDirectly = async () => {
     setAdding(true);
     try {
-      const res = await apiRequest("POST", "/api/my-team", {
-        contractorId: 0,
+      const contractorRes = await apiRequest("POST", "/api/contractors", {
+        name: vendor.name,
         category: vendor.category || "other",
-        notes: `Added from scanned document. ${vendor.phone ? `Phone: ${vendor.phone}` : ""} ${vendor.email ? `Email: ${vendor.email}` : ""} ${vendor.website ? `Website: ${vendor.website}` : ""}`.trim(),
+        phone: vendor.phone || "",
+        email: vendor.email || "",
+        website: vendor.website || "",
+        address: vendor.address || "",
       });
-      if (res.ok) {
+      if (contractorRes.ok) {
+        const contractor = await contractorRes.json();
+        await apiRequest("POST", "/api/my-team", {
+          contractorId: contractor.id,
+          category: vendor.category || "other",
+          notes: `Added from scanned receipt/invoice`,
+        });
         queryClient.invalidateQueries({ queryKey: ["/api/my-team"] });
-        toast({ title: `${vendor.name} noted`, description: "Check the HomeBase Pros marketplace to find and add verified vendors to your team." });
+        toast({ title: `${vendor.name} added to your team!`, description: "You can find them in My Team anytime." });
       } else {
-        toast({ title: "Could not add to team directly", description: "Search for this vendor in the HomeBase Pros marketplace to add them to your team." });
+        toast({ title: "Couldn't add vendor", description: "Try searching the marketplace instead.", variant: "destructive" });
       }
     } catch {
-      toast({ title: "Search in marketplace", description: `Look for "${vendor.name}" in HomeBase Pros to add them to your team.` });
+      toast({ title: "Something went wrong", description: "Try searching the marketplace instead.", variant: "destructive" });
     }
     setAdding(false);
     onDismiss();
@@ -577,9 +586,13 @@ function AddVendorToTeamPrompt({ vendor, onDismiss }: { vendor: ScanResult["vend
             <p className="text-xs text-muted-foreground mt-0.5">
               {[vendor.phone, vendor.email, vendor.category?.replace(/_/g, " ")].filter(Boolean).join(" · ")}
             </p>
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-2 mt-2 flex-wrap">
+              <Button size="sm" variant="default" className="h-7 text-xs" onClick={handleAddDirectly} disabled={adding}>
+                {adding ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <UserPlus className="h-3 w-3 mr-1" />}
+                {adding ? "Adding..." : "Add to My Team"}
+              </Button>
               <Link href={`/marketplace?search=${encodeURIComponent(vendor.name)}`}>
-                <Button size="sm" variant="default" className="h-7 text-xs"><Search className="h-3 w-3 mr-1" />Find in Marketplace</Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs"><Search className="h-3 w-3 mr-1" />Find in Marketplace</Button>
               </Link>
               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onDismiss}><X className="h-3 w-3 mr-1" />Dismiss</Button>
             </div>
