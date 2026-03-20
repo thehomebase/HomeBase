@@ -8329,7 +8329,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/referral/generate", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
+    if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const existing = await storage.getReferralCodeByAgent(req.user.id);
       if (existing) {
@@ -8348,7 +8348,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.get("/api/referral/my-code", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
+    if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const referralCode = await storage.getReferralCodeByAgent(req.user.id);
       if (!referralCode) {
