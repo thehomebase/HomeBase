@@ -1771,12 +1771,17 @@ export function registerRoutes(app: Express): Server {
       const contractorsWithRatings = await Promise.all(
         contractors.map(async (contractor) => {
           const reviews = await storage.getContractorReviews(contractor.id);
+          const vendorRatings = await storage.getVendorRatings(contractor.id);
+          const allRatings = [
+            ...reviews.map(r => r.rating),
+            ...vendorRatings.map(r => r.overallRating),
+          ];
           let averageRating: number | null = null;
-          if (reviews.length > 0) {
-            const total = reviews.reduce((sum, r) => sum + r.rating, 0);
-            averageRating = Math.round((total / reviews.length) * 10) / 10;
+          if (allRatings.length > 0) {
+            const total = allRatings.reduce((sum, r) => sum + r, 0);
+            averageRating = Math.round((total / allRatings.length) * 10) / 10;
           }
-          return { ...contractor, averageRating, reviewCount: reviews.length };
+          return { ...contractor, averageRating, reviewCount: allRatings.length };
         })
       );
       res.json(contractorsWithRatings);
