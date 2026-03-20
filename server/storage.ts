@@ -3045,7 +3045,7 @@ export class DatabaseStorage implements IStorage {
   async getAllContractors(): Promise<Contractor[]> {
     try {
       const result = await db.execute(sql`
-        SELECT * FROM contractors ORDER BY name
+        SELECT * FROM contractors WHERE created_by_user_id IS NULL ORDER BY name
       `);
       return result.rows.map((row: any) => this.mapContractorRow(row));
     } catch (error) {
@@ -3072,7 +3072,7 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(sql`
         INSERT INTO contractors (
           name, category, phone, email, website, address, city, state, zip_code,
-          description, google_maps_url, yelp_url, bbb_url, agent_id, agent_rating, agent_notes, vendor_user_id
+          description, google_maps_url, yelp_url, bbb_url, agent_id, agent_rating, agent_notes, vendor_user_id, created_by_user_id
         ) VALUES (
           ${contractor.name}, ${contractor.category}, ${contractor.phone || null},
           ${contractor.email || null}, ${contractor.website || null}, ${contractor.address || null},
@@ -3080,7 +3080,7 @@ export class DatabaseStorage implements IStorage {
           ${contractor.description || null}, ${contractor.googleMapsUrl || null},
           ${contractor.yelpUrl || null}, ${contractor.bbbUrl || null},
           ${contractor.agentId}, ${contractor.agentRating || null}, ${contractor.agentNotes || null},
-          ${contractor.vendorUserId || null}
+          ${contractor.vendorUserId || null}, ${contractor.createdByUserId || null}
         )
         RETURNING *
       `);
@@ -3210,6 +3210,7 @@ export class DatabaseStorage implements IStorage {
       agentNotes: row.agent_notes ? String(row.agent_notes) : null,
       latitude: row.latitude ? Number(row.latitude) : null,
       longitude: row.longitude ? Number(row.longitude) : null,
+      createdByUserId: row.created_by_user_id ? Number(row.created_by_user_id) : null,
       createdAt: row.created_at ? new Date(row.created_at) : null,
       updatedAt: row.updated_at ? new Date(row.updated_at) : null
     };

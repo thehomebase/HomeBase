@@ -1904,6 +1904,9 @@ export function registerRoutes(app: Express): Server {
       if (!contractor) {
         return res.status(404).json({ error: 'Contractor not found' });
       }
+      if (contractor.createdByUserId && contractor.createdByUserId !== req.user.id) {
+        return res.status(404).json({ error: 'Contractor not found' });
+      }
       res.json(contractor);
     } catch (error) {
       console.error('Error fetching contractor:', error);
@@ -1935,6 +1938,7 @@ export function registerRoutes(app: Express): Server {
             agentNotes: null,
             latitude: null,
             longitude: null,
+            createdByUserId: req.user.id,
           };
       const parsed = insertContractorSchema.safeParse(safeBody);
       if (!parsed.success) {
@@ -1949,21 +1953,22 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.patch("/api/contractors/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
-      return res.sendStatus(401);
-    }
+    if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
       const contractor = await storage.getContractor(Number(req.params.id));
       if (!contractor) {
         return res.status(404).json({ error: 'Contractor not found' });
       }
-      if (contractor.agentId !== req.user.id) {
-        return res.status(403).json({ error: 'Not authorized to edit this contractor. Vendor-created profiles should be edited via the vendor portal.' });
+      const isPrivateOwner = contractor.createdByUserId && contractor.createdByUserId === req.user.id;
+      const isAgentOwner = (req.user.role === "agent" || req.user.role === "broker") && contractor.agentId === req.user.id;
+      if (!isPrivateOwner && !isAgentOwner) {
+        return res.status(403).json({ error: 'Not authorized to edit this contractor.' });
       }
       
-      const allowedFields = ['name', 'category', 'phone', 'email', 'website', 'address', 
-        'city', 'state', 'zipCode', 'description', 'googleMapsUrl', 'yelpUrl', 'bbbUrl', 'agentRating', 'agentNotes'];
+      const allowedFields = isPrivateOwner
+        ? ['name', 'category', 'phone', 'email', 'website', 'address', 'city', 'state', 'zipCode', 'description']
+        : ['name', 'category', 'phone', 'email', 'website', 'address', 'city', 'state', 'zipCode', 'description', 'googleMapsUrl', 'yelpUrl', 'bbbUrl', 'agentRating', 'agentNotes'];
       const sanitizedData: Record<string, any> = {};
       for (const field of allowedFields) {
         if (req.body[field] !== undefined) {
@@ -1980,16 +1985,16 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.delete("/api/contractors/:id", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
-      return res.sendStatus(401);
-    }
+    if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
       const contractor = await storage.getContractor(Number(req.params.id));
       if (!contractor) {
         return res.status(404).json({ error: 'Contractor not found' });
       }
-      if (contractor.agentId !== req.user.id) {
+      const isPrivateOwner = contractor.createdByUserId && contractor.createdByUserId === req.user.id;
+      const isAgentOwner = (req.user.role === "agent" || req.user.role === "broker") && contractor.agentId === req.user.id;
+      if (!isPrivateOwner && !isAgentOwner) {
         return res.status(403).json({ error: 'Not authorized to delete this contractor' });
       }
       await storage.deleteContractor(Number(req.params.id));

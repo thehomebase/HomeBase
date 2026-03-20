@@ -196,6 +196,7 @@ export const contractors = pgTable("contractors", {
   agentNotes: text("agent_notes"),
   latitude: doublePrecision("latitude"),
   longitude: doublePrecision("longitude"),
+  createdByUserId: integer("created_by_user_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 });
