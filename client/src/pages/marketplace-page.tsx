@@ -513,12 +513,15 @@ function ContractorDetail({
         {vendorRatings.length > 0 && (
           <div className="space-y-3 mt-4">
             <h4 className="font-medium text-sm text-muted-foreground">Agent Reviews ({vendorRatings.length})</h4>
-            {vendorRatings.map((rating) => (
+            {vendorRatings.map((rating: any) => (
               <Card key={rating.id}>
                 <CardContent className="pt-4">
                   <div className="flex justify-between items-start mb-1">
-                    {rating.title && <span className="font-medium text-sm">{rating.title}</span>}
-                    <div className="flex items-center gap-1">
+                    <div className="min-w-0">
+                      {rating.reviewerName && <p className="font-medium text-sm">{rating.reviewerName}</p>}
+                      {rating.title && <p className="text-sm">{rating.title}</p>}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
                       <StarRating rating={rating.overallRating} />
                       {rating.wouldRecommend && (
                         <Badge variant="outline" className="ml-2 text-xs text-green-600 border-green-200 bg-green-50">

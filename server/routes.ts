@@ -2169,7 +2169,13 @@ export function registerRoutes(app: Express): Server {
       if (isNaN(contractorId)) return res.status(400).json({ error: 'Invalid contractor ID' });
 
       const ratings = await storage.getVendorRatings(contractorId);
-      res.json(ratings);
+      const ratingsWithNames = await Promise.all(
+        ratings.map(async (rating) => {
+          const user = await storage.getUser(rating.agentId);
+          return { ...rating, reviewerName: user ? `${user.firstName} ${user.lastName}`.trim() || user.username : "Anonymous" };
+        })
+      );
+      res.json(ratingsWithNames);
     } catch (error) {
       console.error('Error fetching vendor ratings:', error);
       res.status(500).json({ error: 'Failed to fetch vendor ratings' });
