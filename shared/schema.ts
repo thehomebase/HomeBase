@@ -124,6 +124,7 @@ export const transactions = pgTable("transactions", {
   earnestMoney: integer("earnest_money"),
   downPayment: integer("down_payment"),
   sellerConcessions: integer("seller_concessions"),
+  listDate: timestamp("list_date"),
   closingDate: timestamp("closing_date"),
   contractExecutionDate: timestamp("contract_execution_date"),
   mlsNumber: text("mls_number"),

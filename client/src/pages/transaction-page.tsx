@@ -38,6 +38,7 @@ export default function TransactionPage() {
     status: "",
     type: "",
     contractPrice: "",
+    listDate: "",
     contractExecutionDate: "",
     optionPeriodExpiration: "",
     optionFee: "",
@@ -81,6 +82,7 @@ export default function TransactionPage() {
         status: transaction.status || "",
         type: transaction.type || "",
         contractPrice: transaction.contractPrice?.toString() || "",
+        listDate: formatDateForInput(transaction.listDate),
         contractExecutionDate: formatDateForInput(transaction.contractExecutionDate),
         optionPeriodExpiration: formatDateForInput(transaction.optionPeriodExpiration),
         optionFee: transaction.optionFee?.toString() || "",
@@ -237,6 +239,9 @@ export default function TransactionPage() {
     if (editForm.sellerConcessions) {
       updateData.sellerConcessions = parseInt(editForm.sellerConcessions);
     }
+    if (editForm.listDate) {
+      updateData.listDate = new Date(editForm.listDate).toISOString();
+    }
     if (editForm.contractExecutionDate) {
       updateData.contractExecutionDate = new Date(editForm.contractExecutionDate).toISOString();
     }
@@ -361,6 +366,19 @@ export default function TransactionPage() {
                     }).format(transaction.contractPrice)
                   : 'Not set'}
               </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">List Date</p>
+              <p className="text-base">
+                {transaction.listDate
+                  ? new Date(transaction.listDate).toLocaleDateString()
+                  : 'Not set'}
+              </p>
+              {transaction.listDate && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {Math.floor((Date.now() - new Date(transaction.listDate).getTime()) / (1000 * 60 * 60 * 24))} days on market
+                </p>
+              )}
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Contract Date</p>
@@ -667,6 +685,17 @@ export default function TransactionPage() {
                 onChange={(e) => setEditForm({ ...editForm, contractPrice: e.target.value })}
                 placeholder="Enter contract price"
                 data-testid="input-contract-price"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="listDate">List Date</Label>
+              <Input
+                id="listDate"
+                type="date"
+                value={editForm.listDate}
+                onChange={(e) => setEditForm({ ...editForm, listDate: e.target.value })}
+                data-testid="input-list-date"
               />
             </div>
 

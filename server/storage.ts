@@ -801,13 +801,12 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
         downPayment: row.down_payment ? Number(row.down_payment) : null,
         sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
+        listDate: row.list_date ? new Date(row.list_date) : null,
         closingDate: row.closing_date ? new Date(row.closing_date) : null,
         contractExecutionDate: row.contract_execution_date ? new Date(row.contract_execution_date) : null,
         mlsNumber: row.mls_number || null,
         financing: row.financing || null
       };
-
-      console.log('Returning transaction:', transaction);
       return transaction;
     } catch (error) {
       console.error('Error in createTransaction:', error);
@@ -842,6 +841,7 @@ export class DatabaseStorage implements IStorage {
           earnest_money as "earnestMoney",
           down_payment as "downPayment",
           seller_concessions as "sellerConcessions",
+          list_date as "listDate",
           closing_date as "closingDate",
           contract_execution_date as "contractExecutionDate",
           mls_number as "mlsNumber",
@@ -877,6 +877,7 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
         downPayment: row.downPayment ? Number(row.downPayment) : null,
         sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
+        listDate: row.listDate ? new Date(row.listDate) : null,
         closingDate: row.closingDate ? new Date(row.closingDate) : null,
         contractExecutionDate: row.contractExecutionDate ? new Date(row.contractExecutionDate) : null,
         mlsNumber: row.mlsNumber || null,
@@ -921,6 +922,7 @@ export class DatabaseStorage implements IStorage {
           t.earnest_money::numeric as "earnestMoney",
           t.down_payment::numeric as "downPayment",
           t.seller_concessions::numeric as "sellerConcessions",
+          t.list_date::timestamptz as "listDate",
           t.closing_date::timestamptz as "closingDate",
           t.contract_execution_date::timestamptz as "contractExecutionDate",
           t.mls_number as "mlsNumber",
@@ -956,6 +958,7 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnestMoney ? Number(row.earnestMoney) : null,
         downPayment: row.downPayment ? Number(row.downPayment) : null,
         sellerConcessions: row.sellerConcessions ? Number(row.sellerConcessions) : null,
+        listDate: row.listDate ? new Date(row.listDate) : null,
         closingDate: row.closingDate ? new Date(row.closingDate) : null,
         contractExecutionDate: row.contractExecutionDate ? new Date(row.contractExecutionDate) : null,
         mlsNumber: row.mlsNumber || null,
@@ -982,7 +985,7 @@ export class DatabaseStorage implements IStorage {
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 
           // Handle date fields consistently
-          if (['closing_date', 'contract_execution_date', 'option_period_expiration'].includes(snakeKey)) {
+          if (['list_date', 'closing_date', 'contract_execution_date', 'option_period_expiration'].includes(snakeKey)) {
             if (value) {
               const date = new Date(value);
               date.setUTCHours(12, 0, 0, 0);
@@ -1008,7 +1011,7 @@ export class DatabaseStorage implements IStorage {
         if (key === 'participants') {
           return sql`${sql.identifier([key])} = ${value}::jsonb`;
         }
-        if (['closing_date', 'contract_execution_date', 'option_period_expiration'].includes(key)) {
+        if (['list_date', 'closing_date', 'contract_execution_date', 'option_period_expiration'].includes(key)) {
           return sql`${sql.identifier([key])} = ${value}::timestamptz`;
         }
         return sql`${sql.identifier([key])} = ${value}`;
@@ -1041,6 +1044,7 @@ export class DatabaseStorage implements IStorage {
         earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
         downPayment: row.down_payment ? Number(row.down_payment) : null,
         sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
+        listDate: row.list_date ? new Date(row.list_date).toISOString() : null,
         closingDate: row.closing_date ? new Date(row.closing_date).toISOString() : null,
         contractExecutionDate: row.contract_execution_date ? new Date(row.contract_execution_date).toISOString() : null,
         optionPeriodExpiration: row.option_period_expiration ? new Date(row.option_period_expiration).toISOString() : null,
@@ -4055,6 +4059,7 @@ export class DatabaseStorage implements IStorage {
       earnestMoney: row.earnest_money ? Number(row.earnest_money) : null,
       downPayment: row.down_payment ? Number(row.down_payment) : null,
       sellerConcessions: row.seller_concessions ? Number(row.seller_concessions) : null,
+      listDate: row.list_date ? new Date(row.list_date) : null,
       closingDate: row.closing_date ? new Date(row.closing_date) : null,
       contractExecutionDate: row.contract_execution_date ? new Date(row.contract_execution_date) : null,
       mlsNumber: row.mls_number ? String(row.mls_number) : null,
