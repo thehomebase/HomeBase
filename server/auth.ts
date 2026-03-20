@@ -276,9 +276,10 @@ export function setupAuth(app: Express) {
       }
 
       let referralCodeRecord: any = null;
-      if (req.body.referralCode) {
-        referralCodeRecord = await storage.getReferralCodeByCode(req.body.referralCode);
-        if (!referralCodeRecord) {
+      const referralSource = req.body.referralCode || req.cookies?.hb_referral;
+      if (referralSource) {
+        referralCodeRecord = await storage.getReferralCodeByCode(referralSource);
+        if (req.body.referralCode && !referralCodeRecord) {
           return res.status(400).json({ error: "Invalid referral code" });
         }
       }
@@ -360,6 +361,9 @@ export function setupAuth(app: Express) {
           });
         } catch (creditError) {
           console.error('Error creating referral credits:', creditError);
+        }
+        if (req.cookies?.hb_referral) {
+          res.clearCookie('hb_referral', { path: '/' });
         }
       }
 

@@ -108,6 +108,7 @@ import LenderLeadSubmitPage from "@/pages/lender-lead-submit-page";
 import FindContractorPage from "@/pages/find-contractor-page";
 import VendorRatingsPage from "@/pages/vendor-ratings-page";
 import VendorSyncPage from "@/pages/vendor-sync-page";
+import VendorInvitePage from "@/pages/vendor-invite-page";
 import BiometricSettingsPage from "@/pages/biometric-settings-page";
 import SettingsPage from "@/pages/settings-page";
 import LandingPage from "@/pages/landing-page";
@@ -788,6 +789,7 @@ function Router() {
       <Route path="/top-agents" component={TopAgentsPage} />
       <Route path="/feedback/:token" component={FeedbackPage} />
       <Route path="/open-house/:slug" component={OpenHouseSignInPage} />
+      <Route path="/invite/:token" component={VendorInvitePage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/messages" component={MessagesPage} />

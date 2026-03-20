@@ -17,7 +17,7 @@ import {
   users, transactions, checklists, messages, clients, documents, contractors, contractorReviews,
   propertyViewings, propertyFeedback, showingRequests, savedProperties, communications, smsOptOuts,
   emailSnippets, emailTracking, inspectionItems, bidRequests, bids,
-  homeTeamMembers, homeownerHomes, homeMaintenanceRecords, referralCodes, referralCredits,
+  homeTeamMembers, homeownerHomes, homeMaintenanceRecords, referralCodes, vendorInviteTokens, referralCredits,
   dripCampaigns, dripSteps, dripEnrollments, clientSpecialDates,
   type User, type Transaction, type Checklist, type Message, type Client, type Document,
   type Contractor, type ContractorReview, type PropertyViewing, type PropertyFeedback,
@@ -33,6 +33,7 @@ import {
   type HomeownerHome, type InsertHomeownerHome,
   type MaintenanceRecord, type InsertMaintenanceRecord,
   type ReferralCode, type InsertReferralCode,
+  type VendorInviteToken, type InsertVendorInviteToken,
   type ReferralCredit, type InsertReferralCredit,
   type DripCampaign, type InsertDripCampaign,
   type DripStep, type InsertDripStep,
@@ -277,6 +278,8 @@ export interface IStorage {
   createReferralCode(data: InsertReferralCode): Promise<ReferralCode>;
   getReferralCodeByAgent(agentUserId: number): Promise<ReferralCode | undefined>;
   getReferralCodeByCode(code: string): Promise<ReferralCode | undefined>;
+  createVendorInviteToken(data: InsertVendorInviteToken): Promise<VendorInviteToken>;
+  getVendorInviteTokenByToken(token: string): Promise<VendorInviteToken | undefined>;
   createReferralCredit(data: InsertReferralCredit): Promise<ReferralCredit>;
   getReferralCreditsByUser(userId: number): Promise<ReferralCredit[]>;
   getReferralCreditsByReferralCode(referralCodeId: number): Promise<ReferralCredit[]>;
@@ -4572,6 +4575,23 @@ export class DatabaseStorage implements IStorage {
     if (!result.rows?.length) return undefined;
     const row = result.rows[0] as any;
     return { id: row.id, agentUserId: row.agent_user_id, code: row.code, createdAt: row.created_at };
+  }
+
+  async createVendorInviteToken(data: InsertVendorInviteToken): Promise<VendorInviteToken> {
+    const result = await db.execute(sql`
+      INSERT INTO vendor_invite_tokens (token, invited_by_user_id, referral_code_id, contractor_id, contractor_name)
+      VALUES (${data.token}, ${data.invitedByUserId}, ${data.referralCodeId || null}, ${data.contractorId || null}, ${data.contractorName || null})
+      RETURNING *
+    `);
+    const row = result.rows[0] as any;
+    return { id: row.id, token: row.token, invitedByUserId: row.invited_by_user_id, referralCodeId: row.referral_code_id, contractorId: row.contractor_id, contractorName: row.contractor_name, createdAt: row.created_at };
+  }
+
+  async getVendorInviteTokenByToken(token: string): Promise<VendorInviteToken | undefined> {
+    const result = await db.execute(sql`SELECT * FROM vendor_invite_tokens WHERE token = ${token} LIMIT 1`);
+    if (!result.rows?.length) return undefined;
+    const row = result.rows[0] as any;
+    return { id: row.id, token: row.token, invitedByUserId: row.invited_by_user_id, referralCodeId: row.referral_code_id, contractorId: row.contractor_id, contractorName: row.contractor_name, createdAt: row.created_at };
   }
 
   async createReferralCredit(data: InsertReferralCredit): Promise<ReferralCredit> {

@@ -9093,6 +9093,79 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // ==================== Vendor Invite Routes ====================
+
+  app.post("/api/vendor-invite", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { contractorId } = req.body;
+      let contractor = null;
+      if (contractorId) {
+        contractor = await storage.getContractor(contractorId);
+      }
+
+      let referralCodeId: number | null = null;
+      const isAgentOrBroker = req.user.role === "agent" || req.user.role === "broker";
+      if (isAgentOrBroker) {
+        let referralCode = await storage.getReferralCodeByAgent(req.user.id);
+        if (!referralCode) {
+          const code = `HB-${req.user.id}-${randomUUID().slice(0, 8).toUpperCase()}`;
+          referralCode = await storage.createReferralCode({
+            agentUserId: req.user.id,
+            code,
+          });
+        }
+        referralCodeId = referralCode.id;
+      }
+
+      const token = randomUUID().replace(/-/g, '').slice(0, 12);
+      const invite = await storage.createVendorInviteToken({
+        token,
+        invitedByUserId: req.user.id,
+        referralCodeId,
+        contractorId: contractor?.id || null,
+        contractorName: contractor?.name || req.body.contractorName || null,
+      });
+
+      res.status(201).json({ token: invite.token });
+    } catch (error) {
+      console.error('Error creating vendor invite:', error);
+      res.status(500).json({ error: 'Failed to create invite' });
+    }
+  });
+
+  app.get("/api/vendor-invite/:token", async (req, res) => {
+    try {
+      const invite = await storage.getVendorInviteTokenByToken(req.params.token);
+      if (!invite) {
+        return res.status(404).json({ error: 'Invalid invite link' });
+      }
+
+      if (invite.referralCodeId) {
+        const referralCode = await storage.getReferralCodeByAgent(invite.invitedByUserId);
+        if (referralCode) {
+          res.cookie('hb_referral', referralCode.code, {
+            maxAge: 30 * 24 * 60 * 60 * 1000,
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+            path: '/',
+          });
+        }
+      }
+
+      const inviter = await storage.getUser(invite.invitedByUserId);
+      res.json({
+        contractorName: invite.contractorName,
+        invitedBy: inviter ? `${inviter.firstName} ${inviter.lastName}` : null,
+        hasReferral: !!invite.referralCodeId,
+      });
+    } catch (error) {
+      console.error('Error resolving vendor invite:', error);
+      res.status(500).json({ error: 'Failed to resolve invite' });
+    }
+  });
+
   // ==================== MyHomeTeam Routes ====================
 
   app.post("/api/my-team", async (req, res) => {

@@ -728,6 +728,16 @@ export const referralCodes = pgTable("referral_codes", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const vendorInviteTokens = pgTable("vendor_invite_tokens", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  invitedByUserId: integer("invited_by_user_id").notNull(),
+  referralCodeId: integer("referral_code_id"),
+  contractorId: integer("contractor_id"),
+  contractorName: text("contractor_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const referralCredits = pgTable("referral_credits", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
@@ -929,6 +939,10 @@ export const insertReferralCodeSchema = createInsertSchema(referralCodes).omit({
   id: true,
   createdAt: true,
 });
+export const insertVendorInviteTokenSchema = createInsertSchema(vendorInviteTokens).omit({
+  id: true,
+  createdAt: true,
+});
 export const insertReferralCreditSchema = createInsertSchema(referralCredits).omit({
   id: true,
   createdAt: true,
@@ -993,6 +1007,8 @@ export type HomeImprovement = typeof homeImprovements.$inferSelect;
 export type InsertHomeImprovement = z.infer<typeof insertHomeImprovementSchema>;
 export type ReferralCode = typeof referralCodes.$inferSelect;
 export type InsertReferralCode = z.infer<typeof insertReferralCodeSchema>;
+export type VendorInviteToken = typeof vendorInviteTokens.$inferSelect;
+export type InsertVendorInviteToken = z.infer<typeof insertVendorInviteTokenSchema>;
 export type ReferralCredit = typeof referralCredits.$inferSelect;
 export type InsertReferralCredit = z.infer<typeof insertReferralCreditSchema>;
 export type DripCampaign = typeof dripCampaigns.$inferSelect;

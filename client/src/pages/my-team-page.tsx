@@ -13,6 +13,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +55,10 @@ import {
   Smartphone,
   PhoneOutgoing,
   X,
+  Plus,
+  Send,
+  Copy,
+  Check,
 } from "lucide-react";
 import type { Contractor, HomeTeamMember } from "@shared/schema";
 
@@ -77,6 +88,26 @@ const CATEGORY_ICONS: Record<string, any> = {
   inspector: Search,
   other: Wrench,
 };
+
+const VENDOR_CATEGORIES = [
+  { value: "home_inspector", label: "Home Inspector" },
+  { value: "roofer", label: "Roofer" },
+  { value: "plumber", label: "Plumber" },
+  { value: "electrician", label: "Electrician" },
+  { value: "hvac", label: "HVAC" },
+  { value: "painter", label: "Painter" },
+  { value: "landscaper", label: "Landscaper" },
+  { value: "handyman", label: "Handyman" },
+  { value: "mover", label: "Mover" },
+  { value: "cleaner", label: "Cleaner" },
+  { value: "pest_control", label: "Pest Control" },
+  { value: "title_company", label: "Title Company" },
+  { value: "mortgage_lender", label: "Mortgage Lender" },
+  { value: "appraiser", label: "Appraiser" },
+  { value: "photographer", label: "Photographer" },
+  { value: "stager", label: "Stager" },
+  { value: "other", label: "Other" },
+];
 
 function formatCategoryName(category: string): string {
   return category
@@ -305,12 +336,105 @@ function ContactActions({ contractor, onRemove, isRemoving }: { contractor: Cont
   );
 }
 
+function InviteToHomebaseButton({ contractor }: { contractor: Contractor }) {
+  const { toast } = useToast();
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const inviteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/vendor-invite", {
+        contractorId: contractor.id,
+        contractorName: contractor.name,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const baseUrl = window.location.origin;
+      setInviteLink(`${baseUrl}/invite/${data.token}`);
+      setShowInviteDialog(true);
+    },
+    onError: () => toast({ title: "Failed to generate invite", variant: "destructive" }),
+  });
+
+  const handleCopy = async () => {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      toast({ title: "Link copied!" });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: "Failed to copy", variant: "destructive" });
+    }
+  };
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full gap-1.5 text-xs mt-2 border-primary/30 text-primary hover:bg-primary/5"
+        onClick={() => inviteMutation.mutate()}
+        disabled={inviteMutation.isPending}
+      >
+        {inviteMutation.isPending ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <Send className="h-3 w-3" />
+        )}
+        Invite to HomeBase
+      </Button>
+
+      <Dialog open={showInviteDialog} onOpenChange={(o) => { if (!o) { setShowInviteDialog(false); setInviteLink(null); setCopied(false); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Invite {contractor.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Share this link with {contractor.name} so they can create their vendor profile on HomeBase.
+            </p>
+            {inviteLink && (
+              <div className="flex gap-2">
+                <Input value={inviteLink} readOnly className="text-xs" />
+                <Button size="sm" variant="outline" onClick={handleCopy}>
+                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+            )}
+            <div className="flex gap-2">
+              {contractor.phone && (
+                <a href={`sms:${contractor.phone}?body=${encodeURIComponent(`Hey ${contractor.name}! I'd love for you to join HomeBase so I can easily connect with you for future projects. Sign up here: ${inviteLink}`)}`} className="flex-1">
+                  <Button variant="outline" size="sm" className="w-full gap-1.5">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    Text
+                  </Button>
+                </a>
+              )}
+              {contractor.email && (
+                <a href={`mailto:${contractor.email}?subject=${encodeURIComponent("Join me on HomeBase!")}&body=${encodeURIComponent(`Hi ${contractor.name},\n\nI'd like to invite you to join HomeBase, a platform that connects service professionals with homeowners and real estate agents.\n\nSign up here: ${inviteLink}\n\nLooking forward to working with you!`)}`} className="flex-1">
+                  <Button variant="outline" size="sm" className="w-full gap-1.5">
+                    <Mail className="h-3.5 w-3.5" />
+                    Email
+                  </Button>
+                </a>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function TeamMemberCard({ member, onRemove, isRemoving }: { member: TeamMemberWithContractor; onRemove: () => void; isRemoving: boolean }) {
   const c = member.contractor;
   const name = c?.name || "Unknown";
-  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
   const profileLink = c?.vendorUserId ? `/profile/${c.vendorUserId}` : null;
+  const isPrivate = c && !c.vendorUserId;
 
   const photo = member.vendorProfilePhoto;
   const photoEl = (
@@ -377,7 +501,124 @@ function TeamMemberCard({ member, onRemove, isRemoving }: { member: TeamMemberWi
           </Button>
         </a>
       )}
+      {isPrivate && c && (
+        <InviteToHomebaseButton contractor={c} />
+      )}
     </div>
+  );
+}
+
+function AddVendorDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const contractorRes = await apiRequest("POST", "/api/contractors", {
+        name,
+        category: category || "other",
+        phone: phone || null,
+        email: email || null,
+      });
+      const contractor = await contractorRes.json();
+
+      await apiRequest("POST", "/api/my-team", {
+        contractorId: contractor.id,
+        category: category || "other",
+        notes: notes || null,
+      });
+      return contractor;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/my-team"] });
+      toast({ title: "Added to team", description: `${name} has been added to your team.` });
+      setName("");
+      setCategory("");
+      setPhone("");
+      setEmail("");
+      setNotes("");
+      onOpenChange(false);
+    },
+    onError: () => toast({ title: "Failed to add vendor", variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Add a Vendor</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-sm">Name *</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Business or contact name"
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label className="text-sm">Category</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {VENDOR_CATEGORIES.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-sm">Phone</Label>
+            <Input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="(555) 123-4567"
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label className="text-sm">Email</Label>
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="vendor@email.com"
+              type="email"
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label className="text-sm">Notes</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Personal notes about this vendor..."
+              rows={2}
+              className="mt-1"
+            />
+          </div>
+          <Button
+            className="w-full"
+            onClick={() => createMutation.mutate()}
+            disabled={!name.trim() || createMutation.isPending}
+          >
+            {createMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Plus className="h-4 w-4 mr-2" />
+            )}
+            Add to My Team
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -385,6 +626,7 @@ export default function MyTeamPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [showAddVendor, setShowAddVendor] = useState(false);
 
   const { data: teamMembers, isLoading } = useQuery<TeamMemberWithContractor[]>({
     queryKey: ["/api/my-team"],
@@ -485,14 +727,20 @@ export default function MyTeamPage() {
           </div>
           <h3 className="text-lg font-semibold mb-2">No team members yet</h3>
           <p className="text-muted-foreground mb-6 max-w-md text-sm">
-            Build your home team by browsing our marketplace and adding your preferred contractors for each service category.
+            Build your home team by adding your own vendors or browsing our marketplace.
           </p>
-          <Link href="/marketplace">
-            <Button>
-              <ShoppingBag className="h-4 w-4 mr-2" />
-              Browse Pros
+          <div className="flex gap-3">
+            <Button onClick={() => setShowAddVendor(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Vendor
             </Button>
-          </Link>
+            <Link href="/marketplace">
+              <Button variant="outline">
+                <ShoppingBag className="h-4 w-4 mr-2" />
+                Browse Pros
+              </Button>
+            </Link>
+          </div>
         </div>
       ) : (
         <>
@@ -507,16 +755,22 @@ export default function MyTeamPage() {
             ))}
           </div>
 
-          <div className="flex justify-center mt-12">
+          <div className="flex justify-center gap-3 mt-12">
+            <Button onClick={() => setShowAddVendor(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add Vendor
+            </Button>
             <Link href="/marketplace">
               <Button variant="outline" className="gap-2">
                 <ShoppingBag className="h-4 w-4" />
-                Add More Pros
+                Browse Pros
               </Button>
             </Link>
           </div>
         </>
       )}
+
+      <AddVendorDialog open={showAddVendor} onOpenChange={setShowAddVendor} />
     </div>
   );
 }
