@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,8 @@ import {
   Bug, Waves, Sparkles, Wifi, TreePine, Shield, MoreHorizontal,
   Bell, Clock, CheckCircle2, AlertTriangle, TrendingUp, RefreshCw,
   PiggyBank, Percent, ArrowUpRight, HelpCircle, Hammer, PaintBucket,
-  Thermometer, Package, FolderOpen
+  Thermometer, Package, FolderOpen, ScanLine, Camera, Loader2,
+  UserPlus, Check, X
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -148,7 +149,7 @@ function ExpenseDialog({ open, onOpenChange, homeId, expense }: { open: boolean;
   const { toast } = useToast();
   const [form, setForm] = useState({ category: "", description: "", amount: "", billingDate: "", isRecurring: true, frequency: "monthly", provider: "", notes: "" });
   useEffect(() => { if (open) { setForm({ category: expense?.category || "", description: expense?.description || "", amount: expense?.amount?.toString() || "", billingDate: expense?.billingDate || "", isRecurring: expense?.isRecurring ?? true, frequency: expense?.frequency || "monthly", provider: expense?.provider || "", notes: expense?.notes || "" }); } }, [open, expense]);
-  const isEditing = !!expense;
+  const isEditing = !!(expense && 'id' in expense && expense.id);
   const mutation = useMutation({
     mutationFn: async (data: any) => { const res = isEditing ? await apiRequest("PATCH", `/api/expenses/${expense!.id}`, data) : await apiRequest("POST", `/api/my-homes/${homeId}/expenses`, data); return res.json(); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "expenses"] }); toast({ title: isEditing ? "Expense updated" : "Expense added" }); onOpenChange(false); },
@@ -203,7 +204,7 @@ function MaintenanceDialog({ open, onOpenChange, homeId, record }: { open: boole
   const { toast } = useToast();
   const [form, setForm] = useState({ category: "", description: "", serviceDate: "", cost: "", notes: "", contractorId: null as number | null });
   useEffect(() => { if (open) { setForm({ category: record?.category || "", description: record?.description || "", serviceDate: record?.serviceDate || "", cost: record?.cost?.toString() || "", notes: record?.notes || "", contractorId: record?.contractorId || null }); } }, [open, record]);
-  const isEditing = !!record;
+  const isEditing = !!(record && 'id' in record && record.id);
   const mutation = useMutation({
     mutationFn: async (data: any) => { const res = isEditing ? await apiRequest("PATCH", `/api/maintenance/${record!.id}`, data) : await apiRequest("POST", `/api/my-homes/${homeId}/maintenance`, data); return res.json(); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId] }); queryClient.invalidateQueries({ queryKey: ["/api/my-homes"] }); toast({ title: isEditing ? "Record updated" : "Maintenance record added" }); onOpenChange(false); },
@@ -297,7 +298,7 @@ function WarrantyDialog({ open, onOpenChange, homeId, item }: { open: boolean; o
   const { toast } = useToast();
   const [form, setForm] = useState({ itemName: "", brand: "", model: "", warrantyProvider: "", coverageDetails: "", purchaseDate: "", expirationDate: "", notes: "" });
   useEffect(() => { if (open) { setForm({ itemName: item?.itemName || "", brand: item?.brand || "", model: item?.model || "", warrantyProvider: item?.warrantyProvider || "", coverageDetails: item?.coverageDetails || "", purchaseDate: item?.purchaseDate || "", expirationDate: item?.expirationDate || "", notes: item?.notes || "" }); } }, [open, item]);
-  const isEditing = !!item;
+  const isEditing = !!(item && 'id' in item && item.id);
   const mutation = useMutation({
     mutationFn: async (data: any) => { const res = isEditing ? await apiRequest("PATCH", `/api/warranty/${item!.id}`, data) : await apiRequest("POST", `/api/my-homes/${homeId}/warranty`, data); return res.json(); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "warranty"] }); toast({ title: isEditing ? "Warranty updated" : "Warranty added" }); onOpenChange(false); },
@@ -334,7 +335,7 @@ function ImprovementDialog({ open, onOpenChange, homeId, item }: { open: boolean
   const { toast } = useToast();
   const [form, setForm] = useState({ projectName: "", description: "", category: "", cost: "", startDate: "", completionDate: "", materials: "", notes: "" });
   useEffect(() => { if (open) { setForm({ projectName: item?.projectName || "", description: item?.description || "", category: item?.category || "", cost: item?.cost?.toString() || "", startDate: item?.startDate || "", completionDate: item?.completionDate || "", materials: item?.materials || "", notes: item?.notes || "" }); } }, [open, item]);
-  const isEditing = !!item;
+  const isEditing = !!(item && 'id' in item && item.id);
   const mutation = useMutation({
     mutationFn: async (data: any) => { const res = isEditing ? await apiRequest("PATCH", `/api/improvements/${item!.id}`, data) : await apiRequest("POST", `/api/my-homes/${homeId}/improvements`, data); return res.json(); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "improvements"] }); toast({ title: isEditing ? "Project updated" : "Project added" }); onOpenChange(false); },
@@ -426,11 +427,199 @@ function EquitySetupDialog({ open, onOpenChange, homeId, profile }: { open: bool
   );
 }
 
-function ExpensesTab({ homeId }: { homeId: number }) {
+type ScanResult = {
+  documentType: string;
+  suggestedCategory: string;
+  vendor: { name: string; phone: string | null; email: string | null; website: string | null; address: string | null; category: string | null } | null;
+  amount: number | null;
+  date: string | null;
+  description: string | null;
+  lineItems: { description: string; amount: number }[] | null;
+  expenseCategory: string | null;
+  isRecurring: boolean;
+  billingPeriod: string | null;
+  accountNumber: string | null;
+  itemName: string | null;
+  brand: string | null;
+  model: string | null;
+  warrantyProvider: string | null;
+  expirationDate: string | null;
+  coverageDetails: string | null;
+  serviceCategory: string | null;
+  recommendation: string | null;
+  projectCategory: string | null;
+  materials: string | null;
+};
+
+function ScanReceiptDialog({ open, onOpenChange, homeId, onResult, targetTab }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  homeId: number;
+  onResult: (result: ScanResult) => void;
+  targetTab?: string;
+}) {
+  const { toast } = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [scanning, setScanning] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  const handleFile = useCallback(async (file: File) => {
+    const validTypes = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"];
+    if (!validTypes.some(t => file.type.startsWith(t.split("/")[0]) || file.type === t)) {
+      toast({ title: "Unsupported file type", description: "Please upload a PDF, photo, or image file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum file size is 20MB", variant: "destructive" });
+      return;
+    }
+
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setPreview(url);
+    } else {
+      setPreview(null);
+    }
+
+    setScanning(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/my-homes/${homeId}/scan-receipt`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Scan failed");
+      const result: ScanResult = await res.json();
+      toast({ title: "Document scanned successfully", description: `Detected: ${result.documentType.replace(/_/g, " ")}${result.vendor?.name ? ` from ${result.vendor.name}` : ""}` });
+      onResult(result);
+      onOpenChange(false);
+    } catch (error) {
+      toast({ title: "Failed to scan document", description: "Please try again or enter details manually", variant: "destructive" });
+    } finally {
+      setScanning(false);
+      if (preview) URL.revokeObjectURL(preview);
+      setPreview(null);
+    }
+  }, [homeId, toast, onResult, onOpenChange, preview]);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!scanning) { onOpenChange(v); setPreview(null); } }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><ScanLine className="h-5 w-5 text-primary" />Scan Document</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">Upload a photo or PDF of a receipt, invoice, utility bill, warranty card, or service record. AI will extract the details automatically.</p>
+
+        {scanning ? (
+          <div className="flex flex-col items-center py-8 gap-3">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-sm font-medium">Analyzing document...</p>
+            <p className="text-xs text-muted-foreground">This usually takes a few seconds</p>
+            {preview && <img src={preview} alt="Preview" className="mt-2 max-h-32 rounded-lg border object-contain" />}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <input ref={fileRef} type="file" accept="image/*,application/pdf" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" className="h-24 flex-col gap-2" onClick={() => { if (fileRef.current) { fileRef.current.setAttribute("capture", "environment"); fileRef.current.click(); } }}>
+                <Camera className="h-8 w-8 text-muted-foreground" />
+                <span className="text-xs">Take Photo</span>
+              </Button>
+              <Button variant="outline" className="h-24 flex-col gap-2" onClick={() => { if (fileRef.current) { fileRef.current.removeAttribute("capture"); fileRef.current.click(); } }}>
+                <FileText className="h-8 w-8 text-muted-foreground" />
+                <span className="text-xs">Upload File</span>
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground text-center">Supports PDF, JPG, PNG, WebP · Max 20MB</p>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AddVendorToTeamPrompt({ vendor, onDismiss }: { vendor: ScanResult["vendor"]; onDismiss: () => void }) {
+  const { toast } = useToast();
+  const [adding, setAdding] = useState(false);
+
+  if (!vendor || !vendor.name) return null;
+
+  const handleAdd = async () => {
+    setAdding(true);
+    try {
+      const res = await apiRequest("POST", "/api/my-team", {
+        contractorId: 0,
+        category: vendor.category || "other",
+        notes: `Added from scanned document. ${vendor.phone ? `Phone: ${vendor.phone}` : ""} ${vendor.email ? `Email: ${vendor.email}` : ""} ${vendor.website ? `Website: ${vendor.website}` : ""}`.trim(),
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ["/api/my-team"] });
+        toast({ title: `${vendor.name} noted`, description: "Check the HomeBase Pros marketplace to find and add verified vendors to your team." });
+      } else {
+        toast({ title: "Could not add to team directly", description: "Search for this vendor in the HomeBase Pros marketplace to add them to your team." });
+      }
+    } catch {
+      toast({ title: "Search in marketplace", description: `Look for "${vendor.name}" in HomeBase Pros to add them to your team.` });
+    }
+    setAdding(false);
+    onDismiss();
+  };
+
+  return (
+    <Card className="border-primary/30 bg-primary/5">
+      <CardContent className="p-3">
+        <div className="flex items-start gap-3">
+          <UserPlus className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Add {vendor.name} to your team?</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {[vendor.phone, vendor.email, vendor.category?.replace(/_/g, " ")].filter(Boolean).join(" · ")}
+            </p>
+            <div className="flex gap-2 mt-2">
+              <Link href={`/marketplace?search=${encodeURIComponent(vendor.name)}`}>
+                <Button size="sm" variant="default" className="h-7 text-xs"><Search className="h-3 w-3 mr-1" />Find in Marketplace</Button>
+              </Link>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onDismiss}><X className="h-3 w-3 mr-1" />Dismiss</Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ExpensesTab({ homeId, pendingScan, onScanConsumed }: { homeId: number; pendingScan?: ScanResult | null; onScanConsumed?: () => void }) {
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<HomeExpense | null>(null);
+  const [showScan, setShowScan] = useState(false);
+  const [scannedVendor, setScannedVendor] = useState<ScanResult["vendor"] | null>(null);
   const { data: expenses = [], isLoading } = useQuery<HomeExpense[]>({ queryKey: ["/api/my-homes", homeId, "expenses"], queryFn: async () => { const r = await fetch(`/api/my-homes/${homeId}/expenses`, { credentials: "include" }); return r.json(); } });
   const deleteMutation = useMutation({ mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/expenses/${id}`); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "expenses"] }); } });
+
+  useEffect(() => {
+    if (pendingScan) {
+      handleScanResult(pendingScan);
+      onScanConsumed?.();
+    }
+  }, [pendingScan]);
+
+  const handleScanResult = useCallback((result: ScanResult) => {
+    const prefilled: any = {
+      category: result.expenseCategory || "",
+      description: result.description || "",
+      amount: result.amount?.toString() || "",
+      billingDate: result.date || "",
+      isRecurring: result.isRecurring,
+      frequency: "monthly",
+      provider: result.vendor?.name || "",
+      notes: result.recommendation || "",
+    };
+    setEditing(prefilled as any);
+    setShowDialog(true);
+    if (result.vendor?.name) setScannedVendor(result.vendor);
+  }, []);
 
   const monthlyTotal = useMemo(() => expenses.filter(e => e.isRecurring && e.frequency === 'monthly').reduce((s, e) => s + (e.amount || 0), 0), [expenses]);
   const categoryTotals = useMemo(() => {
@@ -443,9 +632,12 @@ function ExpensesTab({ homeId }: { homeId: number }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-lg font-semibold flex items-center gap-2"><DollarSign className="h-5 w-5 text-primary" />Home Expenses</h3>
-        <Button size="sm" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add Expense</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowScan(true)}><ScanLine className="h-4 w-4 mr-1" />Scan</Button>
+          <Button size="sm" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add Expense</Button>
+        </div>
       </div>
 
       {expenses.length > 0 && (
@@ -494,7 +686,9 @@ function ExpensesTab({ homeId }: { homeId: number }) {
           })}
         </div>
       )}
+      {scannedVendor && <AddVendorToTeamPrompt vendor={scannedVendor} onDismiss={() => setScannedVendor(null)} />}
       <ExpenseDialog open={showDialog} onOpenChange={setShowDialog} homeId={homeId} expense={editing} />
+      <ScanReceiptDialog open={showScan} onOpenChange={setShowScan} homeId={homeId} onResult={handleScanResult} targetTab="expenses" />
     </div>
   );
 }
@@ -895,11 +1089,36 @@ function EquityTab({ homeId, home }: { homeId: number; home: HomeownerHome }) {
   );
 }
 
-function WarrantyTab({ homeId }: { homeId: number }) {
+function WarrantyTab({ homeId, pendingScan, onScanConsumed }: { homeId: number; pendingScan?: ScanResult | null; onScanConsumed?: () => void }) {
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<HomeWarrantyItem | null>(null);
+  const [showScan, setShowScan] = useState(false);
+  const [scannedVendor, setScannedVendor] = useState<ScanResult["vendor"] | null>(null);
   const { data: items = [], isLoading } = useQuery<HomeWarrantyItem[]>({ queryKey: ["/api/my-homes", homeId, "warranty"], queryFn: async () => { const r = await fetch(`/api/my-homes/${homeId}/warranty`, { credentials: "include" }); return r.json(); } });
   const deleteMutation = useMutation({ mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/warranty/${id}`); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "warranty"] }); } });
+
+  useEffect(() => {
+    if (pendingScan) {
+      handleScanResult(pendingScan);
+      onScanConsumed?.();
+    }
+  }, [pendingScan]);
+
+  const handleScanResult = useCallback((result: ScanResult) => {
+    const prefilled: any = {
+      itemName: result.itemName || result.description || "",
+      brand: result.brand || "",
+      model: result.model || "",
+      warrantyProvider: result.warrantyProvider || result.vendor?.name || "",
+      coverageDetails: result.coverageDetails || "",
+      purchaseDate: result.date || "",
+      expirationDate: result.expirationDate || "",
+      notes: "",
+    };
+    setEditing(prefilled as any);
+    setShowDialog(true);
+    if (result.vendor?.name) setScannedVendor(result.vendor);
+  }, []);
 
   const expiringSoon = items.filter(i => { if (!i.expirationDate) return false; const d = new Date(i.expirationDate); const diff = (d.getTime() - Date.now()) / (1000 * 60 * 60 * 24); return diff > 0 && diff <= 90; });
   const expired = items.filter(i => i.expirationDate && new Date(i.expirationDate) < new Date());
@@ -908,9 +1127,12 @@ function WarrantyTab({ homeId }: { homeId: number }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-lg font-semibold flex items-center gap-2"><Shield className="h-5 w-5 text-primary" />Warranty Tracker</h3>
-        <Button size="sm" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add Warranty</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowScan(true)}><ScanLine className="h-4 w-4 mr-1" />Scan</Button>
+          <Button size="sm" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add Warranty</Button>
+        </div>
       </div>
 
       {expiringSoon.length > 0 && (
@@ -953,16 +1175,43 @@ function WarrantyTab({ homeId }: { homeId: number }) {
           })}
         </div>
       )}
+      {scannedVendor && <AddVendorToTeamPrompt vendor={scannedVendor} onDismiss={() => setScannedVendor(null)} />}
       <WarrantyDialog open={showDialog} onOpenChange={setShowDialog} homeId={homeId} item={editing} />
+      <ScanReceiptDialog open={showScan} onOpenChange={setShowScan} homeId={homeId} onResult={handleScanResult} targetTab="warranty" />
     </div>
   );
 }
 
-function ImprovementsTab({ homeId }: { homeId: number }) {
+function ImprovementsTab({ homeId, pendingScan, onScanConsumed }: { homeId: number; pendingScan?: ScanResult | null; onScanConsumed?: () => void }) {
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<HomeImprovement | null>(null);
+  const [showScan, setShowScan] = useState(false);
+  const [scannedVendor, setScannedVendor] = useState<ScanResult["vendor"] | null>(null);
   const { data: items = [], isLoading } = useQuery<HomeImprovement[]>({ queryKey: ["/api/my-homes", homeId, "improvements"], queryFn: async () => { const r = await fetch(`/api/my-homes/${homeId}/improvements`, { credentials: "include" }); return r.json(); } });
   const deleteMutation = useMutation({ mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/improvements/${id}`); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/my-homes", homeId, "improvements"] }); } });
+
+  useEffect(() => {
+    if (pendingScan) {
+      handleScanResult(pendingScan);
+      onScanConsumed?.();
+    }
+  }, [pendingScan]);
+
+  const handleScanResult = useCallback((result: ScanResult) => {
+    const prefilled: any = {
+      projectName: result.description || "",
+      description: result.recommendation || "",
+      category: result.projectCategory || "",
+      cost: result.amount?.toString() || "",
+      startDate: result.date || "",
+      completionDate: "",
+      materials: result.materials || "",
+      notes: result.vendor?.name ? `Contractor: ${result.vendor.name}` : "",
+    };
+    setEditing(prefilled as any);
+    setShowDialog(true);
+    if (result.vendor?.name) setScannedVendor(result.vendor);
+  }, []);
 
   const totalSpent = useMemo(() => items.reduce((s, i) => s + (i.cost || 0), 0), [items]);
 
@@ -970,9 +1219,12 @@ function ImprovementsTab({ homeId }: { homeId: number }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-lg font-semibold flex items-center gap-2"><Hammer className="h-5 w-5 text-primary" />Home Improvements</h3>
-        <Button size="sm" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add Project</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowScan(true)}><ScanLine className="h-4 w-4 mr-1" />Scan</Button>
+          <Button size="sm" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="h-4 w-4 mr-1" />Add Project</Button>
+        </div>
       </div>
 
       {items.length > 0 && (
@@ -1015,7 +1267,9 @@ function ImprovementsTab({ homeId }: { homeId: number }) {
           ))}
         </div>
       )}
+      {scannedVendor && <AddVendorToTeamPrompt vendor={scannedVendor} onDismiss={() => setScannedVendor(null)} />}
       <ImprovementDialog open={showDialog} onOpenChange={setShowDialog} homeId={homeId} item={editing} />
+      <ScanReceiptDialog open={showScan} onOpenChange={setShowScan} homeId={homeId} onResult={handleScanResult} targetTab="improvements" />
     </div>
   );
 }
@@ -1060,6 +1314,35 @@ function HomeDetail({ homeId }: { homeId: number }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MaintenanceRecord | null>(null);
+  const [showScan, setShowScan] = useState(false);
+  const [scannedVendor, setScannedVendor] = useState<ScanResult["vendor"] | null>(null);
+  const [pendingScanResult, setPendingScanResult] = useState<ScanResult | null>(null);
+
+  const handleScanResult = useCallback((result: ScanResult) => {
+    const cat = result.suggestedCategory;
+    if (cat === "expense") {
+      setPendingScanResult(result);
+      setActiveTab("expenses");
+    } else if (cat === "warranty") {
+      setPendingScanResult(result);
+      setActiveTab("warranty");
+    } else if (cat === "improvement") {
+      setPendingScanResult(result);
+      setActiveTab("improvements");
+    } else {
+      const prefilled: any = {
+        category: result.serviceCategory || "",
+        description: result.description || "",
+        serviceDate: result.date || "",
+        cost: result.amount?.toString() || "",
+        notes: result.recommendation || "",
+        contractorId: null,
+      };
+      setEditingRecord(prefilled as any);
+      setShowMaintenanceDialog(true);
+    }
+    if (result.vendor?.name) setScannedVendor(result.vendor);
+  }, []);
 
   const { data: homeData, isLoading } = useQuery<HomeWithMaintenance>({
     queryKey: ["/api/my-homes", homeId],
@@ -1151,6 +1434,7 @@ function HomeDetail({ homeId }: { homeId: number }) {
           <TabsContent value="overview" className="mt-4">
             <div className="space-y-4">
               <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="flex-1 md:flex-none" onClick={() => setShowScan(true)}><ScanLine className="h-4 w-4 mr-1.5" />Scan</Button>
                 <Button size="sm" className="flex-1 md:flex-none" onClick={() => { setEditingRecord(null); setShowMaintenanceDialog(true); }}><Plus className="h-4 w-4 mr-1.5" />Add Record</Button>
                 <Link href="/marketplace" className="flex-1 md:flex-none"><Button size="sm" variant="outline" className="w-full"><Search className="h-4 w-4 mr-1.5" />Find a Pro</Button></Link>
                 <Link href="/my-team" className="flex-1 md:flex-none"><Button size="sm" variant="outline" className="w-full"><Users className="h-4 w-4 mr-1.5" />My Team</Button></Link>
@@ -1195,16 +1479,18 @@ function HomeDetail({ homeId }: { homeId: number }) {
             </div>
           </TabsContent>
 
-          <TabsContent value="expenses" className="mt-4"><ExpensesTab homeId={homeId} /></TabsContent>
+          <TabsContent value="expenses" className="mt-4"><ExpensesTab homeId={homeId} pendingScan={activeTab === "expenses" ? pendingScanResult : null} onScanConsumed={() => setPendingScanResult(null)} /></TabsContent>
           <TabsContent value="reminders" className="mt-4"><RemindersTab homeId={homeId} /></TabsContent>
           <TabsContent value="equity" className="mt-4"><EquityTab homeId={homeId} home={homeData} /></TabsContent>
-          <TabsContent value="warranty" className="mt-4"><WarrantyTab homeId={homeId} /></TabsContent>
-          <TabsContent value="improvements" className="mt-4"><ImprovementsTab homeId={homeId} /></TabsContent>
+          <TabsContent value="warranty" className="mt-4"><WarrantyTab homeId={homeId} pendingScan={activeTab === "warranty" ? pendingScanResult : null} onScanConsumed={() => setPendingScanResult(null)} /></TabsContent>
+          <TabsContent value="improvements" className="mt-4"><ImprovementsTab homeId={homeId} pendingScan={activeTab === "improvements" ? pendingScanResult : null} onScanConsumed={() => setPendingScanResult(null)} /></TabsContent>
           <TabsContent value="documents" className="mt-4"><DocumentsTab /></TabsContent>
         </Tabs>
       </div>
 
+      {scannedVendor && <AddVendorToTeamPrompt vendor={scannedVendor} onDismiss={() => setScannedVendor(null)} />}
       <MaintenanceDialog open={showMaintenanceDialog} onOpenChange={setShowMaintenanceDialog} homeId={homeId} record={editingRecord} />
+      <ScanReceiptDialog open={showScan} onOpenChange={setShowScan} homeId={homeId} onResult={handleScanResult} targetTab="overview" />
     </div>
   );
 }

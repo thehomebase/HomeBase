@@ -9034,6 +9034,33 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/my-homes/:id/scan-receipt", upload.single("file"), async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    try {
+      const allowedMimes = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"];
+      if (!allowedMimes.includes(req.file.mimetype)) {
+        return res.status(400).json({ error: "Invalid file type. Upload a PDF or image (JPEG, PNG, WebP, HEIC)." });
+      }
+      if (req.file.size > 20 * 1024 * 1024) {
+        return res.status(400).json({ error: "File too large. Maximum 20MB." });
+      }
+      const homeId = parseInt(req.params.id);
+      const homes = await storage.getHomesByUser(req.user.id);
+      const home = homes.find(h => h.id === homeId);
+      if (!home) return res.status(403).json({ error: "Not authorized" });
+
+      const { parseHomeReceiptWithAI } = await import("./ai-document-parser");
+      const mimeType = req.file.mimetype === "image/jpg" ? "image/jpeg" : req.file.mimetype;
+      const result = await parseHomeReceiptWithAI(req.file.buffer, mimeType);
+
+      res.json(result.parsed);
+    } catch (error) {
+      console.error("Error scanning receipt:", error);
+      res.status(500).json({ error: "Failed to scan document" });
+    }
+  });
+
   // ==================== MyHomeTeam Routes ====================
 
   app.post("/api/my-team", async (req, res) => {
