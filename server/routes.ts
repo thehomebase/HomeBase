@@ -895,11 +895,13 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const id = Number(req.params.id);
-      const allowedTxFields = ['status', 'type', 'streetName', 'city', 'state', 'zipCode', 'price', 'contractPrice', 'closingDate', 'contractExecutionDate', 'optionPeriodExpiration', 'notes', 'buyerName', 'sellerName', 'titleCompany', 'escrowOfficer', 'lenderName', 'propertyType', 'mlsNumber', 'earnestMoney', 'optionMoney', 'optionFee', 'downPayment', 'sellerConcessions', 'commission', 'clientId', 'requestClientReview'];
+      const allowedTxFields = ['status', 'type', 'streetName', 'city', 'state', 'zipCode', 'price', 'contractPrice', 'closingDate', 'contractExecutionDate', 'optionPeriodExpiration', 'notes', 'buyerName', 'sellerName', 'titleCompany', 'escrowOfficer', 'lenderName', 'propertyType', 'mlsNumber', 'earnestMoney', 'optionMoney', 'optionFee', 'downPayment', 'sellerConcessions', 'commission', 'clientId', 'requestClientReview', 'financing'];
       const data: Record<string, any> = {};
       for (const key of allowedTxFields) {
         if (req.body[key] !== undefined) data[key] = req.body[key];
       }
+      console.log('[TX PATCH] body:', JSON.stringify(req.body));
+      console.log('[TX PATCH] filtered data:', JSON.stringify(data));
 
       const { allowed: txAllowed, permissionLevel: txPermLevel, transaction: oldTransaction } = await verifyTransactionAccess(id, req.user.id, req.user.role);
       if (!txAllowed || !oldTransaction || txPermLevel !== "full") {
