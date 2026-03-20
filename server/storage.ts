@@ -822,7 +822,6 @@ export class DatabaseStorage implements IStorage {
         return undefined;
       }
 
-      console.log('Fetching transaction with ID:', id);
       const result = await db.execute(sql`
         SELECT 
           id,
@@ -852,8 +851,6 @@ export class DatabaseStorage implements IStorage {
         FROM transactions 
         WHERE id = ${id}
       `);
-
-      console.log('Query result:', result.rows);
 
       if (!result.rows || result.rows.length === 0) {
         console.log('No transaction found with ID:', id);
@@ -888,7 +885,6 @@ export class DatabaseStorage implements IStorage {
         updatedAt: row.updatedAt ? new Date(row.updatedAt) : null
       };
 
-      console.log('Processed transaction:', transaction);
       return transaction;
 
     } catch (error) {
@@ -987,11 +983,9 @@ export class DatabaseStorage implements IStorage {
 
           // Handle date fields consistently
           if (['closing_date', 'contract_execution_date', 'option_period_expiration'].includes(snakeKey)) {
-            console.log(`Processing date field ${snakeKey}:`, value);
             if (value) {
               const date = new Date(value);
               date.setUTCHours(12, 0, 0, 0);
-              console.log(`Converted date for ${snakeKey}:`, date.toISOString());
               cleanData[snakeKey] = date.toISOString();
             } else {
               cleanData[snakeKey] = null;
@@ -1005,8 +999,6 @@ export class DatabaseStorage implements IStorage {
           }
         }
       });
-
-      console.log('Clean data for SQL update:', cleanData);
 
       // Create SET clause for SQL update
       const setColumns = Object.entries(cleanData).map(([key, value]) => {

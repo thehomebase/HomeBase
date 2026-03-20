@@ -851,8 +851,6 @@ export function registerRoutes(app: Express): Server {
 
     try {
       const id = Number(req.params.id);
-      console.log('Processing request for transaction ID:', id, 'User:', req.user);
-
       const { allowed, transaction } = await verifyTransactionAccess(id, req.user.id, req.user.role);
       if (!allowed || !transaction) {
         return res.status(403).json({ error: 'Access denied' });
@@ -900,9 +898,6 @@ export function registerRoutes(app: Express): Server {
       for (const key of allowedTxFields) {
         if (req.body[key] !== undefined) data[key] = req.body[key];
       }
-      console.log('[TX PATCH] body:', JSON.stringify(req.body));
-      console.log('[TX PATCH] filtered data:', JSON.stringify(data));
-
       const { allowed: txAllowed, permissionLevel: txPermLevel, transaction: oldTransaction } = await verifyTransactionAccess(id, req.user.id, req.user.role);
       if (!txAllowed || !oldTransaction || txPermLevel !== "full") {
         return res.status(403).json({ error: "Not authorized to update this transaction" });
