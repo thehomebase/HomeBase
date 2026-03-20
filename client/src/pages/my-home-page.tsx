@@ -602,9 +602,136 @@ function RemindersTab({ homeId }: { homeId: number }) {
   );
 }
 
+type LenderLeadType = 'refinance' | 'heloc' | 'purchase' | 'other';
+
+function LenderLeadDialog({ open, onOpenChange, home, equityData, leadType }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  home: HomeownerHome;
+  equityData?: { balance: number; equityPercent: number; equityAmount: number; estimatedValue: number; monthlyPayment: number; rateDiff?: number | null; currentRate?: number | null } | null;
+  leadType: LenderLeadType;
+}) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [form, setForm] = useState({ phone: "", creditScore: "", message: "", loanType: "conventional" as string });
+
+  useEffect(() => {
+    if (open) {
+      const defaultMsg = leadType === 'refinance'
+        ? `I'm interested in refinancing. Current rate: ${equityData?.rateDiff ? `my rate is ${equityData.rateDiff.toFixed(2)}% above current market rates` : 'seeking a better rate'}. Estimated home value: $${(equityData?.estimatedValue || home.purchasePrice || 0).toLocaleString()}. Remaining balance: ~$${(equityData?.balance || 0).toLocaleString()}.`
+        : leadType === 'heloc'
+        ? `I'm interested in a HELOC or home equity loan. Estimated equity: $${(equityData?.equityAmount || 0).toLocaleString()} (${equityData?.equityPercent || 0}%). Estimated home value: $${(equityData?.estimatedValue || home.purchasePrice || 0).toLocaleString()}.`
+        : '';
+      setForm({ phone: user?.phone || "", creditScore: "", message: defaultMsg, loanType: "conventional" });
+    }
+  }, [open, leadType, equityData, home, user]);
+
+  const submitMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/lender-leads/submit", data);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: data.assigned ? "Request sent to a local lender!" : "Request submitted",
+        description: data.assigned
+          ? "A lender in your area will be in touch soon."
+          : "We'll connect you with a lender when one is available in your area.",
+      });
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to submit request", variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    const nameParts = (user.name || user.username || "").split(" ");
+    submitMutation.mutate({
+      firstName: nameParts[0] || user.username,
+      lastName: nameParts.slice(1).join(" ") || "",
+      email: user.email || "",
+      phone: form.phone || null,
+      zipCode: home.zipCode || "00000",
+      loanType: form.loanType,
+      purchasePrice: (equityData?.estimatedValue || home.purchasePrice || "").toString(),
+      creditScore: form.creditScore || null,
+      message: form.message || null,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {leadType === 'refinance' ? <><Percent className="h-5 w-5 text-green-600" />Talk to a Lender About Refinancing</> : <><PiggyBank className="h-5 w-5 text-primary" />Explore Home Equity Options</>}
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="rounded-lg bg-muted/50 p-3 space-y-1.5 text-sm">
+            <p className="font-medium">{home.address}</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground text-xs">
+              {equityData?.estimatedValue && <span>Est. Value: ${equityData.estimatedValue.toLocaleString()}</span>}
+              {equityData?.balance && <span>Balance: ${equityData.balance.toLocaleString()}</span>}
+              {equityData?.equityPercent && <span>Equity: {equityData.equityPercent}%</span>}
+              {equityData?.monthlyPayment && <span>Payment: ${equityData.monthlyPayment.toLocaleString()}/mo</span>}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Phone</Label>
+              <Input placeholder="(555) 123-4567" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Credit Score Range</Label>
+              <Select value={form.creditScore} onValueChange={(v) => setForm({ ...form, creditScore: v })}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="760+">Excellent (760+)</SelectItem>
+                  <SelectItem value="700-759">Good (700-759)</SelectItem>
+                  <SelectItem value="660-699">Fair (660-699)</SelectItem>
+                  <SelectItem value="620-659">Below Avg (620-659)</SelectItem>
+                  <SelectItem value="below-620">Poor (&lt;620)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Loan Type</Label>
+            <Select value={form.loanType} onValueChange={(v) => setForm({ ...form, loanType: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="conventional">Conventional</SelectItem>
+                <SelectItem value="fha">FHA</SelectItem>
+                <SelectItem value="va">VA</SelectItem>
+                <SelectItem value="usda">USDA</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Message to Lender</Label>
+            <Textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} rows={3} />
+          </div>
+          <p className="text-[11px] text-muted-foreground">Your information will be shared with a verified lender in your area. By submitting, you agree to be contacted about lending options.</p>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={submitMutation.isPending}>{submitMutation.isPending ? "Submitting..." : "Connect Me with a Lender"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function EquityTab({ homeId, home }: { homeId: number; home: HomeownerHome }) {
   const { toast } = useToast();
   const [showSetup, setShowSetup] = useState(false);
+  const [showLenderDialog, setShowLenderDialog] = useState(false);
+  const [leadType, setLeadType] = useState<LenderLeadType>('refinance');
   const { data: profile, isLoading } = useQuery<HomeEquityProfile | null>({ queryKey: ["/api/my-homes", homeId, "equity"], queryFn: async () => { const r = await fetch(`/api/my-homes/${homeId}/equity`, { credentials: "include" }); return r.json(); } });
   const { data: rates } = useQuery<{ rate30yr: string; rate15yr: string; source: string; asOf: string }>({ queryKey: ["/api/mortgage-rates"] });
   const { data: insights } = useQuery<{ medianValue: number | null; estimatedValue: number | null; disclaimer: string }>({ queryKey: ["/api/my-homes", homeId, "market-insights"], queryFn: async () => { const r = await fetch(`/api/my-homes/${homeId}/market-insights`, { credentials: "include" }); return r.json(); } });
@@ -730,7 +857,7 @@ function EquityTab({ homeId, home }: { homeId: number; home: HomeownerHome }) {
                 <div>
                   <h4 className="font-semibold text-green-800 dark:text-green-300">Refinance Opportunity</h4>
                   <p className="text-sm text-green-700 dark:text-green-400 mt-1">Current rates are {equity.rateDiff?.toFixed(2)}% lower than your rate. Refinancing could save you approximately ${Math.round((equity.rateDiff || 0) / 100 * equity.balance / 12).toLocaleString()}/month.</p>
-                  <Link href="/marketplace"><Button size="sm" className="mt-3 gap-1">Talk to a Lender<ArrowUpRight className="h-3.5 w-3.5" /></Button></Link>
+                  <Button size="sm" className="mt-3 gap-1" onClick={() => { setLeadType('refinance'); setShowLenderDialog(true); }}>Talk to a Lender<ArrowUpRight className="h-3.5 w-3.5" /></Button>
                 </div>
               </div>
             </CardContent></Card>
@@ -743,7 +870,7 @@ function EquityTab({ homeId, home }: { homeId: number; home: HomeownerHome }) {
                 <div>
                   <h4 className="font-semibold">Home Equity Options</h4>
                   <p className="text-sm text-muted-foreground mt-1">With {equity.equityPercent}% equity, you may qualify for a HELOC or home equity loan up to approximately <span className="font-semibold text-foreground">${equity.helocAvailable.toLocaleString()}</span>. Use it for home improvements, debt consolidation, or major purchases.</p>
-                  <Link href="/marketplace"><Button size="sm" variant="outline" className="mt-3 gap-1">Find a Lender<ArrowUpRight className="h-3.5 w-3.5" /></Button></Link>
+                  <Button size="sm" variant="outline" className="mt-3 gap-1" onClick={() => { setLeadType('heloc'); setShowLenderDialog(true); }}>Explore Equity Options<ArrowUpRight className="h-3.5 w-3.5" /></Button>
                 </div>
               </div>
             </CardContent></Card>
@@ -763,6 +890,7 @@ function EquityTab({ homeId, home }: { homeId: number; home: HomeownerHome }) {
       )}
 
       <EquitySetupDialog open={showSetup} onOpenChange={setShowSetup} homeId={homeId} profile={profile} />
+      <LenderLeadDialog open={showLenderDialog} onOpenChange={setShowLenderDialog} home={home} equityData={equity} leadType={leadType} />
     </div>
   );
 }
