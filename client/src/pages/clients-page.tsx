@@ -173,7 +173,7 @@ const ClientCard = ({ client, onSelect, onEdit }: {
             </div>
             <div className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">{client.phone || 'No phone'}</span>
+              <span className="text-sm">{client.phone ? formatPhoneDisplay(client.phone) : 'No phone'}</span>
             </div>
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -743,28 +743,18 @@ const MobileClientList = ({
   const isSortedBy = (key: keyof Client) => sortConfig?.key === key;
   const sortDir = sortConfig?.direction;
 
-  const handleCardClick = (client: Client) => {
-    if (selectMode) {
-      onToggleSelect(client.id);
-    } else {
-      onSelect(client);
-    }
-  };
-
-  const handleLongPress = (client: Client) => {
-    if (!selectMode) {
-      onEnterSelectMode();
-    }
-    onToggleSelect(client.id);
-  };
-
   return (
     <div className="md:hidden">
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-1">
-          {!selectMode && (
-            <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8 mr-1" onClick={onEnterSelectMode}>
+          {selectMode ? (
+            <Button variant="default" size="sm" className="gap-1.5 text-xs h-8 mr-1" onClick={() => { onEnterSelectMode(); }}>
               <CheckSquare className="h-3.5 w-3.5" />
+              Selecting
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8 mr-1" onClick={onEnterSelectMode}>
+              <Square className="h-3.5 w-3.5" />
               Select
             </Button>
           )}
@@ -843,10 +833,10 @@ const MobileClientList = ({
                   )}
                 </button>
               )}
-              <div className="flex-1" onClick={() => handleCardClick(client)} onContextMenu={(e) => { e.preventDefault(); handleLongPress(client); }}>
+              <div className="flex-1">
                 <ClientCard
                   client={client}
-                  onSelect={selectMode ? () => onToggleSelect(client.id) : onSelect}
+                  onSelect={onSelect}
                   onEdit={onEdit}
                 />
               </div>
@@ -922,7 +912,7 @@ const MobileClientList = ({
                   )}
                   <td className="px-3 py-2.5">
                     <div className="font-medium">{client.firstName} {client.lastName}</div>
-                    <div className="text-xs text-muted-foreground">{client.phone || client.email || ''}</div>
+                    <div className="text-xs text-muted-foreground">{client.phone ? formatPhoneDisplay(client.phone) : client.email || ''}</div>
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex flex-wrap gap-0.5">
@@ -1126,6 +1116,7 @@ const TableContent = ({
   const [columns, setColumns] = useState<ClientColumn[]>(DEFAULT_COLUMNS);
   const [, navigate] = useLocation();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [mobileSelectMode, setMobileSelectMode] = useState(false);
 
   useEffect(() => {
     setSelectedIds(prev => {
@@ -1292,7 +1283,7 @@ const TableContent = ({
         <BulkActionBar
           selectedIds={selectedIds}
           clients={clients}
-          onClear={() => setSelectedIds(new Set())}
+          onClear={() => { setSelectedIds(new Set()); setMobileSelectMode(false); }}
           allExistingLabels={allExistingLabels}
         />
       )}
@@ -1386,8 +1377,8 @@ const TableContent = ({
         onDelete={onDelete}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}
-        selectMode={someSelected}
-        onEnterSelectMode={() => {}}
+        selectMode={mobileSelectMode}
+        onEnterSelectMode={() => setMobileSelectMode(true)}
       />
 
       {/* Client Details Panel */}
