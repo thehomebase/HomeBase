@@ -602,6 +602,74 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/clients/bulk-update", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
+      return res.sendStatus(401);
+    }
+    try {
+      const { clientIds, action, value } = req.body;
+      if (!Array.isArray(clientIds) || clientIds.length === 0 || clientIds.length > 500) {
+        return res.status(400).json({ error: 'clientIds must be a non-empty array (max 500)' });
+      }
+      const validActions = ['add_label', 'remove_label', 'set_status', 'delete'];
+      if (!validActions.includes(action)) {
+        return res.status(400).json({ error: `action must be one of: ${validActions.join(', ')}` });
+      }
+      const validStatuses = ['active', 'inactive', 'pending'];
+      if (action === 'set_status' && (!value || !validStatuses.includes(value))) {
+        return res.status(400).json({ error: `status must be one of: ${validStatuses.join(', ')}` });
+      }
+      if ((action === 'add_label' || action === 'remove_label') && (typeof value !== 'string' || !value.trim())) {
+        return res.status(400).json({ error: 'value must be a non-empty string for label actions' });
+      }
+
+      const uniqueIds = [...new Set(clientIds.map(Number).filter(n => !isNaN(n)))];
+      let updated = 0;
+      let skipped = 0;
+      const results = [];
+
+      for (const id of uniqueIds) {
+        try {
+          const client = await storage.getClient(id);
+          if (!client || (client.agentId !== req.user.id && req.user.role !== "broker")) {
+            skipped++;
+            continue;
+          }
+
+          let update: Record<string, any> = {};
+          if (action === 'add_label') {
+            const currentLabels = client.labels || [];
+            if (!currentLabels.includes(value.trim())) {
+              update.labels = [...currentLabels, value.trim()];
+            }
+          } else if (action === 'remove_label') {
+            update.labels = (client.labels || []).filter((l: string) => l !== value);
+          } else if (action === 'set_status') {
+            update.status = value;
+          } else if (action === 'delete') {
+            await storage.deleteClient(id);
+            updated++;
+            results.push({ id, deleted: true });
+            continue;
+          }
+
+          if (Object.keys(update).length > 0) {
+            const updatedClient = await storage.updateClient(id, update);
+            updated++;
+            results.push(updatedClient);
+          }
+        } catch (itemErr) {
+          console.error(`Error processing client ${id}:`, itemErr);
+          skipped++;
+        }
+      }
+      res.json({ updated, skipped, results });
+    } catch (error) {
+      console.error('Error bulk updating clients:', error);
+      res.status(500).json({ error: 'Failed to bulk update clients' });
+    }
+  });
+
   app.get("/api/clients/:id/linked", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {

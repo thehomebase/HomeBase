@@ -30,7 +30,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, type Client, type InsertClient, type ClientInvitation } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check, Upload, FileSpreadsheet, Info, AlertTriangle, MessageSquare, Send, UserPlus, Clock, Heart, Link2, Unlink, Cake, CalendarHeart } from "lucide-react";
+import { Plus, Mail, Phone, ChevronUp, ChevronDown, MapPin, Trash2, Search, Filter, Check, Upload, FileSpreadsheet, Info, AlertTriangle, MessageSquare, Send, UserPlus, Clock, Heart, Link2, Unlink, Cake, CalendarHeart, CheckSquare, Square, XCircle, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -925,6 +925,127 @@ const SortableHeader = ({
   );
 };
 
+const BulkActionBar = ({ selectedIds, clients, onClear, allExistingLabels }: { selectedIds: Set<number>; clients: Client[]; onClear: () => void; allExistingLabels: string[] }) => {
+  const { toast } = useToast();
+  const [newLabel, setNewLabel] = useState("");
+  const [showLabelInput, setShowLabelInput] = useState(false);
+  const [showRemoveLabel, setShowRemoveLabel] = useState(false);
+
+  const bulkMutation = useMutation({
+    mutationFn: async (params: { action: string; value?: string }) => {
+      const res = await apiRequest("POST", "/api/clients/bulk-update", {
+        clientIds: Array.from(selectedIds),
+        action: params.action,
+        value: params.value,
+      });
+      return res.json();
+    },
+    onSuccess: (data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      const actionNames: Record<string, string> = { add_label: "Label added", remove_label: "Label removed", set_status: "Status updated", delete: "Clients deleted" };
+      const count = data?.updated ?? selectedIds.size;
+      const skipped = data?.skipped ?? 0;
+      toast({ title: actionNames[vars.action] || "Updated", description: `${count} client${count !== 1 ? 's' : ''} updated${skipped > 0 ? `, ${skipped} skipped` : ''}.` });
+      onClear();
+      setShowLabelInput(false);
+      setShowRemoveLabel(false);
+      setNewLabel("");
+    },
+    onError: () => toast({ title: "Failed to update clients", variant: "destructive" }),
+  });
+
+  const selectedClients = clients.filter(c => selectedIds.has(c.id));
+  const commonLabels = useMemo(() => {
+    if (selectedClients.length === 0) return [];
+    const labelCounts = new Map<string, number>();
+    selectedClients.forEach(c => (c.labels || []).forEach((l: string) => labelCounts.set(l, (labelCounts.get(l) || 0) + 1)));
+    return Array.from(labelCounts.entries()).filter(([, count]) => count > 0).map(([label]) => label).sort();
+  }, [selectedClients]);
+
+  return (
+    <div className="sticky top-0 z-20 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg mb-3 flex items-center gap-2 flex-wrap shadow-md">
+      <span className="text-sm font-medium mr-1">{selectedIds.size} selected</span>
+      <Button variant="secondary" size="sm" className="h-7 text-xs gap-1" onClick={() => onClear()}>
+        <XCircle className="h-3 w-3" /> Clear
+      </Button>
+      <div className="h-4 w-px bg-primary-foreground/30 mx-1" />
+
+      {showLabelInput ? (
+        <div className="flex items-center gap-1.5">
+          <Input
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            placeholder="Label name..."
+            className="h-7 w-32 text-xs bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/50"
+            onKeyDown={(e) => { if (e.key === 'Enter' && newLabel.trim()) bulkMutation.mutate({ action: 'add_label', value: newLabel.trim() }); }}
+            autoFocus
+          />
+          {allExistingLabels.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" size="sm" className="h-7 text-xs">Pick</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {allExistingLabels.map(l => (
+                  <DropdownMenuItem key={l} onClick={() => bulkMutation.mutate({ action: 'add_label', value: l })}>{l}</DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <Button variant="secondary" size="sm" className="h-7 text-xs" disabled={!newLabel.trim() || bulkMutation.isPending} onClick={() => bulkMutation.mutate({ action: 'add_label', value: newLabel.trim() })}>
+            {bulkMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Add"}
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 text-xs text-primary-foreground/70" onClick={() => { setShowLabelInput(false); setNewLabel(""); }}>
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      ) : (
+        <Button variant="secondary" size="sm" className="h-7 text-xs gap-1" onClick={() => setShowLabelInput(true)}>
+          <Tag className="h-3 w-3" /> Add Label
+        </Button>
+      )}
+
+      {showRemoveLabel ? (
+        <DropdownMenu open={showRemoveLabel} onOpenChange={setShowRemoveLabel}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="secondary" size="sm" className="h-7 text-xs gap-1">
+              <Tag className="h-3 w-3" /> Remove Label
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {commonLabels.length > 0 ? commonLabels.map(l => (
+              <DropdownMenuItem key={l} onClick={() => bulkMutation.mutate({ action: 'remove_label', value: l })}>{l}</DropdownMenuItem>
+            )) : (
+              <DropdownMenuItem disabled>No labels on selected</DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <Button variant="secondary" size="sm" className="h-7 text-xs gap-1" onClick={() => setShowRemoveLabel(true)}>
+          <Tag className="h-3 w-3" /> Remove Label
+        </Button>
+      )}
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="secondary" size="sm" className="h-7 text-xs gap-1">
+            Set Status
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onClick={() => bulkMutation.mutate({ action: 'set_status', value: 'active' })}>Active</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => bulkMutation.mutate({ action: 'set_status', value: 'inactive' })}>Inactive</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => bulkMutation.mutate({ action: 'set_status', value: 'pending' })}>Pending</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Button variant="secondary" size="sm" className="h-7 text-xs gap-1 text-red-200 hover:text-red-100" onClick={() => { if (confirm(`Delete ${selectedIds.size} client${selectedIds.size > 1 ? 's' : ''}? This cannot be undone.`)) bulkMutation.mutate({ action: 'delete' }); }}>
+        <Trash2 className="h-3 w-3" /> Delete
+      </Button>
+    </div>
+  );
+};
+
 const TableContent = ({
   clients,
   onUpdate,
@@ -940,6 +1061,32 @@ const TableContent = ({
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const [columns, setColumns] = useState<ClientColumn[]>(DEFAULT_COLUMNS);
   const [, navigate] = useLocation();
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    setSelectedIds(prev => {
+      const validIds = new Set(clients.map(c => c.id));
+      const pruned = new Set([...prev].filter(id => validIds.has(id)));
+      return pruned.size !== prev.size ? pruned : prev;
+    });
+  }, [clients]);
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const sorted = sortData(clients, sortConfig);
+    if (selectedIds.size === sorted.length && sorted.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sorted.map(c => c.id)));
+    }
+  };
 
   const allExistingLabels = useMemo(() => {
     const labelSet = new Set<string>();
@@ -1071,8 +1218,20 @@ const TableContent = ({
     }
   };
 
+  const sortedClients = sortData(clients, sortConfig);
+  const allSelected = sortedClients.length > 0 && selectedIds.size === sortedClients.length;
+  const someSelected = selectedIds.size > 0;
+
   return (
     <>
+      {someSelected && (
+        <BulkActionBar
+          selectedIds={selectedIds}
+          clients={clients}
+          onClear={() => setSelectedIds(new Set())}
+          allExistingLabels={allExistingLabels}
+        />
+      )}
       {/* Desktop view - Table */}
       <div className="hidden md:block w-full min-w-0 overflow-x-auto">
         <DndContext
@@ -1083,6 +1242,20 @@ const TableContent = ({
           <Table className="w-full table-auto">
             <TableHeader>
               <TableRow className="bg-gray-100 dark:bg-gray-800">
+                <TableHead className="w-10 px-3">
+                  <button
+                    onClick={toggleSelectAll}
+                    className="flex items-center justify-center"
+                  >
+                    {allSelected ? (
+                      <CheckSquare className="h-4 w-4 text-primary" />
+                    ) : someSelected ? (
+                      <div className="h-4 w-4 border-2 border-primary rounded-sm bg-primary/20" />
+                    ) : (
+                      <Square className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </button>
+                </TableHead>
                 <SortableContext
                   items={columns.map(col => col.id)}
                   strategy={horizontalListSortingStrategy}
@@ -1099,14 +1272,27 @@ const TableContent = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortData(clients, sortConfig).map((client, index) => (
+              {sortedClients.map((client, index) => (
                 <TableRow
                   key={client.id}
                   className={`hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
+                    selectedIds.has(client.id) ? 'bg-primary/5 dark:bg-primary/10' :
                     index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
                   }`}
                   onClick={() => setSelectedClient(client)}
                 >
+                  <TableCell className="py-3 px-3 w-10">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleSelect(client.id); }}
+                      className="flex items-center justify-center"
+                    >
+                      {selectedIds.has(client.id) ? (
+                        <CheckSquare className="h-4 w-4 text-primary" />
+                      ) : (
+                        <Square className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </button>
+                  </TableCell>
                   {columns.map((column) => (
                     <TableCell key={column.id} className="py-3">
                       {renderCell(client, column.id)}
@@ -1116,7 +1302,7 @@ const TableContent = ({
               ))}
               {clients.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={columns.length} className="text-center text-muted-foreground">
+                  <TableCell colSpan={columns.length + 1} className="text-center text-muted-foreground">
                     No clients found. Add your first client to get started!
                   </TableCell>
                 </TableRow>
