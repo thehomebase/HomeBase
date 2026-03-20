@@ -1446,11 +1446,11 @@ function HomeDetail({ homeId }: { homeId: number }) {
 
           <TabsContent value="overview" className="mt-4">
             <div className="space-y-4">
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1 md:flex-none" onClick={() => setShowScan(true)}><ScanLine className="h-4 w-4 mr-1.5" />Scan</Button>
-                <Button size="sm" className="flex-1 md:flex-none" onClick={() => { setEditingRecord(null); setShowMaintenanceDialog(true); }}><Plus className="h-4 w-4 mr-1.5" />Add Record</Button>
-                <Link href="/marketplace" className="flex-1 md:flex-none"><Button size="sm" variant="outline" className="w-full"><Search className="h-4 w-4 mr-1.5" />Find a Pro</Button></Link>
-                <Link href="/my-team" className="flex-1 md:flex-none"><Button size="sm" variant="outline" className="w-full"><Users className="h-4 w-4 mr-1.5" />My Team</Button></Link>
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+                <Button size="sm" variant="outline" className="shrink-0" onClick={() => setShowScan(true)}><ScanLine className="h-4 w-4 mr-1.5" />Scan</Button>
+                <Button size="sm" className="shrink-0" onClick={() => { setEditingRecord(null); setShowMaintenanceDialog(true); }}><Plus className="h-4 w-4 mr-1.5" />Add Record</Button>
+                <Link href="/marketplace" className="shrink-0"><Button size="sm" variant="outline" className="w-full"><Search className="h-4 w-4 mr-1.5" />Find a Pro</Button></Link>
+                <Link href="/my-team" className="shrink-0"><Button size="sm" variant="outline" className="w-full"><Users className="h-4 w-4 mr-1.5" />My Team</Button></Link>
               </div>
 
               <Card>
