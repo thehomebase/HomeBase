@@ -3,7 +3,7 @@ import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useTransactionLock } from "@/hooks/use-transaction-lock";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock, FileSignature, Star } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock, FileSignature, Star, Search } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -593,6 +593,12 @@ export default function TransactionPage() {
           <TabsTrigger value="signatures" className="shrink-0">
             <FileSignature className="h-4 w-4 mr-2" />
             Signatures
+          </TabsTrigger>
+          <TabsTrigger value="inspection" className="shrink-0" asChild>
+            <Link href={`/transactions/${parsedId}/inspection`}>
+              <Search className="h-4 w-4 mr-2" />
+              Inspection
+            </Link>
           </TabsTrigger>
         </TabsList>
 
