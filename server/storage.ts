@@ -6464,8 +6464,8 @@ export class DatabaseStorage implements IStorage {
 
   async createOpenHouseVisitor(data: any): Promise<any> {
     const result = await db.execute(sql`
-      INSERT INTO open_house_visitors (open_house_id, first_name, last_name, email, phone, interested_level, notes, pre_approved, working_with_agent)
-      VALUES (${data.openHouseId}, ${data.firstName}, ${data.lastName || null}, ${data.email || null}, ${data.phone || null}, ${data.interestedLevel || null}, ${data.notes || null}, ${data.preApproved || false}, ${data.workingWithAgent || false})
+      INSERT INTO open_house_visitors (open_house_id, first_name, last_name, email, phone, interested_level, notes, pre_approved, working_with_agent, visitor_role, brokerage_name)
+      VALUES (${data.openHouseId}, ${data.firstName}, ${data.lastName || null}, ${data.email || null}, ${data.phone || null}, ${data.interestedLevel || null}, ${data.notes || null}, ${data.preApproved || false}, ${data.workingWithAgent || false}, ${data.visitorRole || 'unrepresented_buyer'}, ${data.brokerageName || null})
       RETURNING *
     `);
     return result.rows[0];

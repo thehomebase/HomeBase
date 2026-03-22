@@ -1423,6 +1423,8 @@ export const openHouseVisitors = pgTable("open_house_visitors", {
   notes: text("notes"),
   preApproved: boolean("pre_approved").default(false),
   workingWithAgent: boolean("working_with_agent").default(false),
+  visitorRole: text("visitor_role").default("unrepresented_buyer"),
+  brokerageName: text("brokerage_name"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -11,6 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Star, CheckCircle2, Home, AlertCircle, MapPin, Calendar, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+type VisitorRole = "unrepresented_buyer" | "represented_buyer" | "agent";
+
 export default function OpenHouseSignInPage() {
   const [, params] = useRoute("/open-house/:slug");
   const slug = params?.slug || "";
@@ -23,11 +25,24 @@ export default function OpenHouseSignInPage() {
   const [interestLevel, setInterestLevel] = useState(0);
   const [hoveredStar, setHoveredStar] = useState(0);
   const [preApproved, setPreApproved] = useState(false);
-  const [workingWithAgent, setWorkingWithAgent] = useState(false);
+  const [visitorRole, setVisitorRole] = useState<VisitorRole>("unrepresented_buyer");
+  const [brokerageName, setBrokerageName] = useState("");
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  const { data: openHouse, isLoading, error } = useQuery<any>({
+  const { data: openHouse, isLoading, error } = useQuery<{
+    id: number;
+    address: string;
+    city: string;
+    state: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    start_time?: string;
+    end_time?: string;
+    agentName: string;
+    status: string;
+  }>({
     queryKey: ["/api/open-house", slug],
     queryFn: async () => {
       const res = await fetch(`/api/open-house/${slug}`);
@@ -50,7 +65,9 @@ export default function OpenHouseSignInPage() {
           phone: phone || undefined,
           interestedLevel: interestLevel || undefined,
           preApproved,
-          workingWithAgent,
+          workingWithAgent: visitorRole === "represented_buyer",
+          visitorRole,
+          brokerageName: visitorRole === "agent" ? brokerageName || undefined : undefined,
           notes: notes || undefined,
         }),
       });
@@ -124,6 +141,12 @@ export default function OpenHouseSignInPage() {
 
   const fullAddress = [openHouse.address, openHouse.city, openHouse.state].filter(Boolean).join(", ");
 
+  const roleOptions: { value: VisitorRole; label: string; description: string }[] = [
+    { value: "unrepresented_buyer", label: "Buyer (not working with an agent)", description: "I'm looking on my own" },
+    { value: "represented_buyer", label: "Buyer (working with an agent)", description: "I have an agent already" },
+    { value: "agent", label: "Real Estate Agent", description: "I'm an agent visiting" },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 to-muted flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
@@ -148,7 +171,7 @@ export default function OpenHouseSignInPage() {
                 </span>
                 <span className="flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" />
-                  {formatTime(openHouse.startTime || openHouse.start_time)} – {formatTime(openHouse.endTime || openHouse.end_time)}
+                  {formatTime(openHouse.startTime || openHouse.start_time || "")} – {formatTime(openHouse.endTime || openHouse.end_time || "")}
                 </span>
               </p>
             </div>
@@ -156,6 +179,27 @@ export default function OpenHouseSignInPage() {
 
           <div className="border-t pt-4 space-y-4">
             <p className="text-sm font-medium text-center">Please sign in below</p>
+
+            <div>
+              <Label className="mb-2 block">I am a... *</Label>
+              <div className="space-y-2">
+                {roleOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setVisitorRole(opt.value)}
+                    className={`w-full text-left p-3 rounded-lg border-2 transition-colors ${
+                      visitorRole === opt.value
+                        ? "border-primary bg-primary/5"
+                        : "border-muted hover:border-muted-foreground/30"
+                    }`}
+                  >
+                    <p className="text-sm font-medium">{opt.label}</p>
+                    <p className="text-xs text-muted-foreground">{opt.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -178,61 +222,62 @@ export default function OpenHouseSignInPage() {
               <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" />
             </div>
 
-            <div>
-              <Label className="mb-2 block">Interest Level</Label>
-              <div className="flex gap-1 justify-center">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onMouseEnter={() => setHoveredStar(star)}
-                    onMouseLeave={() => setHoveredStar(0)}
-                    onClick={() => setInterestLevel(star)}
-                    className="p-1 transition-transform hover:scale-110"
-                  >
-                    <Star
-                      className={`h-7 w-7 transition-colors ${
-                        star <= (hoveredStar || interestLevel)
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-gray-300"
-                      }`}
-                    />
-                  </button>
-                ))}
+            {visitorRole === "agent" && (
+              <div>
+                <Label>Brokerage / Company</Label>
+                <Input value={brokerageName} onChange={(e) => setBrokerageName(e.target.value)} placeholder="Your brokerage name" />
               </div>
-              {interestLevel > 0 && (
-                <p className="text-center text-xs text-muted-foreground mt-1">
-                  {interestLevel === 1 && "Just browsing"}
-                  {interestLevel === 2 && "Somewhat interested"}
-                  {interestLevel === 3 && "Interested"}
-                  {interestLevel === 4 && "Very interested"}
-                  {interestLevel === 5 && "Love it!"}
-                </p>
-              )}
-            </div>
+            )}
 
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="preApproved"
-                  checked={preApproved}
-                  onCheckedChange={(checked) => setPreApproved(!!checked)}
-                />
-                <Label htmlFor="preApproved" className="text-sm font-normal cursor-pointer">
-                  Are you pre-approved for a mortgage?
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="workingWithAgent"
-                  checked={workingWithAgent}
-                  onCheckedChange={(checked) => setWorkingWithAgent(!!checked)}
-                />
-                <Label htmlFor="workingWithAgent" className="text-sm font-normal cursor-pointer">
-                  Are you currently working with an agent?
-                </Label>
-              </div>
-            </div>
+            {visitorRole !== "agent" && (
+              <>
+                <div>
+                  <Label className="mb-2 block">Interest Level</Label>
+                  <div className="flex gap-1 justify-center">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onMouseEnter={() => setHoveredStar(star)}
+                        onMouseLeave={() => setHoveredStar(0)}
+                        onClick={() => setInterestLevel(star)}
+                        className="p-1 transition-transform hover:scale-110"
+                      >
+                        <Star
+                          className={`h-7 w-7 transition-colors ${
+                            star <= (hoveredStar || interestLevel)
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-gray-300"
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  {interestLevel > 0 && (
+                    <p className="text-center text-xs text-muted-foreground mt-1">
+                      {interestLevel === 1 && "Just browsing"}
+                      {interestLevel === 2 && "Somewhat interested"}
+                      {interestLevel === 3 && "Interested"}
+                      {interestLevel === 4 && "Very interested"}
+                      {interestLevel === 5 && "Love it!"}
+                    </p>
+                  )}
+                </div>
+
+                {visitorRole === "unrepresented_buyer" && (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="preApproved"
+                      checked={preApproved}
+                      onCheckedChange={(checked) => setPreApproved(!!checked)}
+                    />
+                    <Label htmlFor="preApproved" className="text-sm font-normal cursor-pointer">
+                      Are you pre-approved for a mortgage?
+                    </Label>
+                  </div>
+                )}
+              </>
+            )}
 
             <div>
               <Label>Notes</Label>

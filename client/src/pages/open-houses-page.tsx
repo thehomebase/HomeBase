@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -56,6 +56,10 @@ import {
   CheckCircle2,
   ExternalLink,
   Link2,
+  QrCode,
+  Download,
+  UserCheck,
+  Briefcase,
 } from "lucide-react";
 
 function StatusBadge({ status }: { status: string }) {
@@ -68,6 +72,78 @@ function StatusBadge({ status }: { status: string }) {
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variants[status] || variants.scheduled}`}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
+  );
+}
+
+function VisitorRoleBadge({ role }: { role?: string }) {
+  if (!role || role === "unrepresented_buyer") {
+    return <Badge variant="default" className="text-xs">Buyer</Badge>;
+  }
+  if (role === "represented_buyer") {
+    return <Badge variant="secondary" className="text-xs flex items-center gap-1"><UserCheck className="h-3 w-3" />Has Agent</Badge>;
+  }
+  if (role === "agent") {
+    return <Badge variant="outline" className="text-xs flex items-center gap-1"><Briefcase className="h-3 w-3" />Agent</Badge>;
+  }
+  return null;
+}
+
+function QrCodeModal({ slug, address }: { slug: string; address: string }) {
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const signInUrl = `${window.location.origin}/open-house/${slug}`;
+
+  useEffect(() => {
+    if (!open) return;
+    import("qrcode").then((QRCode) => {
+      QRCode.toDataURL(signInUrl, {
+        width: 400,
+        margin: 2,
+        color: { dark: "#000000", light: "#ffffff" },
+      }).then((url: string) => setQrDataUrl(url));
+    });
+  }, [open, signInUrl]);
+
+  const downloadQr = () => {
+    if (!qrDataUrl) return;
+    const link = document.createElement("a");
+    link.download = `open-house-qr-${slug}.png`;
+    link.href = qrDataUrl;
+    link.click();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" title="QR Code">
+          <QrCode className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>QR Code for Sign-In</DialogTitle>
+        </DialogHeader>
+        <div className="text-center space-y-4">
+          <p className="text-sm text-muted-foreground">{address}</p>
+          {qrDataUrl ? (
+            <img src={qrDataUrl} alt="QR Code" className="mx-auto rounded-lg border" />
+          ) : (
+            <Skeleton className="h-[400px] w-[400px] mx-auto" />
+          )}
+          <p className="text-xs text-muted-foreground break-all">{signInUrl}</p>
+          <div className="flex gap-2">
+            <Button className="flex-1" variant="outline" onClick={() => {
+              navigator.clipboard.writeText(signInUrl);
+            }}>
+              <Copy className="h-4 w-4 mr-2" />Copy Link
+            </Button>
+            <Button className="flex-1" onClick={downloadQr} disabled={!qrDataUrl}>
+              <Download className="h-4 w-4 mr-2" />Download QR
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -161,16 +237,19 @@ function VisitorList({ openHouseId }: { openHouseId: number }) {
       {visitors.map((v: any) => (
         <div key={v.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg text-sm">
           <div>
-            <p className="font-medium">{v.first_name} {v.last_name || ""}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-medium">{v.first_name} {v.last_name || ""}</p>
+              <VisitorRoleBadge role={v.visitor_role} />
+            </div>
             <div className="flex gap-3 text-muted-foreground text-xs mt-0.5">
               {v.email && <span>{v.email}</span>}
               {v.phone && <span>{v.phone}</span>}
+              {v.brokerage_name && <span className="italic">{v.brokerage_name}</span>}
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {v.interested_level && <span>Interest: {v.interested_level}/5</span>}
             {v.pre_approved && <Badge variant="secondary" className="text-xs">Pre-approved</Badge>}
-            {v.working_with_agent && <Badge variant="outline" className="text-xs">Has agent</Badge>}
           </div>
         </div>
       ))}
@@ -329,6 +408,7 @@ export default function OpenHousesPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    <QrCodeModal slug={oh.slug} address={oh.address} />
                     <Button variant="ghost" size="icon" onClick={() => copySignInLink(oh.slug)} title="Copy sign-in link">
                       <Copy className="h-4 w-4" />
                     </Button>
@@ -413,7 +493,7 @@ export default function OpenHousesPage() {
                     <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
                     <span className="text-sm font-semibold text-green-800 dark:text-green-200">Live — Visitor Sign-In Active</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-2">Share this link with visitors so they can sign in on their phone:</p>
+                  <p className="text-xs text-muted-foreground mb-2">Share this link or QR code with visitors so they can sign in on their phone:</p>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 bg-white dark:bg-gray-900 border rounded-md px-3 py-2 text-sm font-mono truncate">
                       {window.location.origin}/open-house/{oh.slug}

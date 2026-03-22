@@ -12664,14 +12664,19 @@ export function registerRoutes(app: Express): Server {
       const openHouse = await storage.getOpenHouseBySlug(req.params.slug);
       if (!openHouse) return res.status(404).json({ error: "Open house not found" });
 
-      const { firstName, lastName, email, phone, interestedLevel, notes, preApproved, workingWithAgent } = req.body;
+      const { firstName, lastName, email, phone, interestedLevel, notes, preApproved, workingWithAgent, visitorRole, brokerageName } = req.body;
       if (!firstName) return res.status(400).json({ error: "First name is required" });
 
+      const role = ['unrepresented_buyer', 'represented_buyer', 'agent'].includes(visitorRole) ? visitorRole : 'unrepresented_buyer';
+      const isWorkingWithAgent = role === 'represented_buyer' || workingWithAgent;
+
       const visitor = await storage.createOpenHouseVisitor({
-        openHouseId: openHouse.id, firstName, lastName, email, phone, interestedLevel, notes, preApproved, workingWithAgent,
+        openHouseId: openHouse.id, firstName, lastName, email, phone, interestedLevel, notes,
+        preApproved, workingWithAgent: isWorkingWithAgent, visitorRole: role,
+        brokerageName: role === 'agent' ? (brokerageName || null) : null,
       });
 
-      if (email || phone) {
+      if (role === 'unrepresented_buyer' && (email || phone)) {
         try {
           await storage.createLead({
             firstName, lastName: lastName || '', email: email || '', phone: phone || '',
