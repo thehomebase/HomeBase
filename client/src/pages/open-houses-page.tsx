@@ -80,7 +80,7 @@ function VisitorRoleBadge({ role }: { role?: string }) {
     return <Badge variant="default" className="text-xs">Buyer</Badge>;
   }
   if (role === "represented_buyer") {
-    return <Badge variant="secondary" className="text-xs flex items-center gap-1"><UserCheck className="h-3 w-3" />Has Agent</Badge>;
+    return <Badge variant="secondary" className="text-xs flex items-center gap-1"><UserCheck className="h-3 w-3" />Represented Buyer</Badge>;
   }
   if (role === "agent") {
     return <Badge variant="outline" className="text-xs flex items-center gap-1"><Briefcase className="h-3 w-3" />Agent</Badge>;
@@ -137,8 +137,17 @@ function QrCodeModal({ slug, address }: { slug: string; address: string }) {
             }}>
               <Copy className="h-4 w-4 mr-2" />Copy Link
             </Button>
-            <Button className="flex-1" onClick={downloadQr} disabled={!qrDataUrl}>
-              <Download className="h-4 w-4 mr-2" />Download QR
+            <Button className="flex-1" variant="outline" onClick={downloadQr} disabled={!qrDataUrl}>
+              <Download className="h-4 w-4 mr-2" />Download
+            </Button>
+            <Button className="flex-1" onClick={() => {
+              if (!qrDataUrl) return;
+              const win = window.open("", "_blank");
+              if (!win) return;
+              win.document.write(`<html><head><title>QR Code - ${address}</title><style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;margin:0}img{max-width:400px}p{margin-top:16px;font-size:14px;color:#666;word-break:break-all;max-width:400px;text-align:center}h2{margin-bottom:8px}</style></head><body><h2>${address}</h2><img src="${qrDataUrl}" /><p>${signInUrl}</p><script>window.print();</script></body></html>`);
+              win.document.close();
+            }} disabled={!qrDataUrl}>
+              <QrCode className="h-4 w-4 mr-2" />Print
             </Button>
           </div>
         </div>

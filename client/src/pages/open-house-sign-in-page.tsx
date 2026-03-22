@@ -264,18 +264,16 @@ export default function OpenHouseSignInPage() {
                   )}
                 </div>
 
-                {visitorRole === "unrepresented_buyer" && (
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="preApproved"
-                      checked={preApproved}
-                      onCheckedChange={(checked) => setPreApproved(!!checked)}
-                    />
-                    <Label htmlFor="preApproved" className="text-sm font-normal cursor-pointer">
-                      Are you pre-approved for a mortgage?
-                    </Label>
-                  </div>
-                )}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="preApproved"
+                    checked={preApproved}
+                    onCheckedChange={(checked) => setPreApproved(!!checked)}
+                  />
+                  <Label htmlFor="preApproved" className="text-sm font-normal cursor-pointer">
+                    Are you pre-approved for a mortgage?
+                  </Label>
+                </div>
               </>
             )}
 
