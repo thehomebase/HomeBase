@@ -6374,13 +6374,22 @@ export class DatabaseStorage implements IStorage {
     `);
     const monthlyResult = await db.execute(sql`
       SELECT
-        EXTRACT(MONTH FROM created_at)::int as month,
-        EXTRACT(YEAR FROM created_at)::int as year,
-        COALESCE(SUM(commission_amount), 0)::int as total,
-        COUNT(*)::int as deals
-      FROM commission_entries
-      WHERE agent_id = ${agentId} AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW())
-      GROUP BY EXTRACT(YEAR FROM created_at), EXTRACT(MONTH FROM created_at)
+        EXTRACT(MONTH FROM ce.created_at)::int as month,
+        EXTRACT(YEAR FROM ce.created_at)::int as year,
+        COALESCE(SUM(ce.commission_amount), 0)::int as total,
+        COUNT(*)::int as deals,
+        COALESCE(SUM(
+          GREATEST(0,
+            ce.commission_amount
+            * (1.0 - COALESCE(ce.brokerage_split_percent, 0) / 100.0)
+            * (1.0 - COALESCE(ce.referral_fee_percent, 0) / 100.0)
+          )
+        ), 0)::int as net_total,
+        COALESCE(SUM(t.contract_price), 0)::bigint as volume
+      FROM commission_entries ce
+      JOIN transactions t ON ce.transaction_id = t.id
+      WHERE ce.agent_id = ${agentId} AND EXTRACT(YEAR FROM ce.created_at) = EXTRACT(YEAR FROM NOW())
+      GROUP BY EXTRACT(YEAR FROM ce.created_at), EXTRACT(MONTH FROM ce.created_at)
       ORDER BY year, month
     `);
     return { ...result.rows[0], monthly: monthlyResult.rows };

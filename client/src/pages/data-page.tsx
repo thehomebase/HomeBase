@@ -315,12 +315,17 @@ export default function DataPage() {
     ];
     return allMonths.map((date, i) => {
       const m = commissionSummary.monthly.find(
-        (cm) => cm.month === i + 1 && cm.year === currentYear
+        (cm: any) => cm.month === i + 1 && cm.year === currentYear
       );
+      const volume = Number(m?.volume || 0);
       return {
         month: monthNames[i],
-        earned: m?.total || 0,
+        earned: (m?.total || 0) / 100,
+        net: (m?.net_total || 0) / 100,
         deals: m?.deals || 0,
+        bench1: volume * 0.01,
+        bench2: volume * 0.02,
+        bench3: volume * 0.03,
       };
     });
   }, [commissionSummary, currentYear, allMonths]);
@@ -604,27 +609,51 @@ export default function DataPage() {
               <h3 className="text-sm font-semibold">Commission Earnings</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {commissionSummary
-                  ? `${formatFullCurrency(commissionSummary.ytd_earned)} earned YTD`
+                  ? `${formatFullCurrency(commissionSummary.ytd_earned / 100)} earned YTD`
                   : "No commission data yet"}
               </p>
             </div>
-            {commissionSummary && commissionSummary.ytd_pending > 0 && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
-                <Clock className="h-3 w-3" />
-                {formatFullCurrency(commissionSummary.ytd_pending)} pending
+            <div className="flex items-center gap-3">
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(142, 71%, 45%)" }} />
+                  <span className="text-[10px] text-muted-foreground">Gross</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(217, 91%, 60%)" }} />
+                  <span className="text-[10px] text-muted-foreground">Net</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 rounded border-dashed border-t-2" style={{ borderColor: "#f59e0b" }} />
+                  <span className="text-[10px] text-muted-foreground">1%</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 rounded border-dashed border-t-2" style={{ borderColor: "#f97316" }} />
+                  <span className="text-[10px] text-muted-foreground">2%</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 rounded border-dashed border-t-2" style={{ borderColor: "#ef4444" }} />
+                  <span className="text-[10px] text-muted-foreground">3%</span>
+                </div>
               </div>
-            )}
+              {commissionSummary && commissionSummary.ytd_pending > 0 && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
+                  <Clock className="h-3 w-3" />
+                  {formatFullCurrency(commissionSummary.ytd_pending / 100)} pending
+                </div>
+              )}
+            </div>
           </div>
-          <div className="h-[220px] w-full">
+          <div className="h-[260px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
+              <ComposedChart
                 data={commissionChartData}
                 margin={{ top: 5, right: 5, bottom: 0, left: -10 }}
               >
                 <defs>
                   <linearGradient id="commGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--foreground))" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0} />
+                    <stop offset="5%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis
@@ -649,20 +678,59 @@ export default function DataPage() {
                     fontSize: "12px",
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
-                  formatter={(value: number, name: string) => [
-                    name === "earned" ? formatFullCurrency(value) : value,
-                    name === "earned" ? "Earned" : "Deals",
-                  ]}
+                  formatter={(value: number, name: string) => {
+                    if (name === "deals") return [value, "Deals"];
+                    const labels: Record<string, string> = { earned: "Gross Commission", net: "Net Income", bench1: "1% Benchmark", bench2: "2% Benchmark", bench3: "3% Benchmark" };
+                    return [formatFullCurrency(value), labels[name] || name];
+                  }}
                 />
                 <Area
                   type="monotone"
                   dataKey="earned"
-                  stroke="hsl(var(--foreground))"
+                  stroke="hsl(142, 71%, 45%)"
                   strokeWidth={2}
                   fill="url(#commGradient)"
                   name="earned"
                 />
-              </AreaChart>
+                <Line
+                  type="monotone"
+                  dataKey="net"
+                  stroke="hsl(217, 91%, 60%)"
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: "hsl(217, 91%, 60%)" }}
+                  name="net"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="bench1"
+                  stroke="#f59e0b"
+                  strokeWidth={1}
+                  strokeDasharray="6 3"
+                  dot={false}
+                  name="bench1"
+                  opacity={0.5}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="bench2"
+                  stroke="#f97316"
+                  strokeWidth={1}
+                  strokeDasharray="6 3"
+                  dot={false}
+                  name="bench2"
+                  opacity={0.5}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="bench3"
+                  stroke="#ef4444"
+                  strokeWidth={1}
+                  strokeDasharray="6 3"
+                  dot={false}
+                  name="bench3"
+                  opacity={0.5}
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
           {commissionSummary && (
@@ -672,7 +740,7 @@ export default function DataPage() {
                   Total Earned
                 </p>
                 <p className="text-sm font-bold mt-0.5">
-                  {formatFullCurrency(commissionSummary.total_earned)}
+                  {formatFullCurrency(commissionSummary.total_earned / 100)}
                 </p>
               </div>
               <div>
@@ -680,7 +748,7 @@ export default function DataPage() {
                   Avg / Deal
                 </p>
                 <p className="text-sm font-bold mt-0.5">
-                  {formatFullCurrency(commissionSummary.avg_per_deal)}
+                  {formatFullCurrency(commissionSummary.avg_per_deal / 100)}
                 </p>
               </div>
               <div>
