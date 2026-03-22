@@ -225,7 +225,7 @@ function Layout({ children }: { children: React.ReactNode }) {
               side="left"
               variant="sidebar"
               collapsible="none"
-              className="border-r sticky top-0 h-screen overflow-y-auto shrink-0"
+              className="border-r sticky top-0 h-screen overflow-y-auto shrink-0 hidden md:flex"
             >
               <SidebarHeader>
                 <div className="flex items-center justify-between p-2">
