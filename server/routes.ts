@@ -12667,7 +12667,8 @@ export function registerRoutes(app: Express): Server {
       const { firstName, lastName, email, phone, interestedLevel, notes, preApproved, workingWithAgent, visitorRole, brokerageName } = req.body;
       if (!firstName) return res.status(400).json({ error: "First name is required" });
 
-      const role = ['unrepresented_buyer', 'represented_buyer', 'agent'].includes(visitorRole) ? visitorRole : 'unrepresented_buyer';
+      let role = ['unrepresented_buyer', 'represented_buyer', 'agent'].includes(visitorRole) ? visitorRole : 'unrepresented_buyer';
+      if (role === 'unrepresented_buyer' && workingWithAgent) role = 'represented_buyer';
       const isWorkingWithAgent = role === 'represented_buyer' || workingWithAgent;
 
       const visitor = await storage.createOpenHouseVisitor({
