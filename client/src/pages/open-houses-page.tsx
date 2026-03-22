@@ -131,21 +131,21 @@ function QrCodeModal({ slug, address }: { slug: string; address: string }) {
           {qrError ? (
             <p className="text-sm text-destructive py-8">Failed to generate QR code. Please try again.</p>
           ) : qrDataUrl ? (
-            <img src={qrDataUrl} alt="QR Code" className="mx-auto rounded-lg border" />
+            <img src={qrDataUrl} alt="QR Code" className="mx-auto rounded-lg border w-full max-w-[280px]" />
           ) : (
-            <Skeleton className="h-[400px] w-[400px] mx-auto" />
+            <Skeleton className="h-[280px] w-[280px] mx-auto" />
           )}
-          <p className="text-xs text-muted-foreground break-all">{signInUrl}</p>
-          <div className="flex gap-2">
-            <Button className="flex-1" variant="outline" onClick={() => {
+          <p className="text-xs text-muted-foreground break-all px-2">{signInUrl}</p>
+          <div className="flex gap-2 flex-wrap">
+            <Button className="flex-1 min-w-[100px]" variant="outline" size="sm" onClick={() => {
               navigator.clipboard.writeText(signInUrl);
             }}>
-              <Copy className="h-4 w-4 mr-2" />Copy Link
+              <Copy className="h-3.5 w-3.5 mr-1.5" />Copy Link
             </Button>
-            <Button className="flex-1" variant="outline" onClick={downloadQr} disabled={!qrDataUrl}>
-              <Download className="h-4 w-4 mr-2" />Download
+            <Button className="flex-1 min-w-[100px]" variant="outline" size="sm" onClick={downloadQr} disabled={!qrDataUrl}>
+              <Download className="h-3.5 w-3.5 mr-1.5" />Download
             </Button>
-            <Button className="flex-1" onClick={() => {
+            <Button className="flex-1 min-w-[100px]" size="sm" onClick={() => {
               if (!qrDataUrl) return;
               const win = window.open("", "_blank");
               if (!win) return;
@@ -157,7 +157,7 @@ function QrCodeModal({ slug, address }: { slug: string; address: string }) {
               doc.getElementById("url")!.textContent = signInUrl;
               win.print();
             }} disabled={!qrDataUrl}>
-              <QrCode className="h-4 w-4 mr-2" />Print
+              <QrCode className="h-3.5 w-3.5 mr-1.5" />Print
             </Button>
           </div>
         </div>
