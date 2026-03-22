@@ -2381,9 +2381,18 @@ function ClientTransactionNotifications() {
 
   if (isLoading) return <Skeleton className="h-48 w-full" />;
 
-  const toggle = (field: string) => {
-    mutation.mutate({ [field]: !(prefs as any)?.[field] });
+  type PrefKey = keyof NonNullable<typeof prefs>;
+
+  const toggle = (field: PrefKey) => {
+    mutation.mutate({ [field]: !prefs?.[field] });
   };
+
+  const channels: { key: PrefKey; label: string; desc: string }[] = [
+    { key: 'channelInApp', label: 'In-App', desc: 'Bell icon alerts within the app' },
+    { key: 'channelEmail', label: 'Email', desc: 'Receive email when status changes' },
+    { key: 'channelSms', label: 'SMS', desc: 'Get a text message for each update' },
+    { key: 'channelPush', label: 'Push', desc: 'Browser push notifications' },
+  ];
 
   return (
     <Card>
@@ -2412,24 +2421,19 @@ function ClientTransactionNotifications() {
             <Separator />
             <p className="text-sm font-medium text-muted-foreground">Notification Channels</p>
             <div className="grid gap-3">
-              {[
-                { key: 'channelInApp', label: 'In-App', desc: 'Bell icon alerts within the app' },
-                { key: 'channelEmail', label: 'Email', desc: 'Receive email when status changes' },
-                { key: 'channelSms', label: 'SMS', desc: 'Get a text message for each update' },
-                { key: 'channelPush', label: 'Push', desc: 'Browser push notifications' },
-              ].map(ch => (
+              {channels.map(ch => (
                 <div key={ch.key} className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium">{ch.label}</p>
                     <p className="text-xs text-muted-foreground">{ch.desc}</p>
                   </div>
                   <Button
-                    variant={(prefs as any)?.[ch.key] ? "default" : "outline"}
+                    variant={prefs?.[ch.key] ? "default" : "outline"}
                     size="sm"
                     disabled={mutation.isPending}
                     onClick={() => toggle(ch.key)}
                   >
-                    {(prefs as any)?.[ch.key] ? "On" : "Off"}
+                    {prefs?.[ch.key] ? "On" : "Off"}
                   </Button>
                 </div>
               ))}

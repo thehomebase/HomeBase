@@ -3,7 +3,7 @@ import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useTransactionLock } from "@/hooks/use-transaction-lock";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock, FileSignature, Star, Search, DollarSign, Plus, X, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock, FileSignature, Star, Search, DollarSign, Plus, X, ChevronDown, ChevronUp, Bell, BellOff } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -836,6 +836,8 @@ export default function TransactionPage() {
         </Card>
       )}
 
+      <ClientNotificationStatus transactionId={parsedId} />
+
       <Tabs defaultValue="progress" className="w-full">
         <TabsList className="w-full overflow-x-auto flex-nowrap justify-start">
           <TabsTrigger value="progress" className="shrink-0">
@@ -1144,5 +1146,56 @@ export default function TransactionPage() {
         </DialogContent>
       </Dialog>
     </main>
+  );
+}
+
+function ClientNotificationStatus({ transactionId }: { transactionId: number }) {
+  const { user } = useAuth();
+  const { data, isLoading } = useQuery<{
+    clients: Array<{
+      firstName: string;
+      notificationsEnabled: boolean;
+      channels: { inApp: boolean; email: boolean; sms: boolean; push: boolean } | null;
+    }>;
+  }>({
+    queryKey: ['/api/transactions', transactionId, 'client-notification-status'],
+    queryFn: async () => {
+      const res = await fetch(`/api/transactions/${transactionId}/client-notification-status`);
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+    enabled: !!transactionId && (user?.role === 'agent' || user?.role === 'broker' || user?.role === 'admin'),
+  });
+
+  if (isLoading || !data?.clients?.length) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mb-2">
+      {data.clients.map((client, i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          {client.notificationsEnabled ? (
+            <>
+              <Bell className="h-3.5 w-3.5 text-green-600" />
+              <span>{client.firstName}: notifications on</span>
+              {client.channels && (
+                <span className="text-xs">
+                  ({[
+                    client.channels.inApp && 'in-app',
+                    client.channels.email && 'email',
+                    client.channels.sms && 'SMS',
+                    client.channels.push && 'push',
+                  ].filter(Boolean).join(', ') || 'no channels'})
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <BellOff className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>{client.firstName}: notifications off</span>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }

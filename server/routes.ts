@@ -969,10 +969,13 @@ export function registerRoutes(app: Express): Server {
               }
 
               if (prefs.channelSms && clientUser.phone) {
-                const smsBody = `HomeBase: Your transaction for ${address} has moved to "${statusLabel}". Log in for details.`;
-                sendSMS(clientUser.phone, smsBody).catch((err) => {
-                  console.error('Failed to send transaction status SMS:', err);
-                });
+                const isOptedOut = await storage.isPhoneOptedOut(clientUser.phone);
+                if (!isOptedOut) {
+                  const smsBody = `HomeBase: Your transaction for ${address} has moved to "${statusLabel}". Log in for details.`;
+                  sendSMS(clientUser.phone, smsBody).catch((err) => {
+                    console.error('Failed to send transaction status SMS:', err);
+                  });
+                }
               }
 
               if (prefs.channelPush) {
@@ -12786,6 +12789,39 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error fetching client notification preferences:', error);
       res.status(500).json({ error: 'Failed to fetch preferences' });
+    }
+  });
+
+  app.get("/api/transactions/:id/client-notification-status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const transactionId = parseInt(req.params.id);
+      if (isNaN(transactionId)) return res.status(400).json({ error: 'Invalid transaction ID' });
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
+      if (transaction.agentId !== req.user.id && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const clientUsers = await storage.getClientUserIdsForTransaction(transactionId);
+      const statuses = await Promise.all(
+        clientUsers.map(async (cu) => {
+          const prefs = await storage.getClientNotificationPreferences(cu.userId);
+          return {
+            firstName: cu.firstName,
+            notificationsEnabled: prefs.transactionUpdates,
+            channels: prefs.transactionUpdates ? {
+              inApp: prefs.channelInApp,
+              email: prefs.channelEmail,
+              sms: prefs.channelSms,
+              push: prefs.channelPush,
+            } : null,
+          };
+        })
+      );
+      res.json({ clients: statuses });
+    } catch (error) {
+      console.error('Error fetching client notification status:', error);
+      res.status(500).json({ error: 'Failed to fetch status' });
     }
   });
 
