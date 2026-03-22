@@ -93,15 +93,18 @@ function QrCodeModal({ slug, address }: { slug: string; address: string }) {
   const [open, setOpen] = useState(false);
   const signInUrl = `${window.location.origin}/open-house/${slug}`;
 
+  const [qrError, setQrError] = useState(false);
+
   useEffect(() => {
     if (!open) return;
+    setQrError(false);
     import("qrcode").then((QRCode) => {
       QRCode.toDataURL(signInUrl, {
         width: 400,
         margin: 2,
         color: { dark: "#000000", light: "#ffffff" },
       }).then((url: string) => setQrDataUrl(url));
-    });
+    }).catch(() => setQrError(true));
   }, [open, signInUrl]);
 
   const downloadQr = () => {
@@ -125,7 +128,9 @@ function QrCodeModal({ slug, address }: { slug: string; address: string }) {
         </DialogHeader>
         <div className="text-center space-y-4">
           <p className="text-sm text-muted-foreground">{address}</p>
-          {qrDataUrl ? (
+          {qrError ? (
+            <p className="text-sm text-destructive py-8">Failed to generate QR code. Please try again.</p>
+          ) : qrDataUrl ? (
             <img src={qrDataUrl} alt="QR Code" className="mx-auto rounded-lg border" />
           ) : (
             <Skeleton className="h-[400px] w-[400px] mx-auto" />
