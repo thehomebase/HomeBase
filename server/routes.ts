@@ -952,7 +952,13 @@ export function registerRoutes(app: Express): Server {
 
         (async () => {
           try {
-            const clientUsers = await storage.getClientUserIdsForTransaction(transaction.id);
+            const allClientUsers = await storage.getClientUserIdsForTransaction(transaction.id);
+            const seen = new Set<number>();
+            const clientUsers = allClientUsers.filter(cu => {
+              if (seen.has(cu.userId)) return false;
+              seen.add(cu.userId);
+              return true;
+            });
             for (const clientUser of clientUsers) {
               const prefs = await storage.getClientNotificationPreferences(clientUser.userId);
               if (!prefs.transactionUpdates) continue;
@@ -12783,6 +12789,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/client-notification-preferences", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== 'client') return res.status(403).json({ error: 'Client role required' });
     try {
       const prefs = await storage.getClientNotificationPreferences(req.user.id);
       res.json(prefs);
@@ -12794,6 +12801,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/transactions/:id/client-notification-status", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (!['agent', 'broker', 'admin'].includes(req.user.role)) return res.status(403).json({ error: 'Access denied' });
     try {
       const transactionId = parseInt(req.params.id);
       if (isNaN(transactionId)) return res.status(400).json({ error: 'Invalid transaction ID' });
@@ -12826,6 +12834,7 @@ export function registerRoutes(app: Express): Server {
 
   app.put("/api/client-notification-preferences", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== 'client') return res.status(403).json({ error: 'Client role required' });
     try {
       const schema = z.object({
         transactionUpdates: z.boolean(),
