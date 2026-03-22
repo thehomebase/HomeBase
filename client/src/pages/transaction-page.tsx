@@ -3,7 +3,7 @@ import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useTransactionLock } from "@/hooks/use-transaction-lock";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock, FileSignature, Star, Search } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock, FileSignature, Star, Search, DollarSign, Plus, X, ChevronDown, ChevronUp } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
 export default function TransactionPage() {
@@ -139,6 +140,82 @@ export default function TransactionPage() {
     },
   });
   const [selectedLenderId, setSelectedLenderId] = useState<string>("");
+  const [showCommission, setShowCommission] = useState(false);
+  const [commissionForm, setCommissionForm] = useState({
+    commissionRate: "",
+    commissionAmount: "",
+    brokerageSplitPercent: "30",
+    referralFeePercent: "0",
+    notes: "",
+    status: "pending",
+    paidDate: "",
+    expenses: [] as { description: string; amount: number }[],
+  });
+
+  const { data: commissionEntry } = useQuery<any>({
+    queryKey: ["/api/commissions/transaction", parsedId],
+    queryFn: async () => {
+      const res = await fetch(`/api/commissions?transactionId=${parsedId}`);
+      if (!res.ok) return null;
+      const entries = await res.json();
+      return entries.find((e: any) => e.transaction_id === parsedId || e.transactionId === parsedId) || null;
+    },
+    enabled: !!parsedId && isAgent,
+  });
+
+  useEffect(() => {
+    if (commissionEntry) {
+      const rate = commissionEntry.commission_rate ?? commissionEntry.commissionRate;
+      const amount = commissionEntry.commission_amount ?? commissionEntry.commissionAmount;
+      const brokSplit = commissionEntry.brokerage_split_percent ?? commissionEntry.brokerageSplitPercent;
+      const refFee = commissionEntry.referral_fee_percent ?? commissionEntry.referralFeePercent;
+      const paidD = commissionEntry.paid_date ?? commissionEntry.paidDate;
+      setCommissionForm({
+        commissionRate: rate?.toString() || "",
+        commissionAmount: amount ? String(amount / 100) : "",
+        brokerageSplitPercent: brokSplit?.toString() || "30",
+        referralFeePercent: refFee?.toString() || "0",
+        notes: commissionEntry.notes || "",
+        status: commissionEntry.status || "pending",
+        paidDate: paidD ? paidD.split("T")[0] : "",
+        expenses: (commissionEntry.expenses || []).map((e: any) => ({ ...e, amount: e.amount / 100 })),
+      });
+    }
+  }, [commissionEntry]);
+
+  const saveCommissionMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (commissionEntry) {
+        const res = await apiRequest("PATCH", `/api/commissions/${commissionEntry.id}`, data);
+        if (!res.ok) throw new Error("Failed to update commission");
+      } else {
+        const res = await apiRequest("POST", "/api/commissions", { ...data, transactionId: parsedId });
+        if (!res.ok) throw new Error("Failed to create commission");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/commissions/transaction", parsedId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/commissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/commissions/summary"] });
+      toast({ title: commissionEntry ? "Commission updated" : "Commission saved" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error saving commission", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleSaveCommission = () => {
+    saveCommissionMutation.mutate({
+      commissionRate: commissionForm.commissionRate,
+      commissionAmount: Math.round(parseFloat(commissionForm.commissionAmount || "0") * 100),
+      brokerageSplitPercent: commissionForm.brokerageSplitPercent,
+      referralFeePercent: commissionForm.referralFeePercent || "0",
+      expenses: commissionForm.expenses.map(e => ({ description: e.description, amount: Math.round(e.amount * 100) })),
+      notes: commissionForm.notes,
+      status: commissionForm.status,
+      paidDate: commissionForm.status === "paid" && commissionForm.paidDate ? commissionForm.paidDate : null,
+    });
+  };
 
   const { data: lenderStatus } = useQuery<{
     linked: boolean;
@@ -567,6 +644,192 @@ export default function TransactionPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {isAgent && (
+        <Card className="mb-6">
+          <CardContent className="pt-4 pb-4">
+            <button
+              className="flex items-center justify-between w-full text-left"
+              onClick={() => setShowCommission(!showCommission)}
+            >
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-emerald-600" />
+                <span className="text-sm font-semibold">Commission</span>
+                {commissionEntry && (
+                  <Badge variant="secondary" className={commissionEntry.status === "paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}>
+                    {commissionEntry.status === "paid" ? "Paid" : "Pending"}
+                  </Badge>
+                )}
+                {(commissionEntry?.commission_amount || commissionEntry?.commissionAmount) && (
+                  <span className="text-sm text-muted-foreground ml-1">
+                    {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((commissionEntry.commission_amount ?? commissionEntry.commissionAmount) / 100)}
+                  </span>
+                )}
+              </div>
+              {showCommission ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </button>
+            {showCommission && (
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Commission Rate (%)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g. 3.0"
+                      value={commissionForm.commissionRate}
+                      onChange={(e) => setCommissionForm({ ...commissionForm, commissionRate: e.target.value })}
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Commission Amount ($)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g. 15000"
+                      value={commissionForm.commissionAmount}
+                      onChange={(e) => setCommissionForm({ ...commissionForm, commissionAmount: e.target.value })}
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Brokerage Split (%)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={commissionForm.brokerageSplitPercent}
+                      onChange={(e) => setCommissionForm({ ...commissionForm, brokerageSplitPercent: e.target.value })}
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Referral Fee (%)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={commissionForm.referralFeePercent}
+                      onChange={(e) => setCommissionForm({ ...commissionForm, referralFeePercent: e.target.value })}
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-xs">Expenses</Label>
+                    {!isReadOnly && (
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCommissionForm({ ...commissionForm, expenses: [...commissionForm.expenses, { description: "", amount: 0 }] })}>
+                        <Plus className="h-3 w-3 mr-1" /> Add
+                      </Button>
+                    )}
+                  </div>
+                  {commissionForm.expenses.map((exp, idx) => (
+                    <div key={idx} className="flex gap-2 mb-2">
+                      <Input
+                        placeholder="Description"
+                        value={exp.description}
+                        onChange={(e) => {
+                          const updated = [...commissionForm.expenses];
+                          updated[idx] = { ...updated[idx], description: e.target.value };
+                          setCommissionForm({ ...commissionForm, expenses: updated });
+                        }}
+                        className="flex-1"
+                        disabled={isReadOnly}
+                      />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Amount"
+                        value={exp.amount || ""}
+                        onChange={(e) => {
+                          const updated = [...commissionForm.expenses];
+                          updated[idx] = { ...updated[idx], amount: parseFloat(e.target.value) || 0 };
+                          setCommissionForm({ ...commissionForm, expenses: updated });
+                        }}
+                        className="w-28"
+                        disabled={isReadOnly}
+                      />
+                      {!isReadOnly && (
+                        <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setCommissionForm({ ...commissionForm, expenses: commissionForm.expenses.filter((_, i) => i !== idx) })}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Notes</Label>
+                  <Textarea
+                    value={commissionForm.notes}
+                    onChange={(e) => setCommissionForm({ ...commissionForm, notes: e.target.value })}
+                    rows={2}
+                    disabled={isReadOnly}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Status</Label>
+                    <Select
+                      value={commissionForm.status}
+                      onValueChange={(v) => setCommissionForm({ ...commissionForm, status: v })}
+                      disabled={isReadOnly}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {commissionForm.status === "paid" && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Paid Date</Label>
+                      <Input
+                        type="date"
+                        value={commissionForm.paidDate}
+                        onChange={(e) => setCommissionForm({ ...commissionForm, paidDate: e.target.value })}
+                        disabled={isReadOnly}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {(() => {
+                  const gross = parseFloat(commissionForm.commissionAmount || "0");
+                  const brokSplit = parseFloat(commissionForm.brokerageSplitPercent || "0");
+                  const refFee = parseFloat(commissionForm.referralFeePercent || "0");
+                  const expTotal = commissionForm.expenses.reduce((s, e) => s + (e.amount || 0), 0);
+                  const afterBrok = gross * (1 - brokSplit / 100);
+                  const afterRef = afterBrok * (1 - refFee / 100);
+                  const net = afterRef - expTotal;
+                  return gross > 0 ? (
+                    <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
+                      <div className="flex justify-between"><span className="text-muted-foreground">Gross Commission</span><span>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(gross)}</span></div>
+                      {brokSplit > 0 && <div className="flex justify-between"><span className="text-muted-foreground">After Brokerage ({brokSplit}%)</span><span>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(afterBrok)}</span></div>}
+                      {refFee > 0 && <div className="flex justify-between"><span className="text-muted-foreground">After Referral ({refFee}%)</span><span>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(afterRef)}</span></div>}
+                      {expTotal > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Expenses</span><span className="text-destructive">-{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(expTotal)}</span></div>}
+                      <div className="flex justify-between font-semibold border-t pt-1"><span>Net Commission</span><span className="text-emerald-600">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(net)}</span></div>
+                    </div>
+                  ) : null;
+                })()}
+
+                {!isReadOnly && (
+                  <Button className="w-full" onClick={handleSaveCommission} disabled={saveCommissionMutation.isPending}>
+                    {saveCommissionMutation.isPending ? "Saving..." : (commissionEntry ? "Update Commission" : "Save Commission")}
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="progress" className="w-full">
         <TabsList className="w-full overflow-x-auto flex-nowrap justify-start">

@@ -235,6 +235,7 @@ export default function DataPage() {
       volume: 0,
       deals: 0,
       cumulative: 0,
+      commission: 0,
     }));
 
     transactions
@@ -251,6 +252,14 @@ export default function DataPage() {
         data[monthIdx].deals += 1;
       });
 
+    if (commissionSummary?.monthly) {
+      commissionSummary.monthly
+        .filter((m) => m.year === currentYear)
+        .forEach((m) => {
+          data[m.month - 1].commission += m.total / 100;
+        });
+    }
+
     let running = 0;
     data.forEach((d) => {
       running += d.volume;
@@ -258,7 +267,7 @@ export default function DataPage() {
     });
 
     return data;
-  }, [transactions, currentYear, allMonths]);
+  }, [transactions, currentYear, allMonths, commissionSummary]);
 
   const pipelineData = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -458,6 +467,7 @@ export default function DataPage() {
                   }}
                   formatter={(value: number, name: string) => {
                     if (name === "deals") return [value, "Deals"];
+                    if (name === "commission") return [formatFullCurrency(value), "Commission"];
                     return [
                       formatFullCurrency(value),
                       name === "volume" ? "Monthly Volume" : "Cumulative",
@@ -470,6 +480,14 @@ export default function DataPage() {
                   fill="hsl(var(--foreground))"
                   radius={[3, 3, 0, 0]}
                   name="volume"
+                  opacity={0.85}
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="commission"
+                  fill="hsl(142, 71%, 45%)"
+                  radius={[3, 3, 0, 0]}
+                  name="commission"
                   opacity={0.85}
                 />
                 <Line
