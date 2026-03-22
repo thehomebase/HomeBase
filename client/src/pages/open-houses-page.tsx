@@ -144,8 +144,13 @@ function QrCodeModal({ slug, address }: { slug: string; address: string }) {
               if (!qrDataUrl) return;
               const win = window.open("", "_blank");
               if (!win) return;
-              win.document.write(`<html><head><title>QR Code - ${address}</title><style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;margin:0}img{max-width:400px}p{margin-top:16px;font-size:14px;color:#666;word-break:break-all;max-width:400px;text-align:center}h2{margin-bottom:8px}</style></head><body><h2>${address}</h2><img src="${qrDataUrl}" /><p>${signInUrl}</p><script>window.print();</script></body></html>`);
-              win.document.close();
+              const doc = win.document;
+              doc.write(`<html><head><title>QR Code</title><style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;margin:0}img{max-width:400px}p{margin-top:16px;font-size:14px;color:#666;word-break:break-all;max-width:400px;text-align:center}h2{margin-bottom:8px}</style></head><body><h2 id="addr"></h2><img id="qr" /><p id="url"></p></body></html>`);
+              doc.close();
+              doc.getElementById("addr")!.textContent = address;
+              doc.getElementById("qr")!.setAttribute("src", qrDataUrl);
+              doc.getElementById("url")!.textContent = signInUrl;
+              win.print();
             }} disabled={!qrDataUrl}>
               <QrCode className="h-4 w-4 mr-2" />Print
             </Button>
