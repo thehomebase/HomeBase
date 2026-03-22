@@ -399,111 +399,108 @@ export default function OpenHousesPage() {
           {openHouses.map((oh: any) => (
             <Card key={oh.id} className="overflow-hidden">
               <div className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold truncate">{oh.address}</h3>
-                      <StatusBadge status={oh.status} />
-                    </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                      {(oh.city || oh.state) && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3.5 w-3.5" />
-                          {[oh.city, oh.state].filter(Boolean).join(", ")}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {formatDate(oh.date)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        {formatTime(oh.start_time)} – {formatTime(oh.end_time)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3.5 w-3.5" />
-                        {oh.visitor_count || 0} visitor{(oh.visitor_count || 0) !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <QrCodeModal slug={oh.slug} address={oh.address} />
-                    <Button variant="ghost" size="icon" onClick={() => copySignInLink(oh.slug)} title="Copy sign-in link">
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    {nextStatus[oh.status] && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant={nextStatus[oh.status] === "active" ? "default" : "outline"}
-                              size="sm"
-                              disabled={updatingStatusId === oh.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setUpdatingStatusId(oh.id);
-                                updateMutation.mutate({ id: oh.id, data: { status: nextStatus[oh.status] } });
-                              }}
-                            >
-                              {updatingStatusId === oh.id ? "Updating..." : nextStatus[oh.status] === "active" ? (
-                                <><Play className="h-3.5 w-3.5 mr-1.5" />Go Live</>
-                              ) : (
-                                <><CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />End Session</>
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-[220px] text-center">
-                            {nextStatus[oh.status] === "active"
-                              ? "Start the open house session and enable the visitor sign-in page for guests"
-                              : "End the open house session and close the visitor sign-in page"}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    <Dialog open={editingHouse?.id === oh.id} onOpenChange={(open) => !open && setEditingHouse(null)}>
-                      <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => setEditingHouse(oh)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Edit Open House</DialogTitle>
-                        </DialogHeader>
-                        <OpenHouseForm
-                          initial={editingHouse}
-                          onSubmit={(data) => updateMutation.mutate({ id: oh.id, data })}
-                          isPending={updateMutation.isPending}
-                        />
-                      </DialogContent>
-                    </Dialog>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Open House?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete this open house and all visitor data. This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteMutation.mutate(oh.id)}>Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setExpandedId(expandedId === oh.id ? null : oh.id)}
-                    >
-                      {expandedId === oh.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </Button>
-                  </div>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="font-semibold truncate flex-1 min-w-0">{oh.address}</h3>
+                  <StatusBadge status={oh.status} />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 h-8 w-8"
+                    onClick={() => setExpandedId(expandedId === oh.id ? null : oh.id)}
+                  >
+                    {expandedId === oh.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground mb-3">
+                  {(oh.city || oh.state) && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {[oh.city, oh.state].filter(Boolean).join(", ")}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {formatDate(oh.date)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    {formatTime(oh.start_time)} – {formatTime(oh.end_time)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Users className="h-3.5 w-3.5" />
+                    {oh.visitor_count || 0} visitor{(oh.visitor_count || 0) !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {nextStatus[oh.status] && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant={nextStatus[oh.status] === "active" ? "default" : "outline"}
+                            size="sm"
+                            disabled={updatingStatusId === oh.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setUpdatingStatusId(oh.id);
+                              updateMutation.mutate({ id: oh.id, data: { status: nextStatus[oh.status] } });
+                            }}
+                          >
+                            {updatingStatusId === oh.id ? "Updating..." : nextStatus[oh.status] === "active" ? (
+                              <><Play className="h-3.5 w-3.5 mr-1.5" />Go Live</>
+                            ) : (
+                              <><CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />End Session</>
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-[220px] text-center">
+                          {nextStatus[oh.status] === "active"
+                            ? "Start the open house session and enable the visitor sign-in page for guests"
+                            : "End the open house session and close the visitor sign-in page"}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  <QrCodeModal slug={oh.slug} address={oh.address} />
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copySignInLink(oh.slug)} title="Copy sign-in link">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Dialog open={editingHouse?.id === oh.id} onOpenChange={(open) => !open && setEditingHouse(null)}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingHouse(oh)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Edit Open House</DialogTitle>
+                      </DialogHeader>
+                      <OpenHouseForm
+                        initial={editingHouse}
+                        onSubmit={(data) => updateMutation.mutate({ id: oh.id, data })}
+                        isPending={updateMutation.isPending}
+                      />
+                    </DialogContent>
+                  </Dialog>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Open House?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently delete this open house and all visitor data. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deleteMutation.mutate(oh.id)}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
               {oh.status === "active" && (
