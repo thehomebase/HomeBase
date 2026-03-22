@@ -12,7 +12,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
-import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, syncTransactionToGoogleCalendar, syncAllTransactionsToGoogleCalendar, type EmailAttachment } from "./gmail-service";
+import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, syncTransactionToGoogleCalendar, syncAllTransactionsToGoogleCalendar, countGmailEmailsForClients, type EmailAttachment } from "./gmail-service";
 import { getSignNowAuthUrl, handleSignNowCallback, getSignNowStatus, disconnectSignNow, uploadDocument as snUploadDocument, sendSigningInvite, getDocumentStatus as snGetDocumentStatus, getDocuments as snGetDocuments, downloadDocument as snDownloadDocument, isSignNowConfigured, logSignNowAction } from "./signnow-service";
 import { getDocuSignAuthUrl, handleDocuSignCallback, getDocuSignStatus, disconnectDocuSign, createEnvelope, createDraftEnvelope, createSenderView, getEnvelopeStatus, listEnvelopes, downloadEnvelopeDocuments, isDocuSignConfigured, logDocuSignAction, generatePKCE } from "./docusign-service";
 import { isDropboxConfigured, generateDropboxState, getDropboxAuthUrl, handleDropboxCallback, getDropboxConnectionStatus, disconnectDropbox, listDropboxFiles, downloadDropboxFile, searchDropboxFiles } from "./dropbox-service";
@@ -1485,6 +1485,30 @@ export function registerRoutes(app: Express): Server {
       const parsedContactId = req.query.contactId ? parseInt(req.query.contactId as string) : undefined;
       const contactId = parsedContactId && Number.isFinite(parsedContactId) ? parsedContactId : undefined;
       const metrics = await storage.getCommunicationMetrics(req.user.id, contactId);
+
+      if (!contactId) {
+        try {
+          const clients = await storage.getClientsByAgent(req.user.id);
+          const clientEmails = clients
+            .map((c: any) => c.email)
+            .filter((e: string | null | undefined): e is string => !!e && e.includes("@"));
+          if (clientEmails.length > 0) {
+            const gmailCounts = await countGmailEmailsForClients(req.user.id, clientEmails);
+            if (!gmailCounts.error) {
+              metrics.email = {
+                today: gmailCounts.today,
+                thisWeek: gmailCounts.thisWeek,
+                thisMonth: gmailCounts.thisMonth,
+                total: gmailCounts.total,
+              };
+              metrics.emailSource = "gmail";
+            }
+          }
+        } catch (gmailErr) {
+          console.error("Gmail email count failed (non-blocking):", gmailErr);
+        }
+      }
+
       res.json(metrics);
     } catch (error) {
       console.error('Error fetching communication metrics:', error);

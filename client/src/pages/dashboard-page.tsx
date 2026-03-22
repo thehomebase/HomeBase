@@ -29,7 +29,6 @@ const AGENT_WIDGETS = [
   { id: "pipeline", label: "Deal Pipeline" },
   { id: "stats", label: "Key Metrics" },
   { id: "communications", label: "Communications" },
-  { id: "activity_chart", label: "Activity Chart (24h)" },
   { id: "leads", label: "Leads Overview" },
   { id: "deadlines", label: "Upcoming Deadlines" },
   { id: "recent", label: "Recent Activity" },
@@ -121,51 +120,6 @@ function StatCard({ icon: Icon, label, value, subValue, change, accent }: {
         <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
           <Icon className="h-5 w-5 text-muted-foreground" />
         </div>
-      </div>
-    </Card>
-  );
-}
-
-function ActivityChart({ data }: { data: { hour: number; messages: number; sms: number; emails: number }[] }) {
-  const total = data.reduce((s, d) => s + d.messages + d.sms + d.emails, 0);
-  return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="font-semibold text-sm">Activity</h3>
-          <p className="text-xs text-muted-foreground">Messages & communications in the last 24 hours</p>
-        </div>
-        <div className="text-right">
-          <p className="text-2xl font-bold">{total}</p>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total</p>
-        </div>
-      </div>
-      <div className="h-[180px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-            <XAxis
-              dataKey="hour"
-              tick={{ fontSize: 10 }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(h) => `${h}:00`}
-              interval={3}
-            />
-            <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} allowDecimals={false} />
-            <Tooltip
-              labelFormatter={(h) => `${h}:00`}
-              contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))" }}
-            />
-            <Bar dataKey="messages" stackId="a" fill="#6366f1" maxBarSize={20} name="Messages" />
-            <Bar dataKey="sms" stackId="a" fill="#3b82f6" maxBarSize={20} name="SMS" />
-            <Bar dataKey="emails" stackId="a" fill="#10b981" maxBarSize={20} name="Emails" radius={[3, 3, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="flex gap-4 mt-3 pt-3 border-t justify-center">
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "#6366f1" }} /><span className="text-xs text-muted-foreground">Messages</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "#3b82f6" }} /><span className="text-xs text-muted-foreground">SMS</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ background: "#10b981" }} /><span className="text-xs text-muted-foreground">Emails</span></div>
       </div>
     </Card>
   );
@@ -863,11 +817,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {isWidgetVisible("activity_chart") && dashData.activityChart && (
-            <div className="mb-6">
-              <ActivityChart data={dashData.activityChart} />
-            </div>
-          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             {isWidgetVisible("deadlines") && (

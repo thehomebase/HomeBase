@@ -652,3 +652,58 @@ export async function syncTransactionToGoogleCalendar(
     return { synced: false, error: error?.message || "Calendar sync failed" };
   }
 }
+
+export async function countGmailEmailsForClients(
+  userId: number,
+  clientEmails: string[]
+): Promise<{ total: number; today: number; thisWeek: number; thisMonth: number; error?: string }> {
+  const zero = { total: 0, today: 0, thisWeek: 0, thisMonth: 0 };
+  try {
+    if (!clientEmails.length) return zero;
+
+    const auth = await getAuthenticatedClient(userId);
+    if (!auth) {
+      return { ...zero, error: "Gmail not connected" };
+    }
+
+    const gmail = google.gmail({ version: "v1", auth: auth.client });
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = new Date(todayStart);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const formatDate = (d: Date) =>
+      `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+
+    const limitedEmails = clientEmails.slice(0, 50);
+    const emailQuery = limitedEmails.map((e) => `from:${e} OR to:${e}`).join(" OR ");
+
+    const countMessages = async (afterDate?: Date): Promise<number> => {
+      const q = afterDate ? `(${emailQuery}) after:${formatDate(afterDate)}` : `(${emailQuery})`;
+      try {
+        const res = await gmail.users.messages.list({
+          userId: "me",
+          q,
+          maxResults: 1,
+        });
+        return res.data.resultSizeEstimate || 0;
+      } catch {
+        return 0;
+      }
+    };
+
+    const [total, today, thisWeek, thisMonth] = await Promise.all([
+      countMessages(),
+      countMessages(todayStart),
+      countMessages(weekStart),
+      countMessages(monthStart),
+    ]);
+
+    return { total, today, thisWeek, thisMonth };
+  } catch (error: any) {
+    console.error("Gmail email count error:", error?.message);
+    return { ...zero, error: error?.message || "Failed to count emails" };
+  }
+}
