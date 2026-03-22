@@ -420,12 +420,22 @@ export default function DataPage() {
             <div>
               <h3 className="text-sm font-semibold">Sales Performance</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Monthly volume &amp; cumulative trend
+                Monthly volume, cumulative trend & commission
               </p>
             </div>
-            <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
-              {currentYear}
-            </span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-foreground opacity-85" />
+                <span className="text-[10px] text-muted-foreground">Volume</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(142, 71%, 45%)" }} />
+                <span className="text-[10px] text-muted-foreground">Commission</span>
+              </div>
+              <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
+                {currentYear}
+              </span>
+            </div>
           </div>
           <div className="h-[280px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -482,13 +492,14 @@ export default function DataPage() {
                   name="volume"
                   opacity={0.85}
                 />
-                <Bar
-                  yAxisId="left"
+                <Line
+                  yAxisId="right"
+                  type="monotone"
                   dataKey="commission"
-                  fill="hsl(142, 71%, 45%)"
-                  radius={[3, 3, 0, 0]}
+                  stroke="hsl(142, 71%, 45%)"
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: "hsl(142, 71%, 45%)" }}
                   name="commission"
-                  opacity={0.85}
                 />
                 <Line
                   yAxisId="right"
