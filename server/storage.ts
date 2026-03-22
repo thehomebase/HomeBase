@@ -6728,7 +6728,13 @@ export class DatabaseStorage implements IStorage {
         AND u.role = 'client'
         AND u.account_status = 'active'
     `);
-    return (result.rows as any[]).map(r => ({
+    interface ClientUserRow {
+      userId: string | number;
+      email: string | null;
+      phone: string | null;
+      firstName: string | null;
+    }
+    return (result.rows as ClientUserRow[]).map(r => ({
       userId: Number(r.userId),
       email: r.email ? String(r.email) : null,
       phone: r.phone ? String(r.phone) : null,

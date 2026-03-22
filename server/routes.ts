@@ -12797,9 +12797,8 @@ export function registerRoutes(app: Express): Server {
     try {
       const transactionId = parseInt(req.params.id);
       if (isNaN(transactionId)) return res.status(400).json({ error: 'Invalid transaction ID' });
-      const transaction = await storage.getTransaction(transactionId);
-      if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
-      if (transaction.agentId !== req.user.id && req.user.role !== 'admin') {
+      const { allowed } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+      if (!allowed) {
         return res.status(403).json({ error: 'Access denied' });
       }
       const clientUsers = await storage.getClientUserIdsForTransaction(transactionId);
