@@ -464,7 +464,7 @@ export default function DataPage() {
                   tickFormatter={formatCurrency}
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 11, fill: "hsl(142, 71%, 45%)" }}
                   width={55}
                 />
                 <RechartsTooltip
@@ -502,7 +502,7 @@ export default function DataPage() {
                   name="commission"
                 />
                 <Line
-                  yAxisId="right"
+                  yAxisId="left"
                   type="monotone"
                   dataKey="cumulative"
                   stroke="hsl(var(--foreground))"
