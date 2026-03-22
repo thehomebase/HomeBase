@@ -12801,7 +12801,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/transactions/:id/client-notification-status", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    if (!['agent', 'broker', 'admin'].includes(req.user.role)) return res.status(403).json({ error: 'Access denied' });
+    if (!['agent', 'broker'].includes(req.user.role)) return res.status(403).json({ error: 'Access denied' });
     try {
       const transactionId = parseInt(req.params.id);
       if (isNaN(transactionId)) return res.status(400).json({ error: 'Invalid transaction ID' });

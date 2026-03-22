@@ -2364,7 +2364,15 @@ function ClientTransactionNotifications() {
 
   const mutation = useMutation({
     mutationFn: async (updates: Record<string, boolean>) => {
+      const defaults = {
+        transactionUpdates: false,
+        channelEmail: false,
+        channelSms: false,
+        channelPush: false,
+        channelInApp: false,
+      };
       const res = await apiRequest('PUT', '/api/client-notification-preferences', {
+        ...defaults,
         ...prefs,
         ...updates,
       });
