@@ -6301,7 +6301,7 @@ export class DatabaseStorage implements IStorage {
   async createCommissionEntry(data: any): Promise<any> {
     const result = await db.execute(sql`
       INSERT INTO commission_entries (transaction_id, agent_id, commission_rate, commission_amount, brokerage_split_percent, referral_fee_percent, expenses, notes, status, paid_date)
-      VALUES (${data.transactionId}, ${data.agentId}, ${data.commissionRate || null}, ${data.commissionAmount || null}, ${data.brokerageSplitPercent || null}, ${data.referralFeePercent || null}, ${data.expenses ? JSON.stringify(data.expenses) : null}, ${data.notes || null}, ${data.status || 'pending'}, ${data.paidDate || null})
+      VALUES (${data.transactionId}, ${data.agentId}, ${data.commissionRate ?? null}, ${data.commissionAmount ?? null}, ${data.brokerageSplitPercent ?? null}, ${data.referralFeePercent ?? null}, ${data.expenses ? JSON.stringify(data.expenses) : null}, ${data.notes || null}, ${data.status || 'pending'}, ${data.paidDate || null})
       RETURNING *
     `);
     return result.rows[0];
@@ -6335,16 +6335,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCommissionEntry(id: number, data: any): Promise<any> {
+    const rate = data.commissionRate !== undefined ? data.commissionRate : null;
+    const amount = data.commissionAmount !== undefined ? data.commissionAmount : null;
+    const brokSplit = data.brokerageSplitPercent !== undefined ? data.brokerageSplitPercent : null;
+    const refFee = data.referralFeePercent !== undefined ? data.referralFeePercent : null;
     const result = await db.execute(sql`
       UPDATE commission_entries
-      SET commission_rate = COALESCE(${data.commissionRate}, commission_rate),
-          commission_amount = COALESCE(${data.commissionAmount}, commission_amount),
-          brokerage_split_percent = COALESCE(${data.brokerageSplitPercent}, brokerage_split_percent),
-          referral_fee_percent = COALESCE(${data.referralFeePercent}, referral_fee_percent),
+      SET commission_rate = COALESCE(${rate}, commission_rate),
+          commission_amount = COALESCE(${amount}, commission_amount),
+          brokerage_split_percent = COALESCE(${brokSplit}, brokerage_split_percent),
+          referral_fee_percent = COALESCE(${refFee}, referral_fee_percent),
           expenses = COALESCE(${data.expenses ? JSON.stringify(data.expenses) : null}::json, expenses),
           notes = COALESCE(${data.notes}, notes),
           status = COALESCE(${data.status}, status),
-          paid_date = COALESCE(${data.paidDate}, paid_date)
+          paid_date = ${data.paidDate ?? null}
       WHERE id = ${id}
       RETURNING *
     `);

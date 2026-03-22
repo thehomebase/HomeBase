@@ -678,7 +678,12 @@ export default function TransactionPage() {
                       step="0.01"
                       placeholder="e.g. 3.0"
                       value={commissionForm.commissionRate}
-                      onChange={(e) => setCommissionForm({ ...commissionForm, commissionRate: e.target.value })}
+                      onChange={(e) => {
+                        const rate = e.target.value;
+                        const contractPrice = transaction?.contractPrice || 0;
+                        const autoAmount = rate && contractPrice ? ((parseFloat(rate) / 100) * contractPrice).toFixed(2) : commissionForm.commissionAmount;
+                        setCommissionForm({ ...commissionForm, commissionRate: rate, commissionAmount: autoAmount });
+                      }}
                       disabled={isReadOnly}
                     />
                   </div>
