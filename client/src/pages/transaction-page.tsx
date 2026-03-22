@@ -1164,7 +1164,7 @@ function ClientNotificationStatus({ transactionId }: { transactionId: number }) 
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     },
-    enabled: !!transactionId && (user?.role === 'agent' || user?.role === 'broker' || user?.role === 'admin'),
+    enabled: !!transactionId && (user?.role === 'agent' || user?.role === 'broker'),
   });
 
   if (isLoading || !data?.clients?.length) return null;

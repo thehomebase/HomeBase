@@ -12809,7 +12809,13 @@ export function registerRoutes(app: Express): Server {
       if (!allowed) {
         return res.status(403).json({ error: 'Access denied' });
       }
-      const clientUsers = await storage.getClientUserIdsForTransaction(transactionId);
+      const allClientUsers = await storage.getClientUserIdsForTransaction(transactionId);
+      const seenIds = new Set<number>();
+      const clientUsers = allClientUsers.filter(cu => {
+        if (seenIds.has(cu.userId)) return false;
+        seenIds.add(cu.userId);
+        return true;
+      });
       const statuses = await Promise.all(
         clientUsers.map(async (cu) => {
           const prefs = await storage.getClientNotificationPreferences(cu.userId);
