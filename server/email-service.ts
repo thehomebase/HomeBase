@@ -345,3 +345,50 @@ export async function sendSigningEmail(
     return { success: false, error: error.message || "Failed to send signing email" };
   }
 }
+
+export async function sendTransactionStatusEmail(
+  to: string,
+  clientName: string,
+  propertyAddress: string,
+  newStatus: string,
+  agentName?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!ensureInitialized()) {
+    return { success: false, error: "SendGrid not configured" };
+  }
+
+  const msg = {
+    to,
+    from: {
+      email: getFromEmail(),
+      name: "HomeBase",
+    },
+    subject: `Transaction Update: ${propertyAddress}`,
+    html: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 24px;">
+        <div style="background: white; border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h2 style="color: #1f2937; margin: 0;">Transaction Update</h2>
+          </div>
+          <p style="color: #374151; font-size: 16px;">Hi ${clientName},</p>
+          <p style="color: #374151; font-size: 16px;">Your transaction for <strong>${propertyAddress}</strong> has been updated to a new stage:</p>
+          <div style="text-align: center; margin: 24px 0;">
+            <span style="background: #7c3aed; color: white; padding: 12px 28px; border-radius: 24px; font-size: 18px; font-weight: 600; display: inline-block;">${newStatus}</span>
+          </div>
+          ${agentName ? `<p style="color: #6b7280; font-size: 14px;">Updated by: ${agentName}</p>` : ""}
+          <p style="color: #374151; font-size: 14px;">Log in to your client portal for more details.</p>
+          <p style="font-size: 14px; color: #9ca3af; text-align: center; margin-top: 32px;">Powered by HomeBase</p>
+        </div>
+      </div>
+    `,
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log(`Transaction status email sent to ${to} for "${propertyAddress}"`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("SendGrid transaction status email error:", error?.response?.body || error.message);
+    return { success: false, error: error.message || "Failed to send transaction status email" };
+  }
+}

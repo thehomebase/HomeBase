@@ -2350,8 +2350,100 @@ function TeamAccessSection() {
   );
 }
 
+function ClientTransactionNotifications() {
+  const { toast } = useToast();
+  const { data: prefs, isLoading } = useQuery<{
+    transactionUpdates: boolean;
+    channelEmail: boolean;
+    channelSms: boolean;
+    channelPush: boolean;
+    channelInApp: boolean;
+  }>({
+    queryKey: ['/api/client-notification-preferences'],
+  });
+
+  const mutation = useMutation({
+    mutationFn: async (updates: Record<string, boolean>) => {
+      const res = await apiRequest('PUT', '/api/client-notification-preferences', {
+        ...prefs,
+        ...updates,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/client-notification-preferences'] });
+      toast({ title: "Notification preferences updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save preferences", variant: "destructive" });
+    },
+  });
+
+  if (isLoading) return <Skeleton className="h-48 w-full" />;
+
+  const toggle = (field: string) => {
+    mutation.mutate({ [field]: !(prefs as any)?.[field] });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Transaction Updates</CardTitle>
+        <CardDescription>Get notified when your transaction moves to a new stage</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium">Enable Transaction Notifications</p>
+            <p className="text-sm text-muted-foreground">Receive alerts when your agent updates your transaction status</p>
+          </div>
+          <Button
+            variant={prefs?.transactionUpdates ? "default" : "outline"}
+            size="sm"
+            disabled={mutation.isPending}
+            onClick={() => toggle('transactionUpdates')}
+          >
+            {prefs?.transactionUpdates ? "On" : "Off"}
+          </Button>
+        </div>
+
+        {prefs?.transactionUpdates && (
+          <>
+            <Separator />
+            <p className="text-sm font-medium text-muted-foreground">Notification Channels</p>
+            <div className="grid gap-3">
+              {[
+                { key: 'channelInApp', label: 'In-App', desc: 'Bell icon alerts within the app' },
+                { key: 'channelEmail', label: 'Email', desc: 'Receive email when status changes' },
+                { key: 'channelSms', label: 'SMS', desc: 'Get a text message for each update' },
+                { key: 'channelPush', label: 'Push', desc: 'Browser push notifications' },
+              ].map(ch => (
+                <div key={ch.key} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{ch.label}</p>
+                    <p className="text-xs text-muted-foreground">{ch.desc}</p>
+                  </div>
+                  <Button
+                    variant={(prefs as any)?.[ch.key] ? "default" : "outline"}
+                    size="sm"
+                    disabled={mutation.isPending}
+                    onClick={() => toggle(ch.key)}
+                  >
+                    {(prefs as any)?.[ch.key] ? "On" : "Off"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function NotificationsSection() {
   const { toast } = useToast();
+  const { user } = useAuth();
 
   return (
     <div className="space-y-6">
@@ -2360,6 +2452,8 @@ function NotificationsSection() {
         <p className="text-sm text-muted-foreground">Control how and when you receive notifications</p>
       </div>
       <Separator />
+
+      {user?.role === 'client' && <ClientTransactionNotifications />}
 
       <Card>
         <CardContent className="pt-6 space-y-4">

@@ -1782,3 +1782,23 @@ export const adminMessages = pgTable("admin_messages", {
 });
 
 export type AdminMessage = typeof adminMessages.$inferSelect;
+
+export const clientNotificationPreferences = pgTable("client_notification_preferences", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  transactionUpdates: boolean("transaction_updates").notNull().default(false),
+  channelEmail: boolean("channel_email").notNull().default(false),
+  channelSms: boolean("channel_sms").notNull().default(false),
+  channelPush: boolean("channel_push").notNull().default(false),
+  channelInApp: boolean("channel_in_app").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertClientNotificationPreferencesSchema = createInsertSchema(clientNotificationPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type ClientNotificationPreferences = typeof clientNotificationPreferences.$inferSelect;
+export type InsertClientNotificationPreferences = z.infer<typeof insertClientNotificationPreferencesSchema>;

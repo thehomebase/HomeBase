@@ -511,6 +511,10 @@ export interface IStorage {
   getWebhooks(userId: number): Promise<Webhook[]>;
   getWebhooksByEvent(event: string): Promise<Webhook[]>;
   deleteWebhook(id: number, userId: number): Promise<void>;
+
+  getClientNotificationPreferences(userId: number): Promise<{ userId: number; transactionUpdates: boolean; channelEmail: boolean; channelSms: boolean; channelPush: boolean; channelInApp: boolean }>;
+  upsertClientNotificationPreferences(userId: number, prefs: { transactionUpdates: boolean; channelEmail: boolean; channelSms: boolean; channelPush: boolean; channelInApp: boolean }): Promise<{ userId: number; transactionUpdates: boolean; channelEmail: boolean; channelSms: boolean; channelPush: boolean; channelInApp: boolean }>;
+  getClientUserIdsForTransaction(transactionId: number): Promise<{ userId: number; email: string | null; phone: string | null; firstName: string }[]>;
 }
 
 const PgStore = connectPgSimple(session);
@@ -6673,6 +6677,63 @@ export class DatabaseStorage implements IStorage {
 
   async deleteWebhook(id: number, userId: number): Promise<void> {
     await db.update(webhooks).set({ isActive: false }).where(and(eq(webhooks.id, id), eq(webhooks.userId, userId)));
+  }
+
+  async getClientNotificationPreferences(userId: number): Promise<{ userId: number; transactionUpdates: boolean; channelEmail: boolean; channelSms: boolean; channelPush: boolean; channelInApp: boolean }> {
+    const result = await db.execute(sql`
+      SELECT id, user_id as "userId", transaction_updates as "transactionUpdates",
+        channel_email as "channelEmail", channel_sms as "channelSms",
+        channel_push as "channelPush", channel_in_app as "channelInApp"
+      FROM client_notification_preferences WHERE user_id = ${userId} LIMIT 1
+    `);
+    if (result.rows.length === 0) {
+      return {
+        userId,
+        transactionUpdates: false,
+        channelEmail: false,
+        channelSms: false,
+        channelPush: false,
+        channelInApp: false,
+      };
+    }
+    return result.rows[0];
+  }
+
+  async upsertClientNotificationPreferences(userId: number, prefs: { transactionUpdates: boolean; channelEmail: boolean; channelSms: boolean; channelPush: boolean; channelInApp: boolean }): Promise<{ userId: number; transactionUpdates: boolean; channelEmail: boolean; channelSms: boolean; channelPush: boolean; channelInApp: boolean }> {
+    const result = await db.execute(sql`
+      INSERT INTO client_notification_preferences (user_id, transaction_updates, channel_email, channel_sms, channel_push, channel_in_app, updated_at)
+      VALUES (${userId}, ${!!prefs.transactionUpdates}, ${!!prefs.channelEmail}, ${!!prefs.channelSms}, ${!!prefs.channelPush}, ${!!prefs.channelInApp}, NOW())
+      ON CONFLICT (user_id)
+      DO UPDATE SET
+        transaction_updates = ${!!prefs.transactionUpdates},
+        channel_email = ${!!prefs.channelEmail},
+        channel_sms = ${!!prefs.channelSms},
+        channel_push = ${!!prefs.channelPush},
+        channel_in_app = ${!!prefs.channelInApp},
+        updated_at = NOW()
+      RETURNING id, user_id as "userId", transaction_updates as "transactionUpdates",
+        channel_email as "channelEmail", channel_sms as "channelSms",
+        channel_push as "channelPush", channel_in_app as "channelInApp"
+    `);
+    return result.rows[0];
+  }
+
+  async getClientUserIdsForTransaction(transactionId: number): Promise<{ userId: number; email: string | null; phone: string | null; firstName: string }[]> {
+    const result = await db.execute(sql`
+      SELECT u.id as "userId", u.email, c.phone, c.first_name as "firstName"
+      FROM transactions t
+      JOIN clients c ON c.id = t.client_id OR c.id = t.secondary_client_id
+      JOIN users u ON u.client_record_id = c.id
+      WHERE t.id = ${transactionId}
+        AND u.role = 'client'
+        AND u.account_status = 'active'
+    `);
+    return (result.rows as any[]).map(r => ({
+      userId: Number(r.userId),
+      email: r.email ? String(r.email) : null,
+      phone: r.phone ? String(r.phone) : null,
+      firstName: r.firstName ? String(r.firstName) : 'there',
+    }));
   }
 
 }

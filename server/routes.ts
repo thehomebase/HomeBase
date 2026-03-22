@@ -948,14 +948,56 @@ export function registerRoutes(app: Express): Server {
       if (data.status && oldTransaction && oldTransaction.status !== data.status) {
         const address = [transaction.streetName, transaction.city].filter(Boolean).join(', ') || 'a property';
         const statusLabel = data.status.replace(/_/g, ' ');
-        if (transaction.clientId) {
+        const agentName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'your agent';
+
+        (async () => {
           try {
-            const client = await storage.getClient(transaction.clientId);
-            if (client?.userId) {
-              notify(client.userId, 'transaction_update', 'Transaction Updated', `${address} moved to ${statusLabel}`, transaction.id, 'transaction').catch(() => {});
+            const clientUsers = await storage.getClientUserIdsForTransaction(transaction.id);
+            for (const clientUser of clientUsers) {
+              const prefs = await storage.getClientNotificationPreferences(clientUser.userId);
+              if (!prefs.transactionUpdates) continue;
+
+              if (prefs.channelInApp) {
+                notify(clientUser.userId, 'transaction_update', 'Transaction Updated', `${address} moved to ${statusLabel}`, transaction.id, 'transaction').catch(() => {});
+              }
+
+              if (prefs.channelEmail && clientUser.email) {
+                const { sendTransactionStatusEmail } = await import("./email-service");
+                sendTransactionStatusEmail(clientUser.email, clientUser.firstName, address, statusLabel, agentName).catch((err) => {
+                  console.error('Failed to send transaction status email:', err);
+                });
+              }
+
+              if (prefs.channelSms && clientUser.phone) {
+                const smsBody = `HomeBase: Your transaction for ${address} has moved to "${statusLabel}". Log in for details.`;
+                sendSMS(clientUser.phone, smsBody).catch((err) => {
+                  console.error('Failed to send transaction status SMS:', err);
+                });
+              }
+
+              if (prefs.channelPush) {
+                try {
+                  const subs = await storage.getPushSubscriptionsByUser(clientUser.userId);
+                  if (subs.length > 0) {
+                    const { sendPushNotification } = await import("./notification-service");
+                    sendPushNotification(subs, {
+                      title: 'Transaction Updated',
+                      body: `${address} moved to ${statusLabel}`,
+                      data: { url: `/client-transaction/${transaction.id}` },
+                    }, async (subId) => {
+                      await storage.deletePushSubscription(subId);
+                    }).catch(() => {});
+                  }
+                } catch (pushErr) {
+                  console.error('Failed to send transaction status push:', pushErr);
+                }
+              }
             }
-          } catch (e) {}
-        }
+          } catch (err) {
+            console.error('Error dispatching client transaction notifications:', err);
+          }
+        })();
+
         if (transaction.agentId !== req.user.id) {
           notify(transaction.agentId, 'transaction_update', 'Transaction Updated', `${address} moved to ${statusLabel}`, transaction.id, 'transaction').catch(() => {});
         }
@@ -12733,6 +12775,39 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error marking all notifications read:', error);
       res.status(500).json({ error: 'Failed to mark all notifications read' });
+    }
+  });
+
+  app.get("/api/client-notification-preferences", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const prefs = await storage.getClientNotificationPreferences(req.user.id);
+      res.json(prefs);
+    } catch (error) {
+      console.error('Error fetching client notification preferences:', error);
+      res.status(500).json({ error: 'Failed to fetch preferences' });
+    }
+  });
+
+  app.put("/api/client-notification-preferences", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const schema = z.object({
+        transactionUpdates: z.boolean(),
+        channelEmail: z.boolean(),
+        channelSms: z.boolean(),
+        channelPush: z.boolean(),
+        channelInApp: z.boolean(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid preferences", details: parsed.error.flatten() });
+      }
+      const prefs = await storage.upsertClientNotificationPreferences(req.user.id, parsed.data);
+      res.json(prefs);
+    } catch (error) {
+      console.error('Error updating client notification preferences:', error);
+      res.status(500).json({ error: 'Failed to update preferences' });
     }
   });
 
