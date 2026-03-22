@@ -947,7 +947,7 @@ export function registerRoutes(app: Express): Server {
 
       if (data.status && oldTransaction && oldTransaction.status !== data.status) {
         const address = [transaction.streetName, transaction.city].filter(Boolean).join(', ') || 'a property';
-        const statusLabel = data.status.replace(/_/g, ' ');
+        const statusLabel = data.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         const agentName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'your agent';
 
         (async () => {
