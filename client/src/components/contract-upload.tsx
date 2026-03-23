@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Check, X, Shield, AlertTriangle, Loader2, Users, Pencil, ArrowLeftRight, Sparkles, Bot } from "lucide-react";
+import { Upload, FileText, Check, X, Shield, AlertTriangle, Loader2, Users, Pencil, ArrowLeftRight, Sparkles, Bot, RefreshCw, UserPlus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { type Transaction } from "@shared/schema";
 import { Separator } from "@/components/ui/separator";
@@ -150,6 +150,20 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
   const [documentType, setDocumentType] = useState<string | null>(null);
   const [documentNotes, setDocumentNotes] = useState<string | null>(null);
 
+  interface ExistingContact {
+    id: number;
+    role: string;
+    firstName: string;
+    lastName: string;
+    email?: string;
+    phone?: string;
+  }
+
+  type ContactMatchStatus = "new" | "update" | "exists";
+
+  const [existingContacts, setExistingContacts] = useState<ExistingContact[]>([]);
+  const [contactMatchStatuses, setContactMatchStatuses] = useState<Record<number, { status: ContactMatchStatus; matchedContact?: ExistingContact }>>({});
+
   const overwriteFields = extractedData
     ? TRANSACTION_FIELDS.filter((key) => {
         if (!selectedFields[key]) return false;
@@ -185,12 +199,56 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
         initial[key] = val !== null && val !== undefined;
       }
       setSelectedFields(initial);
+
+      let fetchedExisting: ExistingContact[] = [];
+      try {
+        const existingRes = await fetch(`/api/contacts/${transactionId}`, { credentials: "include" });
+        if (existingRes.ok) {
+          fetchedExisting = await existingRes.json();
+          setExistingContacts(fetchedExisting);
+        }
+      } catch {
+        // ignore - will treat all as new
+      }
+
       const contactInit: Record<number, boolean> = {};
+      const matchStatuses: Record<number, { status: ContactMatchStatus; matchedContact?: ExistingContact }> = {};
+      const usedIds = new Set<number>();
+
       if (data.extracted.extractedContacts) {
-        data.extracted.extractedContacts.forEach((_: ExtractedContactInfo, idx: number) => {
-          contactInit[idx] = true;
+        data.extracted.extractedContacts.forEach((contact: ExtractedContactInfo, idx: number) => {
+          const nameMatch = fetchedExisting.find(
+            (ec) =>
+              !usedIds.has(ec.id) &&
+              ec.firstName?.toLowerCase() === contact.firstName?.toLowerCase() &&
+              ec.lastName?.toLowerCase() === contact.lastName?.toLowerCase()
+          );
+          const roleMatch = !nameMatch
+            ? fetchedExisting.find(
+                (ec) => !usedIds.has(ec.id) && ec.role === contact.role
+              )
+            : null;
+
+          const matched = nameMatch || roleMatch;
+          if (matched) {
+            usedIds.add(matched.id);
+            const hasNewEmail = contact.email && (!matched.email || matched.email !== contact.email);
+            const hasNewPhone = contact.phone && (!matched.phone || matched.phone !== contact.phone);
+
+            if (hasNewEmail || hasNewPhone) {
+              matchStatuses[idx] = { status: "update", matchedContact: matched };
+              contactInit[idx] = true;
+            } else {
+              matchStatuses[idx] = { status: "exists", matchedContact: matched };
+              contactInit[idx] = false;
+            }
+          } else {
+            matchStatuses[idx] = { status: "new" };
+            contactInit[idx] = true;
+          }
         });
       }
+      setContactMatchStatuses(matchStatuses);
       setSelectedContacts(contactInit);
       setShowReview(true);
       setSelectedFile(null);
@@ -352,6 +410,8 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
       setAiUsed(false);
       setDocumentType(null);
       setDocumentNotes(null);
+      setContactMatchStatuses({});
+      setExistingContacts([]);
       toast({ title: "Applied successfully", description: `Updated transaction${contactsToAdd.length > 0 ? ` and saved ${contactsToAdd.length} contact${contactsToAdd.length !== 1 ? "s" : ""}` : ""}.` });
     } catch {
       toast({ title: "Error", description: "Failed to apply some changes.", variant: "destructive" });
@@ -481,6 +541,8 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
           setDocumentNotes(null);
           setSelectedFields({});
           setSelectedContacts({});
+          setContactMatchStatuses({});
+          setExistingContacts([]);
           setEditingField(null);
           setEditingContactIdx(null);
         }
@@ -557,15 +619,22 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
-                      <p className="text-sm font-medium">Extracted Contacts (will be added to Contacts tab)</p>
+                      <p className="text-sm font-medium">Extracted Contacts</p>
                     </div>
-                    {extractedData.extractedContacts.map((contact, idx) => (
+                    {extractedData.extractedContacts.map((contact, idx) => {
+                      const matchInfo = contactMatchStatuses[idx];
+                      const matchStatus = matchInfo?.status || "new";
+                      const matchedExisting = matchInfo?.matchedContact;
+
+                      return (
                       <div
                         key={idx}
                         className={`p-3 rounded-lg border transition-colors ${
-                          selectedContacts[idx]
-                            ? "bg-primary/5 border-primary/30"
-                            : "bg-background border-border"
+                          matchStatus === "exists" && !selectedContacts[idx]
+                            ? "bg-muted/30 border-border opacity-70"
+                            : selectedContacts[idx]
+                              ? "bg-primary/5 border-primary/30"
+                              : "bg-background border-border"
                         }`}
                       >
                         <div className="flex items-start gap-3">
@@ -659,8 +728,23 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
                             </div>
                           ) : (
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs font-medium px-2 py-0.5 bg-muted rounded-full">{contact.role}</span>
+                                {matchStatus === "exists" && (
+                                  <span className="text-xs font-medium px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full flex items-center gap-1">
+                                    <Check className="h-3 w-3" /> Already on file
+                                  </span>
+                                )}
+                                {matchStatus === "update" && (
+                                  <span className="text-xs font-medium px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-full flex items-center gap-1">
+                                    <RefreshCw className="h-3 w-3" /> Has new info
+                                  </span>
+                                )}
+                                {matchStatus === "new" && (
+                                  <span className="text-xs font-medium px-2 py-0.5 bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 rounded-full flex items-center gap-1">
+                                    <UserPlus className="h-3 w-3" /> New contact
+                                  </span>
+                                )}
                                 <span className="text-sm font-medium">{contact.firstName} {contact.lastName}</span>
                                 <Button
                                   type="button"
@@ -676,13 +760,28 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
                                 {contact.email && <p>Email: {contact.email}</p>}
                                 {contact.phone && <p>Phone: {contact.phone}</p>}
                                 {contact.brokerage && <p>Brokerage: {contact.brokerage}</p>}
-                                {!contact.email && !contact.phone && !contact.brokerage && <p>No additional details found</p>}
+                                {matchedExisting && matchStatus === "exists" && (
+                                  <p className="text-green-600 dark:text-green-400">Using existing contact data — no new info found</p>
+                                )}
+                                {matchedExisting && matchStatus === "update" && (
+                                  <div className="mt-1 text-blue-600 dark:text-blue-400">
+                                    <p>Will update existing contact with:</p>
+                                    {contact.email && (!matchedExisting.email || matchedExisting.email !== contact.email) && (
+                                      <p className="ml-2">+ Email: {contact.email}</p>
+                                    )}
+                                    {contact.phone && (!matchedExisting.phone || matchedExisting.phone !== contact.phone) && (
+                                      <p className="ml-2">+ Phone: {contact.phone}</p>
+                                    )}
+                                  </div>
+                                )}
+                                {!contact.email && !contact.phone && !contact.brokerage && matchStatus === "new" && <p>No additional details found</p>}
                               </div>
                             </div>
                           )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <Separator />
                 </>
