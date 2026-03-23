@@ -942,6 +942,23 @@ export function registerRoutes(app: Express): Server {
       // Google Calendar sync is handled via iCal subscription feed and manual "Push to Google Calendar" button.
       // Automatic push removed to prevent duplicate events.
 
+      // Auto-geocode transaction when address fields are set/changed
+      if ((data.streetName || data.city || data.state || data.zipCode) && transaction.streetName && transaction.city) {
+        const addressParts = [transaction.streetName, transaction.city, transaction.state, transaction.zipCode].filter(Boolean);
+        const address = addressParts.join(', ');
+        fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=us`,
+          { headers: { 'User-Agent': 'HomeBase-RealEstate-App/1.0' } }
+        )
+          .then(r => r.json())
+          .then(data => {
+            if (data && data.length > 0) {
+              storage.updateTransactionCoordinates(id, parseFloat(data[0].lat), parseFloat(data[0].lon));
+            }
+          })
+          .catch(err => console.error('Background geocode error:', err?.message));
+      }
+
       if (data.status && oldTransaction && oldTransaction.status !== data.status) {
         const address = [transaction.streetName, transaction.city].filter(Boolean).join(', ') || 'a property';
         const statusLabel = data.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -2659,13 +2676,13 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/transactions/:id/geocode", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) {
       return res.sendStatus(401);
     }
     
     try {
-      const transaction = await storage.getTransaction(Number(req.params.id));
-      if (!transaction || transaction.agentId !== req.user.id) {
+      const { allowed, transaction } = await verifyTransactionAccess(Number(req.params.id), req.user.id, req.user.role);
+      if (!allowed || !transaction) {
         return res.sendStatus(403);
       }
       

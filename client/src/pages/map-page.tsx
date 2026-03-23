@@ -543,7 +543,60 @@ export default function MapPage() {
     return miles < 0.1 ? `${Math.round(miles * 5280)} ft` : `${miles.toFixed(1)} mi`;
   };
 
-  const transactionsWithCoords = transactions.filter(t => t.latitude && t.longitude);
+  const [geocodedTransactions, setGeocodedTransactions] = useState<Record<number, { lat: number; lon: number }>>({});
+  const [isGeocodingTransactions, setIsGeocodingTransactions] = useState(false);
+  const [geocodedIds, setGeocodedIds] = useState<Set<number>>(new Set());
+
+  const txCoordsKey = transactions.map(t => `${t.id}:${t.latitude ?? ''}:${t.longitude ?? ''}:${t.streetName ?? ''}`).join('|');
+
+  useEffect(() => {
+    if (mapDisplayFilter !== "listings" || !isAgent || transactions.length === 0) return;
+    
+    const geocodeMissing = async () => {
+      const needsGeocode = transactions.filter(
+        t => (t.latitude == null || t.longitude == null) && t.streetName && t.city && !geocodedIds.has(t.id)
+      );
+      
+      if (needsGeocode.length === 0) return;
+      setIsGeocodingTransactions(true);
+      
+      const newResults: Record<number, { lat: number; lon: number }> = {};
+      const newGeocodedIds = new Set(geocodedIds);
+      
+      for (const tx of needsGeocode) {
+        newGeocodedIds.add(tx.id);
+        const address = [tx.streetName, tx.city, tx.state, tx.zipCode].filter(Boolean).join(', ');
+        try {
+          const response = await fetch(
+            `/api/transactions/${tx.id}/geocode`,
+            { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } }
+          );
+          const data = await response.json();
+          if (data.success && data.lat && data.lon) {
+            newResults[tx.id] = { lat: parseFloat(data.lat), lon: parseFloat(data.lon) };
+          }
+          await new Promise(r => setTimeout(r, 1100));
+        } catch {
+          // skip
+        }
+      }
+      
+      if (Object.keys(newResults).length > 0) {
+        setGeocodedTransactions(prev => ({ ...prev, ...newResults }));
+        queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      }
+      setGeocodedIds(newGeocodedIds);
+      setIsGeocodingTransactions(false);
+    };
+    
+    geocodeMissing();
+  }, [mapDisplayFilter, txCoordsKey]);
+
+  const allTransactions = transactions.map(t => {
+    const geocoded = geocodedTransactions[t.id];
+    return geocoded ? { ...t, latitude: geocoded.lat, longitude: geocoded.lon } : t;
+  });
+  const transactionsWithCoords = allTransactions.filter(t => t.latitude != null && t.longitude != null);
   const filteredViewings = isAgent && selectedClientFilter !== "all" 
     ? viewings.filter(v => v.clientId === selectedClientFilter)
     : viewings;
@@ -1172,7 +1225,7 @@ export default function MapPage() {
           {isAgent && mapDisplayFilter === "listings" && (
             <Badge variant="outline" className="flex items-center gap-1 bg-background shadow">
               <Home className="h-3 w-3 text-green-600" />
-              {transactionsWithCoords.length} listings
+              {isGeocodingTransactions ? "Mapping..." : `${transactionsWithCoords.length} of ${transactions.length} listings mapped`}
             </Badge>
           )}
           {isAgent && mapDisplayFilter === "showings" && (
