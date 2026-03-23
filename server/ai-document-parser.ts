@@ -28,7 +28,7 @@ function truncateText(text: string, maxChars: number = 30000): string {
   return text.substring(0, maxChars) + "\n[DOCUMENT TRUNCATED]";
 }
 
-const DOCUMENT_EXTRACTION_PROMPT = `You are a real estate document parser. Analyze this PDF document and extract the following fields. Return ONLY a valid JSON object with no markdown formatting, no code fences, no explanation.
+const DOCUMENT_EXTRACTION_PROMPT = `You are a real estate document parser specializing in TREC (Texas Real Estate Commission) contracts and similar purchase agreements. Analyze this PDF document and extract the following fields. Return ONLY a valid JSON object with no markdown formatting, no code fences, no explanation.
 
 Fields to extract:
 - documentType: string - the type of document (e.g. "purchase_contract", "listing_agreement", "inspection_report", "addendum", "disclosure", "closing_document", "lease", "amendment", "unknown")
@@ -48,10 +48,22 @@ Fields to extract:
 - contacts: array of objects with { role, firstName, lastName, email, phone, brokerage } - extracted people (buyers, sellers, agents, brokers, inspectors, lenders, title officers, etc.)
 - notes: string or null - any important terms, contingencies, or special conditions worth noting
 
-Rules:
+CRITICAL DATE EXTRACTION RULES — read very carefully:
+- closingDate: This is the closing/settlement date, NOT the contract execution date. On TREC forms, look for "closing" or "closing date" typically in the closing section (often Paragraph 9). Read the exact month, day, and year written next to it. Do NOT confuse with any other date on the form.
+- optionPeriodExpiration: This is the date the option period ENDS. On TREC forms, look for "option period" and the specific expiration date (often Paragraph 23). It is usually a short period (5-14 days) after the contract execution date. Do NOT pick up dates from other sections like inspection deadlines, financing deadlines, or prior contract dates.
+- contractExecutionDate: This is the date all parties signed the final executed contract, often called the "Effective Date" on TREC forms. It is typically the MOST RECENT signature date or explicitly labeled "Effective Date." It should be a recent date close to when the document was created. Do NOT confuse with prior amendment dates, listing dates, or dates in the body of the contract.
+- IMPORTANT: If the document is an amendment, addendum, or updated contract, be careful to distinguish between dates from the ORIGINAL contract vs. the CURRENT/AMENDED dates. Always extract the most current, applicable dates.
+- IMPORTANT: Many contracts have MULTIPLE dates throughout. Read each date field label carefully. Do NOT mix up dates between different sections.
+
+CRITICAL FINANCING TYPE RULES:
+- financing: Look for the financing section (often Paragraph 4 on TREC forms) which lists options like "Third Party Financing", "Cash", etc. Under third party financing, look for checked/selected sub-options: "Conventional", "FHA", "VA", "USDA". Only ONE should be checked/filled in.
+- Examine checkboxes, filled circles, or "X" marks very carefully. A checkbox may appear dark due to printing but NOT actually be checked. Look for a clear checkmark (✓), X mark, or filled indicator INSIDE the box.
+- Do NOT assume a checkbox is checked just because the text near it mentions that loan type. Only report the option that is clearly SELECTED/CHECKED.
+
+General Rules:
 - For monetary values, return plain numbers (no $ or commas)
-- For dates, convert to ISO 8601 format
-- If a field cannot be found, return null
+- For dates, convert to ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ). Read dates exactly as written — do not adjust or assume.
+- If a field cannot be found or you are not confident in the value, return null. It is better to return null than an incorrect value.
 - For contacts, extract as many people as you can find with their roles
 - Be thorough but only include data you can confidently extract
 - Do NOT fabricate or guess data that isn't in the document
@@ -197,16 +209,40 @@ export async function parseDocumentWithAI(input: Buffer | string): Promise<{
 
   const rawPreview = Buffer.isBuffer(input) ? "[PDF sent directly to AI]" : input.substring(0, 2000);
 
+  const validFinancingTypes = ["conventional", "fha", "va", "usda", "cash"];
+  let financing = typeof parsed.financing === "string" ? parsed.financing.toLowerCase().trim() : null;
+  if (financing && !validFinancingTypes.includes(financing)) {
+    console.log(`[AI Parser] Invalid financing type "${financing}", setting to null`);
+    financing = null;
+  }
+
+  function validateDateStr(dateStr: unknown, fieldName: string): string | null {
+    if (typeof dateStr !== "string") return null;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) {
+      console.log(`[AI Parser] Invalid date for ${fieldName}: "${dateStr}"`);
+      return null;
+    }
+    const now = new Date();
+    const twoYearsAgo = new Date(now.getFullYear() - 2, now.getMonth(), now.getDate());
+    const fiveYearsOut = new Date(now.getFullYear() + 5, now.getMonth(), now.getDate());
+    if (d < twoYearsAgo || d > fiveYearsOut) {
+      console.log(`[AI Parser] Date out of reasonable range for ${fieldName}: "${dateStr}" (parsed as ${d.toISOString()})`);
+      return null;
+    }
+    return dateStr;
+  }
+
   const extracted: ExtractedContractData = {
     contractPrice: typeof parsed.contractPrice === "number" ? parsed.contractPrice : null,
     earnestMoney: typeof parsed.earnestMoney === "number" ? parsed.earnestMoney : null,
     optionFee: typeof parsed.optionFee === "number" ? parsed.optionFee : null,
     downPayment: typeof parsed.downPayment === "number" ? parsed.downPayment : null,
     sellerConcessions: typeof parsed.sellerConcessions === "number" ? parsed.sellerConcessions : null,
-    closingDate: typeof parsed.closingDate === "string" ? parsed.closingDate : null,
-    optionPeriodExpiration: typeof parsed.optionPeriodExpiration === "string" ? parsed.optionPeriodExpiration : null,
-    contractExecutionDate: typeof parsed.contractExecutionDate === "string" ? parsed.contractExecutionDate : null,
-    financing: typeof parsed.financing === "string" ? parsed.financing : null,
+    closingDate: validateDateStr(parsed.closingDate, "closingDate"),
+    optionPeriodExpiration: validateDateStr(parsed.optionPeriodExpiration, "optionPeriodExpiration"),
+    contractExecutionDate: validateDateStr(parsed.contractExecutionDate, "contractExecutionDate"),
+    financing,
     mlsNumber: typeof parsed.mlsNumber === "string" ? parsed.mlsNumber : null,
     propertyAddress: typeof parsed.propertyAddress === "string" ? parsed.propertyAddress : null,
     buyerName: typeof parsed.buyerName === "string" ? parsed.buyerName : null,
