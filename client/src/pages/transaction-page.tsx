@@ -46,6 +46,8 @@ export default function TransactionPage() {
     earnestMoney: "",
     downPayment: "",
     sellerConcessions: "",
+    buyerAgentCompensation: "",
+    homeWarranty: "",
     closingDate: "",
     mlsNumber: "",
     financing: "",
@@ -90,6 +92,8 @@ export default function TransactionPage() {
         earnestMoney: transaction.earnestMoney?.toString() || "",
         downPayment: transaction.downPayment?.toString() || "",
         sellerConcessions: transaction.sellerConcessions?.toString() || "",
+        buyerAgentCompensation: (transaction as any).buyerAgentCompensation?.toString() || "",
+        homeWarranty: (transaction as any).homeWarranty?.toString() || "",
         closingDate: formatDateForInput(transaction.closingDate),
         mlsNumber: transaction.mlsNumber || "",
         financing: transaction.financing || "",
@@ -316,6 +320,12 @@ export default function TransactionPage() {
     if (editForm.sellerConcessions !== "") {
       updateData.sellerConcessions = parseInt(editForm.sellerConcessions);
     }
+    if (editForm.buyerAgentCompensation !== "") {
+      (updateData as any).buyerAgentCompensation = parseInt(editForm.buyerAgentCompensation);
+    }
+    if (editForm.homeWarranty !== "") {
+      (updateData as any).homeWarranty = parseInt(editForm.homeWarranty);
+    }
     if (editForm.listDate) {
       updateData.listDate = new Date(editForm.listDate).toISOString();
     }
@@ -514,6 +524,28 @@ export default function TransactionPage() {
                       style: 'currency',
                       currency: 'USD',
                     }).format(transaction.sellerConcessions)
+                  : 'Not set'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Buyer's Agent Compensation</p>
+              <p className="text-base">
+                {(transaction as any).buyerAgentCompensation != null
+                  ? new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                    }).format((transaction as any).buyerAgentCompensation)
+                  : 'Not set'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Home Warranty</p>
+              <p className="text-base">
+                {(transaction as any).homeWarranty != null
+                  ? new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                    }).format((transaction as any).homeWarranty)
                   : 'Not set'}
               </p>
             </div>
@@ -1042,6 +1074,28 @@ export default function TransactionPage() {
                 onChange={(e) => setEditForm({ ...editForm, sellerConcessions: e.target.value })}
                 placeholder="Enter seller concessions"
                 data-testid="input-seller-concessions"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="buyerAgentCompensation">Buyer's Agent Compensation ($)</Label>
+              <Input
+                id="buyerAgentCompensation"
+                type="number"
+                value={editForm.buyerAgentCompensation}
+                onChange={(e) => setEditForm({ ...editForm, buyerAgentCompensation: e.target.value })}
+                placeholder="Enter buyer's agent compensation"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="homeWarranty">Home Warranty ($)</Label>
+              <Input
+                id="homeWarranty"
+                type="number"
+                value={editForm.homeWarranty}
+                onChange={(e) => setEditForm({ ...editForm, homeWarranty: e.target.value })}
+                placeholder="Enter home warranty amount"
               />
             </div>
 

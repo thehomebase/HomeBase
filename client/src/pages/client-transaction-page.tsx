@@ -869,6 +869,8 @@ export default function ClientTransactionPage() {
               { label: "Option Fee", value: formatCurrency(transaction.optionFee) },
               { label: "Down Payment", value: formatCurrency(transaction.downPayment) },
               { label: "Seller Concessions", value: formatCurrency(transaction.sellerConcessions) },
+              { label: "Buyer's Agent Compensation", value: formatCurrency((transaction as any).buyerAgentCompensation) },
+              { label: "Home Warranty", value: formatCurrency((transaction as any).homeWarranty) },
               { label: "Financing", value: transaction.financing ? transaction.financing.charAt(0).toUpperCase() + transaction.financing.slice(1) : "Not set" },
             ].map((row) => (
               <div key={row.label} className="flex justify-between text-sm">

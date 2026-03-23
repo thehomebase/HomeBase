@@ -15,6 +15,8 @@ export interface ExtractedContractData {
   optionFee: number | null;
   downPayment: number | null;
   sellerConcessions: number | null;
+  buyerAgentCompensation: number | null;
+  homeWarranty: number | null;
   closingDate: string | null;
   optionPeriodExpiration: string | null;
   contractExecutionDate: string | null;
@@ -353,6 +355,8 @@ function parseTRECForm(text: string, pages: string[]): ExtractedContractData {
     optionFee: null,
     downPayment: null,
     sellerConcessions: null,
+    buyerAgentCompensation: null,
+    homeWarranty: null,
     closingDate: null,
     optionPeriodExpiration: null,
     contractExecutionDate: null,

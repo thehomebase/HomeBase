@@ -36,7 +36,9 @@ Fields to extract:
 - earnestMoney: number or null - earnest money deposit amount
 - optionFee: number or null - option fee amount (common in Texas; may not exist in other states — return null if not present)
 - downPayment: number or null - down payment amount
-- sellerConcessions: number or null - seller concessions/contributions (may be labeled "seller concessions", "seller contributions", "seller credit", or similar)
+- sellerConcessions: number or null - seller concessions/contributions (may be labeled "seller concessions", "seller contributions", "seller credit", or similar). Do NOT include buyer's agent commission here — that goes in buyerAgentCompensation.
+- buyerAgentCompensation: number or null - amount the seller pays toward the buyer's agent commission/compensation (may be labeled "buyer's agent compensation", "buyer broker fee", "compensation to buyer's agent", "seller pays buyer's agent", or similar). This is SEPARATE from seller concessions.
+- homeWarranty: number or null - home warranty amount or cost (may be labeled "home warranty", "residential service contract", or similar). In TREC contracts, look for Paragraph 7H.
 - closingDate: string or null - closing date in ISO format (YYYY-MM-DDTHH:mm:ss.sssZ)
 - optionPeriodExpiration: string or null - option period or due diligence period end date in ISO format (return null if the contract type does not have one)
 - contractExecutionDate: string or null - date contract was executed/signed in ISO format
@@ -201,6 +203,8 @@ function parseJSON(responseText: string): Record<string, unknown> {
         { key: 'optionFee', pattern: /"optionFee"\s*:\s*(\d+(?:\.\d+)?)/ },
         { key: 'downPayment', pattern: /"downPayment"\s*:\s*(\d+(?:\.\d+)?)/ },
         { key: 'sellerConcessions', pattern: /"sellerConcessions"\s*:\s*(\d+(?:\.\d+)?)/ },
+        { key: 'buyerAgentCompensation', pattern: /"buyerAgentCompensation"\s*:\s*(\d+(?:\.\d+)?)/ },
+        { key: 'homeWarranty', pattern: /"homeWarranty"\s*:\s*(\d+(?:\.\d+)?)/ },
         { key: 'closingDate', pattern: /"closingDate"\s*:\s*"([^"]*)"/ },
         { key: 'optionPeriodExpiration', pattern: /"optionPeriodExpiration"\s*:\s*"([^"]*)"/ },
         { key: 'contractExecutionDate', pattern: /"contractExecutionDate"\s*:\s*"([^"]*)"/ },
@@ -215,7 +219,7 @@ function parseJSON(responseText: string): Record<string, unknown> {
         const match = jsonMatch[0].match(pattern);
         if (match) {
           const val = match[1];
-          if (['contractPrice', 'earnestMoney', 'optionFee', 'downPayment', 'sellerConcessions'].includes(key)) {
+          if (['contractPrice', 'earnestMoney', 'optionFee', 'downPayment', 'sellerConcessions', 'buyerAgentCompensation', 'homeWarranty'].includes(key)) {
             partialFields[key] = parseFloat(val);
           } else {
             partialFields[key] = val;
@@ -328,6 +332,8 @@ export async function parseDocumentWithAI(input: Buffer | string): Promise<{
     optionFee: typeof parsed.optionFee === "number" ? parsed.optionFee : null,
     downPayment: typeof parsed.downPayment === "number" ? parsed.downPayment : null,
     sellerConcessions: typeof parsed.sellerConcessions === "number" ? parsed.sellerConcessions : null,
+    buyerAgentCompensation: typeof parsed.buyerAgentCompensation === "number" ? parsed.buyerAgentCompensation : null,
+    homeWarranty: typeof parsed.homeWarranty === "number" ? parsed.homeWarranty : null,
     closingDate: validateDateStr(parsed.closingDate, "closingDate"),
     optionPeriodExpiration: validateDateStr(parsed.optionPeriodExpiration, "optionPeriodExpiration"),
     contractExecutionDate: validateDateStr(parsed.contractExecutionDate, "contractExecutionDate"),

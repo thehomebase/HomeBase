@@ -27,7 +27,7 @@ Preferred communication style: Simple, everyday language.
 ### Data Storage
 - **Database**: PostgreSQL (Neon serverless)
 - **ORM**: Drizzle ORM
-- **Key Models**: Users, transactions, clients, documents, checklists, contractors, messages, leads, referrals, drip campaigns, authorized_users, and specific entities for vendor, lender, broker, and homeowner functionalities.
+- **Key Models**: Users, transactions (with buyer_agent_compensation and home_warranty fields), clients, documents, checklists, contractors, messages, leads, referrals, drip campaigns, authorized_users, and specific entities for vendor, lender, broker, and homeowner functionalities.
 
 ### Key Features
 - **Transaction & Document Management**: Contract and document upload with AI-powered data extraction (Gemini Flash primary, TREC regex fallback). PDFs are sent directly to Gemini for multimodal analysis (text + layout + images). Inspection report parsing also AI-primary with regex fallback; AI detects photos of deficiencies and marks items with `hasPhoto`. Document signing link tracking, transaction timelines with risk alerts, client portal, transaction templates, Kanban pipelines, document scanning. WebSocket-based optimistic locking for transactions.

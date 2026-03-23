@@ -56,6 +56,8 @@ const FIELD_LABELS: Record<string, string> = {
   optionFee: "Option Fee",
   downPayment: "Down Payment",
   sellerConcessions: "Seller Concessions",
+  buyerAgentCompensation: "Buyer's Agent Compensation",
+  homeWarranty: "Home Warranty",
   closingDate: "Closing Date",
   optionPeriodExpiration: "Option Period Expiration",
   contractExecutionDate: "Contract Execution Date",
@@ -63,9 +65,9 @@ const FIELD_LABELS: Record<string, string> = {
   mlsNumber: "MLS Number",
 };
 
-const CURRENCY_FIELDS = ["contractPrice", "earnestMoney", "optionFee", "downPayment", "sellerConcessions"];
+const CURRENCY_FIELDS = ["contractPrice", "earnestMoney", "optionFee", "downPayment", "sellerConcessions", "buyerAgentCompensation", "homeWarranty"];
 const DATE_FIELDS = ["closingDate", "optionPeriodExpiration", "contractExecutionDate"];
-const TRANSACTION_FIELDS = ["contractPrice", "earnestMoney", "optionFee", "downPayment", "sellerConcessions", "closingDate", "optionPeriodExpiration", "contractExecutionDate", "financing", "mlsNumber"];
+const TRANSACTION_FIELDS = ["contractPrice", "earnestMoney", "optionFee", "downPayment", "sellerConcessions", "buyerAgentCompensation", "homeWarranty", "closingDate", "optionPeriodExpiration", "contractExecutionDate", "financing", "mlsNumber"];
 
 const CONTACT_ROLES = [
   "Buyer",
@@ -314,7 +316,8 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
         const val = extractedData[key as keyof ExtractedData];
         if (val !== null && val !== undefined) {
           if (DATE_FIELDS.includes(key)) {
-            updateData[key] = new Date(val as string).toISOString();
+            const parsed = parseDateUTC(val as string);
+            updateData[key] = parsed.toISOString();
           } else {
             updateData[key] = val;
           }
