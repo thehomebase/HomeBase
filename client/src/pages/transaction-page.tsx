@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useTransactionLock } from "@/hooks/use-transaction-lock";
+import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock, FileSignature, Star, Search, DollarSign, Plus, X, ChevronDown, ChevronUp, Bell, BellOff } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -1145,11 +1146,18 @@ export default function TransactionPage() {
               <>
                 <div className="space-y-2">
                   <Label htmlFor="streetName">Street Name</Label>
-                  <Input
+                  <AddressAutocomplete
                     id="streetName"
                     value={editForm.streetName}
-                    onChange={(e) => setEditForm({ ...editForm, streetName: e.target.value })}
-                    placeholder="Enter street name"
+                    onChange={(val) => setEditForm({ ...editForm, streetName: val })}
+                    onAddressSelect={(addr) => setEditForm({
+                      ...editForm,
+                      streetName: addr.street,
+                      city: addr.city,
+                      state: addr.state,
+                      zipCode: addr.zipCode
+                    })}
+                    placeholder="Start typing an address..."
                   />
                 </div>
                 <div className="space-y-2">

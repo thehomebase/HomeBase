@@ -595,6 +595,26 @@ export function registerRoutes(app: Express): Server {
         if (req.body[key] !== undefined) safeBody[key] = req.body[key];
       }
       const client = await storage.updateClient(clientId, safeBody);
+
+      const syncFields = ['street', 'city', 'state', 'zipCode', 'anniversary'];
+      const changedSyncFields: Record<string, any> = {};
+      for (const field of syncFields) {
+        if (safeBody[field] !== undefined && safeBody[field] !== (existing as any)[field]) {
+          changedSyncFields[field] = safeBody[field];
+        }
+      }
+
+      if (Object.keys(changedSyncFields).length > 0 && existing.linkedClientId) {
+        try {
+          const linkedClient = await storage.getClient(existing.linkedClientId);
+          if (linkedClient && (linkedClient.agentId === req.user.id || req.user.role === "broker")) {
+            await storage.updateClient(existing.linkedClientId, changedSyncFields);
+          }
+        } catch (syncErr) {
+          console.error('Error syncing linked client fields:', syncErr);
+        }
+      }
+
       res.json(client);
     } catch (error) {
       console.error('Error updating client:', error);

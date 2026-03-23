@@ -18,6 +18,7 @@ const getLabelColor = (label: string, _index?: number) => {
 };
 
 import { formatPhoneDisplay } from "@/lib/format-phone";
+import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -308,7 +309,26 @@ const ClientDetailsPanel = ({
         description: error instanceof Error ? error.message : "Failed to update client",
         variant: "destructive",
       });
-      // Revert the local state on error
+      setEditingClient(client);
+      throw error;
+    }
+  };
+
+  const handleBatchUpdate = async (fields: Partial<Client>) => {
+    const updatedClient = { ...editingClient, ...fields } as Client;
+    setEditingClient(updatedClient);
+    try {
+      await onUpdate(updatedClient);
+      toast({
+        title: "Success",
+        description: "Client updated successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update client",
+        variant: "destructive",
+      });
       setEditingClient(client);
       throw error;
     }
@@ -433,10 +453,18 @@ const ClientDetailsPanel = ({
               </div>
               <div className="space-y-2">
                 <Label>Street Address</Label>
-                <Input
+                <AddressAutocomplete
                   value={editingClient.street || ''}
-                  onChange={(e) => handleUpdate('street', e.target.value)}
-                  placeholder="123 Main St"
+                  onChange={(val) => handleUpdate('street', val)}
+                  onAddressSelect={(addr) => {
+                    handleBatchUpdate({
+                      street: addr.street,
+                      city: addr.city,
+                      state: addr.state,
+                      zipCode: addr.zipCode,
+                    });
+                  }}
+                  placeholder="Start typing an address..."
                 />
               </div>
               <div className="grid grid-cols-3 gap-2">
