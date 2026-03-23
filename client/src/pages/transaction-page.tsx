@@ -301,19 +301,19 @@ export default function TransactionPage() {
       updateData.zipCode = editForm.zipCode?.trim() || null;
     }
 
-    if (editForm.contractPrice) {
+    if (editForm.contractPrice !== "") {
       updateData.contractPrice = parseInt(editForm.contractPrice);
     }
-    if (editForm.optionFee) {
+    if (editForm.optionFee !== "") {
       updateData.optionFee = parseInt(editForm.optionFee);
     }
-    if (editForm.earnestMoney) {
+    if (editForm.earnestMoney !== "") {
       updateData.earnestMoney = parseInt(editForm.earnestMoney);
     }
-    if (editForm.downPayment) {
+    if (editForm.downPayment !== "") {
       updateData.downPayment = parseInt(editForm.downPayment);
     }
-    if (editForm.sellerConcessions) {
+    if (editForm.sellerConcessions !== "") {
       updateData.sellerConcessions = parseInt(editForm.sellerConcessions);
     }
     if (editForm.listDate) {
@@ -436,7 +436,7 @@ export default function TransactionPage() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Contract Price</p>
               <p className="text-base">
-                {transaction.contractPrice
+                {transaction.contractPrice != null
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: 'USD',
@@ -476,7 +476,7 @@ export default function TransactionPage() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Option Fee</p>
               <p className="text-base">
-                {transaction.optionFee
+                {transaction.optionFee != null
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: 'USD',
@@ -487,7 +487,7 @@ export default function TransactionPage() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Earnest Money</p>
               <p className="text-base">
-                {transaction.earnestMoney
+                {transaction.earnestMoney != null
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: 'USD',
@@ -498,7 +498,7 @@ export default function TransactionPage() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Down Payment</p>
               <p className="text-base">
-                {transaction.downPayment
+                {transaction.downPayment != null
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: 'USD',
@@ -509,7 +509,7 @@ export default function TransactionPage() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Seller Concessions</p>
               <p className="text-base">
-                {transaction.sellerConcessions
+                {transaction.sellerConcessions != null
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: 'USD',
