@@ -178,7 +178,66 @@ function parseJSON(responseText: string): Record<string, unknown> {
   if (!jsonMatch) {
     throw new Error("No JSON object found in AI response");
   }
-  return JSON.parse(jsonMatch[0]);
+  let jsonStr = jsonMatch[0];
+  try {
+    return JSON.parse(jsonStr);
+  } catch (firstError) {
+    console.log("[AI Parser] Initial JSON parse failed, attempting repair...");
+    jsonStr = jsonStr
+      .replace(/,\s*([}\]])/g, '$1')
+      .replace(/(["\d\w])\s*\n\s*"/g, '$1,\n"')
+      .replace(/}\s*{/g, '},{')
+      .replace(/]\s*"/g, '],"')
+      .replace(/"\s*\[/g, '":[')
+      .replace(/(["\d\w\]}])\s*"(?=[a-zA-Z])/g, '$1,"');
+    try {
+      return JSON.parse(jsonStr);
+    } catch (secondError) {
+      const partialFields: Record<string, unknown> = {};
+      const fieldPatterns = [
+        { key: 'documentType', pattern: /"documentType"\s*:\s*"([^"]*)"/ },
+        { key: 'contractPrice', pattern: /"contractPrice"\s*:\s*(\d+(?:\.\d+)?)/ },
+        { key: 'earnestMoney', pattern: /"earnestMoney"\s*:\s*(\d+(?:\.\d+)?)/ },
+        { key: 'optionFee', pattern: /"optionFee"\s*:\s*(\d+(?:\.\d+)?)/ },
+        { key: 'downPayment', pattern: /"downPayment"\s*:\s*(\d+(?:\.\d+)?)/ },
+        { key: 'sellerConcessions', pattern: /"sellerConcessions"\s*:\s*(\d+(?:\.\d+)?)/ },
+        { key: 'closingDate', pattern: /"closingDate"\s*:\s*"([^"]*)"/ },
+        { key: 'optionPeriodExpiration', pattern: /"optionPeriodExpiration"\s*:\s*"([^"]*)"/ },
+        { key: 'contractExecutionDate', pattern: /"contractExecutionDate"\s*:\s*"([^"]*)"/ },
+        { key: 'financing', pattern: /"financing"\s*:\s*"([^"]*)"/ },
+        { key: 'mlsNumber', pattern: /"mlsNumber"\s*:\s*"([^"]*)"/ },
+        { key: 'propertyAddress', pattern: /"propertyAddress"\s*:\s*"([^"]*)"/ },
+        { key: 'buyerName', pattern: /"buyerName"\s*:\s*"([^"]*)"/ },
+        { key: 'sellerName', pattern: /"sellerName"\s*:\s*"([^"]*)"/ },
+        { key: 'notes', pattern: /"notes"\s*:\s*"([^"]*)"/ },
+      ];
+      for (const { key, pattern } of fieldPatterns) {
+        const match = jsonMatch[0].match(pattern);
+        if (match) {
+          const val = match[1];
+          if (['contractPrice', 'earnestMoney', 'optionFee', 'downPayment', 'sellerConcessions'].includes(key)) {
+            partialFields[key] = parseFloat(val);
+          } else {
+            partialFields[key] = val;
+          }
+        }
+      }
+      const nullMatch = jsonMatch[0].match(/"(\w+)"\s*:\s*null/g);
+      if (nullMatch) {
+        for (const m of nullMatch) {
+          const keyMatch = m.match(/"(\w+)"/);
+          if (keyMatch && !(keyMatch[1] in partialFields)) {
+            partialFields[keyMatch[1]] = null;
+          }
+        }
+      }
+      if (Object.keys(partialFields).length > 0) {
+        console.log(`[AI Parser] Recovered ${Object.keys(partialFields).length} fields from malformed JSON via regex extraction`);
+        return partialFields;
+      }
+      throw firstError;
+    }
+  }
 }
 
 export async function parseDocumentWithAI(input: Buffer | string): Promise<{
