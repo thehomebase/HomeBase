@@ -939,11 +939,8 @@ export function registerRoutes(app: Express): Server {
 
       const transaction = await storage.updateTransaction(id, data);
 
-      if (data.closingDate || data.optionPeriodExpiration) {
-        syncTransactionToGoogleCalendar(req.user.id, transaction).catch(err => {
-          console.error("Background Google Calendar sync error:", err?.message);
-        });
-      }
+      // Google Calendar sync is handled via iCal subscription feed and manual "Push to Google Calendar" button.
+      // Automatic push removed to prevent duplicate events.
 
       if (data.status && oldTransaction && oldTransaction.status !== data.status) {
         const address = [transaction.streetName, transaction.city].filter(Boolean).join(', ') || 'a property';
