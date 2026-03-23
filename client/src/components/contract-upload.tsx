@@ -188,7 +188,7 @@ export function ContractUpload({ transactionId, transaction, readOnly = false }:
       }
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setExtractedData(data.extracted);
       setAiUsed(data.aiUsed || false);
       setDocumentType(data.documentType || null);
