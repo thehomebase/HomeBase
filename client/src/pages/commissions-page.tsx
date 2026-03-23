@@ -92,7 +92,8 @@ interface CommissionSummary {
   ytd_deals: number;
   ytd_earned: number;
   ytd_pending: number;
-  monthly: { month: number; year: number; total: number; deals: number }[];
+  projected_total: number;
+  monthly: { month: number; year: number; total: number; deals: number; projected: number }[];
 }
 
 function SummaryCards({ summary, isLoading }: { summary?: CommissionSummary; isLoading: boolean }) {
@@ -120,8 +121,8 @@ function SummaryCards({ summary, isLoading }: { summary?: CommissionSummary; isL
       accent: "text-amber-600",
     },
     {
-      label: "Average per Deal",
-      value: formatUSD(summary?.avg_per_deal || 0),
+      label: "Projected",
+      value: formatUSD(summary?.projected_total || 0),
       icon: TrendingUp,
       accent: "text-blue-600",
     },
@@ -154,12 +155,21 @@ function SummaryCards({ summary, isLoading }: { summary?: CommissionSummary; isL
   );
 }
 
-function MonthlyChart({ monthly }: { monthly: { month: number; year: number; total: number; deals: number }[] }) {
-  const chartData = monthly.map((m) => ({
-    name: MONTH_NAMES[m.month - 1],
-    amount: m.total / 100,
-    deals: m.deals,
-  }));
+function MonthlyChart({ monthly }: { monthly: { month: number; year: number; total: number; deals: number; projected: number }[] }) {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  const chartData = monthly.map((m) => {
+    const projectedAmt = (m.projected || 0) / 100;
+    const actualAmt = (m.total - (m.projected || 0)) / 100;
+    return {
+      name: MONTH_NAMES[m.month - 1],
+      actual: actualAmt,
+      projected: projectedAmt,
+      deals: m.deals,
+    };
+  });
 
   return (
     <Card>
@@ -175,17 +185,29 @@ function MonthlyChart({ monthly }: { monthly: { month: number; year: number; tot
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v}`}
+                tickFormatter={(v: number) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v}`}
               />
               <Tooltip
-                formatter={(value: number) =>
-                  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
-                }
+                formatter={(value: number, name: string) => [
+                  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value),
+                  name === "projected" ? "Projected" : "Earned",
+                ]}
                 contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))" }}
               />
-              <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={40} name="Earnings" />
+              <Bar dataKey="actual" stackId="earnings" fill="hsl(var(--primary))" radius={[0, 0, 0, 0]} maxBarSize={40} name="Earned" />
+              <Bar dataKey="projected" stackId="earnings" fill="hsl(var(--primary) / 0.35)" radius={[4, 4, 0, 0]} maxBarSize={40} name="Projected" />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground justify-center">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm" style={{ background: "hsl(var(--primary))" }} />
+            <span>Earned</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm" style={{ background: "hsl(var(--primary) / 0.35)" }} />
+            <span>Projected</span>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -226,6 +248,7 @@ function CommissionsTable({
               <TableRow>
                 <TableHead>Property</TableHead>
                 <TableHead>Client</TableHead>
+                <TableHead>Closing Date</TableHead>
                 <TableHead className="text-right">Contract Price</TableHead>
                 <TableHead className="text-right">Rate</TableHead>
                 <TableHead className="text-right">Commission</TableHead>
@@ -238,47 +261,61 @@ function CommissionsTable({
             <TableBody>
               {commissions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     No commission entries yet
                   </TableCell>
                 </TableRow>
               ) : (
-                commissions.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">
-                      <div>{c.street_name}</div>
-                      <div className="text-xs text-muted-foreground">{c.city}, {c.state}</div>
-                    </TableCell>
-                    <TableCell>
-                      {c.client_first_name && c.client_last_name
-                        ? `${c.client_first_name} ${c.client_last_name}`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {c.contract_price ? formatUSD(c.contract_price) : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">{c.commissionRate}%</TableCell>
-                    <TableCell className="text-right">{formatUSD(c.commissionAmount)}</TableCell>
-                    <TableCell className="text-right">{c.brokerageSplitPercent}%</TableCell>
-                    <TableCell className="text-right font-medium">{formatUSD(netAmount(c))}</TableCell>
-                    <TableCell>
-                      <Badge variant={c.status === "paid" ? "default" : "secondary"}
-                        className={c.status === "paid" ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" : "bg-amber-100 text-amber-800 hover:bg-amber-100"}>
-                        {c.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(c)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(c.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                commissions.map((c) => {
+                  const isProjected = c.closing_date && new Date(c.closing_date) > new Date();
+                  return (
+                    <TableRow key={c.id} className={isProjected ? "opacity-80" : ""}>
+                      <TableCell className="font-medium">
+                        <div>{c.street_name}</div>
+                        <div className="text-xs text-muted-foreground">{c.city}, {c.state}</div>
+                      </TableCell>
+                      <TableCell>
+                        {c.client_first_name && c.client_last_name
+                          ? `${c.client_first_name} ${c.client_last_name}`
+                          : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {c.closing_date
+                          ? new Date(c.closing_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {c.contract_price ? formatUSD(c.contract_price) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">{c.commissionRate}%</TableCell>
+                      <TableCell className="text-right">{formatUSD(c.commissionAmount)}</TableCell>
+                      <TableCell className="text-right">{c.brokerageSplitPercent}%</TableCell>
+                      <TableCell className="text-right font-medium">{formatUSD(netAmount(c))}</TableCell>
+                      <TableCell>
+                        {isProjected ? (
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                            Projected
+                          </Badge>
+                        ) : (
+                          <Badge variant={c.status === "paid" ? "default" : "secondary"}
+                            className={c.status === "paid" ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" : "bg-amber-100 text-amber-800 hover:bg-amber-100"}>
+                            {c.status}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(c)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(c.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -641,7 +678,8 @@ export default function CommissionsPage() {
 
   const filteredCommissions = commissions.filter((c) => {
     if (yearFilter === "all") return true;
-    const year = new Date(c.createdAt).getFullYear();
+    const dateStr = c.closing_date || c.createdAt;
+    const year = new Date(dateStr).getFullYear();
     return year === parseInt(yearFilter);
   });
 

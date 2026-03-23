@@ -42,7 +42,8 @@ interface CommissionSummary {
   ytd_deals: number;
   ytd_earned: number;
   ytd_pending: number;
-  monthly: { month: number; year: number; total: number; deals: number }[];
+  projected_total: number;
+  monthly: { month: number; year: number; total: number; deals: number; projected: number }[];
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -318,9 +319,12 @@ export default function DataPage() {
         (cm: any) => cm.month === i + 1 && cm.year === currentYear
       );
       const volume = Number(m?.volume || 0);
+      const projectedAmt = (m?.projected || 0) / 100;
+      const earnedAmt = ((m?.total || 0) - (m?.projected || 0)) / 100;
       return {
         month: monthNames[i],
-        earned: (m?.total || 0) / 100,
+        earned: earnedAmt,
+        projected: projectedAmt,
         net: (m?.net_total || 0) / 100,
         deals: m?.deals || 0,
         bench1: volume * 0.01,
@@ -609,7 +613,7 @@ export default function DataPage() {
               <h3 className="text-sm font-semibold">Commission Earnings</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {commissionSummary
-                  ? `${formatFullCurrency(commissionSummary.ytd_earned / 100)} earned YTD`
+                  ? `${formatFullCurrency(commissionSummary.ytd_earned / 100)} earned YTD${commissionSummary.projected_total > 0 ? ` · ${formatFullCurrency(commissionSummary.projected_total / 100)} projected` : ""}`
                   : "No commission data yet"}
               </p>
             </div>
@@ -618,6 +622,10 @@ export default function DataPage() {
                 <div className="flex items-center gap-1.5">
                   <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(142, 71%, 45%)" }} />
                   <span className="text-[10px] text-muted-foreground">Gross</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(142, 71%, 45%, 0.35)" }} />
+                  <span className="text-[10px] text-muted-foreground">Projected</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(217, 91%, 60%)" }} />
@@ -680,7 +688,7 @@ export default function DataPage() {
                   }}
                   formatter={(value: number, name: string) => {
                     if (name === "deals") return [value, "Deals"];
-                    const labels: Record<string, string> = { earned: "Gross Commission", net: "Net Income", bench1: "1% Benchmark", bench2: "2% Benchmark", bench3: "3% Benchmark" };
+                    const labels: Record<string, string> = { earned: "Gross Commission", projected: "Projected", net: "Net Income", bench1: "1% Benchmark", bench2: "2% Benchmark", bench3: "3% Benchmark" };
                     return [formatFullCurrency(value), labels[name] || name];
                   }}
                 />
@@ -691,6 +699,16 @@ export default function DataPage() {
                   strokeWidth={2}
                   fill="url(#commGradient)"
                   name="earned"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="projected"
+                  stroke="hsl(142, 71%, 45%)"
+                  strokeWidth={1.5}
+                  strokeDasharray="5 3"
+                  fill="hsl(142, 71%, 45%)"
+                  fillOpacity={0.08}
+                  name="projected"
                 />
                 <Line
                   type="monotone"

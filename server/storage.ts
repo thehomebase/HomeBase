@@ -6331,7 +6331,7 @@ export class DatabaseStorage implements IStorage {
       JOIN transactions t ON ce.transaction_id = t.id
       LEFT JOIN clients c ON t.client_id = c.id
       WHERE ce.agent_id = ${agentId}
-      ORDER BY ce.created_at DESC
+      ORDER BY COALESCE(t.closing_date, ce.created_at) DESC
     `);
     return result.rows as any[];
   }
@@ -6379,19 +6379,21 @@ export class DatabaseStorage implements IStorage {
     const result = await db.execute(sql`
       SELECT
         COUNT(*)::int as total_deals,
-        COALESCE(SUM(CASE WHEN status = 'paid' THEN commission_amount ELSE 0 END), 0)::int as total_earned,
-        COALESCE(SUM(CASE WHEN status = 'pending' THEN commission_amount ELSE 0 END), 0)::int as total_pending,
-        COALESCE(AVG(commission_amount) FILTER (WHERE commission_amount > 0), 0)::int as avg_per_deal,
-        COUNT(*) FILTER (WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW()))::int as ytd_deals,
-        COALESCE(SUM(CASE WHEN EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW()) AND status = 'paid' THEN commission_amount ELSE 0 END), 0)::int as ytd_earned,
-        COALESCE(SUM(CASE WHEN EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW()) AND status = 'pending' THEN commission_amount ELSE 0 END), 0)::int as ytd_pending
-      FROM commission_entries
-      WHERE agent_id = ${agentId}
+        COALESCE(SUM(CASE WHEN ce.status = 'paid' THEN ce.commission_amount ELSE 0 END), 0)::int as total_earned,
+        COALESCE(SUM(CASE WHEN ce.status = 'pending' THEN ce.commission_amount ELSE 0 END), 0)::int as total_pending,
+        COALESCE(AVG(ce.commission_amount) FILTER (WHERE ce.commission_amount > 0), 0)::int as avg_per_deal,
+        COUNT(*) FILTER (WHERE EXTRACT(YEAR FROM COALESCE(t.closing_date, ce.created_at)) = EXTRACT(YEAR FROM NOW()))::int as ytd_deals,
+        COALESCE(SUM(CASE WHEN EXTRACT(YEAR FROM COALESCE(t.closing_date, ce.created_at)) = EXTRACT(YEAR FROM NOW()) AND ce.status = 'paid' THEN ce.commission_amount ELSE 0 END), 0)::int as ytd_earned,
+        COALESCE(SUM(CASE WHEN EXTRACT(YEAR FROM COALESCE(t.closing_date, ce.created_at)) = EXTRACT(YEAR FROM NOW()) AND ce.status = 'pending' THEN ce.commission_amount ELSE 0 END), 0)::int as ytd_pending,
+        COALESCE(SUM(CASE WHEN t.closing_date > NOW() THEN ce.commission_amount ELSE 0 END), 0)::int as projected_total
+      FROM commission_entries ce
+      JOIN transactions t ON ce.transaction_id = t.id
+      WHERE ce.agent_id = ${agentId}
     `);
     const monthlyResult = await db.execute(sql`
       SELECT
-        EXTRACT(MONTH FROM ce.created_at)::int as month,
-        EXTRACT(YEAR FROM ce.created_at)::int as year,
+        EXTRACT(MONTH FROM COALESCE(t.closing_date, ce.created_at))::int as month,
+        EXTRACT(YEAR FROM COALESCE(t.closing_date, ce.created_at))::int as year,
         COALESCE(SUM(ce.commission_amount), 0)::int as total,
         COUNT(*)::int as deals,
         COALESCE(SUM(
@@ -6401,11 +6403,12 @@ export class DatabaseStorage implements IStorage {
             * (1.0 - COALESCE(ce.referral_fee_percent, 0) / 100.0)
           )
         ), 0)::int as net_total,
-        COALESCE(SUM(t.contract_price), 0)::bigint as volume
+        COALESCE(SUM(t.contract_price), 0)::bigint as volume,
+        COALESCE(SUM(CASE WHEN t.closing_date > NOW() THEN ce.commission_amount ELSE 0 END), 0)::int as projected
       FROM commission_entries ce
       JOIN transactions t ON ce.transaction_id = t.id
-      WHERE ce.agent_id = ${agentId} AND EXTRACT(YEAR FROM ce.created_at) = EXTRACT(YEAR FROM NOW())
-      GROUP BY EXTRACT(YEAR FROM ce.created_at), EXTRACT(MONTH FROM ce.created_at)
+      WHERE ce.agent_id = ${agentId} AND EXTRACT(YEAR FROM COALESCE(t.closing_date, ce.created_at)) = EXTRACT(YEAR FROM NOW())
+      GROUP BY EXTRACT(YEAR FROM COALESCE(t.closing_date, ce.created_at)), EXTRACT(MONTH FROM COALESCE(t.closing_date, ce.created_at))
       ORDER BY year, month
     `);
     return { ...result.rows[0], monthly: monthlyResult.rows };
