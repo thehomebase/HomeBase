@@ -28,17 +28,17 @@ function truncateText(text: string, maxChars: number = 30000): string {
   return text.substring(0, maxChars) + "\n[DOCUMENT TRUNCATED]";
 }
 
-const DOCUMENT_EXTRACTION_PROMPT = `You are a real estate document parser specializing in TREC (Texas Real Estate Commission) contracts and similar purchase agreements. Analyze this PDF document and extract the following fields. Return ONLY a valid JSON object with no markdown formatting, no code fences, no explanation.
+const DOCUMENT_EXTRACTION_PROMPT = `You are a real estate document parser that handles purchase contracts, listing agreements, and related documents from ALL U.S. states. Analyze this PDF document and extract the following fields. Return ONLY a valid JSON object with no markdown formatting, no code fences, no explanation.
 
 Fields to extract:
 - documentType: string - the type of document (e.g. "purchase_contract", "listing_agreement", "inspection_report", "addendum", "disclosure", "closing_document", "lease", "amendment", "unknown")
 - contractPrice: number or null - the total purchase/sales price
 - earnestMoney: number or null - earnest money deposit amount
-- optionFee: number or null - option fee amount
+- optionFee: number or null - option fee amount (common in Texas; may not exist in other states — return null if not present)
 - downPayment: number or null - down payment amount
-- sellerConcessions: number or null - seller concessions/contributions
+- sellerConcessions: number or null - seller concessions/contributions (may be labeled "seller concessions", "seller contributions", "seller credit", or similar)
 - closingDate: string or null - closing date in ISO format (YYYY-MM-DDTHH:mm:ss.sssZ)
-- optionPeriodExpiration: string or null - option period end date in ISO format
+- optionPeriodExpiration: string or null - option period or due diligence period end date in ISO format (return null if the contract type does not have one)
 - contractExecutionDate: string or null - date contract was executed/signed in ISO format
 - financing: string or null - one of: "conventional", "fha", "va", "usda", "cash", or null
 - mlsNumber: string or null - MLS listing number
@@ -49,16 +49,45 @@ Fields to extract:
 - notes: string or null - any important terms, contingencies, or special conditions worth noting
 
 CRITICAL DATE EXTRACTION RULES — read very carefully:
-- closingDate: This is the closing/settlement date, NOT the contract execution date. On TREC forms, look for "closing" or "closing date" typically in the closing section (often Paragraph 9). Read the exact month, day, and year written next to it. Do NOT confuse with any other date on the form.
-- optionPeriodExpiration: This is the date the option period ENDS. On TREC forms, look for "option period" and the specific expiration date (often Paragraph 23). It is usually a short period (5-14 days) after the contract execution date. Do NOT pick up dates from other sections like inspection deadlines, financing deadlines, or prior contract dates.
-- contractExecutionDate: This is the date all parties signed the final executed contract, often called the "Effective Date" on TREC forms. It is typically the MOST RECENT signature date or explicitly labeled "Effective Date." It should be a recent date close to when the document was created. Do NOT confuse with prior amendment dates, listing dates, or dates in the body of the contract.
-- IMPORTANT: If the document is an amendment, addendum, or updated contract, be careful to distinguish between dates from the ORIGINAL contract vs. the CURRENT/AMENDED dates. Always extract the most current, applicable dates.
-- IMPORTANT: Many contracts have MULTIPLE dates throughout. Read each date field label carefully. Do NOT mix up dates between different sections.
+Real estate contracts contain MANY dates. You must read the LABEL next to each date carefully and match it to the correct field. Do NOT mix up dates from different sections.
+
+- closingDate: The date the transaction closes/settles. Common labels across states:
+  * "Closing Date", "Settlement Date", "Close of Escrow", "Closing/Settlement"
+  * TREC (Texas): Often in Paragraph 9
+  * CAR (California): "Close of Escrow" date
+  * FAR/BAR (Florida): "Closing Date" in the closing section
+  * GAR (Georgia): "Closing Date"
+  * Other states: Look for "closing", "settlement", or "close of escrow" in the contract body
+  * Do NOT confuse with contract execution date, possession date, or any other deadline
+
+- optionPeriodExpiration: The end of the buyer's unrestricted right to terminate. Different states call this different things:
+  * TREC (Texas): "Option Period" expiration (Paragraph 23) — typically 5-14 days after execution
+  * North Carolina: "Due Diligence Period" end date
+  * Some states: "Inspection Period" or "Investigation Period" end date
+  * Many states (CA, FL, NY, etc.) do NOT have a formal option period — return null if not present
+  * This is NOT the same as the inspection deadline, financing contingency deadline, or appraisal deadline
+
+- contractExecutionDate: The date the contract becomes fully executed / binding. Common labels:
+  * "Effective Date", "Binding Agreement Date", "Execution Date", "Date of Acceptance"
+  * This is typically the date the LAST party signed (making it binding), or an explicitly labeled effective date
+  * It should be a recent date — close to when the document was created
+  * Do NOT confuse with dates written inside the contract body referring to deadlines or prior agreements
+  * If there are multiple signature dates, use the most recent one OR the explicitly labeled "Effective Date"
+
+- IMPORTANT: If the document is an amendment, addendum, or updated contract, distinguish between dates from the ORIGINAL contract vs. the CURRENT/AMENDED dates. Always extract the most current, applicable dates.
+- IMPORTANT: Pay attention to handwritten dates vs. pre-printed dates. Handwritten dates near signatures are usually the actual execution dates.
 
 CRITICAL FINANCING TYPE RULES:
-- financing: Look for the financing section (often Paragraph 4 on TREC forms) which lists options like "Third Party Financing", "Cash", etc. Under third party financing, look for checked/selected sub-options: "Conventional", "FHA", "VA", "USDA". Only ONE should be checked/filled in.
+- financing: Determine how the purchase is being financed. Look for:
+  * A "Financing" or "Method of Payment" section listing options like "Conventional", "FHA", "VA", "USDA", "Cash"
+  * TREC (Texas): Paragraph 4 — look for which sub-option is checked
+  * CAR (California): Look for loan type in the financing section
+  * FAR/BAR (Florida): Financing section with checkboxes
+  * Other states: Look for the financing/loan contingency section
 - Examine checkboxes, filled circles, or "X" marks very carefully. A checkbox may appear dark due to printing but NOT actually be checked. Look for a clear checkmark (✓), X mark, or filled indicator INSIDE the box.
 - Do NOT assume a checkbox is checked just because the text near it mentions that loan type. Only report the option that is clearly SELECTED/CHECKED.
+- If the contract says "Cash" or "all cash" with no financing contingency, return "cash".
+- If you cannot determine the financing type with confidence, return null.
 
 General Rules:
 - For monetary values, return plain numbers (no $ or commas)
