@@ -78,13 +78,26 @@ const CONTACT_ROLES = [
   "Transaction Coordinator",
 ];
 
+function parseDateUTC(dateStr: string): Date {
+  const d = new Date(dateStr);
+  if (dateStr.includes("T") || dateStr.endsWith("Z")) {
+    return d;
+  }
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    return new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0));
+  }
+  return d;
+}
+
 function formatValue(key: string, value: unknown): string {
   if (value === null || value === undefined) return "Not found";
   if (CURRENCY_FIELDS.includes(key)) {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value as number);
   }
   if (DATE_FIELDS.includes(key)) {
-    return new Date(value as string).toLocaleDateString();
+    const d = parseDateUTC(value as string);
+    return d.toLocaleDateString("en-US", { timeZone: "UTC" });
   }
   return String(value);
 }
@@ -93,8 +106,11 @@ function formatEditValue(key: string, value: unknown): string {
   if (value === null || value === undefined) return "";
   if (CURRENCY_FIELDS.includes(key)) return String(value);
   if (DATE_FIELDS.includes(key)) {
-    const d = new Date(value as string);
-    return d.toISOString().split("T")[0];
+    const d = parseDateUTC(value as string);
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
   return String(value);
 }
@@ -106,8 +122,12 @@ function parseEditValue(key: string, value: string): unknown {
     return isNaN(num) ? null : Math.round(num);
   }
   if (DATE_FIELDS.includes(key)) {
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d.toISOString();
+    const parts = value.split("-");
+    if (parts.length === 3) {
+      const d = new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0));
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    }
+    return null;
   }
   return value;
 }
