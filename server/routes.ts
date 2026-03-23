@@ -2122,6 +2122,9 @@ export function registerRoutes(app: Express): Server {
             state: req.body.state || null,
             zipCode: req.body.zipCode || null,
             description: req.body.description || null,
+            googleMapsUrl: req.body.googleMapsUrl || null,
+            yelpUrl: req.body.yelpUrl || null,
+            bbbUrl: req.body.bbbUrl || null,
             agentId: null,
             vendorUserId: null,
             agentRating: null,
@@ -2157,7 +2160,7 @@ export function registerRoutes(app: Express): Server {
       }
       
       const allowedFields = isPrivateOwner
-        ? ['name', 'category', 'phone', 'email', 'website', 'address', 'city', 'state', 'zipCode', 'description']
+        ? ['name', 'category', 'phone', 'email', 'website', 'address', 'city', 'state', 'zipCode', 'description', 'googleMapsUrl', 'yelpUrl', 'bbbUrl']
         : ['name', 'category', 'phone', 'email', 'website', 'address', 'city', 'state', 'zipCode', 'description', 'googleMapsUrl', 'yelpUrl', 'bbbUrl', 'agentRating', 'agentNotes'];
       const sanitizedData: Record<string, any> = {};
       for (const field of allowedFields) {
@@ -9385,6 +9388,26 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error fetching team members:', error);
       res.status(500).json({ error: 'Failed to fetch team members' });
+    }
+  });
+
+  app.patch("/api/my-team/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = Number(req.params.id);
+      const member = await storage.getHomeTeamMember(id);
+      if (!member) return res.status(404).json({ error: 'Team member not found' });
+      if (member.userId !== req.user.id) return res.sendStatus(403);
+      const { notes, category } = req.body;
+      const updates: Record<string, any> = {};
+      if (notes !== undefined) updates.notes = notes;
+      if (category !== undefined) updates.category = category;
+      if (Object.keys(updates).length === 0) return res.json(member);
+      const updated = await storage.updateHomeTeamMember(id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating team member:', error);
+      res.status(500).json({ error: 'Failed to update team member' });
     }
   });
 

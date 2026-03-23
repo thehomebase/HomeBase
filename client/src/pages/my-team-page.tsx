@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -59,7 +59,9 @@ import {
   Send,
   Copy,
   Check,
+  Pencil,
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Contractor, HomeTeamMember } from "@shared/schema";
 
 type TeamMemberWithContractor = HomeTeamMember & {
@@ -429,7 +431,7 @@ function InviteToHomebaseButton({ contractor }: { contractor: Contractor }) {
   );
 }
 
-function TeamMemberCard({ member, onRemove, isRemoving }: { member: TeamMemberWithContractor; onRemove: () => void; isRemoving: boolean }) {
+function TeamMemberCard({ member, onRemove, isRemoving, onEdit }: { member: TeamMemberWithContractor; onRemove: () => void; isRemoving: boolean; onEdit: () => void }) {
   const c = member.contractor;
   const name = c?.name || "Unknown";
 
@@ -489,18 +491,29 @@ function TeamMemberCard({ member, onRemove, isRemoving }: { member: TeamMemberWi
         </p>
       )}
       <ContactActions contractor={c} onRemove={onRemove} isRemoving={isRemoving} />
-      {c?.website && (
-        <a
-          href={c.website.startsWith("http") ? c.website : `https://${c.website}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-1"
-        >
-          <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground gap-1 px-2">
-            <Globe className="h-3 w-3" /> Website
-          </Button>
-        </a>
-      )}
+      <div className="flex items-center gap-1 mt-1">
+        {c?.website && (
+          <a
+            href={c.website.startsWith("http") ? c.website : `https://${c.website}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground gap-1 px-2">
+              <Globe className="h-3 w-3" /> Website
+            </Button>
+          </a>
+        )}
+        {c?.yelpUrl && (
+          <a href={c.yelpUrl} target="_blank" rel="noopener noreferrer">
+            <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground gap-1 px-2">
+              <Star className="h-3 w-3" /> Yelp
+            </Button>
+          </a>
+        )}
+      </div>
+      <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground gap-1 px-2 mt-0.5" onClick={onEdit}>
+        <Pencil className="h-3 w-3" /> Edit
+      </Button>
       {isPrivate && c && (
         <InviteToHomebaseButton contractor={c} />
       )}
@@ -508,115 +521,264 @@ function TeamMemberCard({ member, onRemove, isRemoving }: { member: TeamMemberWi
   );
 }
 
-function AddVendorDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+interface VendorFormData {
+  name: string;
+  category: string;
+  phone: string;
+  email: string;
+  website: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  description: string;
+  yelpUrl: string;
+  googleMapsUrl: string;
+  bbbUrl: string;
+  notes: string;
+}
+
+const emptyVendorForm: VendorFormData = {
+  name: "", category: "", phone: "", email: "", website: "",
+  address: "", city: "", state: "", zipCode: "", description: "",
+  yelpUrl: "", googleMapsUrl: "", bbbUrl: "", notes: "",
+};
+
+function VendorFormDialog({
+  open,
+  onOpenChange,
+  editingMember,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingMember?: TeamMemberWithContractor | null;
+}) {
   const { toast } = useToast();
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [notes, setNotes] = useState("");
+  const isEdit = !!editingMember;
+  const c = editingMember?.contractor;
+  const canEditContractor = !isEdit || (c && !c.vendorUserId);
+
+  const [form, setForm] = useState<VendorFormData>(emptyVendorForm);
+
+  useEffect(() => {
+    if (open && isEdit && c) {
+      setForm({
+        name: c.name || "",
+        category: editingMember.category || c.category || "",
+        phone: c.phone || "",
+        email: c.email || "",
+        website: c.website || "",
+        address: c.address || "",
+        city: c.city || "",
+        state: c.state || "",
+        zipCode: c.zipCode || "",
+        description: c.description || "",
+        yelpUrl: c.yelpUrl || "",
+        googleMapsUrl: c.googleMapsUrl || "",
+        bbbUrl: c.bbbUrl || "",
+        notes: editingMember.notes || "",
+      });
+    } else if (open && !isEdit) {
+      setForm(emptyVendorForm);
+    }
+  }, [open, editingMember?.id]);
+
+  const setField = (field: keyof VendorFormData, value: string) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
 
   const createMutation = useMutation({
     mutationFn: async () => {
       const contractorRes = await apiRequest("POST", "/api/contractors", {
-        name,
-        category: category || "other",
-        phone: phone || null,
-        email: email || null,
+        name: form.name,
+        category: form.category || "other",
+        phone: form.phone || null,
+        email: form.email || null,
+        website: form.website || null,
+        address: form.address || null,
+        city: form.city || null,
+        state: form.state || null,
+        zipCode: form.zipCode || null,
+        description: form.description || null,
+        yelpUrl: form.yelpUrl || null,
+        googleMapsUrl: form.googleMapsUrl || null,
+        bbbUrl: form.bbbUrl || null,
       });
       const contractor = await contractorRes.json();
-
       await apiRequest("POST", "/api/my-team", {
         contractorId: contractor.id,
-        category: category || "other",
-        notes: notes || null,
+        category: form.category || "other",
+        notes: form.notes || null,
       });
       return contractor;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/my-team"] });
-      toast({ title: "Added to team", description: `${name} has been added to your team.` });
-      setName("");
-      setCategory("");
-      setPhone("");
-      setEmail("");
-      setNotes("");
+      toast({ title: "Added to team", description: `${form.name} has been added to your team.` });
+      setForm(emptyVendorForm);
       onOpenChange(false);
     },
     onError: () => toast({ title: "Failed to add vendor", variant: "destructive" }),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      if (canEditContractor && c) {
+        await apiRequest("PATCH", `/api/contractors/${c.id}`, {
+          name: form.name,
+          category: form.category || "other",
+          phone: form.phone || null,
+          email: form.email || null,
+          website: form.website || null,
+          address: form.address || null,
+          city: form.city || null,
+          state: form.state || null,
+          zipCode: form.zipCode || null,
+          description: form.description || null,
+          yelpUrl: form.yelpUrl || null,
+          googleMapsUrl: form.googleMapsUrl || null,
+          bbbUrl: form.bbbUrl || null,
+        });
+      }
+      if (editingMember) {
+        await apiRequest("PATCH", `/api/my-team/${editingMember.id}`, {
+          notes: form.notes || null,
+          category: form.category || "other",
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/my-team"] });
+      toast({ title: "Vendor updated", description: `${form.name} has been updated.` });
+      onOpenChange(false);
+    },
+    onError: () => toast({ title: "Failed to update vendor", variant: "destructive" }),
+  });
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add a Vendor</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Vendor" : "Add a Vendor"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <Label className="text-sm">Name *</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Business or contact name"
-              className="mt-1"
-            />
+        {canEditContractor ? (
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="location">Location</TabsTrigger>
+              <TabsTrigger value="links">Links & Notes</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="basic" className="space-y-3 mt-3">
+              <div>
+                <Label className="text-sm">Name *</Label>
+                <Input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Business or contact name" className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-sm">Category</Label>
+                <Select value={form.category} onValueChange={(v) => setField("category", v)}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    {VENDOR_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Phone</Label>
+                <Input value={form.phone} onChange={(e) => setField("phone", e.target.value)} placeholder="(555) 123-4567" className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-sm">Email</Label>
+                <Input value={form.email} onChange={(e) => setField("email", e.target.value)} placeholder="vendor@email.com" type="email" className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-sm">Description</Label>
+                <Textarea value={form.description} onChange={(e) => setField("description", e.target.value)} placeholder="Brief description of services..." rows={2} className="mt-1" />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="location" className="space-y-3 mt-3">
+              <div>
+                <Label className="text-sm">Street Address</Label>
+                <Input value={form.address} onChange={(e) => setField("address", e.target.value)} placeholder="123 Main St" className="mt-1" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm">City</Label>
+                  <Input value={form.city} onChange={(e) => setField("city", e.target.value)} placeholder="City" className="mt-1" />
+                </div>
+                <div>
+                  <Label className="text-sm">State</Label>
+                  <Input value={form.state} onChange={(e) => setField("state", e.target.value)} placeholder="TX" className="mt-1" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Zip Code</Label>
+                <Input value={form.zipCode} onChange={(e) => setField("zipCode", e.target.value)} placeholder="76244" className="mt-1" />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="links" className="space-y-3 mt-3">
+              <div>
+                <Label className="text-sm">Website</Label>
+                <Input value={form.website} onChange={(e) => setField("website", e.target.value)} placeholder="https://example.com" className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-sm">Yelp Page</Label>
+                <Input value={form.yelpUrl} onChange={(e) => setField("yelpUrl", e.target.value)} placeholder="https://yelp.com/biz/..." className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-sm">Google Maps / Business</Label>
+                <Input value={form.googleMapsUrl} onChange={(e) => setField("googleMapsUrl", e.target.value)} placeholder="https://maps.google.com/..." className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-sm">BBB Page</Label>
+                <Input value={form.bbbUrl} onChange={(e) => setField("bbbUrl", e.target.value)} placeholder="https://bbb.org/..." className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-sm">Personal Notes</Label>
+                <Textarea value={form.notes} onChange={(e) => setField("notes", e.target.value)} placeholder="Your notes about this vendor..." rows={2} className="mt-1" />
+              </div>
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <div className="space-y-3 mt-2">
+            <p className="text-xs text-muted-foreground">This vendor manages their own profile. You can update your category and personal notes.</p>
+            <div>
+              <Label className="text-sm">Category</Label>
+              <Select value={form.category} onValueChange={(v) => setField("category", v)}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectContent>
+                  {VENDOR_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm">Personal Notes</Label>
+              <Textarea value={form.notes} onChange={(e) => setField("notes", e.target.value)} placeholder="Your notes about this vendor..." rows={3} className="mt-1" />
+            </div>
           </div>
-          <div>
-            <Label className="text-sm">Category</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {VENDOR_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-sm">Phone</Label>
-            <Input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="(555) 123-4567"
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label className="text-sm">Email</Label>
-            <Input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="vendor@email.com"
-              type="email"
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label className="text-sm">Notes</Label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Personal notes about this vendor..."
-              rows={2}
-              className="mt-1"
-            />
-          </div>
-          <Button
-            className="w-full"
-            onClick={() => createMutation.mutate()}
-            disabled={!name.trim() || createMutation.isPending}
-          >
-            {createMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Plus className="h-4 w-4 mr-2" />
-            )}
-            Add to My Team
-          </Button>
-        </div>
+        )}
+
+        <Button
+          className="w-full mt-2"
+          onClick={() => isEdit ? updateMutation.mutate() : createMutation.mutate()}
+          disabled={!form.name.trim() || isPending}
+        >
+          {isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : isEdit ? (
+            <Check className="h-4 w-4 mr-2" />
+          ) : (
+            <Plus className="h-4 w-4 mr-2" />
+          )}
+          {isEdit ? "Save Changes" : "Add to My Team"}
+        </Button>
       </DialogContent>
     </Dialog>
   );
@@ -627,6 +789,7 @@ export default function MyTeamPage() {
   const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [showAddVendor, setShowAddVendor] = useState(false);
+  const [editingMember, setEditingMember] = useState<TeamMemberWithContractor | null>(null);
 
   const { data: teamMembers, isLoading } = useQuery<TeamMemberWithContractor[]>({
     queryKey: ["/api/my-team"],
@@ -751,6 +914,7 @@ export default function MyTeamPage() {
                 member={member}
                 onRemove={() => removeMutation.mutate(member.id)}
                 isRemoving={removeMutation.isPending}
+                onEdit={() => setEditingMember(member)}
               />
             ))}
           </div>
@@ -770,7 +934,12 @@ export default function MyTeamPage() {
         </>
       )}
 
-      <AddVendorDialog open={showAddVendor} onOpenChange={setShowAddVendor} />
+      <VendorFormDialog open={showAddVendor} onOpenChange={setShowAddVendor} />
+      <VendorFormDialog
+        open={!!editingMember}
+        onOpenChange={(open) => { if (!open) setEditingMember(null); }}
+        editingMember={editingMember}
+      />
     </div>
   );
 }

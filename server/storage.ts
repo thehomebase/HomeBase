@@ -260,6 +260,7 @@ export interface IStorage {
   removeHomeTeamMember(id: number): Promise<void>;
   getHomeTeamByUser(userId: number): Promise<HomeTeamMember[]>;
   getHomeTeamMember(id: number): Promise<HomeTeamMember | undefined>;
+  updateHomeTeamMember(id: number, data: Record<string, any>): Promise<HomeTeamMember>;
 
   // Homeowner Home operations
   createHome(data: InsertHomeownerHome): Promise<HomeownerHome>;
@@ -4480,6 +4481,20 @@ export class DatabaseStorage implements IStorage {
   async getHomeTeamMember(id: number): Promise<HomeTeamMember | undefined> {
     const result = await db.execute(sql`SELECT * FROM home_team_members WHERE id = ${id}`);
     if (!result.rows?.length) return undefined;
+    const row = result.rows[0] as any;
+    return { id: row.id, userId: row.user_id, contractorId: row.contractor_id, category: row.category, notes: row.notes, addedAt: row.added_at };
+  }
+
+  async updateHomeTeamMember(id: number, data: Record<string, any>): Promise<HomeTeamMember> {
+    const notesVal = data.notes !== undefined ? data.notes : undefined;
+    const catVal = data.category !== undefined ? data.category : undefined;
+    const result = await db.execute(sql`
+      UPDATE home_team_members
+      SET notes = ${notesVal !== undefined ? notesVal : sql`notes`},
+          category = ${catVal !== undefined ? catVal : sql`category`}
+      WHERE id = ${id}
+      RETURNING *
+    `);
     const row = result.rows[0] as any;
     return { id: row.id, userId: row.user_id, contractorId: row.contractor_id, category: row.category, notes: row.notes, addedAt: row.added_at };
   }
