@@ -86,7 +86,7 @@ function getActiveKey(userId: number | undefined) {
   return `homebase_tutorial_active_${userId ?? "anon"}`;
 }
 
-export function useOnboardingTutorial(userId?: number, role?: string, emailVerified?: boolean) {
+export function useOnboardingTutorial(userId?: number, role?: string, emailVerified?: boolean, tutorialCompleted?: boolean) {
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [, setLocation] = useLocation();
@@ -95,13 +95,14 @@ export function useOnboardingTutorial(userId?: number, role?: string, emailVerif
 
   useEffect(() => {
     if (!isEligible || !userId) return;
+    if (tutorialCompleted) return;
     const completed = localStorage.getItem(getStorageKey(userId));
     const active = localStorage.getItem(getActiveKey(userId));
     if (!completed && !active) {
       setIsActive(true);
       localStorage.setItem(getActiveKey(userId), "true");
     }
-  }, [isEligible, userId]);
+  }, [isEligible, userId, tutorialCompleted]);
 
   const startTutorial = useCallback(() => {
     setCurrentStep(0);
@@ -115,6 +116,11 @@ export function useOnboardingTutorial(userId?: number, role?: string, emailVerif
     if (userId) {
       localStorage.setItem(getStorageKey(userId), "true");
       localStorage.removeItem(getActiveKey(userId));
+      fetch("/api/tutorial/complete", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      }).catch(() => {});
     }
   }, [userId]);
 

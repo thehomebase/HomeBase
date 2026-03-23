@@ -1563,6 +1563,17 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/tutorial/complete", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      await storage.updateUser(req.user.id, { tutorialCompleted: true });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking tutorial complete:', error);
+      res.status(500).json({ error: 'Failed to update tutorial status' });
+    }
+  });
+
   app.get("/api/communications/metrics", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (!["agent", "broker", "vendor", "lender"].includes(req.user.role)) return res.sendStatus(403);

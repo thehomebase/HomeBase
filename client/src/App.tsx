@@ -153,15 +153,23 @@ export function useActingAs() { return useContext(ActingAsContext); }
 
 function LeadAlertBanner() {
   const { newLeadCount, isAgent } = useLeadAlerts();
-  const [dismissedAt, setDismissedAt] = React.useState(0);
+  const { user } = useAuth();
+  const storageKey = `homebase_lead_alert_dismissed_${user?.id ?? "anon"}`;
 
-  React.useEffect(() => {
-    if (newLeadCount > dismissedAt && dismissedAt > 0) {
-      setDismissedAt(0);
-    }
-  }, [newLeadCount, dismissedAt]);
+  const [dismissedCount, setDismissedCount] = React.useState(() => {
+    try {
+      return parseInt(localStorage.getItem(storageKey) || "0", 10) || 0;
+    } catch { return 0; }
+  });
 
-  if (!isAgent || newLeadCount === 0 || (dismissedAt > 0 && newLeadCount <= dismissedAt)) return null;
+  const handleDismiss = () => {
+    setDismissedCount(newLeadCount);
+    try { localStorage.setItem(storageKey, String(newLeadCount)); } catch {}
+  };
+
+  const shouldShow = isAgent && newLeadCount > 0 && newLeadCount !== dismissedCount;
+
+  if (!shouldShow) return null;
 
   return (
     <div className="bg-primary text-primary-foreground px-4 py-2 flex items-center justify-between gap-3 text-sm">
@@ -177,7 +185,7 @@ function LeadAlertBanner() {
         <Link href="/lead-gen" className="underline font-semibold hover:opacity-80">
           View Leads
         </Link>
-        <button onClick={() => setDismissedAt(newLeadCount)} className="opacity-70 hover:opacity-100 ml-1">
+        <button onClick={handleDismiss} className="opacity-70 hover:opacity-100 ml-1">
           ✕
         </button>
       </div>
@@ -197,7 +205,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   const { newLeadCount } = useLeadAlerts();
   const isAgentOrBroker = user?.role === 'agent' || user?.role === 'broker';
   const isAdmin = user?.role === 'admin';
-  const tutorial = useOnboardingTutorial(user?.id, user?.role, user?.emailVerified);
+  const tutorial = useOnboardingTutorial(user?.id, user?.role, user?.emailVerified, user?.tutorialCompleted);
   const [actingAs, setActingAs] = useState<ActingAsAccount | null>(null);
   const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains("dark"));

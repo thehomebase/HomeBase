@@ -53,6 +53,7 @@ export const users = pgTable("users", {
   totpSecret: text("totp_secret"),
   totpEnabled: boolean("totp_enabled").default(false),
   accountStatus: text("account_status").notNull().default("active"),
+  tutorialCompleted: boolean("tutorial_completed").default(false),
   trialEndsAt: timestamp("trial_ends_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });

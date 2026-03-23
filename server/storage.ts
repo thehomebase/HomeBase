@@ -624,6 +624,7 @@ export class DatabaseStorage implements IStorage {
         twitterUrl: user.twitterUrl ?? null,
         linkedinUrl: user.linkedinUrl ?? null,
         accountStatus: user.accountStatus ?? "active",
+        tutorialCompleted: user.tutorialCompleted ?? false,
       };
     } catch (error) {
       console.error('Error in getUser:', error);
@@ -675,6 +676,7 @@ export class DatabaseStorage implements IStorage {
         twitterUrl: user.twitterUrl ?? null,
         linkedinUrl: user.linkedinUrl ?? null,
         accountStatus: user.accountStatus ?? "active",
+        tutorialCompleted: user.tutorialCompleted ?? false,
       };
     } catch (error) {
       console.error('Error in getUserByEmail:', error);
@@ -730,6 +732,7 @@ export class DatabaseStorage implements IStorage {
         registrationIp: user.registrationIp ?? null,
         brokerageId: user.brokerageId ? Number(user.brokerageId) : null,
         accountStatus: user.accountStatus ?? "active",
+        tutorialCompleted: user.tutorialCompleted ?? false,
       };
     } catch (error) {
       console.error('Error in createUser:', error);
@@ -3033,6 +3036,7 @@ export class DatabaseStorage implements IStorage {
         registrationIp: user.registration_ip ?? null,
         brokerageId: user.brokerage_id ? Number(user.brokerage_id) : null,
         accountStatus: user.account_status ?? "active",
+        tutorialCompleted: user.tutorial_completed ?? false,
       };
     } catch (error) {
       console.error('Error in updateUser:', error);
