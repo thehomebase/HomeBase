@@ -32,7 +32,7 @@ export function SiteFooter() {
         </div>
       </div>
       <div className="max-w-5xl mx-auto mt-8 overflow-hidden">
-        <span className="text-[4rem] md:text-[6rem] font-black leading-none tracking-tight text-zinc-800 dark:text-zinc-900 select-none">
+        <span className="text-[4rem] md:text-[6rem] font-black leading-none tracking-tight select-none text-zinc-800 dark:text-transparent footer-outline-text">
           HomeBase
         </span>
       </div>

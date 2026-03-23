@@ -68,9 +68,11 @@ import {
   Key,
   User as UserIcon,
   Settings,
-  Target
+  Target,
+  Moon,
+  Sun
 } from "lucide-react";
-import React, { useState, createContext, useContext } from "react";
+import React, { useState, useEffect, createContext, useContext } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { OnboardingTutorial, useOnboardingTutorial, TutorialStartButton } from "@/components/onboarding-tutorial";
 import CalculatorsPage from "@/pages/calculators-page";
@@ -198,6 +200,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   const tutorial = useOnboardingTutorial(user?.id, user?.role, user?.emailVerified);
   const [actingAs, setActingAs] = useState<ActingAsAccount | null>(null);
   const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
 
   const { data: authorizedAccounts = [] } = useQueryRQ<any[]>({
     queryKey: ["/api/authorized-users/accounts"],
@@ -726,6 +729,19 @@ function Layout({ children }: { children: React.ReactNode }) {
                       <p className="text-xs text-muted-foreground capitalize truncate">{user?.role}</p>
                     </div>
                   </Link>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const nowDark = document.documentElement.classList.toggle("dark");
+                      localStorage.setItem("theme", nowDark ? "dark" : "light");
+                      setIsDarkMode(nowDark);
+                    }}
+                    className="w-full justify-start text-muted-foreground hover:text-foreground"
+                  >
+                    {isDarkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+                    {isDarkMode ? "Light Mode" : "Dark Mode"}
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"

@@ -219,3 +219,8 @@ body, #root {
   }
 }
 
+.dark .footer-outline-text {
+  -webkit-text-stroke: 1.5px rgba(161, 161, 170, 0.4);
+  color: transparent;
+}
+
