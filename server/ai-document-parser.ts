@@ -263,12 +263,13 @@ export async function parseDocumentWithAI(input: Buffer | string): Promise<{
     model: "gemini-2.5-flash",
     contents,
     config: {
-      maxOutputTokens: 4096,
+      maxOutputTokens: 8192,
       temperature: 0.1,
     },
   });
 
-  const responseText = response.text || "";
+  let responseText = response.text || "";
+  responseText = responseText.replace(/^```(?:json)?\s*\n?/m, '').replace(/\n?```\s*$/m, '');
 
   let parsed: Record<string, unknown>;
   try {
