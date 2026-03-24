@@ -2729,6 +2729,80 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/geocode/batch", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const { addresses } = req.body;
+      if (!Array.isArray(addresses) || addresses.length === 0) {
+        return res.status(400).json({ error: "addresses array required" });
+      }
+
+      const results: Record<string, { lat: number; lon: number }> = {};
+      const toGeocode = addresses.slice(0, 50);
+
+      const batchSize = 10;
+      for (let i = 0; i < toGeocode.length; i += batchSize) {
+        const batch = toGeocode.slice(i, i + batchSize);
+        const promises = batch.map(async (addr: string) => {
+          try {
+            const result = await geocodeAddress(addr);
+            if (result) {
+              results[addr] = { lat: result.lat, lon: result.lon };
+            }
+          } catch {}
+        });
+        await Promise.all(promises);
+      }
+
+      res.json(results);
+    } catch (error) {
+      console.error("Batch address geocode error:", error);
+      res.status(500).json({ error: "Failed to batch geocode" });
+    }
+  });
+
+  app.post("/api/transactions/batch-geocode", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const { transactionIds } = req.body;
+      if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
+        return res.status(400).json({ error: "transactionIds array required" });
+      }
+
+      const results: Record<number, { lat: number; lon: number }> = {};
+
+      const batchSize = 10;
+      const ids = transactionIds.slice(0, 50);
+
+      for (let i = 0; i < ids.length; i += batchSize) {
+        const batch = ids.slice(i, i + batchSize);
+        const promises = batch.map(async (txId: number) => {
+          try {
+            const { allowed, transaction } = await verifyTransactionAccess(txId, req.user!.id, req.user!.role);
+            if (!allowed || !transaction || !transaction.streetName || !transaction.city) return;
+
+            const address = [transaction.streetName, transaction.city, transaction.state, transaction.zipCode].filter(Boolean).join(', ');
+            const result = await geocodeAddress(address);
+            if (result) {
+              await storage.updateTransactionCoordinates(txId, result.lat, result.lon);
+              results[txId] = { lat: result.lat, lon: result.lon };
+            }
+          } catch {}
+        });
+        await Promise.all(promises);
+      }
+
+      res.json(results);
+    } catch (error) {
+      console.error("Batch geocode error:", error);
+      res.status(500).json({ error: "Failed to batch geocode" });
+    }
+  });
+
   app.post("/api/transactions/:id/geocode", async (req, res) => {
     if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) {
       return res.sendStatus(401);

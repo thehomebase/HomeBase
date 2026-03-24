@@ -560,31 +560,32 @@ export default function MapPage() {
       if (needsGeocode.length === 0) return;
       setIsGeocodingTransactions(true);
       
-      const newResults: Record<number, { lat: number; lon: number }> = {};
       const newGeocodedIds = new Set(geocodedIds);
-      
-      for (const tx of needsGeocode) {
-        newGeocodedIds.add(tx.id);
-        const address = [tx.streetName, tx.city, tx.state, tx.zipCode].filter(Boolean).join(', ');
-        try {
-          const response = await fetch(
-            `/api/transactions/${tx.id}/geocode`,
-            { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } }
-          );
-          const data = await response.json();
-          if (data.success && data.lat && data.lon) {
-            newResults[tx.id] = { lat: parseFloat(data.lat), lon: parseFloat(data.lon) };
+      needsGeocode.forEach(tx => newGeocodedIds.add(tx.id));
+
+      try {
+        const ids = needsGeocode.map(tx => tx.id);
+        const response = await fetch("/api/transactions/batch-geocode", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transactionIds: ids }),
+        });
+        if (response.ok) {
+          const results = await response.json();
+          if (results && Object.keys(results).length > 0) {
+            const mapped: Record<number, { lat: number; lon: number }> = {};
+            for (const [id, coords] of Object.entries(results as Record<string, { lat: number; lon: number }>)) {
+              mapped[Number(id)] = coords;
+            }
+            setGeocodedTransactions(prev => ({ ...prev, ...mapped }));
+            queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
           }
-          await new Promise(r => setTimeout(r, 1100));
-        } catch {
-          // skip
         }
+      } catch {
+        // silent
       }
-      
-      if (Object.keys(newResults).length > 0) {
-        setGeocodedTransactions(prev => ({ ...prev, ...newResults }));
-        queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      }
+
       setGeocodedIds(newGeocodedIds);
       setIsGeocodingTransactions(false);
     };
@@ -676,35 +677,34 @@ export default function MapPage() {
         }
       }
       
-      for (const { client, address } of clientsToGeocode) {
-        const cacheKey = address.toLowerCase().trim();
-        
+      if (clientsToGeocode.length > 0) {
         try {
-          const response = await fetch("/api/geocode", {
+          const addresses = clientsToGeocode.map(c => c.address);
+          const response = await fetch("/api/geocode/batch", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ address }),
+            body: JSON.stringify({ addresses }),
           });
           
           if (response.ok) {
-            const data = await response.json();
-            if (data.lat && data.lon) {
-              cache[cacheKey] = { lat: data.lat, lon: data.lon };
-              geocodedClients.push({
-                ...client,
-                latitude: data.lat,
-                longitude: data.lon
-              });
-            } else {
-              geocodedClients.push(client);
+            const batchResults = await response.json() as Record<string, { lat: number; lon: number }>;
+            for (const { client, address } of clientsToGeocode) {
+              const cacheKey = address.toLowerCase().trim();
+              const coords = batchResults[address];
+              if (coords) {
+                cache[cacheKey] = coords;
+                geocodedClients.push({ ...client, latitude: coords.lat, longitude: coords.lon });
+              } else {
+                geocodedClients.push(client);
+              }
             }
           } else {
-            geocodedClients.push(client);
+            clientsToGeocode.forEach(({ client }) => geocodedClients.push(client));
           }
         } catch (error) {
-          console.error("Failed to geocode client:", client.id, error);
-          geocodedClients.push(client);
+          console.error("Failed to batch geocode clients:", error);
+          clientsToGeocode.forEach(({ client }) => geocodedClients.push(client));
         }
       }
       
