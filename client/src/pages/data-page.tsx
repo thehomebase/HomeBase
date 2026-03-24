@@ -231,10 +231,13 @@ export default function DataPage() {
   }, [transactions, clients, currentYear]);
 
   const monthlyChartData = useMemo(() => {
+    const now = new Date();
     const data = allMonths.map((date) => ({
       month: format(date, "MMM"),
       volume: 0,
+      projectedVolume: 0,
       deals: 0,
+      projectedDeals: 0,
       cumulative: 0,
       commission: 0,
     }));
@@ -242,15 +245,20 @@ export default function DataPage() {
     transactions
       .filter(
         (t) =>
-          t.status === "closed" &&
           t.closingDate &&
           t.contractPrice &&
           getYear(new Date(t.closingDate)) === currentYear
       )
       .forEach((t) => {
-        const monthIdx = new Date(t.closingDate!).getMonth();
-        data[monthIdx].volume += t.contractPrice || 0;
-        data[monthIdx].deals += 1;
+        const closingDate = new Date(t.closingDate!);
+        const monthIdx = closingDate.getMonth();
+        if (t.status === "closed") {
+          data[monthIdx].volume += t.contractPrice || 0;
+          data[monthIdx].deals += 1;
+        } else if (closingDate > now) {
+          data[monthIdx].projectedVolume += t.contractPrice || 0;
+          data[monthIdx].projectedDeals += 1;
+        }
       });
 
     if (commissionSummary?.monthly) {
@@ -263,7 +271,7 @@ export default function DataPage() {
 
     let running = 0;
     data.forEach((d) => {
-      running += d.volume;
+      running += d.volume + d.projectedVolume;
       d.cumulative = running;
     });
 
@@ -458,7 +466,11 @@ export default function DataPage() {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-sm bg-foreground opacity-85" />
-                <span className="text-[10px] text-muted-foreground">Volume</span>
+                <span className="text-[10px] text-muted-foreground">Closed</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-foreground opacity-30" />
+                <span className="text-[10px] text-muted-foreground">Projected</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(142, 71%, 45%)" }} />
@@ -508,21 +520,34 @@ export default function DataPage() {
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
                   formatter={(value: number, name: string) => {
-                    if (name === "deals") return [value, "Deals"];
+                    if (name === "deals") return [value, "Closed Deals"];
+                    if (name === "projectedDeals") return [value, "Projected Deals"];
                     if (name === "commission") return [formatFullCurrency(value), "Commission"];
-                    return [
-                      formatFullCurrency(value),
-                      name === "volume" ? "Monthly Volume" : "Cumulative",
-                    ];
+                    const labels: Record<string, string> = {
+                      volume: "Closed Volume",
+                      projectedVolume: "Projected Volume",
+                      cumulative: "Cumulative",
+                    };
+                    return [formatFullCurrency(value), labels[name] || name];
                   }}
                 />
                 <Bar
                   yAxisId="left"
                   dataKey="volume"
                   fill="hsl(var(--foreground))"
-                  radius={[3, 3, 0, 0]}
+                  radius={[0, 0, 0, 0]}
                   name="volume"
                   opacity={0.85}
+                  stackId="dealVolume"
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="projectedVolume"
+                  fill="hsl(var(--foreground))"
+                  radius={[3, 3, 0, 0]}
+                  name="projectedVolume"
+                  opacity={0.3}
+                  stackId="dealVolume"
                 />
                 <Line
                   yAxisId="right"
@@ -850,11 +875,23 @@ export default function DataPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="p-5 border border-border/60 shadow-sm">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold">Monthly Deal Volume</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Transactions closed per month
-            </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold">Monthly Deal Volume</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Closed & projected deals per month
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-foreground opacity-80" />
+                <span className="text-[10px] text-muted-foreground">Closed</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-foreground opacity-25" />
+                <span className="text-[10px] text-muted-foreground">Projected</span>
+              </div>
+            </div>
           </div>
           <div className="h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -884,13 +921,24 @@ export default function DataPage() {
                     fontSize: "12px",
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
-                  formatter={(value: number) => [value, "Deals"]}
+                  formatter={(value: number, name: string) => [
+                    value,
+                    name === "projectedDeals" ? "Projected Deals" : "Closed Deals",
+                  ]}
                 />
                 <Bar
                   dataKey="deals"
                   fill="hsl(var(--foreground))"
-                  radius={[3, 3, 0, 0]}
+                  radius={[0, 0, 0, 0]}
                   opacity={0.8}
+                  stackId="deals"
+                />
+                <Bar
+                  dataKey="projectedDeals"
+                  fill="hsl(var(--foreground))"
+                  radius={[3, 3, 0, 0]}
+                  opacity={0.25}
+                  stackId="deals"
                 />
               </BarChart>
             </ResponsiveContainer>
