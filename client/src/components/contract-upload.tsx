@@ -57,7 +57,6 @@ const FIELD_LABELS: Record<string, string> = {
   downPayment: "Down Payment",
   sellerConcessions: "Seller Concessions",
   buyerAgentCompensation: "Buyer's Agent Compensation",
-  listingAgentCommission: "Listing Agent Commission",
   homeWarranty: "Home Warranty",
   closingDate: "Closing Date",
   optionPeriodExpiration: "Option Period Expiration",
