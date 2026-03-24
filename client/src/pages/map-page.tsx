@@ -596,7 +596,9 @@ export default function MapPage() {
     const geocoded = geocodedTransactions[t.id];
     return geocoded ? { ...t, latitude: geocoded.lat, longitude: geocoded.lon } : t;
   });
-  const transactionsWithCoords = allTransactions.filter(t => t.latitude != null && t.longitude != null);
+  const transactionsWithCoords = allTransactions.filter(t => 
+    t.latitude != null && t.longitude != null && t.streetName
+  );
   const filteredViewings = isAgent && selectedClientFilter !== "all" 
     ? viewings.filter(v => v.clientId === selectedClientFilter)
     : viewings;

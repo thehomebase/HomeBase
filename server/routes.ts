@@ -973,7 +973,11 @@ export function registerRoutes(app: Express): Server {
           .then(r => r.json())
           .then(data => {
             if (data && data.length > 0) {
-              storage.updateTransactionCoordinates(id, parseFloat(data[0].lat), parseFloat(data[0].lon));
+              const lat = parseFloat(data[0].lat);
+              const lon = parseFloat(data[0].lon);
+              if (lat >= 24 && lat <= 50 && lon >= -125 && lon <= -66) {
+                storage.updateTransactionCoordinates(id, lat, lon);
+              }
             }
           })
           .catch(err => console.error('Background geocode error:', err?.message));
@@ -2695,9 +2699,14 @@ export function registerRoutes(app: Express): Server {
       const data = await response.json();
       
       if (data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lon = parseFloat(data[0].lon);
+        if (lat < 24 || lat > 50 || lon < -125 || lon > -66) {
+          return res.status(404).json({ error: 'Geocoded location outside US boundaries' });
+        }
         res.json({
-          lat: parseFloat(data[0].lat),
-          lon: parseFloat(data[0].lon),
+          lat,
+          lon,
           displayName: data[0].display_name
         });
       } else {
@@ -2720,27 +2729,41 @@ export function registerRoutes(app: Express): Server {
         return res.sendStatus(403);
       }
       
-      const address = [transaction.streetName, transaction.city, transaction.state, transaction.zipCode].filter(Boolean).join(', ');
-      if (!address) {
+      const addressParts = [transaction.streetName, transaction.city, transaction.state, transaction.zipCode].filter(Boolean);
+      if (addressParts.length === 0) {
         return res.status(400).json({ error: 'Property address required for geocoding' });
       }
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
-        {
-          headers: {
-            'User-Agent': 'HomeBase-RealEstate-App/1.0'
+
+      const queries = [
+        addressParts.join(', '),
+        [transaction.streetName, transaction.city, transaction.state].filter(Boolean).join(', '),
+        [transaction.city, transaction.state, transaction.zipCode].filter(Boolean).join(', '),
+      ].filter((q, i, arr) => q && arr.indexOf(q) === i);
+
+      let foundLat: number | null = null;
+      let foundLon: number | null = null;
+
+      for (const query of queries) {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=us`,
+          { headers: { 'User-Agent': 'HomeBase-RealEstate-App/1.0' } }
+        );
+        const data = await response.json();
+        if (data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          if (lat >= 24 && lat <= 50 && lon >= -125 && lon <= -66) {
+            foundLat = lat;
+            foundLon = lon;
+            break;
           }
         }
-      );
-      const data = await response.json();
-      
-      if (data.length > 0) {
-        await storage.updateTransactionCoordinates(
-          Number(req.params.id),
-          parseFloat(data[0].lat),
-          parseFloat(data[0].lon)
-        );
-        res.json({ success: true, lat: data[0].lat, lon: data[0].lon });
+        await new Promise(r => setTimeout(r, 1100));
+      }
+
+      if (foundLat !== null && foundLon !== null) {
+        await storage.updateTransactionCoordinates(Number(req.params.id), foundLat, foundLon);
+        res.json({ success: true, lat: String(foundLat), lon: String(foundLon) });
       } else {
         res.status(404).json({ error: 'Address not found' });
       }
