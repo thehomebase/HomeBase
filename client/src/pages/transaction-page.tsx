@@ -48,6 +48,7 @@ export default function TransactionPage() {
     downPayment: "",
     sellerConcessions: "",
     buyerAgentCompensation: "",
+    listingAgentCommission: "",
     homeWarranty: "",
     closingDate: "",
     mlsNumber: "",
@@ -94,6 +95,7 @@ export default function TransactionPage() {
         downPayment: transaction.downPayment?.toString() || "",
         sellerConcessions: transaction.sellerConcessions?.toString() || "",
         buyerAgentCompensation: (transaction as any).buyerAgentCompensation?.toString() || "",
+        listingAgentCommission: (transaction as any).listingAgentCommission?.toString() || "",
         homeWarranty: (transaction as any).homeWarranty?.toString() || "",
         closingDate: formatDateForInput(transaction.closingDate),
         mlsNumber: transaction.mlsNumber || "",
@@ -324,6 +326,9 @@ export default function TransactionPage() {
     if (editForm.buyerAgentCompensation !== "") {
       (updateData as any).buyerAgentCompensation = parseInt(editForm.buyerAgentCompensation);
     }
+    if (editForm.listingAgentCommission !== "") {
+      (updateData as any).listingAgentCommission = parseInt(editForm.listingAgentCommission);
+    }
     if (editForm.homeWarranty !== "") {
       (updateData as any).homeWarranty = parseInt(editForm.homeWarranty);
     }
@@ -536,6 +541,17 @@ export default function TransactionPage() {
                       style: 'currency',
                       currency: 'USD',
                     }).format((transaction as any).buyerAgentCompensation)
+                  : 'Not set'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Listing Agent Commission</p>
+              <p className="text-base">
+                {(transaction as any).listingAgentCommission != null
+                  ? new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                    }).format((transaction as any).listingAgentCommission)
                   : 'Not set'}
               </p>
             </div>
@@ -1086,6 +1102,17 @@ export default function TransactionPage() {
                 value={editForm.buyerAgentCompensation}
                 onChange={(e) => setEditForm({ ...editForm, buyerAgentCompensation: e.target.value })}
                 placeholder="Enter buyer's agent compensation"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="listingAgentCommission">Listing Agent Commission ($)</Label>
+              <Input
+                id="listingAgentCommission"
+                type="number"
+                value={editForm.listingAgentCommission}
+                onChange={(e) => setEditForm({ ...editForm, listingAgentCommission: e.target.value })}
+                placeholder="Enter listing agent commission"
               />
             </div>
 
