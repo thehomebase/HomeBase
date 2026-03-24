@@ -1975,7 +1975,22 @@ export function registerRoutes(app: Express): Server {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const contractors = await storage.getContractors(req.user.id);
-      res.json(contractors);
+      const vendorUserIds = contractors.filter(c => c.vendorUserId).map(c => c.vendorUserId!);
+      const vendorNameMap = new Map<number, string>();
+      if (vendorUserIds.length > 0) {
+        const vendorIdsArray = `{${vendorUserIds.join(',')}}`;
+        const vendorUsers = await db.execute(sql`
+          SELECT id, first_name, last_name FROM users WHERE id = ANY(${vendorIdsArray}::int[])
+        `);
+        for (const row of vendorUsers.rows as any[]) {
+          vendorNameMap.set(row.id, `${row.first_name} ${row.last_name}`.trim());
+        }
+      }
+      const enriched = contractors.map(c => ({
+        ...c,
+        vendorContactName: c.vendorUserId ? vendorNameMap.get(c.vendorUserId) || null : null,
+      }));
+      res.json(enriched);
     } catch (error) {
       console.error('Error fetching my contractors:', error);
       res.status(500).json({ error: 'Failed to fetch contractors' });
@@ -2070,11 +2085,28 @@ export function registerRoutes(app: Express): Server {
       const filteredContractors = contractorsWithDistance
         .filter(c => c.distance !== null && c.distance <= radiusMiles)
         .sort((a, b) => (a.distance || 0) - (b.distance || 0));
+
+      const proxVendorIds = filteredContractors.filter(c => c.vendorUserId).map(c => c.vendorUserId!);
+      const proxVendorNameMap = new Map<number, string>();
+      if (proxVendorIds.length > 0) {
+        const proxIdsArray = `{${proxVendorIds.join(',')}}`;
+        const proxVendorUsers = await db.execute(sql`
+          SELECT id, first_name, last_name FROM users WHERE id = ANY(${proxIdsArray}::int[])
+        `);
+        for (const row of proxVendorUsers.rows as any[]) {
+          proxVendorNameMap.set(row.id, `${row.first_name} ${row.last_name}`.trim());
+        }
+      }
+
+      const enrichedProximity = filteredContractors.map(c => ({
+        ...c,
+        vendorContactName: c.vendorUserId ? proxVendorNameMap.get(c.vendorUserId) || null : null,
+      }));
       
       res.json({
         searchLocation: { lat: searchLat, lon: searchLon, zip },
         radius: radiusMiles,
-        contractors: filteredContractors
+        contractors: enrichedProximity
       });
     } catch (error) {
       console.error("Error in proximity search:", error);
@@ -8736,10 +8768,23 @@ export function registerRoutes(app: Express): Server {
         trustedMap.set(row.contractor_id, Number(row.count));
       }
 
+      const vendorUserIds = contractors.filter(c => c.vendorUserId).map(c => c.vendorUserId!);
+      const vendorNameMap = new Map<number, string>();
+      if (vendorUserIds.length > 0) {
+        const vendorIdsArray = `{${vendorUserIds.join(',')}}`;
+        const vendorUsers = await db.execute(sql`
+          SELECT id, first_name, last_name FROM users WHERE id = ANY(${vendorIdsArray}::int[])
+        `);
+        for (const row of vendorUsers.rows as any[]) {
+          vendorNameMap.set(row.id, `${row.first_name} ${row.last_name}`.trim());
+        }
+      }
+
       const enriched = contractors.map(c => ({
         ...c,
         teamCount: teamMap.get(c.id) || 0,
         trustedByCount: trustedMap.get(c.id) || 0,
+        vendorContactName: c.vendorUserId ? vendorNameMap.get(c.vendorUserId) || null : null,
       }));
 
       res.json({ contractors: enriched, total, limit, offset });
@@ -8766,7 +8811,15 @@ export function registerRoutes(app: Express): Server {
         storage.getContractorTrustedByAgentCount(id),
       ]);
 
-      res.json({ ...contractor, reviews, recommendationCount, teamCount, trustedByCount });
+      let vendorContactName: string | null = null;
+      if (contractor.vendorUserId) {
+        const vendorUser = await storage.getUser(contractor.vendorUserId);
+        if (vendorUser) {
+          vendorContactName = `${vendorUser.firstName} ${vendorUser.lastName}`.trim();
+        }
+      }
+
+      res.json({ ...contractor, reviews, recommendationCount, teamCount, trustedByCount, vendorContactName });
     } catch (error) {
       console.error('Error fetching marketplace contractor:', error);
       res.status(500).json({ error: 'Failed to fetch contractor' });

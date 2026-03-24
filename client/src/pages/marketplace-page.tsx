@@ -97,6 +97,7 @@ type ContractorWithDetails = Contractor & {
   teamCount?: number;
   trustedByCount?: number;
   distance?: number | null;
+  vendorContactName?: string | null;
 };
 
 type MarketplaceResponse = {
@@ -376,6 +377,9 @@ function ContractorDetail({
                 </Badge>
               )}
             </div>
+            {contractor.vendorContactName && (
+              <p className="text-sm text-muted-foreground mt-0.5">Contact: {contractor.vendorContactName}</p>
+            )}
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <Badge variant="secondary">{categoryLabel}</Badge>
               {(contractor.trustedByCount ?? 0) > 0 && (
@@ -938,6 +942,9 @@ export default function MarketplacePage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <CardTitle className="text-base truncate">{contractor.name}</CardTitle>
+                          {(contractor as any).vendorContactName && (
+                            <p className="text-xs text-muted-foreground truncate mt-0.5">{(contractor as any).vendorContactName}</p>
+                          )}
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                             <Badge variant="secondary" className="text-xs">{categoryLabel}</Badge>
                             {isLinked ? (
@@ -1205,6 +1212,9 @@ export default function MarketplacePage() {
                   <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
                       <CardTitle className="text-base truncate">{contractor.name}</CardTitle>
+                      {contractor.vendorContactName && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{contractor.vendorContactName}</p>
+                      )}
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         <Badge variant="secondary" className="text-xs">
                           {categoryLabel}
@@ -1342,6 +1352,9 @@ export default function MarketplacePage() {
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <span className="font-medium">{contractor.name}</span>
+                        {contractor.vendorContactName && (
+                          <span className="text-xs text-muted-foreground">{contractor.vendorContactName}</span>
+                        )}
                         <div className="flex gap-1 flex-wrap">
                           {isPremium && (
                             <Badge className="gap-0.5 text-xs bg-gradient-to-r from-amber-500 to-amber-600 text-white border-0 px-1.5 py-0">
