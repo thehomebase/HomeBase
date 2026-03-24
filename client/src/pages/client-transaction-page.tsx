@@ -883,6 +883,16 @@ export default function ClientTransactionPage() {
         </Card>
       )}
 
+      <a href="/compare-lenders" className="block">
+        <div className="flex items-center gap-3 p-4 rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors">
+          <DollarSign className="h-5 w-5 text-primary flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Compare Lender Estimates</p>
+            <p className="text-xs text-muted-foreground">Get side-by-side loan quotes from multiple lenders</p>
+          </div>
+        </div>
+      </a>
+
       {(agent || contacts.length > 0) && (
         <Card className="border border-border/60 shadow-sm">
           <CardHeader className="pb-3">

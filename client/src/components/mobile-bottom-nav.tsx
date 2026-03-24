@@ -94,6 +94,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
   if (role === "lender") {
     return [
       { icon: FileText, label: "Pipeline", href: "/lender-portal", id: "lender-portal" },
+      { icon: DollarSign, label: "Estimates", href: "/compare-lenders", id: "compare-lenders" },
       { icon: Store, label: "Pros", href: "/marketplace", id: "marketplace" },
       { icon: MessageSquare, label: "Messages", href: "/messages", id: "messages" },
       { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
@@ -144,6 +145,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Search, label: "Search", href: "/property-search", id: "search" },
       { icon: MessageSquare, label: "Messages", href: "/messages", id: "messages" },
       { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
+      { icon: DollarSign, label: "Compare Lenders", href: "/compare-lenders", id: "compare-lenders" },
       { icon: HardHat, label: "My Team", href: "/my-team", id: "my-team" },
       { icon: Store, label: "HomeBase Pros", href: "/marketplace", id: "marketplace" },
       { icon: Home, label: "MyHome", href: "/my-home", id: "my-home" },
@@ -233,6 +235,7 @@ function getCategorizedItems(role: string | undefined): NavCategory[] {
     return [
       { label: "Pipeline", items: [
         { icon: FileText, label: "Loan Pipeline", href: "/lender-portal", id: "lender-portal" },
+        { icon: DollarSign, label: "Estimate Requests", href: "/compare-lenders", id: "compare-lenders" },
         { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
       ]},
       { label: "Networking", items: [
@@ -264,6 +267,7 @@ function getCategorizedItems(role: string | undefined): NavCategory[] {
         { icon: MessageSquare, label: "Messages", href: "/messages", id: "messages" },
       ]},
       { label: "Services", items: [
+        { icon: DollarSign, label: "Compare Lenders", href: "/compare-lenders", id: "compare-lenders" },
         { icon: Store, label: "HomeBase Pros", href: "/marketplace", id: "marketplace" },
         { icon: HardHat, label: "My Team", href: "/my-team", id: "my-team" },
         { icon: Star, label: "Find Agents", href: "/top-agents", id: "top-agents" },

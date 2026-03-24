@@ -369,6 +369,10 @@ export default function LenderPortal() {
               <Target className="h-4 w-4" />
               Lead Generation
             </TabsTrigger>
+            <TabsTrigger value="estimates" className="gap-1.5">
+              <SendHorizonal className="h-4 w-4" />
+              Estimate Requests
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="pipeline" className="space-y-6 mt-4">
@@ -629,6 +633,10 @@ export default function LenderPortal() {
 
           <TabsContent value="leads" className="mt-4">
             <LenderLeadGenTab />
+          </TabsContent>
+
+          <TabsContent value="estimates" className="mt-4">
+            <LenderEstimateTab />
           </TabsContent>
         </Tabs>
       </div>
@@ -1056,5 +1064,465 @@ function LenderLeadGenTab() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function LenderEstimateTab() {
+  const { toast } = useToast();
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [showServiceAreas, setShowServiceAreas] = useState(false);
+  const [newZip, setNewZip] = useState("");
+
+  const { data: estimateRequests, isLoading: loadingRequests } = useQuery<any[]>({
+    queryKey: ["/api/lender/estimate-requests"],
+  });
+
+  const { data: serviceAreas, isLoading: loadingAreas } = useQuery<any[]>({
+    queryKey: ["/api/lender/service-areas"],
+  });
+
+  const { data: rankingStats } = useQuery<any>({
+    queryKey: ["/api/lender/ranking-stats"],
+  });
+
+  const updateServiceAreasMutation = useMutation({
+    mutationFn: async (zipCodes: string[]) => {
+      const res = await apiRequest("PUT", "/api/lender/service-areas", { zipCodes });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lender/service-areas"] });
+      toast({ title: "Service areas updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update service areas", variant: "destructive" });
+    },
+  });
+
+  const submitEstimateMutation = useMutation({
+    mutationFn: async ({ requestId, data }: { requestId: number; data: any }) => {
+      const res = await apiRequest("POST", `/api/estimate-requests/${requestId}/estimates`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lender/estimate-requests"] });
+      setSelectedRequest(null);
+      toast({ title: "Estimate submitted successfully" });
+    },
+    onError: (err: any) => {
+      toast({ title: err?.message || "Failed to submit estimate", variant: "destructive" });
+    },
+  });
+
+  const addZip = () => {
+    if (!/^\d{5}$/.test(newZip)) {
+      toast({ title: "Enter a valid 5-digit zip code", variant: "destructive" });
+      return;
+    }
+    const existing = (serviceAreas || []).map((a: any) => a.zipCode);
+    if (existing.includes(newZip)) {
+      toast({ title: "Zip code already added", variant: "destructive" });
+      return;
+    }
+    updateServiceAreasMutation.mutate([...existing, newZip]);
+    setNewZip("");
+  };
+
+  const removeZip = (zip: string) => {
+    const existing = (serviceAreas || []).map((a: any) => a.zipCode);
+    updateServiceAreasMutation.mutate(existing.filter((z: string) => z !== zip));
+  };
+
+  const pendingRequests = (estimateRequests || []).filter((r: any) => !r.hasResponded && r.status === "open");
+  const respondedRequests = (estimateRequests || []).filter((r: any) => r.hasResponded);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Inbox className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Pending</span>
+            </div>
+            <p className="text-2xl font-bold mt-1">{pendingRequests.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Responded</span>
+            </div>
+            <p className="text-2xl font-bold mt-1">{respondedRequests.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Response Rate</span>
+            </div>
+            <p className="text-2xl font-bold mt-1">
+              {rankingStats?.responseRate ? `${(rankingStats.responseRate * 100).toFixed(0)}%` : "N/A"}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Service Areas</span>
+            </div>
+            <p className="text-2xl font-bold mt-1">{(serviceAreas || []).length}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">Service Areas</CardTitle>
+            <CardDescription>Zip codes where you'll receive estimate requests</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setShowServiceAreas(!showServiceAreas)}>
+            {showServiceAreas ? "Hide" : "Manage"}
+          </Button>
+        </CardHeader>
+        {showServiceAreas && (
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter zip code"
+                value={newZip}
+                onChange={(e) => setNewZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                className="w-40"
+                onKeyDown={(e) => e.key === "Enter" && addZip()}
+              />
+              <Button onClick={addZip} disabled={updateServiceAreasMutation.isPending} size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Add
+              </Button>
+            </div>
+            {loadingAreas ? (
+              <div className="flex gap-2 flex-wrap">
+                {[1,2,3].map(i => <Skeleton key={i} className="h-8 w-20" />)}
+              </div>
+            ) : (serviceAreas || []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">No service areas configured. Add zip codes to receive estimate requests.</p>
+            ) : (
+              <div className="flex gap-2 flex-wrap">
+                {(serviceAreas || []).map((area: any) => (
+                  <Badge key={area.id} variant="secondary" className="gap-1 px-3 py-1.5">
+                    {area.zipCode}
+                    <button onClick={() => removeZip(area.zipCode)} className="ml-1 hover:text-destructive">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Pending Estimate Requests</CardTitle>
+          <CardDescription>Buyers looking for loan estimates in your service areas</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingRequests ? (
+            <div className="space-y-3">
+              {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+            </div>
+          ) : pendingRequests.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Inbox className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>No pending requests</p>
+              <p className="text-sm">Add service area zip codes to start receiving requests</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingRequests.map((req: any) => (
+                <div key={req.id} className="border rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline">{req.propertyZip}</Badge>
+                      <span className="font-medium">${Number(req.propertyPrice).toLocaleString()}</span>
+                      <Badge variant="secondary">{req.loanType}</Badge>
+                      <Badge variant="secondary">{req.loanTerm}yr</Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Down: ${Number(req.downPayment).toLocaleString()} ({req.downPaymentPercent ? `${req.downPaymentPercent}%` : "N/A"})
+                      {req.creditScoreRange && ` • Credit: ${req.creditScoreRange}`}
+                      {req.propertyAddress && ` • ${req.propertyAddress}`}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Requested {new Date(req.createdAt).toLocaleDateString()}
+                      {req.expiresAt && ` • Expires ${new Date(req.expiresAt).toLocaleDateString()}`}
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={() => setSelectedRequest(req)}>
+                    <SendHorizonal className="h-4 w-4 mr-1" />
+                    Submit Estimate
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {respondedRequests.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Submitted Estimates</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {respondedRequests.map((req: any) => (
+                <div key={req.id} className="border rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 opacity-75">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline">{req.propertyZip}</Badge>
+                      <span className="font-medium">${Number(req.propertyPrice).toLocaleString()}</span>
+                      <Badge variant="secondary">{req.loanType}</Badge>
+                      <Badge>{req.status}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Responded {new Date(req.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Submitted
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedRequest && (
+        <EstimateSubmitDialog
+          request={selectedRequest}
+          onClose={() => setSelectedRequest(null)}
+          onSubmit={(data) => submitEstimateMutation.mutate({ requestId: selectedRequest.id, data })}
+          isPending={submitEstimateMutation.isPending}
+        />
+      )}
+    </div>
+  );
+}
+
+function EstimateSubmitDialog({
+  request,
+  onClose,
+  onSubmit,
+  isPending,
+}: {
+  request: any;
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+  isPending: boolean;
+}) {
+  const loanAmount = request.propertyPrice - request.downPayment;
+
+  const estimateForm = useForm({
+    resolver: zodResolver(
+      z.object({
+        interestRate: z.coerce.number().min(0.01).max(20),
+        apr: z.coerce.number().min(0.01).max(25),
+        points: z.coerce.number().min(0).max(5).default(0),
+        rateLockDays: z.coerce.number().min(0).max(365).default(30),
+        monthlyPrincipalInterest: z.coerce.number().min(1),
+        monthlyTaxEstimate: z.coerce.number().min(0).default(0),
+        monthlyInsuranceEstimate: z.coerce.number().min(0).default(0),
+        monthlyPmi: z.coerce.number().min(0).default(0),
+        monthlyHoa: z.coerce.number().min(0).default(0),
+        originationFee: z.coerce.number().min(0).default(0),
+        underwritingFee: z.coerce.number().min(0).default(0),
+        appraisalFee: z.coerce.number().min(0).default(0),
+        creditReportFee: z.coerce.number().min(0).default(0),
+        titleInsuranceFee: z.coerce.number().min(0).default(0),
+        escrowPrepaid: z.coerce.number().min(0).default(0),
+        otherFees: z.coerce.number().min(0).default(0),
+        lenderCredits: z.coerce.number().min(0).default(0),
+        notes: z.string().optional(),
+      })
+    ),
+    defaultValues: {
+      interestRate: 0,
+      apr: 0,
+      points: 0,
+      rateLockDays: 30,
+      monthlyPrincipalInterest: 0,
+      monthlyTaxEstimate: 0,
+      monthlyInsuranceEstimate: 0,
+      monthlyPmi: 0,
+      monthlyHoa: 0,
+      originationFee: 0,
+      underwritingFee: 0,
+      appraisalFee: 0,
+      creditReportFee: 0,
+      titleInsuranceFee: 0,
+      escrowPrepaid: 0,
+      otherFees: 0,
+      lenderCredits: 0,
+      notes: "",
+    },
+  });
+
+  const watchedValues = estimateForm.watch();
+  const totalMonthly = (watchedValues.monthlyPrincipalInterest || 0) +
+    (watchedValues.monthlyTaxEstimate || 0) + (watchedValues.monthlyInsuranceEstimate || 0) +
+    (watchedValues.monthlyPmi || 0) + (watchedValues.monthlyHoa || 0);
+  const totalClosing = (watchedValues.originationFee || 0) + (watchedValues.underwritingFee || 0) +
+    (watchedValues.appraisalFee || 0) + (watchedValues.creditReportFee || 0) +
+    (watchedValues.titleInsuranceFee || 0) + (watchedValues.escrowPrepaid || 0) +
+    (watchedValues.otherFees || 0) - (watchedValues.lenderCredits || 0);
+
+  const handleSubmit = (values: any) => {
+    onSubmit({
+      ...values,
+      totalMonthlyPayment: totalMonthly,
+      totalClosingCosts: totalClosing,
+      totalCost5yr: totalClosing + totalMonthly * 60,
+      totalCost7yr: totalClosing + totalMonthly * 84,
+    });
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Submit Loan Estimate</DialogTitle>
+        </DialogHeader>
+        <div className="bg-muted/50 rounded-lg p-3 mb-4 text-sm space-y-1">
+          <div className="flex justify-between">
+            <span>Property Price</span>
+            <span className="font-medium">${Number(request.propertyPrice).toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Loan Amount</span>
+            <span className="font-medium">${loanAmount.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Loan Type</span>
+            <span className="font-medium">{request.loanType} • {request.loanTerm}yr</span>
+          </div>
+          {request.creditScoreRange && (
+            <div className="flex justify-between">
+              <span>Credit Range</span>
+              <span className="font-medium">{request.creditScoreRange}</span>
+            </div>
+          )}
+        </div>
+
+        <Form {...estimateForm}>
+          <form onSubmit={estimateForm.handleSubmit(handleSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <FormField control={estimateForm.control} name="interestRate" render={({ field }) => (
+                <FormItem><FormLabel>Interest Rate (%)</FormLabel><FormControl><Input type="number" step="0.001" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={estimateForm.control} name="apr" render={({ field }) => (
+                <FormItem><FormLabel>APR (%)</FormLabel><FormControl><Input type="number" step="0.001" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={estimateForm.control} name="points" render={({ field }) => (
+                <FormItem><FormLabel>Points</FormLabel><FormControl><Input type="number" step="0.125" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={estimateForm.control} name="rateLockDays" render={({ field }) => (
+                <FormItem><FormLabel>Rate Lock (days)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </div>
+
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-semibold mb-3">Monthly Payment Breakdown</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={estimateForm.control} name="monthlyPrincipalInterest" render={({ field }) => (
+                  <FormItem><FormLabel>Principal & Interest ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={estimateForm.control} name="monthlyTaxEstimate" render={({ field }) => (
+                  <FormItem><FormLabel>Property Tax ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={estimateForm.control} name="monthlyInsuranceEstimate" render={({ field }) => (
+                  <FormItem><FormLabel>Homeowner Insurance ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={estimateForm.control} name="monthlyPmi" render={({ field }) => (
+                  <FormItem><FormLabel>PMI ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={estimateForm.control} name="monthlyHoa" render={({ field }) => (
+                  <FormItem><FormLabel>HOA ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+              <div className="mt-2 text-sm font-medium text-right">
+                Total Monthly: ${totalMonthly.toLocaleString()}
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-semibold mb-3">Closing Costs</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={estimateForm.control} name="originationFee" render={({ field }) => (
+                  <FormItem><FormLabel>Origination ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={estimateForm.control} name="underwritingFee" render={({ field }) => (
+                  <FormItem><FormLabel>Underwriting ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={estimateForm.control} name="appraisalFee" render={({ field }) => (
+                  <FormItem><FormLabel>Appraisal ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={estimateForm.control} name="creditReportFee" render={({ field }) => (
+                  <FormItem><FormLabel>Credit Report ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={estimateForm.control} name="titleInsuranceFee" render={({ field }) => (
+                  <FormItem><FormLabel>Title Insurance ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={estimateForm.control} name="escrowPrepaid" render={({ field }) => (
+                  <FormItem><FormLabel>Escrow Prepaid ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={estimateForm.control} name="otherFees" render={({ field }) => (
+                  <FormItem><FormLabel>Other Fees ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={estimateForm.control} name="lenderCredits" render={({ field }) => (
+                  <FormItem><FormLabel>Lender Credits ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+              <div className="mt-2 text-sm font-medium text-right">
+                Total Closing Costs: ${totalClosing.toLocaleString()}
+              </div>
+            </div>
+
+            <FormField control={estimateForm.control} name="notes" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Notes (optional)</FormLabel>
+                <FormControl><Textarea placeholder="Any special programs, conditions, or details for the buyer..." {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <div className="bg-muted/50 rounded-lg p-3 text-sm">
+              <div className="flex justify-between font-medium">
+                <span>5-Year Total Cost</span>
+                <span>${(totalClosing + totalMonthly * 60).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between font-medium">
+                <span>7-Year Total Cost</span>
+                <span>${(totalClosing + totalMonthly * 84).toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Submitting..." : "Submit Estimate"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }

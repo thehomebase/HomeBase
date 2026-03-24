@@ -1808,3 +1808,109 @@ export const insertClientNotificationPreferencesSchema = createInsertSchema(clie
 });
 export type ClientNotificationPreferences = typeof clientNotificationPreferences.$inferSelect;
 export type InsertClientNotificationPreferences = z.infer<typeof insertClientNotificationPreferencesSchema>;
+
+export const lenderServiceAreas = pgTable("lender_service_areas", {
+  id: serial("id").primaryKey(),
+  lenderId: integer("lender_id").notNull(),
+  zipCode: text("zip_code").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type LenderServiceArea = typeof lenderServiceAreas.$inferSelect;
+
+export const estimateRequests = pgTable("estimate_requests", {
+  id: serial("id").primaryKey(),
+  buyerUserId: integer("buyer_user_id"),
+  agentUserId: integer("agent_user_id"),
+  transactionId: integer("transaction_id"),
+  propertyPrice: integer("property_price").notNull(),
+  downPayment: integer("down_payment").notNull(),
+  downPaymentPercent: doublePrecision("down_payment_percent"),
+  loanType: text("loan_type").notNull().default("conventional"),
+  loanTerm: integer("loan_term").notNull().default(30),
+  creditScoreRange: text("credit_score_range"),
+  propertyZip: text("property_zip").notNull(),
+  propertyAddress: text("property_address"),
+  status: text("status").notNull().default("open"),
+  preferredLenderId: integer("preferred_lender_id"),
+  maxEstimates: integer("max_estimates").notNull().default(3),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+});
+
+export const insertEstimateRequestSchema = createInsertSchema(estimateRequests).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+});
+export type EstimateRequest = typeof estimateRequests.$inferSelect;
+export type InsertEstimateRequest = z.infer<typeof insertEstimateRequestSchema>;
+
+export const lenderEstimates = pgTable("lender_estimates", {
+  id: serial("id").primaryKey(),
+  requestId: integer("request_id").notNull(),
+  lenderUserId: integer("lender_user_id").notNull(),
+  interestRate: doublePrecision("interest_rate").notNull(),
+  apr: doublePrecision("apr").notNull(),
+  points: doublePrecision("points").default(0),
+  rateLockDays: integer("rate_lock_days").default(30),
+  monthlyPrincipalInterest: integer("monthly_principal_interest").notNull(),
+  monthlyTaxEstimate: integer("monthly_tax_estimate"),
+  monthlyInsuranceEstimate: integer("monthly_insurance_estimate"),
+  monthlyPmi: integer("monthly_pmi").default(0),
+  monthlyHoa: integer("monthly_hoa").default(0),
+  totalMonthlyPayment: integer("total_monthly_payment").notNull(),
+  originationFee: integer("origination_fee").default(0),
+  underwritingFee: integer("underwriting_fee").default(0),
+  appraisalFee: integer("appraisal_fee").default(0),
+  creditReportFee: integer("credit_report_fee").default(0),
+  titleInsuranceFee: integer("title_insurance_fee").default(0),
+  escrowPrepaid: integer("escrow_prepaid").default(0),
+  otherFees: integer("other_fees").default(0),
+  lenderCredits: integer("lender_credits").default(0),
+  totalClosingCosts: integer("total_closing_costs").notNull(),
+  totalCost5yr: integer("total_cost_5yr"),
+  totalCost7yr: integer("total_cost_7yr"),
+  notes: text("notes"),
+  isManualEntry: boolean("is_manual_entry").default(false),
+  manualLenderName: text("manual_lender_name"),
+  status: text("status").notNull().default("submitted"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLenderEstimateSchema = createInsertSchema(lenderEstimates).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+});
+export type LenderEstimate = typeof lenderEstimates.$inferSelect;
+export type InsertLenderEstimate = z.infer<typeof insertLenderEstimateSchema>;
+
+export const lenderRankingStats = pgTable("lender_ranking_stats", {
+  id: serial("id").primaryKey(),
+  lenderUserId: integer("lender_user_id").notNull().unique(),
+  totalRequestsReceived: integer("total_requests_received").default(0),
+  totalResponses: integer("total_responses").default(0),
+  responseRate: doublePrecision("response_rate").default(0),
+  avgResponseTimeHours: doublePrecision("avg_response_time_hours"),
+  avgRating: doublePrecision("avg_rating").default(0),
+  totalRatings: integer("total_ratings").default(0),
+  subscriptionTier: text("subscription_tier").default("free"),
+  lastOpportunityAt: timestamp("last_opportunity_at"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type LenderRankingStats = typeof lenderRankingStats.$inferSelect;
+
+export const lenderEstimateRatings = pgTable("lender_estimate_ratings", {
+  id: serial("id").primaryKey(),
+  estimateId: integer("estimate_id").notNull(),
+  requestId: integer("request_id").notNull(),
+  ratedByUserId: integer("rated_by_user_id").notNull(),
+  lenderUserId: integer("lender_user_id").notNull(),
+  rating: integer("rating").notNull(),
+  review: text("review"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type LenderEstimateRating = typeof lenderEstimateRatings.$inferSelect;

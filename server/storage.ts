@@ -67,7 +67,12 @@ import {
   scannedDocuments, type ScannedDocument, type InsertScannedDocument,
   apiKeys, type ApiKey, type InsertApiKey,
   webhooks, type Webhook, type InsertWebhook,
-  vendorTeamRequests, type VendorTeamRequest, type InsertVendorTeamRequest
+  vendorTeamRequests, type VendorTeamRequest, type InsertVendorTeamRequest,
+  lenderServiceAreas, type LenderServiceArea,
+  estimateRequests, type EstimateRequest, type InsertEstimateRequest,
+  lenderEstimates, type LenderEstimate, type InsertLenderEstimate,
+  lenderRankingStats, type LenderRankingStats,
+  lenderEstimateRatings, type LenderEstimateRating
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
@@ -516,6 +521,20 @@ export interface IStorage {
   getClientNotificationPreferences(userId: number): Promise<{ userId: number; transactionUpdates: boolean; channelEmail: boolean; channelSms: boolean; channelPush: boolean; channelInApp: boolean }>;
   upsertClientNotificationPreferences(userId: number, prefs: { transactionUpdates: boolean; channelEmail: boolean; channelSms: boolean; channelPush: boolean; channelInApp: boolean }): Promise<{ userId: number; transactionUpdates: boolean; channelEmail: boolean; channelSms: boolean; channelPush: boolean; channelInApp: boolean }>;
   getClientUserIdsForTransaction(transactionId: number): Promise<{ userId: number; email: string | null; phone: string | null; firstName: string }[]>;
+
+  getLenderServiceAreas(lenderId: number): Promise<LenderServiceArea[]>;
+  setLenderServiceAreas(lenderId: number, zipCodes: string[]): Promise<LenderServiceArea[]>;
+  createEstimateRequest(data: InsertEstimateRequest): Promise<EstimateRequest>;
+  getEstimateRequest(id: number): Promise<EstimateRequest | undefined>;
+  getEstimateRequestsForBuyer(buyerUserId: number): Promise<EstimateRequest[]>;
+  getEstimateRequestsForLender(lenderUserId: number): Promise<(EstimateRequest & { hasResponded?: boolean })[]>;
+  submitLenderEstimate(data: InsertLenderEstimate): Promise<LenderEstimate>;
+  getEstimatesForRequest(requestId: number): Promise<(LenderEstimate & { lenderName?: string; lenderCompany?: string })[]>;
+  getLenderRankingStats(lenderUserId: number): Promise<LenderRankingStats | undefined>;
+  upsertLenderRankingStats(lenderUserId: number, updates: Partial<LenderRankingStats>): Promise<LenderRankingStats>;
+  rankLendersForZip(zipCode: string, excludeLenderIds?: number[]): Promise<{ lenderUserId: number; score: number }[]>;
+  rateLenderEstimate(data: { estimateId: number; requestId: number; ratedByUserId: number; lenderUserId: number; rating: number; review?: string }): Promise<LenderEstimateRating>;
+  updateEstimateRequestStatus(id: number, status: string): Promise<void>;
 }
 
 const PgStore = connectPgSimple(session);
@@ -6822,6 +6841,186 @@ export class DatabaseStorage implements IStorage {
       phone: r.phone ? String(r.phone) : null,
       firstName: r.firstName ? String(r.firstName) : 'there',
     }));
+  }
+
+  async getLenderServiceAreas(lenderId: number): Promise<LenderServiceArea[]> {
+    const result = await db.select().from(lenderServiceAreas).where(eq(lenderServiceAreas.lenderId, lenderId));
+    return result;
+  }
+
+  async setLenderServiceAreas(lenderId: number, zipCodes: string[]): Promise<LenderServiceArea[]> {
+    await db.delete(lenderServiceAreas).where(eq(lenderServiceAreas.lenderId, lenderId));
+    if (zipCodes.length === 0) return [];
+    const values = zipCodes.map(zip => ({ lenderId, zipCode: zip }));
+    const result = await db.insert(lenderServiceAreas).values(values).returning();
+    return result;
+  }
+
+  async createEstimateRequest(data: InsertEstimateRequest): Promise<EstimateRequest> {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    const [request] = await db.insert(estimateRequests).values({
+      ...data,
+      status: "open",
+      expiresAt,
+    }).returning();
+    return request;
+  }
+
+  async getEstimateRequest(id: number): Promise<EstimateRequest | undefined> {
+    const [request] = await db.select().from(estimateRequests).where(eq(estimateRequests.id, id));
+    return request;
+  }
+
+  async getEstimateRequestsForBuyer(buyerUserId: number): Promise<EstimateRequest[]> {
+    return db.select().from(estimateRequests)
+      .where(eq(estimateRequests.buyerUserId, buyerUserId))
+      .orderBy(desc(estimateRequests.createdAt));
+  }
+
+  async getEstimateRequestsForLender(lenderUserId: number): Promise<(EstimateRequest & { hasResponded?: boolean })[]> {
+    const result = await db.execute(sql`
+      SELECT er.*,
+        EXISTS(SELECT 1 FROM lender_estimates le WHERE le.request_id = er.id AND le.lender_user_id = ${lenderUserId}) as "hasResponded"
+      FROM estimate_requests er
+      WHERE er.status = 'open'
+        AND er.property_zip IN (SELECT zip_code FROM lender_service_areas WHERE lender_id = ${lenderUserId})
+        AND (er.expires_at IS NULL OR er.expires_at > NOW())
+      ORDER BY er.created_at DESC
+    `);
+    return result.rows as any[];
+  }
+
+  async submitLenderEstimate(data: InsertLenderEstimate): Promise<LenderEstimate> {
+    let totalCost5yr = (data.totalMonthlyPayment * 60) + data.totalClosingCosts;
+    let totalCost7yr = (data.totalMonthlyPayment * 84) + data.totalClosingCosts;
+
+    const [estimate] = await db.insert(lenderEstimates).values({
+      ...data,
+      totalCost5yr,
+      totalCost7yr,
+      status: "submitted",
+    }).returning();
+
+    const stats = await this.getLenderRankingStats(data.lenderUserId);
+    if (stats) {
+      const newResponses = (stats.totalResponses || 0) + 1;
+      const newRate = stats.totalRequestsReceived ? newResponses / stats.totalRequestsReceived : 1;
+      await this.upsertLenderRankingStats(data.lenderUserId, {
+        totalResponses: newResponses,
+        responseRate: newRate,
+      });
+    }
+
+    return estimate;
+  }
+
+  async getEstimatesForRequest(requestId: number): Promise<(LenderEstimate & { lenderName?: string; lenderCompany?: string })[]> {
+    const result = await db.execute(sql`
+      SELECT le.*,
+        CONCAT(u.first_name, ' ', u.last_name) as "lenderName",
+        u.brokerage_name as "lenderCompany"
+      FROM lender_estimates le
+      LEFT JOIN users u ON u.id = le.lender_user_id
+      WHERE le.request_id = ${requestId}
+      ORDER BY le.total_cost_5yr ASC NULLS LAST
+    `);
+    return result.rows as any[];
+  }
+
+  async getLenderRankingStats(lenderUserId: number): Promise<LenderRankingStats | undefined> {
+    const [stats] = await db.select().from(lenderRankingStats).where(eq(lenderRankingStats.lenderUserId, lenderUserId));
+    return stats;
+  }
+
+  async upsertLenderRankingStats(lenderUserId: number, updates: Partial<LenderRankingStats>): Promise<LenderRankingStats> {
+    const existing = await this.getLenderRankingStats(lenderUserId);
+    if (existing) {
+      const [updated] = await db.update(lenderRankingStats)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(lenderRankingStats.lenderUserId, lenderUserId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(lenderRankingStats).values({
+      lenderUserId,
+      ...updates,
+      updatedAt: new Date(),
+    }).returning();
+    return created;
+  }
+
+  async rankLendersForZip(zipCode: string, excludeLenderIds: number[] = []): Promise<{ lenderUserId: number; score: number }[]> {
+    const excludeClause = excludeLenderIds.length > 0
+      ? sql`AND lsa.lender_id NOT IN (${sql.join(excludeLenderIds.map(id => sql`${id}`), sql`, `)})`
+      : sql``;
+
+    const result = await db.execute(sql`
+      SELECT
+        lsa.lender_id as "lenderUserId",
+        COALESCE(lrs.response_rate, 0) as "responseRate",
+        COALESCE(lrs.avg_rating, 0) as "avgRating",
+        COALESCE(lrs.total_ratings, 0) as "totalRatings",
+        lrs.last_opportunity_at as "lastOpportunityAt",
+        COALESCE(lrs.subscription_tier, 'free') as "subscriptionTier"
+      FROM lender_service_areas lsa
+      JOIN users u ON u.id = lsa.lender_id AND u.role = 'lender' AND u.account_status = 'active'
+      LEFT JOIN lender_ranking_stats lrs ON lrs.lender_user_id = lsa.lender_id
+      WHERE lsa.zip_code = ${zipCode}
+        ${excludeClause}
+      ORDER BY lsa.lender_id
+    `);
+
+    const scored = (result.rows as any[]).map(row => {
+      const responseRateScore = Math.min(Number(row.responseRate) || 0, 1);
+
+      let ratingScore = 0;
+      if (Number(row.totalRatings) > 0) {
+        ratingScore = (Number(row.avgRating) || 0) / 5;
+      }
+
+      let recencyScore = 1;
+      if (row.lastOpportunityAt) {
+        const hoursSince = (Date.now() - new Date(row.lastOpportunityAt).getTime()) / (1000 * 60 * 60);
+        recencyScore = Math.min(hoursSince / 168, 1);
+      }
+
+      let tierScore = 0;
+      if (row.subscriptionTier === 'premium') tierScore = 1;
+      else if (row.subscriptionTier === 'pro') tierScore = 0.6;
+      else tierScore = 0.1;
+
+      const score = (responseRateScore * 0.25) + (ratingScore * 0.25) + (recencyScore * 0.25) + (tierScore * 0.25);
+
+      return {
+        lenderUserId: Number(row.lenderUserId),
+        score,
+      };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored;
+  }
+
+  async rateLenderEstimate(data: { estimateId: number; requestId: number; ratedByUserId: number; lenderUserId: number; rating: number; review?: string }): Promise<LenderEstimateRating> {
+    const [rating] = await db.insert(lenderEstimateRatings).values(data).returning();
+
+    const allRatings = await db.execute(sql`
+      SELECT AVG(rating) as avg, COUNT(*) as count
+      FROM lender_estimate_ratings
+      WHERE lender_user_id = ${data.lenderUserId}
+    `);
+    const row = (allRatings.rows as any[])[0];
+    await this.upsertLenderRankingStats(data.lenderUserId, {
+      avgRating: Number(row.avg) || 0,
+      totalRatings: Number(row.count) || 0,
+    });
+
+    return rating;
+  }
+
+  async updateEstimateRequestStatus(id: number, status: string): Promise<void> {
+    await db.update(estimateRequests).set({ status }).where(eq(estimateRequests.id, id));
   }
 
 }

@@ -6,7 +6,7 @@ import { sql } from "drizzle-orm/sql";
 import { eq, desc } from "drizzle-orm";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema, insertVendorRatingSchema, listingPhotos, formTemplates, homeExpenses, insertHomeExpenseSchema, homeMaintenanceReminders, insertHomeMaintenanceReminderSchema, homeEquityProfiles, insertHomeEquityProfileSchema, homeWarrantyItems, insertHomeWarrantyItemSchema, homeImprovements, insertHomeImprovementSchema } from "@shared/schema";
+import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema, insertVendorRatingSchema, listingPhotos, formTemplates, homeExpenses, insertHomeExpenseSchema, homeMaintenanceReminders, insertHomeMaintenanceReminderSchema, homeEquityProfiles, insertHomeEquityProfileSchema, homeWarrantyItems, insertHomeWarrantyItemSchema, homeImprovements, insertHomeImprovementSchema, insertEstimateRequestSchema, insertLenderEstimateSchema } from "@shared/schema";
 import ical from "ical-generator";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -14480,6 +14480,233 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("Admin reply error:", error);
       res.status(500).json({ error: "Failed to send reply" });
+    }
+  });
+
+  // ============================================================
+  // Lender Estimate Comparison System
+  // ============================================================
+
+  app.get("/api/lender/service-areas", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user!.role !== "lender") return res.status(403).json({ error: "Lenders only" });
+    try {
+      const areas = await storage.getLenderServiceAreas(req.user!.id);
+      res.json(areas);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch service areas" });
+    }
+  });
+
+  app.put("/api/lender/service-areas", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user!.role !== "lender") return res.status(403).json({ error: "Lenders only" });
+    const { zipCodes } = req.body;
+    if (!Array.isArray(zipCodes)) return res.status(400).json({ error: "zipCodes must be an array" });
+    if (zipCodes.length > 50) return res.status(400).json({ error: "Maximum 50 zip codes" });
+    try {
+      const areas = await storage.setLenderServiceAreas(req.user!.id, zipCodes.map(String));
+      res.json(areas);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update service areas" });
+    }
+  });
+
+  app.get("/api/lender/ranking-stats", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user!.role !== "lender") return res.status(403).json({ error: "Lenders only" });
+    try {
+      let stats = await storage.getLenderRankingStats(req.user!.id);
+      if (!stats) {
+        stats = await storage.upsertLenderRankingStats(req.user!.id, { subscriptionTier: "free" });
+      }
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  app.post("/api/estimate-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const parsed = insertEstimateRequestSchema.parse({
+        ...req.body,
+        buyerUserId: req.user!.id,
+      });
+      const request = await storage.createEstimateRequest(parsed);
+
+      const rankedLenders = await storage.rankLendersForZip(
+        request.propertyZip,
+        request.preferredLenderId ? [request.preferredLenderId] : []
+      );
+
+      const slotsAvailable = request.preferredLenderId ? (request.maxEstimates || 3) - 1 : (request.maxEstimates || 3);
+      const selectedLenders = rankedLenders.slice(0, slotsAvailable);
+
+      const allLenderIds = request.preferredLenderId
+        ? [request.preferredLenderId, ...selectedLenders.map(l => l.lenderUserId)]
+        : selectedLenders.map(l => l.lenderUserId);
+
+      for (const lenderId of allLenderIds) {
+        await storage.upsertLenderRankingStats(lenderId, {
+          totalRequestsReceived: undefined,
+          lastOpportunityAt: new Date(),
+        });
+        const stats = await storage.getLenderRankingStats(lenderId);
+        if (stats) {
+          await storage.upsertLenderRankingStats(lenderId, {
+            totalRequestsReceived: (stats.totalRequestsReceived || 0) + 1,
+          });
+        }
+      }
+
+      res.json({ ...request, notifiedLenders: allLenderIds.length });
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ error: "Invalid request data", details: error.issues });
+      console.error("Create estimate request error:", error);
+      res.status(500).json({ error: "Failed to create estimate request" });
+    }
+  });
+
+  app.get("/api/estimate-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const requests = await storage.getEstimateRequestsForBuyer(req.user!.id);
+      res.json(requests);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch requests" });
+    }
+  });
+
+  app.get("/api/estimate-requests/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const request = await storage.getEstimateRequest(Number(req.params.id));
+      if (!request) return res.status(404).json({ error: "Request not found" });
+
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+      const isBuyerOrAgent = request.buyerUserId === userId || request.agentUserId === userId;
+      const isLender = userRole === "lender";
+      const isAdmin = userRole === "admin";
+      if (!isBuyerOrAgent && !isLender && !isAdmin) {
+        return res.status(403).json({ error: "Not authorized to view this request" });
+      }
+
+      const estimates = await storage.getEstimatesForRequest(request.id);
+      res.json({ ...request, estimates });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch request" });
+    }
+  });
+
+  app.get("/api/lender/estimate-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user!.role !== "lender") return res.status(403).json({ error: "Lenders only" });
+    try {
+      const requests = await storage.getEstimateRequestsForLender(req.user!.id);
+      res.json(requests);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch requests" });
+    }
+  });
+
+  app.post("/api/estimate-requests/:id/estimates", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const requestId = Number(req.params.id);
+    try {
+      const request = await storage.getEstimateRequest(requestId);
+      if (!request) return res.status(404).json({ error: "Request not found" });
+      if (request.status !== "open") return res.status(400).json({ error: "Request is no longer open" });
+
+      const existing = await storage.getEstimatesForRequest(requestId);
+      const alreadySubmitted = existing.find(e => e.lenderUserId === req.user!.id);
+      if (alreadySubmitted) return res.status(400).json({ error: "You already submitted an estimate" });
+
+      const nonManualCount = existing.filter(e => !e.isManualEntry).length;
+      if (nonManualCount >= (request.maxEstimates || 3)) {
+        return res.status(400).json({ error: "Maximum number of estimates reached for this request" });
+      }
+
+      const isManual = req.body.isManualEntry === true;
+      const isLender = req.user!.role === "lender";
+
+      if (!isManual && !isLender) {
+        return res.status(403).json({ error: "Only lenders can submit estimates" });
+      }
+
+      const parsed = insertLenderEstimateSchema.parse({
+        ...req.body,
+        requestId,
+        lenderUserId: req.user!.id,
+      });
+
+      const estimate = await storage.submitLenderEstimate(parsed);
+      res.json(estimate);
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ error: "Invalid estimate data", details: error.issues });
+      console.error("Submit estimate error:", error);
+      res.status(500).json({ error: "Failed to submit estimate" });
+    }
+  });
+
+  app.post("/api/estimate-requests/:id/close", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const requestId = Number(req.params.id);
+    try {
+      const request = await storage.getEstimateRequest(requestId);
+      if (!request) return res.status(404).json({ error: "Request not found" });
+      if (request.buyerUserId !== req.user!.id && request.agentUserId !== req.user!.id) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+      await storage.updateEstimateRequestStatus(requestId, "closed");
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to close request" });
+    }
+  });
+
+  app.post("/api/lender-estimates/:id/rate", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const estimateId = Number(req.params.id);
+    const { rating, review } = req.body;
+    if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: "Rating must be 1-5" });
+    try {
+      const result = await db.execute(sql`SELECT request_id, lender_user_id FROM lender_estimates WHERE id = ${estimateId}`);
+      const estimate = (result.rows as any[])[0];
+      if (!estimate) return res.status(404).json({ error: "Estimate not found" });
+
+      const estimateRequest = await storage.getEstimateRequest(Number(estimate.request_id));
+      if (!estimateRequest) return res.status(404).json({ error: "Request not found" });
+      if (estimateRequest.buyerUserId !== req.user!.id && estimateRequest.agentUserId !== req.user!.id) {
+        return res.status(403).json({ error: "Only the buyer or their agent can rate estimates" });
+      }
+
+      const ratingRecord = await storage.rateLenderEstimate({
+        estimateId,
+        requestId: Number(estimate.request_id),
+        ratedByUserId: req.user!.id,
+        lenderUserId: Number(estimate.lender_user_id),
+        rating,
+        review,
+      });
+      res.json(ratingRecord);
+    } catch (error) {
+      console.error("Rate estimate error:", error);
+      res.status(500).json({ error: "Failed to rate estimate" });
+    }
+  });
+
+  app.put("/api/lender/subscription-tier", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user!.role !== "lender") return res.status(403).json({ error: "Lenders only" });
+    const { tier } = req.body;
+    if (!["free", "pro", "premium"].includes(tier)) return res.status(400).json({ error: "Invalid tier" });
+    try {
+      const stats = await storage.upsertLenderRankingStats(req.user!.id, { subscriptionTier: tier });
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update tier" });
     }
   });
 
