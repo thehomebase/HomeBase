@@ -350,12 +350,36 @@ export default function TransactionsPage() {
     },
   });
 
-  const [alertsDismissed, setAlertsDismissed] = useState(false);
-
   const totalAlerts = alertsData.reduce((sum, t) => sum + t.alerts.length, 0);
   const criticalCount = alertsData.reduce((sum, t) => sum + t.alerts.filter(a => a.riskLevel === "critical").length, 0);
   const highCount = alertsData.reduce((sum, t) => sum + t.alerts.filter(a => a.riskLevel === "high").length, 0);
   const mediumCount = alertsData.reduce((sum, t) => sum + t.alerts.filter(a => a.riskLevel === "medium").length, 0);
+
+  const alertsKey = `homebase_alerts_dismissed_${user?.id ?? "anon"}`;
+  const alertsFingerprint = alertsData.map(t => `${t.transactionId}:${t.alerts.map(a => a.message).join(",")}`).sort().join("|");
+  const [alertsDismissed, setAlertsDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem(alertsKey) === alertsFingerprint && alertsFingerprint !== "";
+    } catch { return false; }
+  });
+
+  useEffect(() => {
+    if (alertsFingerprint) {
+      try {
+        const stored = sessionStorage.getItem(alertsKey);
+        if (stored && stored === alertsFingerprint) {
+          setAlertsDismissed(true);
+        } else {
+          setAlertsDismissed(false);
+        }
+      } catch {}
+    }
+  }, [alertsFingerprint, alertsKey]);
+
+  const dismissAlerts = () => {
+    setAlertsDismissed(true);
+    try { sessionStorage.setItem(alertsKey, alertsFingerprint); } catch {}
+  };
 
   const createTransactionMutation = useMutation({
     mutationFn: async (data: z.infer<typeof createTransactionSchema>) => {
@@ -861,7 +885,7 @@ export default function TransactionsPage() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6"
-                  onClick={() => setAlertsDismissed(true)}
+                  onClick={dismissAlerts}
                 >
                   <X className="h-4 w-4" />
                 </Button>
