@@ -691,20 +691,10 @@ export default function DataPage() {
                   tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                 />
                 <YAxis
-                  yAxisId="left"
                   tickFormatter={formatCurrency}
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  width={55}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tickFormatter={formatCurrency}
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: "hsl(217, 91%, 60%)" }}
                   width={55}
                 />
                 <RechartsTooltip
@@ -728,7 +718,6 @@ export default function DataPage() {
                   }}
                 />
                 <Area
-                  yAxisId="right"
                   type="monotone"
                   dataKey="cumulativeProjected"
                   stroke="hsl(217, 91%, 60%)"
@@ -739,7 +728,6 @@ export default function DataPage() {
                   connectNulls
                 />
                 <Area
-                  yAxisId="right"
                   type="monotone"
                   dataKey="cumulativeActual"
                   stroke="hsl(217, 91%, 60%)"
@@ -749,7 +737,6 @@ export default function DataPage() {
                   connectNulls
                 />
                 <Bar
-                  yAxisId="left"
                   dataKey="earned"
                   fill="hsl(142, 71%, 45%)"
                   radius={[3, 3, 0, 0]}
@@ -758,7 +745,6 @@ export default function DataPage() {
                   barSize={18}
                 />
                 <Bar
-                  yAxisId="left"
                   dataKey="projected"
                   fill="hsl(142, 71%, 45%)"
                   fillOpacity={0.3}
