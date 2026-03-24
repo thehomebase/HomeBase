@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useVendorSchema } from "@/lib/schema-markup";
 import { type Contractor, type ContractorReview, type VendorRating, type VendorTeamRequest } from "@shared/schema";
 import { PerformanceStatsDisplay, RateVendorDialog } from "@/pages/vendor-ratings-page";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -308,6 +309,8 @@ function ContractorDetail({
   const { user } = useAuth();
   const { toast } = useToast();
   const [showRateDialog, setShowRateDialog] = useState(false);
+
+  useVendorSchema(contractor);
 
   const { data: reviews = [] } = useQuery<ContractorReview[]>({
     queryKey: ["/api/contractors", contractor.id, "reviews"],

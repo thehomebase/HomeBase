@@ -21,6 +21,7 @@ import { PhotoTouchup } from "@/components/photo-touchup";
 import { PhotoPositionEditor } from "@/components/photo-position-editor";
 import { Move } from "lucide-react";
 import type { User } from "@shared/schema";
+import { useAgentProfileSchema } from "@/lib/schema-markup";
 
 type PublicProfile = Omit<User, "password" | "emailVerificationToken" | "emailVerificationExpires" | "registrationIp">;
 
@@ -870,6 +871,32 @@ export default function ProfilePage() {
   const isAgentOrBroker = profile.role === "agent" || profile.role === "broker";
   const isLicensedRole = profile.role === "agent" || profile.role === "broker" || profile.role === "lender";
   const profileName = `${profile.firstName} ${profile.lastName}`;
+
+  const { data: schemaReviewData } = useQuery<ProfileReviewData>({
+    queryKey: ["/api/profile", profileId, "reviews", "schema"],
+    queryFn: async () => {
+      const res = await fetch(`/api/profile/${profileId}/reviews`, { credentials: "include" });
+      if (!res.ok) return { reviews: [], avgRating: 0, reviewCount: 0 };
+      return res.json();
+    },
+    enabled: !!profileId && isAgentOrBroker,
+  });
+
+  const { data: schemaServiceData } = useQuery<{ cities: Array<{ city: string; state: string }> }>({
+    queryKey: ["/api/profile", profileId, "service-areas", "schema"],
+    queryFn: async () => {
+      const res = await fetch(`/api/profile/${profileId}/service-areas`, { credentials: "include" });
+      if (!res.ok) return { cities: [] };
+      return res.json();
+    },
+    enabled: !!profileId && isAgentOrBroker,
+  });
+
+  useAgentProfileSchema(
+    isLicensedRole ? profile : null,
+    schemaReviewData ? { avgRating: schemaReviewData.avgRating, reviewCount: schemaReviewData.reviewCount } : null,
+    schemaServiceData?.cities?.map(c => `${c.city}, ${c.state}`)
+  );
 
   return (
     <div className="w-full px-4 sm:px-8 py-6 max-w-5xl mx-auto pb-24 md:pb-8">
