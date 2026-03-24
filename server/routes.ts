@@ -962,22 +962,13 @@ export function registerRoutes(app: Express): Server {
       // Google Calendar sync is handled via iCal subscription feed and manual "Push to Google Calendar" button.
       // Automatic push removed to prevent duplicate events.
 
-      // Auto-geocode transaction when address fields are set/changed
       if ((data.streetName || data.city || data.state || data.zipCode) && transaction.streetName && transaction.city) {
         const addressParts = [transaction.streetName, transaction.city, transaction.state, transaction.zipCode].filter(Boolean);
         const address = addressParts.join(', ');
-        fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=us`,
-          { headers: { 'User-Agent': 'HomeBase-RealEstate-App/1.0' } }
-        )
-          .then(r => r.json())
-          .then(data => {
-            if (data && data.length > 0) {
-              const lat = parseFloat(data[0].lat);
-              const lon = parseFloat(data[0].lon);
-              if (lat >= 24 && lat <= 50 && lon >= -125 && lon <= -66) {
-                storage.updateTransactionCoordinates(id, lat, lon);
-              }
+        geocodeAddress(address)
+          .then(result => {
+            if (result) {
+              storage.updateTransactionCoordinates(id, result.lat, result.lon);
             }
           })
           .catch(err => console.error('Background geocode error:', err?.message));
@@ -2679,6 +2670,44 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  async function geocodeAddress(address: string): Promise<{ lat: number; lon: number; displayName: string } | null> {
+    try {
+      const censusUrl = `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(address)}&benchmark=Public_AR_Current&format=json`;
+      const censusRes = await fetch(censusUrl);
+      const censusData = await censusRes.json();
+      const matches = censusData?.result?.addressMatches;
+      if (matches && matches.length > 0) {
+        const coords = matches[0].coordinates;
+        const lat = coords.y;
+        const lon = coords.x;
+        if (lat >= 24 && lat <= 50 && lon >= -125 && lon <= -66) {
+          return { lat, lon, displayName: matches[0].matchedAddress || address };
+        }
+      }
+    } catch (err) {
+      console.error('Census geocoder error, falling back to Nominatim:', (err as any)?.message);
+    }
+
+    try {
+      const nomRes = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=us`,
+        { headers: { 'User-Agent': 'HomeBase-RealEstate-App/1.0' } }
+      );
+      const nomData = await nomRes.json();
+      if (nomData.length > 0) {
+        const lat = parseFloat(nomData[0].lat);
+        const lon = parseFloat(nomData[0].lon);
+        if (lat >= 24 && lat <= 50 && lon >= -125 && lon <= -66) {
+          return { lat, lon, displayName: nomData[0].display_name };
+        }
+      }
+    } catch (err) {
+      console.error('Nominatim geocoder error:', (err as any)?.message);
+    }
+
+    return null;
+  }
+
   app.post("/api/geocode", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
@@ -2688,27 +2717,9 @@ export function registerRoutes(app: Express): Server {
     }
     
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
-        {
-          headers: {
-            'User-Agent': 'HomeBase-RealEstate-App/1.0'
-          }
-        }
-      );
-      const data = await response.json();
-      
-      if (data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lon = parseFloat(data[0].lon);
-        if (lat < 24 || lat > 50 || lon < -125 || lon > -66) {
-          return res.status(404).json({ error: 'Geocoded location outside US boundaries' });
-        }
-        res.json({
-          lat,
-          lon,
-          displayName: data[0].display_name
-        });
+      const result = await geocodeAddress(address);
+      if (result) {
+        res.json(result);
       } else {
         res.status(404).json({ error: 'Address not found' });
       }
@@ -2740,33 +2751,15 @@ export function registerRoutes(app: Express): Server {
         [transaction.city, transaction.state, transaction.zipCode].filter(Boolean).join(', '),
       ].filter((q, i, arr) => q && arr.indexOf(q) === i);
 
-      let foundLat: number | null = null;
-      let foundLon: number | null = null;
-
       for (const query of queries) {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=us`,
-          { headers: { 'User-Agent': 'HomeBase-RealEstate-App/1.0' } }
-        );
-        const data = await response.json();
-        if (data.length > 0) {
-          const lat = parseFloat(data[0].lat);
-          const lon = parseFloat(data[0].lon);
-          if (lat >= 24 && lat <= 50 && lon >= -125 && lon <= -66) {
-            foundLat = lat;
-            foundLon = lon;
-            break;
-          }
+        const result = await geocodeAddress(query);
+        if (result) {
+          await storage.updateTransactionCoordinates(Number(req.params.id), result.lat, result.lon);
+          return res.json({ success: true, lat: String(result.lat), lon: String(result.lon) });
         }
-        await new Promise(r => setTimeout(r, 1100));
       }
 
-      if (foundLat !== null && foundLon !== null) {
-        await storage.updateTransactionCoordinates(Number(req.params.id), foundLat, foundLon);
-        res.json({ success: true, lat: String(foundLat), lon: String(foundLon) });
-      } else {
-        res.status(404).json({ error: 'Address not found' });
-      }
+      res.status(404).json({ error: 'Address not found' });
     } catch (error) {
       console.error('Error geocoding transaction:', error);
       res.status(500).json({ error: 'Failed to geocode transaction' });
