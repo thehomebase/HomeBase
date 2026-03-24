@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -361,8 +361,8 @@ function EditCommissionDialog({
   const [status, setStatus] = useState("pending");
   const [paidDate, setPaidDate] = useState("");
 
-  useState(() => {
-    if (commission) {
+  useEffect(() => {
+    if (commission && open) {
       setCommissionRate(commission.commissionRate || "");
       setCommissionAmount(String((commission.commissionAmount || 0) / 100));
       setBrokerageSplitPercent(commission.brokerageSplitPercent || "");
@@ -372,7 +372,7 @@ function EditCommissionDialog({
       setStatus(commission.status || "pending");
       setPaidDate(commission.paidDate ? commission.paidDate.split("T")[0] : "");
     }
-  });
+  }, [commission, open]);
 
   const addExpense = () => setExpenses([...expenses, { description: "", amount: 0 }]);
   const removeExpense = (idx: number) => setExpenses(expenses.filter((_, i) => i !== idx));
@@ -494,16 +494,22 @@ function AddCommissionDialog({
   onOpenChange,
   onSave,
   isPending,
+  existingTransactionIds,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (data: any) => void;
   isPending: boolean;
+  existingTransactionIds: Set<number>;
 }) {
   const { data: transactions = [] } = useQuery<any[]>({
     queryKey: ["/api/transactions"],
     enabled: open,
   });
+
+  const availableTransactions = transactions.filter(
+    (t: any) => !existingTransactionIds.has(t.id)
+  );
 
   const [transactionId, setTransactionId] = useState("");
   const [commissionRate, setCommissionRate] = useState("");
@@ -512,6 +518,18 @@ function AddCommissionDialog({
   const [referralFeePercent, setReferralFeePercent] = useState("0");
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setTransactionId("");
+      setCommissionRate("");
+      setCommissionAmount("");
+      setBrokerageSplitPercent("30");
+      setReferralFeePercent("0");
+      setExpenses([]);
+      setNotes("");
+    }
+  }, [open]);
 
   const addExpense = () => setExpenses([...expenses, { description: "", amount: 0 }]);
   const removeExpense = (idx: number) => setExpenses(expenses.filter((_, i) => i !== idx));
@@ -549,7 +567,7 @@ function AddCommissionDialog({
                 <SelectValue placeholder="Select a transaction" />
               </SelectTrigger>
               <SelectContent>
-                {transactions.map((t: any) => (
+                {availableTransactions.map((t: any) => (
                   <SelectItem key={t.id} value={String(t.id)}>
                     {t.streetName} — {t.city}, {t.state}
                   </SelectItem>
@@ -650,8 +668,9 @@ export default function CommissionsPage() {
       setShowAddDialog(false);
       toast({ title: "Commission added" });
     },
-    onError: () => {
-      toast({ title: "Failed to add commission", variant: "destructive" });
+    onError: (error: any) => {
+      const msg = error?.message || "Failed to add commission";
+      toast({ title: msg, variant: "destructive" });
     },
   });
 
@@ -666,8 +685,9 @@ export default function CommissionsPage() {
       setEditingCommission(null);
       toast({ title: "Commission updated" });
     },
-    onError: () => {
-      toast({ title: "Failed to update commission", variant: "destructive" });
+    onError: (error: any) => {
+      const msg = error?.message || "Failed to update commission";
+      toast({ title: msg, variant: "destructive" });
     },
   });
 
@@ -753,6 +773,7 @@ export default function CommissionsPage() {
         onOpenChange={setShowAddDialog}
         onSave={(data) => createMutation.mutate(data)}
         isPending={createMutation.isPending}
+        existingTransactionIds={new Set(commissions.map((c) => c.transactionId))}
       />
     </div>
   );
