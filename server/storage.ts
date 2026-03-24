@@ -6344,7 +6344,10 @@ export class DatabaseStorage implements IStorage {
 
   async getCommissionEntriesByAgent(agentId: number): Promise<any[]> {
     const result = await db.execute(sql`
-      SELECT ce.*, t.street_name, t.city, t.state, t.contract_price, t.status as transaction_status, t.closing_date,
+      SELECT ce.id, ce.transaction_id, ce.agent_id, ce.commission_rate, ce.commission_amount,
+        ce.brokerage_split_percent, ce.referral_fee_percent, ce.expenses, ce.notes, ce.status,
+        ce.paid_date, ce.created_at,
+        t.street_name, t.city, t.state, t.contract_price, t.status as transaction_status, t.closing_date,
         c.first_name as client_first_name, c.last_name as client_last_name
       FROM commission_entries ce
       JOIN transactions t ON ce.transaction_id = t.id
@@ -6352,7 +6355,28 @@ export class DatabaseStorage implements IStorage {
       WHERE ce.agent_id = ${agentId}
       ORDER BY COALESCE(t.closing_date, ce.created_at) DESC
     `);
-    return result.rows as any[];
+    return result.rows.map((row: any) => ({
+      id: Number(row.id),
+      transactionId: Number(row.transaction_id),
+      agentId: Number(row.agent_id),
+      commissionRate: row.commission_rate,
+      commissionAmount: Number(row.commission_amount),
+      brokerageSplitPercent: row.brokerage_split_percent,
+      referralFeePercent: row.referral_fee_percent,
+      expenses: row.expenses,
+      notes: row.notes,
+      status: row.status,
+      paidDate: row.paid_date,
+      createdAt: row.created_at,
+      street_name: row.street_name,
+      city: row.city,
+      state: row.state,
+      contract_price: row.contract_price != null ? Number(row.contract_price) : null,
+      transaction_status: row.transaction_status,
+      closing_date: row.closing_date,
+      client_first_name: row.client_first_name,
+      client_last_name: row.client_last_name,
+    }));
   }
 
   async getCommissionEntry(id: number): Promise<any> {

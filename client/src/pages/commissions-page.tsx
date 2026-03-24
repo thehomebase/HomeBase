@@ -285,7 +285,7 @@ function CommissionsTable({
                           : "—"}
                       </TableCell>
                       <TableCell className="text-right">
-                        {c.contract_price ? formatUSD(c.contract_price) : "—"}
+                        {c.contract_price ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(c.contract_price) : "—"}
                       </TableCell>
                       <TableCell className="text-right">{c.commissionRate}%</TableCell>
                       <TableCell className="text-right">{formatUSD(c.commissionAmount)}</TableCell>
