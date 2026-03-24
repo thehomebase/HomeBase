@@ -31,7 +31,7 @@ import {
   Layers, Shield, Camera, Sofa, Truck, MoreHorizontal, Construction,
   ClipboardList, Map, Settings, Users, Plus, Pencil, Trash2,
   ExternalLink, Building2, Award, ThumbsUp, LayoutGrid, List, Check, X, Bell,
-  Send, Copy
+  Send, Copy, Crown
 } from "lucide-react";
 import { SiYelp, SiGoogle } from "react-icons/si";
 import { Megaphone } from "lucide-react";
@@ -803,6 +803,9 @@ export default function MarketplacePage() {
   };
 
   const handleViewDetails = async (contractor: ContractorWithDetails) => {
+    if (contractor.vendorUserId && premiumSet.has(contractor.vendorUserId)) {
+      fetch(`/api/vendor/premium/${contractor.vendorUserId}/click`, { method: "POST", credentials: "include" }).catch(() => {});
+    }
     try {
       const details = await fetchContractorDetail(contractor.id);
       setSelectedContractor(details);
@@ -823,11 +826,39 @@ export default function MarketplacePage() {
     return myTeam?.some((m: any) => m.contractorId === contractorId);
   };
 
+  const { data: premiumVendorIds } = useQuery<number[]>({
+    queryKey: ["/api/marketplace/premium-vendors"],
+  });
+
+  const premiumSet = new Set(premiumVendorIds || []);
+
+  const trackedImpressions = useState<string | null>(null);
+  useEffect(() => {
+    if (premiumVendorIds && premiumVendorIds.length > 0) {
+      const key = premiumVendorIds.sort().join(",");
+      if (trackedImpressions[0] !== key) {
+        trackedImpressions[1](key);
+        fetch("/api/marketplace/premium-impressions", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ vendorUserIds: premiumVendorIds }),
+        }).catch(() => {});
+      }
+    }
+  }, [premiumVendorIds]);
+
   const allContractors: ContractorWithDetails[] = proximityEnabled
     ? (proximityData?.contractors || [])
     : (marketplaceData?.contractors || []);
 
-  const contractors = allContractors.filter((c) => {
+  const sortedContractors = [...allContractors].sort((a, b) => {
+    const aP = a.vendorUserId && premiumSet.has(a.vendorUserId) ? 1 : 0;
+    const bP = b.vendorUserId && premiumSet.has(b.vendorUserId) ? 1 : 0;
+    return bP - aP;
+  });
+
+  const contractors = sortedContractors.filter((c) => {
     if (selectedCategory && c.category !== selectedCategory) return false;
     if (searchQuery && proximityEnabled) {
       const q = searchQuery.toLowerCase();
@@ -1162,11 +1193,12 @@ export default function MarketplacePage() {
               || contractor.category;
             const rating = contractor.averageRating ?? contractor.agentRating ?? 0;
             const onTeam = isOnTeam(contractor.id);
+            const isPremium = contractor.vendorUserId && premiumSet.has(contractor.vendorUserId);
 
             return (
               <Card
                 key={contractor.id}
-                className="hover:shadow-md transition-shadow cursor-pointer group"
+                className={`hover:shadow-md transition-shadow cursor-pointer group ${isPremium ? "ring-2 ring-amber-400/50 shadow-amber-100 dark:shadow-amber-900/20" : ""}`}
                 onClick={() => handleViewDetails(contractor)}
               >
                 <CardHeader className="pb-2">
@@ -1177,6 +1209,12 @@ export default function MarketplacePage() {
                         <Badge variant="secondary" className="text-xs">
                           {categoryLabel}
                         </Badge>
+                        {isPremium && (
+                          <Badge className="gap-1 text-xs bg-gradient-to-r from-amber-500 to-amber-600 text-white border-0">
+                            <Crown className="h-3 w-3" />
+                            Featured
+                          </Badge>
+                        )}
                         <Badge variant="outline" className="gap-1 text-xs text-green-600 border-green-200 bg-green-50">
                           <CheckCircle2 className="h-3 w-3" />
                           Verified
@@ -1297,13 +1335,20 @@ export default function MarketplacePage() {
                   || contractor.category;
                 const rating = contractor.averageRating ?? contractor.agentRating ?? 0;
                 const onTeam = isOnTeam(contractor.id);
+                const isPremium = contractor.vendorUserId && premiumSet.has(contractor.vendorUserId);
 
                 return (
-                  <TableRow key={contractor.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleViewDetails(contractor)}>
+                  <TableRow key={contractor.id} className={`cursor-pointer hover:bg-muted/50 ${isPremium ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`} onClick={() => handleViewDetails(contractor)}>
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <span className="font-medium">{contractor.name}</span>
                         <div className="flex gap-1 flex-wrap">
+                          {isPremium && (
+                            <Badge className="gap-0.5 text-xs bg-gradient-to-r from-amber-500 to-amber-600 text-white border-0 px-1.5 py-0">
+                              <Crown className="h-2.5 w-2.5" />
+                              Featured
+                            </Badge>
+                          )}
                           {contractor.vendorUserId && (
                             <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 text-xs px-1.5 py-0">
                               <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />

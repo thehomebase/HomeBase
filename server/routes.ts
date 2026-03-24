@@ -12525,6 +12525,225 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Broker Seat Licensing
+  app.get("/api/broker/seats", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const plan = await storage.getBrokerSeatPlan(req.user.id);
+      const assignments = await storage.getBrokerSeatAssignments(req.user.id);
+      const agentDetails = await Promise.all(
+        assignments.map(async (a) => {
+          const user = await storage.getUser(a.agentUserId);
+          return { ...a, agentName: user ? `${user.firstName} ${user.lastName}` : "Unknown", agentEmail: user?.email || "" };
+        })
+      );
+      res.json({ plan: plan || null, assignments: agentDetails, usedSeats: assignments.length });
+    } catch (error) {
+      console.error("Error fetching broker seats:", error);
+      res.status(500).json({ error: "Failed to fetch seat plan" });
+    }
+  });
+
+  app.post("/api/broker/seats", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const existing = await storage.getBrokerSeatPlan(req.user.id);
+      if (existing) return res.status(400).json({ error: "Seat plan already exists" });
+      const { totalSeats } = req.body;
+      const seats = Math.max(1, Math.min(100, Number(totalSeats) || 5));
+      const pricePerSeatCents = 3900;
+      const plan = await storage.createBrokerSeatPlan({ brokerUserId: req.user.id, totalSeats: seats, pricePerSeatCents });
+      res.json(plan);
+    } catch (error) {
+      console.error("Error creating broker seat plan:", error);
+      res.status(500).json({ error: "Failed to create seat plan" });
+    }
+  });
+
+  app.patch("/api/broker/seats", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const { totalSeats } = req.body;
+      const seats = Math.max(1, Math.min(100, Number(totalSeats)));
+      const assignments = await storage.getBrokerSeatAssignments(req.user.id);
+      if (seats < assignments.length) {
+        return res.status(400).json({ error: `Cannot reduce below ${assignments.length} (current assignments)` });
+      }
+      const plan = await storage.updateBrokerSeatPlan(req.user.id, { totalSeats: seats });
+      res.json(plan);
+    } catch (error) {
+      console.error("Error updating broker seats:", error);
+      res.status(500).json({ error: "Failed to update seat plan" });
+    }
+  });
+
+  app.post("/api/broker/seats/assign", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const { agentUserId } = req.body;
+      if (!agentUserId) return res.status(400).json({ error: "Agent user ID is required" });
+
+      const plan = await storage.getBrokerSeatPlan(req.user.id);
+      if (!plan) return res.status(400).json({ error: "No seat plan found. Create a plan first." });
+
+      const assignments = await storage.getBrokerSeatAssignments(req.user.id);
+      if (assignments.length >= plan.totalSeats) {
+        return res.status(400).json({ error: "All seats are occupied. Increase your seat count first." });
+      }
+
+      const agent = await storage.getUser(agentUserId);
+      if (!agent || (agent.role !== "agent" && agent.role !== "broker")) {
+        return res.status(400).json({ error: "Invalid agent" });
+      }
+
+      if (agent.brokerageId !== req.user.id) {
+        return res.status(403).json({ error: "Agent is not in your brokerage" });
+      }
+
+      const existing = assignments.find(a => a.agentUserId === agentUserId);
+      if (existing) return res.status(400).json({ error: "Agent is already assigned a seat" });
+
+      const assignment = await storage.assignAgentToSeat(plan.id, req.user.id, agentUserId);
+      res.json(assignment);
+    } catch (error: any) {
+      if (error?.constraint === "broker_seat_assignments_agent_user_id_unique") {
+        return res.status(400).json({ error: "This agent is already on a broker seat plan" });
+      }
+      console.error("Error assigning seat:", error);
+      res.status(500).json({ error: "Failed to assign seat" });
+    }
+  });
+
+  app.delete("/api/broker/seats/remove/:agentId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const agentId = Number(req.params.agentId);
+      await storage.removeAgentFromSeat(req.user.id, agentId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing agent from seat:", error);
+      res.status(500).json({ error: "Failed to remove agent" });
+    }
+  });
+
+  app.get("/api/broker/seats/check", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const result = await storage.isAgentOnBrokerSeat(req.user.id);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check seat status" });
+    }
+  });
+
+  // Vendor Premium Placement
+  app.get("/api/vendor/premium", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "vendor") return res.sendStatus(403);
+    try {
+      const listing = await storage.getVendorPremiumListing(req.user.id);
+      res.json(listing || null);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch premium listing" });
+    }
+  });
+
+  app.post("/api/vendor/premium", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "vendor") return res.sendStatus(403);
+    try {
+      const existing = await storage.getVendorPremiumListing(req.user.id);
+      if (existing) return res.status(400).json({ error: "You already have an active premium listing" });
+
+      const { tier, categories, zipCodes } = req.body;
+      if (!tier || !["featured", "spotlight"].includes(tier)) {
+        return res.status(400).json({ error: "Invalid tier. Choose 'featured' or 'spotlight'" });
+      }
+
+      const listing = await storage.createVendorPremiumListing({
+        vendorUserId: req.user.id,
+        tier,
+        categories: categories || [],
+        zipCodes: zipCodes || [],
+      });
+      res.json(listing);
+    } catch (error) {
+      console.error("Error creating premium listing:", error);
+      res.status(500).json({ error: "Failed to create premium listing" });
+    }
+  });
+
+  app.patch("/api/vendor/premium/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "vendor") return res.sendStatus(403);
+    try {
+      const listing = await storage.getVendorPremiumListing(req.user.id);
+      if (!listing || listing.id !== Number(req.params.id)) {
+        return res.status(404).json({ error: "Premium listing not found" });
+      }
+      const { tier, categories, zipCodes } = req.body;
+      const updates: any = {};
+      if (tier && ["featured", "spotlight"].includes(tier)) updates.tier = tier;
+      if (categories) updates.categories = categories;
+      if (zipCodes) updates.zipCodes = zipCodes;
+      const updated = await storage.updateVendorPremiumListing(listing.id, updates);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update premium listing" });
+    }
+  });
+
+  app.delete("/api/vendor/premium/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "vendor") return res.sendStatus(403);
+    try {
+      const listing = await storage.getVendorPremiumListing(req.user.id);
+      if (!listing || listing.id !== Number(req.params.id)) {
+        return res.status(404).json({ error: "Premium listing not found" });
+      }
+      await storage.cancelVendorPremiumListing(listing.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to cancel premium listing" });
+    }
+  });
+
+  app.post("/api/vendor/premium/:id/click", async (req, res) => {
+    try {
+      const vendorUserId = Number(req.params.id);
+      await storage.incrementPremiumClicks(vendorUserId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to track click" });
+    }
+  });
+
+  app.post("/api/marketplace/premium-impressions", async (req, res) => {
+    try {
+      const { vendorUserIds } = req.body;
+      if (Array.isArray(vendorUserIds) && vendorUserIds.length > 0) {
+        await storage.incrementPremiumImpressions(vendorUserIds.map(Number));
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to track impressions" });
+    }
+  });
+
+  app.get("/api/marketplace/premium-vendors", async (req, res) => {
+    try {
+      const premiumIds = await storage.getActivePremiumVendorIds();
+      res.json(premiumIds);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch premium vendors" });
+    }
+  });
+
   // Transaction Templates
   app.get("/api/transaction-templates", async (req, res) => {
     if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);

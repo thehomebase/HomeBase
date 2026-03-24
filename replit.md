@@ -52,6 +52,8 @@ Preferred communication style: Simple, everyday language.
 - **Profile Pages**: Customizable agent/broker profiles with confirmed info, bio, contact details, social media, reviews, MLS-verified listings (from RentCast), service areas, contact form, and Schema.org JSON-LD for SEO.
 - **FAQ & Contact Page**: Categorized FAQs, CRM comparison, and platform contact form.
 - **Verified Listings**: Auto-discovered from RentCast API, with detail pages for marketing materials.
+- **Broker Seat Licensing**: Brokers can purchase per-seat plans ($39/seat/month vs $49 individual) for their agents. "Team Seats" tab in Broker Portal with seat management, agent assignment/removal, and usage analytics. Agents on broker seats see "Covered by [Broker Name]" on billing page. Tables: `broker_seat_plans`, `broker_seat_assignments`.
+- **Vendor Premium Placement**: Vendors can purchase Featured ($39/mo) or Spotlight ($79/mo) placement in the HomeBase Pros marketplace. Premium vendors appear at the top of search results with a gold "Featured" badge and highlighted card. Performance analytics (impressions, clicks). Table: `vendor_premium_listings`. UI on billing page for vendors.
 
 ## External Dependencies
 

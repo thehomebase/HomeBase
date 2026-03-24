@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   CreditCard, CheckCircle2, Clock, Gift, ExternalLink, Shield, Sparkles,
   Check, Zap, Users, BarChart3, FileText, MessageSquare, Map, Home,
-  Phone, Mail, Star, ArrowRight, Crown, Building2, Briefcase
+  Phone, Mail, Star, ArrowRight, Crown, Building2, Briefcase, Eye, MousePointer
 } from "lucide-react";
 import type { ReferralCredit } from "@shared/schema";
 
@@ -65,6 +65,112 @@ const highlights = [
     description: "Connect with agents, lenders, vendors, and clients all in one centralized platform."
   },
 ];
+
+function VendorPremiumSection() {
+  const { toast } = useToast();
+
+  const { data: premium, isLoading } = useQuery<any>({
+    queryKey: ["/api/vendor/premium"],
+  });
+
+  const createPremium = useMutation({
+    mutationFn: (tier: string) => apiRequest("POST", "/api/vendor/premium", { tier, categories: [], zipCodes: [] }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/vendor/premium"] }); toast({ title: "Premium placement activated!" }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const cancelPremium = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/vendor/premium/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/vendor/premium"] }); toast({ title: "Premium placement cancelled" }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  if (isLoading) return <Skeleton className="h-40 w-full mb-8" />;
+
+  return (
+    <div className="mb-8">
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold tracking-tight mb-2">Boost Your Visibility</h2>
+        <p className="text-muted-foreground">Stand out in the HomeBase Pros marketplace with premium placement</p>
+      </div>
+
+      {premium ? (
+        <Card className="ring-2 ring-amber-400/50">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center">
+                  <Crown className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">
+                    {premium.tier === "spotlight" ? "Spotlight" : "Featured"} Placement
+                  </h3>
+                  <Badge className="bg-gradient-to-r from-amber-500 to-amber-600 text-white border-0">Active</Badge>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => cancelPremium.mutate(premium.id)} disabled={cancelPremium.isPending}>
+                Cancel
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-muted/50 rounded-lg p-3 text-center">
+                <Eye className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                <div className="text-lg font-bold">{(premium.impressions || 0).toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">Impressions</div>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 text-center">
+                <MousePointer className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                <div className="text-lg font-bold">{(premium.clicks || 0).toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">Clicks</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Crown className="h-5 w-5 text-amber-500" />
+                <h3 className="font-semibold">Featured</h3>
+              </div>
+              <div className="text-3xl font-bold mb-1">$39<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+              <p className="text-sm text-muted-foreground mb-4">Appear at the top of marketplace search results with a Featured badge</p>
+              <ul className="space-y-2 mb-6 text-sm">
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Featured badge on your listing</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Priority placement in results</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Performance analytics</li>
+              </ul>
+              <Button className="w-full" onClick={() => createPremium.mutate("featured")} disabled={createPremium.isPending}>
+                {createPremium.isPending ? "Activating..." : "Get Featured"}
+              </Button>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-md transition-shadow ring-2 ring-primary/20">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <h3 className="font-semibold">Spotlight</h3>
+                <Badge variant="secondary" className="text-xs">Best Value</Badge>
+              </div>
+              <div className="text-3xl font-bold mb-1">$79<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+              <p className="text-sm text-muted-foreground mb-4">Maximum visibility with premium placement and highlighted listing</p>
+              <ul className="space-y-2 mb-6 text-sm">
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Everything in Featured</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Highlighted card with gold border</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Top of all category results</li>
+              </ul>
+              <Button className="w-full" onClick={() => createPremium.mutate("spotlight")} disabled={createPremium.isPending}>
+                {createPremium.isPending ? "Activating..." : "Get Spotlight"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function BillingPage() {
   const { user } = useAuth();
@@ -141,6 +247,11 @@ export default function BillingPage() {
     },
   });
 
+  const { data: seatCheck } = useQuery<{ onSeat: boolean; brokerName?: string }>({
+    queryKey: ["/api/broker/seats/check"],
+    enabled: user?.role === "agent",
+  });
+
   const pendingCredits = credits?.filter(c => c.status === 'pending') ?? [];
   const appliedCredits = credits?.filter(c => c.status === 'applied') ?? [];
   const hasPaymentMethod = subscription?.hasPaymentMethod ?? false;
@@ -206,6 +317,17 @@ export default function BillingPage() {
               </AlertDescription>
             </Alert>
           )}
+        </div>
+      )}
+
+      {seatCheck?.onSeat && (
+        <div className="px-4 sm:px-8 pt-4">
+          <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+            <Shield className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800 dark:text-green-200">
+              Your subscription is covered by your broker{seatCheck.brokerName ? ` (${seatCheck.brokerName})` : ""}. You have full platform access at no cost to you.
+            </AlertDescription>
+          </Alert>
         </div>
       )}
 
@@ -513,6 +635,10 @@ export default function BillingPage() {
             </div>
           </Card>
         </div>
+
+        {userRole === "vendor" && (
+          <VendorPremiumSection />
+        )}
 
         <div className="text-center py-12">
           <div className="max-w-lg mx-auto">

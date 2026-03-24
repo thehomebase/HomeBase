@@ -72,7 +72,10 @@ import {
   estimateRequests, type EstimateRequest, type InsertEstimateRequest,
   lenderEstimates, type LenderEstimate, type InsertLenderEstimate,
   lenderRankingStats, type LenderRankingStats,
-  lenderEstimateRatings, type LenderEstimateRating
+  lenderEstimateRatings, type LenderEstimateRating,
+  brokerSeatPlans, type BrokerSeatPlan,
+  brokerSeatAssignments, type BrokerSeatAssignment,
+  vendorPremiumListings, type VendorPremiumListing
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
@@ -7021,6 +7024,74 @@ export class DatabaseStorage implements IStorage {
 
   async updateEstimateRequestStatus(id: number, status: string): Promise<void> {
     await db.update(estimateRequests).set({ status }).where(eq(estimateRequests.id, id));
+  }
+
+  async getBrokerSeatPlan(brokerUserId: number): Promise<BrokerSeatPlan | undefined> {
+    const [plan] = await db.select().from(brokerSeatPlans).where(eq(brokerSeatPlans.brokerUserId, brokerUserId));
+    return plan;
+  }
+
+  async createBrokerSeatPlan(data: { brokerUserId: number; totalSeats: number; pricePerSeatCents: number; stripeSubscriptionId?: string; stripeProductId?: string; stripePriceId?: string }): Promise<BrokerSeatPlan> {
+    const [plan] = await db.insert(brokerSeatPlans).values(data).returning();
+    return plan;
+  }
+
+  async updateBrokerSeatPlan(brokerUserId: number, data: Partial<BrokerSeatPlan>): Promise<BrokerSeatPlan> {
+    const [plan] = await db.update(brokerSeatPlans).set({ ...data, updatedAt: new Date() }).where(eq(brokerSeatPlans.brokerUserId, brokerUserId)).returning();
+    return plan;
+  }
+
+  async getBrokerSeatAssignments(brokerUserId: number): Promise<BrokerSeatAssignment[]> {
+    return db.select().from(brokerSeatAssignments).where(eq(brokerSeatAssignments.brokerUserId, brokerUserId));
+  }
+
+  async assignAgentToSeat(planId: number, brokerUserId: number, agentUserId: number): Promise<BrokerSeatAssignment> {
+    const [assignment] = await db.insert(brokerSeatAssignments).values({ planId, brokerUserId, agentUserId }).returning();
+    return assignment;
+  }
+
+  async removeAgentFromSeat(brokerUserId: number, agentUserId: number): Promise<void> {
+    await db.delete(brokerSeatAssignments).where(and(eq(brokerSeatAssignments.brokerUserId, brokerUserId), eq(brokerSeatAssignments.agentUserId, agentUserId)));
+  }
+
+  async isAgentOnBrokerSeat(agentUserId: number): Promise<{ onSeat: boolean; brokerName?: string }> {
+    const [assignment] = await db.select().from(brokerSeatAssignments).where(eq(brokerSeatAssignments.agentUserId, agentUserId));
+    if (!assignment) return { onSeat: false };
+    const broker = await this.getUser(assignment.brokerUserId);
+    return { onSeat: true, brokerName: broker ? `${broker.firstName} ${broker.lastName}` : undefined };
+  }
+
+  async getVendorPremiumListing(vendorUserId: number): Promise<VendorPremiumListing | undefined> {
+    const [listing] = await db.select().from(vendorPremiumListings).where(and(eq(vendorPremiumListings.vendorUserId, vendorUserId), eq(vendorPremiumListings.status, "active")));
+    return listing;
+  }
+
+  async createVendorPremiumListing(data: { vendorUserId: number; tier: string; categories?: string[]; zipCodes?: string[]; stripeSubscriptionId?: string }): Promise<VendorPremiumListing> {
+    const [listing] = await db.insert(vendorPremiumListings).values(data).returning();
+    return listing;
+  }
+
+  async updateVendorPremiumListing(id: number, data: Partial<VendorPremiumListing>): Promise<VendorPremiumListing> {
+    const [listing] = await db.update(vendorPremiumListings).set(data).where(eq(vendorPremiumListings.id, id)).returning();
+    return listing;
+  }
+
+  async cancelVendorPremiumListing(id: number): Promise<void> {
+    await db.update(vendorPremiumListings).set({ status: "cancelled", endDate: new Date() }).where(eq(vendorPremiumListings.id, id));
+  }
+
+  async getActivePremiumVendorIds(): Promise<number[]> {
+    const listings = await db.select({ vendorUserId: vendorPremiumListings.vendorUserId }).from(vendorPremiumListings).where(eq(vendorPremiumListings.status, "active"));
+    return listings.map(l => l.vendorUserId);
+  }
+
+  async incrementPremiumImpressions(vendorUserIds: number[]): Promise<void> {
+    if (vendorUserIds.length === 0) return;
+    await db.execute(sql`UPDATE vendor_premium_listings SET impressions = impressions + 1 WHERE vendor_user_id = ANY(${vendorUserIds}) AND status = 'active'`);
+  }
+
+  async incrementPremiumClicks(vendorUserId: number): Promise<void> {
+    await db.execute(sql`UPDATE vendor_premium_listings SET clicks = clicks + 1 WHERE vendor_user_id = ${vendorUserId} AND status = 'active'`);
   }
 
 }

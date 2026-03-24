@@ -1914,3 +1914,45 @@ export const lenderEstimateRatings = pgTable("lender_estimate_ratings", {
 });
 
 export type LenderEstimateRating = typeof lenderEstimateRatings.$inferSelect;
+
+export const brokerSeatPlans = pgTable("broker_seat_plans", {
+  id: serial("id").primaryKey(),
+  brokerUserId: integer("broker_user_id").notNull().unique(),
+  totalSeats: integer("total_seats").notNull().default(5),
+  pricePerSeatCents: integer("price_per_seat_cents").notNull().default(3900),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  stripeProductId: text("stripe_product_id"),
+  stripePriceId: text("stripe_price_id"),
+  status: text("status").notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type BrokerSeatPlan = typeof brokerSeatPlans.$inferSelect;
+
+export const brokerSeatAssignments = pgTable("broker_seat_assignments", {
+  id: serial("id").primaryKey(),
+  planId: integer("plan_id").notNull(),
+  brokerUserId: integer("broker_user_id").notNull(),
+  agentUserId: integer("agent_user_id").notNull().unique(),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+});
+
+export type BrokerSeatAssignment = typeof brokerSeatAssignments.$inferSelect;
+
+export const vendorPremiumListings = pgTable("vendor_premium_listings", {
+  id: serial("id").primaryKey(),
+  vendorUserId: integer("vendor_user_id").notNull(),
+  tier: text("tier").notNull().default("featured"),
+  categories: text("categories").array(),
+  zipCodes: text("zip_codes").array(),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  status: text("status").notNull().default("active"),
+  impressions: integer("impressions").default(0),
+  clicks: integer("clicks").default(0),
+  startDate: timestamp("start_date").defaultNow(),
+  endDate: timestamp("end_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type VendorPremiumListing = typeof vendorPremiumListings.$inferSelect;

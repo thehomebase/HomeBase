@@ -20,7 +20,8 @@ import {
   Bell, Trophy, Send, Plus, ArrowUpRight, ArrowDownRight, Minus,
   Phone, Mail, MessageSquare, Calendar, Award, Crown, Medal,
   ChevronUp, ChevronDown, ChevronsUpDown, CheckCircle2, Clock,
-  AlertTriangle, Info, MapPin, ArrowRight, UserCheck, RefreshCw
+  AlertTriangle, Info, MapPin, ArrowRight, UserCheck, RefreshCw,
+  Armchair, UserPlus, UserMinus, X
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { BrokerNotification, SalesCompetition } from "@shared/schema";
@@ -874,6 +875,192 @@ function LeadRoutingTab() {
   );
 }
 
+function TeamSeatsTab() {
+  const { toast } = useToast();
+  const [seatCount, setSeatCount] = useState(5);
+  const [agentEmail, setAgentEmail] = useState("");
+  const [showSetup, setShowSetup] = useState(false);
+
+  const { data: seatData, isLoading } = useQuery<{ plan: any; assignments: any[]; usedSeats: number }>({
+    queryKey: ["/api/broker/seats"],
+  });
+
+  const { data: brokerAgents } = useQuery<any[]>({ queryKey: ["/api/broker/agents"] });
+
+  const createPlan = useMutation({
+    mutationFn: (totalSeats: number) => apiRequest("POST", "/api/broker/seats", { totalSeats }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/broker/seats"] }); toast({ title: "Seat plan created" }); setShowSetup(false); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateSeats = useMutation({
+    mutationFn: (totalSeats: number) => apiRequest("PATCH", "/api/broker/seats", { totalSeats }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/broker/seats"] }); toast({ title: "Seats updated" }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const assignAgent = useMutation({
+    mutationFn: (agentUserId: number) => apiRequest("POST", "/api/broker/seats/assign", { agentUserId }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/broker/seats"] }); setAgentEmail(""); toast({ title: "Agent assigned to seat" }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const removeAgent = useMutation({
+    mutationFn: (agentId: number) => apiRequest("DELETE", `/api/broker/seats/remove/${agentId}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/broker/seats"] }); toast({ title: "Agent removed from seat" }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  if (isLoading) return <div className="space-y-4"><Skeleton className="h-40 w-full" /><Skeleton className="h-60 w-full" /></div>;
+
+  const plan = seatData?.plan;
+  const assignments = seatData?.assignments || [];
+  const usedSeats = seatData?.usedSeats || 0;
+
+  if (!plan) {
+    return (
+      <Card className="p-8 text-center">
+        <Armchair className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h3 className="text-lg font-semibold mb-2">Team Seat Licensing</h3>
+        <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+          Purchase seats for your agents instead of them paying individually. Save money and manage your entire brokerage's subscriptions in one place.
+        </p>
+        <div className="bg-muted/50 rounded-lg p-4 mb-6 max-w-sm mx-auto">
+          <div className="text-3xl font-bold text-primary">$39<span className="text-base font-normal text-muted-foreground">/seat/month</span></div>
+          <p className="text-xs text-muted-foreground mt-1">vs $49/month per individual agent subscription</p>
+        </div>
+        {!showSetup ? (
+          <Button onClick={() => setShowSetup(true)} size="lg">
+            <Plus className="h-4 w-4 mr-2" /> Set Up Team Seats
+          </Button>
+        ) : (
+          <div className="flex items-end gap-3 justify-center">
+            <div>
+              <Label className="text-sm">Number of seats</Label>
+              <Input type="number" min={1} max={100} value={seatCount} onChange={e => setSeatCount(Number(e.target.value))} className="w-24" />
+            </div>
+            <div className="text-sm text-muted-foreground pb-2">=</div>
+            <div className="text-lg font-bold pb-1">${((seatCount * 3900) / 100).toFixed(0)}/mo</div>
+            <Button onClick={() => createPlan.mutate(seatCount)} disabled={createPlan.isPending}>
+              {createPlan.isPending ? "Creating..." : "Create Plan"}
+            </Button>
+          </div>
+        )}
+      </Card>
+    );
+  }
+
+  const availableAgents = (brokerAgents || []).filter(
+    (a: any) => !assignments.find((s: any) => s.agentUserId === a.id)
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-muted-foreground">Seats Used</span>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="text-2xl font-bold">{usedSeats} / {plan.totalSeats}</div>
+          <div className="w-full bg-muted rounded-full h-2 mt-2">
+            <div className="bg-primary rounded-full h-2 transition-all" style={{ width: `${(usedSeats / plan.totalSeats) * 100}%` }} />
+          </div>
+        </Card>
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-muted-foreground">Per Seat Cost</span>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="text-2xl font-bold">${(plan.pricePerSeatCents / 100).toFixed(0)}<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+          <p className="text-xs text-muted-foreground mt-1">Save $10/agent vs individual plans</p>
+        </Card>
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-muted-foreground">Monthly Total</span>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="text-2xl font-bold">${((plan.totalSeats * plan.pricePerSeatCents) / 100).toFixed(0)}<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+          <p className="text-xs text-muted-foreground mt-1">For {plan.totalSeats} seats</p>
+        </Card>
+      </div>
+
+      <Card className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold">Manage Seat Count</h3>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" onClick={() => { if (plan.totalSeats > usedSeats) updateSeats.mutate(plan.totalSeats - 1); }} disabled={plan.totalSeats <= usedSeats}>
+            <Minus className="h-4 w-4" />
+          </Button>
+          <span className="text-lg font-bold w-12 text-center">{plan.totalSeats}</span>
+          <Button variant="outline" size="icon" onClick={() => updateSeats.mutate(plan.totalSeats + 1)}>
+            <Plus className="h-4 w-4" />
+          </Button>
+          <span className="text-sm text-muted-foreground ml-2">seats</span>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <h3 className="font-semibold mb-4">Assign Agent to Seat</h3>
+        {availableAgents.length > 0 ? (
+          <div className="flex gap-3">
+            <Select value={agentEmail} onValueChange={setAgentEmail}>
+              <SelectTrigger className="max-w-sm">
+                <SelectValue placeholder="Select an agent..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableAgents.map((agent: any) => (
+                  <SelectItem key={agent.id} value={String(agent.id)}>
+                    {agent.firstName} {agent.lastName} ({agent.email})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => { if (agentEmail) assignAgent.mutate(Number(agentEmail)); }} disabled={!agentEmail || assignAgent.isPending}>
+              <UserPlus className="h-4 w-4 mr-2" /> Assign
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">All your brokerage agents are already assigned seats, or no agents found.</p>
+        )}
+      </Card>
+
+      {assignments.length > 0 && (
+        <Card className="p-5">
+          <h3 className="font-semibold mb-4">Assigned Agents ({assignments.length})</h3>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Agent</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Assigned</TableHead>
+                  <TableHead className="w-16"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {assignments.map((a: any) => (
+                  <TableRow key={a.id}>
+                    <TableCell className="font-medium">{a.agentName}</TableCell>
+                    <TableCell>{a.agentEmail}</TableCell>
+                    <TableCell>{a.assignedAt ? new Date(a.assignedAt).toLocaleDateString() : "—"}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" onClick={() => removeAgent.mutate(a.agentUserId)} disabled={removeAgent.isPending}>
+                        <X className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 export default function BrokerPortalPage() {
   const { user } = useAuth();
 
@@ -885,10 +1072,14 @@ export default function BrokerPortalPage() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full max-w-lg grid-cols-4">
+        <TabsList className="grid w-full max-w-2xl grid-cols-5">
           <TabsTrigger value="overview" className="gap-2">
             <Briefcase className="h-4 w-4" />
             <span className="hidden sm:inline">Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="seats" className="gap-2">
+            <Armchair className="h-4 w-4" />
+            <span className="hidden sm:inline">Team Seats</span>
           </TabsTrigger>
           <TabsTrigger value="leads" className="gap-2">
             <MapPin className="h-4 w-4" />
@@ -906,6 +1097,10 @@ export default function BrokerPortalPage() {
 
         <TabsContent value="overview">
           <OverviewTab />
+        </TabsContent>
+
+        <TabsContent value="seats">
+          <TeamSeatsTab />
         </TabsContent>
 
         <TabsContent value="leads">
