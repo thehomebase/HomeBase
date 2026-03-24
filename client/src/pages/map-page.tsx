@@ -649,11 +649,12 @@ export default function MapPage() {
       const cache = getCache();
       const clientsToGeocode: { client: typeof clients[0]; address: string }[] = [];
       
-      // First pass: use cached coordinates where available
       for (const client of clients) {
         const addressParts = [];
         if (client.street) addressParts.push(client.street);
+        else if ((client as any).address) addressParts.push((client as any).address);
         if (client.city) addressParts.push(client.city);
+        if (client.state) addressParts.push(client.state);
         if (client.zipCode) addressParts.push(client.zipCode);
         
         if (addressParts.length === 0) {
@@ -675,32 +676,32 @@ export default function MapPage() {
         }
       }
       
-      // Second pass: geocode uncached clients
       for (const { client, address } of clientsToGeocode) {
         const cacheKey = address.toLowerCase().trim();
         
         try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=us`,
-            { headers: { "Accept": "application/json" } }
-          );
-          const data = await response.json();
+          const response = await fetch("/api/geocode", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ address }),
+          });
           
-          if (data && data.length > 0) {
-            const lat = parseFloat(data[0].lat);
-            const lon = parseFloat(data[0].lon);
-            cache[cacheKey] = { lat, lon };
-            geocodedClients.push({
-              ...client,
-              latitude: lat,
-              longitude: lon
-            });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.lat && data.lon) {
+              cache[cacheKey] = { lat: data.lat, lon: data.lon };
+              geocodedClients.push({
+                ...client,
+                latitude: data.lat,
+                longitude: data.lon
+              });
+            } else {
+              geocodedClients.push(client);
+            }
           } else {
             geocodedClients.push(client);
           }
-          
-          // Rate limit to respect Nominatim usage policy
-          await new Promise(resolve => setTimeout(resolve, 200));
         } catch (error) {
           console.error("Failed to geocode client:", client.id, error);
           geocodedClients.push(client);
