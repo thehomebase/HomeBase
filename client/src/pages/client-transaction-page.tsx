@@ -883,12 +883,12 @@ export default function ClientTransactionPage() {
         </Card>
       )}
 
-      <a href="/compare-lenders" className="block">
-        <div className="flex items-center gap-3 p-4 rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors">
-          <DollarSign className="h-5 w-5 text-primary flex-shrink-0" />
+      <a href="/compare-lenders" className="block group">
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-md hover:shadow-lg hover:scale-[1.01] transition-all">
+          <DollarSign className="h-6 w-6 flex-shrink-0" />
           <div>
-            <p className="text-sm font-semibold">Compare Lender Rate Quotes</p>
-            <p className="text-xs text-muted-foreground">Get side-by-side preliminary rate quotes from multiple lenders</p>
+            <p className="text-sm font-bold">Compare Lender Rate Quotes</p>
+            <p className="text-xs opacity-80">Get side-by-side preliminary rate quotes from multiple lenders</p>
           </div>
         </div>
       </a>

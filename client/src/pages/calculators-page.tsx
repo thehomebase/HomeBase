@@ -283,11 +283,11 @@ function MortgageCalculator() {
             <ResultCard label="Total Cost" value={fmt(inputs.purchasePrice + totalInterest)} />
           </div>
 
-          <a href="/compare-lenders" className="block mt-4">
-            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center hover:bg-primary/15 transition-colors">
-              <Landmark className="h-5 w-5 mx-auto mb-1 text-primary" />
-              <p className="text-sm font-semibold text-primary">Get Real Rate Quotes from Lenders</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Compare preliminary rate quotes side-by-side</p>
+          <a href="/compare-lenders" className="block mt-4 group">
+            <div className="bg-gradient-to-r from-primary to-primary/80 rounded-lg p-4 text-center text-primary-foreground shadow-md hover:shadow-lg hover:scale-[1.02] transition-all">
+              <Landmark className="h-6 w-6 mx-auto mb-1.5" />
+              <p className="text-sm font-bold">Get Real Rate Quotes from Lenders</p>
+              <p className="text-xs opacity-80 mt-0.5">Compare preliminary rate quotes side-by-side</p>
             </div>
           </a>
         </div>
@@ -428,11 +428,11 @@ function AffordabilityCalculator() {
             <ResultCard label="Down Payment" value={fmt(inputs.downPaymentSaved)} sub={maxHomePrice > 0 ? `${(inputs.downPaymentSaved / maxHomePrice * 100).toFixed(1)}%` : ""} />
           </div>
 
-          <a href="/compare-lenders" className="block mt-4">
-            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center hover:bg-primary/15 transition-colors">
-              <Landmark className="h-5 w-5 mx-auto mb-1 text-primary" />
-              <p className="text-sm font-semibold text-primary">Get Real Rate Quotes from Lenders</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Compare preliminary rate quotes side-by-side</p>
+          <a href="/compare-lenders" className="block mt-4 group">
+            <div className="bg-gradient-to-r from-primary to-primary/80 rounded-lg p-4 text-center text-primary-foreground shadow-md hover:shadow-lg hover:scale-[1.02] transition-all">
+              <Landmark className="h-6 w-6 mx-auto mb-1.5" />
+              <p className="text-sm font-bold">Get Real Rate Quotes from Lenders</p>
+              <p className="text-xs opacity-80 mt-0.5">Compare preliminary rate quotes side-by-side</p>
             </div>
           </a>
         </div>
@@ -547,6 +547,14 @@ function RefinanceCalculator() {
           </div>
 
           <ResultCard label="Lifetime Savings (incl. closing costs)" value={(lifetimeSavings > 0 ? "+" : "") + fmt(lifetimeSavings)} dark={lifetimeSavings > 0} />
+
+          <a href="/compare-lenders" className="block mt-4 group">
+            <div className="bg-gradient-to-r from-primary to-primary/80 rounded-lg p-4 text-center text-primary-foreground shadow-md hover:shadow-lg hover:scale-[1.02] transition-all">
+              <Landmark className="h-6 w-6 mx-auto mb-1.5" />
+              <p className="text-sm font-bold">Get Real Rate Quotes from Lenders</p>
+              <p className="text-xs opacity-80 mt-0.5">Compare preliminary rate quotes side-by-side</p>
+            </div>
+          </a>
         </div>
       </div>
     </div>

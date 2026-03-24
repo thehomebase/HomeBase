@@ -835,6 +835,9 @@ function Router() {
       <Route path="/my-team">
         <ProtectedRoute path="/my-team" component={MyTeamPage} />
       </Route>
+      <Route path="/compare-lenders">
+        <ProtectedRoute path="/compare-lenders" component={LenderComparisonPage} />
+      </Route>
       <Route path="/scanner">
         <ProtectedRoute path="/scanner" component={DocumentScannerPage} />
       </Route>
@@ -902,9 +905,6 @@ function Router() {
           </Route>
           <Route path="/lender-portal">
             <ProtectedRoute path="/lender-portal" component={LenderPortal} />
-          </Route>
-          <Route path="/compare-lenders">
-            <ProtectedRoute path="/compare-lenders" component={LenderComparisonPage} />
           </Route>
           <Route path="/lender-transaction/:id">
             <ProtectedRoute path="/lender-transaction/:id" component={LenderTransactionPage} />
