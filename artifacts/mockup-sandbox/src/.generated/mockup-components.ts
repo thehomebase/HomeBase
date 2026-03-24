@@ -8,5 +8,9 @@ export const modules: ModuleMap = {
   "./components/mockups/landing-pages/Marketplace.tsx": () => import("../components/mockups/landing-pages/Marketplace.tsx"),
   "./components/mockups/landing-pages/MobileShowcase.tsx": () => import("../components/mockups/landing-pages/MobileShowcase.tsx"),
   "./components/mockups/landing-pages/Showcase.tsx": () => import("../components/mockups/landing-pages/Showcase.tsx"),
-  "./components/mockups/landing-pages/SleekEditorial.tsx": () => import("../components/mockups/landing-pages/SleekEditorial.tsx")
+  "./components/mockups/landing-pages/SleekEditorial.tsx": () => import("../components/mockups/landing-pages/SleekEditorial.tsx"),
+  "./components/mockups/mobile-nav/AppLauncher.tsx": () => import("../components/mockups/mobile-nav/AppLauncher.tsx"),
+  "./components/mockups/mobile-nav/FloatingMenu.tsx": () => import("../components/mockups/mobile-nav/FloatingMenu.tsx"),
+  "./components/mockups/mobile-nav/ScrollableDock.tsx": () => import("../components/mockups/mobile-nav/ScrollableDock.tsx"),
+  "./components/mockups/mobile-nav/SideDrawer.tsx": () => import("../components/mockups/mobile-nav/SideDrawer.tsx")
 };
