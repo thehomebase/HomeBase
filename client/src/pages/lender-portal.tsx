@@ -371,7 +371,7 @@ export default function LenderPortal() {
             </TabsTrigger>
             <TabsTrigger value="estimates" className="gap-1.5">
               <SendHorizonal className="h-4 w-4" />
-              Estimate Requests
+              Rate Quotes
             </TabsTrigger>
           </TabsList>
 
@@ -1107,7 +1107,7 @@ function LenderEstimateTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/lender/estimate-requests"] });
       setSelectedRequest(null);
-      toast({ title: "Estimate submitted successfully" });
+      toast({ title: "Rate quote submitted successfully" });
     },
     onError: (err: any) => {
       toast({ title: err?.message || "Failed to submit estimate", variant: "destructive" });
@@ -1183,7 +1183,7 @@ function LenderEstimateTab() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-lg">Service Areas</CardTitle>
-            <CardDescription>Zip codes where you'll receive estimate requests</CardDescription>
+            <CardDescription>Zip codes where you'll receive rate quote requests</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={() => setShowServiceAreas(!showServiceAreas)}>
             {showServiceAreas ? "Hide" : "Manage"}
@@ -1209,7 +1209,7 @@ function LenderEstimateTab() {
                 {[1,2,3].map(i => <Skeleton key={i} className="h-8 w-20" />)}
               </div>
             ) : (serviceAreas || []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">No service areas configured. Add zip codes to receive estimate requests.</p>
+              <p className="text-sm text-muted-foreground">No service areas configured. Add zip codes to receive rate quote requests.</p>
             ) : (
               <div className="flex gap-2 flex-wrap">
                 {(serviceAreas || []).map((area: any) => (
@@ -1228,8 +1228,8 @@ function LenderEstimateTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Pending Estimate Requests</CardTitle>
-          <CardDescription>Buyers looking for loan estimates in your service areas</CardDescription>
+          <CardTitle className="text-lg">Pending Rate Quote Requests</CardTitle>
+          <CardDescription>Buyers looking for rate quotes in your service areas</CardDescription>
         </CardHeader>
         <CardContent>
           {loadingRequests ? (
@@ -1240,7 +1240,7 @@ function LenderEstimateTab() {
             <div className="text-center py-8 text-muted-foreground">
               <Inbox className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p>No pending requests</p>
-              <p className="text-sm">Add service area zip codes to start receiving requests</p>
+              <p className="text-sm">Add service area zip codes to start receiving rate quote requests</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -1265,7 +1265,7 @@ function LenderEstimateTab() {
                   </div>
                   <Button size="sm" onClick={() => setSelectedRequest(req)}>
                     <SendHorizonal className="h-4 w-4 mr-1" />
-                    Submit Estimate
+                    Submit Quote
                   </Button>
                 </div>
               ))}
@@ -1277,7 +1277,7 @@ function LenderEstimateTab() {
       {respondedRequests.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Submitted Estimates</CardTitle>
+            <CardTitle className="text-lg">Submitted Rate Quotes</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -1398,7 +1398,7 @@ function EstimateSubmitDialog({
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Submit Loan Estimate</DialogTitle>
+          <DialogTitle>Submit Rate Quote</DialogTitle>
         </DialogHeader>
         <div className="bg-muted/50 rounded-lg p-3 mb-4 text-sm space-y-1">
           <div className="flex justify-between">
@@ -1419,6 +1419,9 @@ function EstimateSubmitDialog({
               <span className="font-medium">{request.creditScoreRange}</span>
             </div>
           )}
+          <p className="text-xs text-muted-foreground pt-2 border-t border-background/20">
+            This is a preliminary, non-binding rate quote — not an official CFPB Loan Estimate.
+          </p>
         </div>
 
         <Form {...estimateForm}>
@@ -1517,7 +1520,7 @@ function EstimateSubmitDialog({
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "Submitting..." : "Submit Estimate"}
+                {isPending ? "Submitting..." : "Submit Rate Quote"}
               </Button>
             </div>
           </form>

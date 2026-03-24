@@ -286,8 +286,8 @@ function MortgageCalculator() {
           <a href="/compare-lenders" className="block mt-4">
             <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center hover:bg-primary/15 transition-colors">
               <Landmark className="h-5 w-5 mx-auto mb-1 text-primary" />
-              <p className="text-sm font-semibold text-primary">Get Real Quotes from Lenders</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Compare actual loan estimates side-by-side</p>
+              <p className="text-sm font-semibold text-primary">Get Real Rate Quotes from Lenders</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Compare preliminary rate quotes side-by-side</p>
             </div>
           </a>
         </div>
@@ -431,8 +431,8 @@ function AffordabilityCalculator() {
           <a href="/compare-lenders" className="block mt-4">
             <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center hover:bg-primary/15 transition-colors">
               <Landmark className="h-5 w-5 mx-auto mb-1 text-primary" />
-              <p className="text-sm font-semibold text-primary">Get Real Quotes from Lenders</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Compare actual loan estimates side-by-side</p>
+              <p className="text-sm font-semibold text-primary">Get Real Rate Quotes from Lenders</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Compare preliminary rate quotes side-by-side</p>
             </div>
           </a>
         </div>

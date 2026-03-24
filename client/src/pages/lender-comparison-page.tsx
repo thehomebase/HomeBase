@@ -95,7 +95,7 @@ function RequestForm({ onSuccess }: { onSuccess: () => void }) {
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: "Estimate request created", description: `${data.notifiedLenders} lender(s) notified` });
+      toast({ title: "Rate quote request created", description: `${data.notifiedLenders} lender(s) notified` });
       queryClient.invalidateQueries({ queryKey: ["/api/estimate-requests"] });
       onSuccess();
     },
@@ -114,10 +114,10 @@ function RequestForm({ onSuccess }: { onSuccess: () => void }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Calculator className="h-5 w-5" />
-          Request Lender Estimates
+          Request Rate Quotes
         </CardTitle>
         <CardDescription>
-          Enter your property details and we'll connect you with up to 3 lenders for competitive quotes.
+          Enter your property details and we'll connect you with up to 3 lenders for preliminary rate quotes.
           Lender placement is influenced by subscription level, response rate, and ratings.
         </CardDescription>
       </CardHeader>
@@ -257,7 +257,7 @@ function RequestForm({ onSuccess }: { onSuccess: () => void }) {
             </div>
 
             <Button type="submit" className="w-full" size="lg" disabled={createMutation.isPending}>
-              {createMutation.isPending ? "Requesting..." : "Request Lender Estimates"}
+              {createMutation.isPending ? "Requesting..." : "Request Rate Quotes"}
             </Button>
           </form>
         </Form>
@@ -316,7 +316,7 @@ function ComparisonTable({ request }: { request: EstimateRequestWithEstimates })
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Manual estimate added" });
+      toast({ title: "Manual rate quote added" });
       setShowManualEntry(false);
       queryClient.invalidateQueries({ queryKey: ["/api/estimate-requests", request.id] });
     },
@@ -364,7 +364,7 @@ function ComparisonTable({ request }: { request: EstimateRequestWithEstimates })
             </div>
             <div className="flex gap-2">
               <Badge variant={request.status === "open" ? "default" : "secondary"}>
-                {request.status === "open" ? "Accepting Estimates" : "Closed"}
+                {request.status === "open" ? "Accepting Quotes" : "Closed"}
               </Badge>
               {request.status === "open" && (
                 <Button variant="outline" size="sm" onClick={() => closeMutation.mutate()}>
@@ -380,9 +380,9 @@ function ComparisonTable({ request }: { request: EstimateRequestWithEstimates })
         <Card>
           <CardContent className="py-12 text-center">
             <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Waiting for Estimates</h3>
+            <h3 className="text-lg font-semibold mb-2">Waiting for Rate Quotes</h3>
             <p className="text-muted-foreground mb-4">
-              Lenders have been notified. Estimates typically arrive within 1-24 hours.
+              Lenders have been notified. Rate quotes typically arrive within 1-24 hours.
             </p>
             {request.status === "open" && (
               <Button variant="outline" onClick={() => setShowManualEntry(true)}>
@@ -516,7 +516,7 @@ function ComparisonTable({ request }: { request: EstimateRequestWithEstimates })
       <Dialog open={showManualEntry} onOpenChange={setShowManualEntry}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add Your Lender's Estimate</DialogTitle>
+            <DialogTitle>Add Your Lender's Rate Quote</DialogTitle>
           </DialogHeader>
           <Form {...manualForm}>
             <form onSubmit={manualForm.handleSubmit(data => submitManualMutation.mutate(data))} className="space-y-4">
@@ -569,7 +569,7 @@ function ComparisonTable({ request }: { request: EstimateRequestWithEstimates })
 
               <DialogFooter>
                 <Button type="submit" disabled={submitManualMutation.isPending}>
-                  {submitManualMutation.isPending ? "Adding..." : "Add Estimate"}
+                  {submitManualMutation.isPending ? "Adding..." : "Add Quote"}
                 </Button>
               </DialogFooter>
             </form>
@@ -656,10 +656,14 @@ export default function LenderComparisonPage() {
   return (
     <div className="w-full px-4 sm:px-8 py-6 max-w-6xl mx-auto pb-24 md:pb-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-1">Compare Lender Estimates</h1>
+        <h1 className="text-2xl font-bold mb-1">Compare Lender Rate Quotes</h1>
         <p className="text-muted-foreground">
-          Get competitive quotes from multiple lenders and compare them side-by-side.
+          Get competitive rate quotes from multiple lenders and compare them side-by-side.
         </p>
+        <div className="mt-2 text-xs text-muted-foreground bg-muted/50 border rounded-md p-2.5">
+          <Info className="h-3 w-3 inline mr-1 -mt-0.5" />
+          These are preliminary, non-binding rate quotes — not official CFPB Loan Estimates. An official Loan Estimate is a standardized 3-page document lenders provide after you submit a full loan application. These quotes help you compare options before applying.
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -687,7 +691,7 @@ export default function LenderComparisonPage() {
               <CardContent className="py-12 text-center">
                 <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No Requests Yet</h3>
-                <p className="text-muted-foreground mb-4">Create your first estimate request to start comparing lenders.</p>
+                <p className="text-muted-foreground mb-4">Create your first rate quote request to start comparing lenders.</p>
                 <Button onClick={() => setActiveTab("new")}>
                   <Plus className="h-4 w-4 mr-2" />
                   New Request

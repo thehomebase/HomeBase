@@ -887,8 +887,8 @@ export default function ClientTransactionPage() {
         <div className="flex items-center gap-3 p-4 rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors">
           <DollarSign className="h-5 w-5 text-primary flex-shrink-0" />
           <div>
-            <p className="text-sm font-semibold">Compare Lender Estimates</p>
-            <p className="text-xs text-muted-foreground">Get side-by-side loan quotes from multiple lenders</p>
+            <p className="text-sm font-semibold">Compare Lender Rate Quotes</p>
+            <p className="text-xs text-muted-foreground">Get side-by-side preliminary rate quotes from multiple lenders</p>
           </div>
         </div>
       </a>
