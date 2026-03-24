@@ -703,9 +703,9 @@ export default function TransactionPage() {
                     {commissionEntry.status === "paid" ? "Paid" : "Pending"}
                   </Badge>
                 )}
-                {(commissionEntry?.commission_amount || commissionEntry?.commissionAmount) && (
+                {commissionEntry?.commissionAmount && (
                   <span className="text-sm text-muted-foreground ml-1">
-                    {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((commissionEntry.commission_amount ?? commissionEntry.commissionAmount) / 100)}
+                    {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(commissionEntry.commissionAmount / 100)}
                   </span>
                 )}
               </div>

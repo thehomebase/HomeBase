@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -253,7 +254,8 @@ function CommissionsTable({
                 <TableHead className="text-right">Rate</TableHead>
                 <TableHead className="text-right">Commission</TableHead>
                 <TableHead className="text-right">Brokerage Split</TableHead>
-                <TableHead className="text-right">Net Amount</TableHead>
+                <TableHead className="text-right">Expenses</TableHead>
+                <TableHead className="text-right">Net Profit</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -261,7 +263,7 @@ function CommissionsTable({
             <TableBody>
               {commissions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                     No commission entries yet
                   </TableCell>
                 </TableRow>
@@ -271,8 +273,10 @@ function CommissionsTable({
                   return (
                     <TableRow key={c.id} className={isProjected ? "opacity-80" : ""}>
                       <TableCell className="font-medium">
-                        <div>{c.street_name}</div>
-                        <div className="text-xs text-muted-foreground">{c.city}, {c.state}</div>
+                        <Link href={`/transactions/${c.transactionId}`} className="hover:underline text-primary">
+                          <div>{c.street_name}</div>
+                          <div className="text-xs text-muted-foreground">{c.city}, {c.state}</div>
+                        </Link>
                       </TableCell>
                       <TableCell>
                         {c.client_first_name && c.client_last_name
@@ -290,6 +294,11 @@ function CommissionsTable({
                       <TableCell className="text-right">{c.commissionRate}%</TableCell>
                       <TableCell className="text-right">{formatUSD(c.commissionAmount)}</TableCell>
                       <TableCell className="text-right">{c.brokerageSplitPercent}%</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {(c.expenses && c.expenses.length > 0)
+                          ? formatUSD(c.expenses.reduce((s: number, e: any) => s + (e.amount || 0), 0))
+                          : "—"}
+                      </TableCell>
                       <TableCell className="text-right font-medium">{formatUSD(netAmount(c))}</TableCell>
                       <TableCell>
                         {isProjected ? (
