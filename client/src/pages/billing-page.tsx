@@ -325,7 +325,26 @@ export default function BillingPage() {
           <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
             <Shield className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-800 dark:text-green-200">
-              Your subscription is covered by your broker{seatCheck.brokerName ? ` (${seatCheck.brokerName})` : ""}. You have full platform access at no cost to you.
+              <p className="font-medium mb-1">
+                Your subscription is covered by your broker{seatCheck.brokerName ? ` (${seatCheck.brokerName})` : ""}. You have full platform access at no cost to you.
+              </p>
+              {currentSub && (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2 pt-2 border-t border-green-200 dark:border-green-700">
+                  <p className="text-sm">
+                    You still have an active personal subscription. Since your broker is covering your access, you can cancel it to avoid being charged.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => portalMutation.mutate()}
+                    disabled={portalMutation.isPending}
+                    className="gap-1.5 shrink-0 border-green-300 text-green-800 hover:bg-green-100 dark:border-green-600 dark:text-green-200 dark:hover:bg-green-900"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    {portalMutation.isPending ? "Opening..." : "Cancel Personal Subscription"}
+                  </Button>
+                </div>
+              )}
             </AlertDescription>
           </Alert>
         </div>
