@@ -6390,7 +6390,22 @@ export class DatabaseStorage implements IStorage {
     const result = await db.execute(sql`
       SELECT * FROM commission_entries WHERE transaction_id = ${transactionId} AND agent_id = ${agentId} LIMIT 1
     `);
-    return result.rows[0] || null;
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      id: Number(row.id),
+      transactionId: Number(row.transaction_id),
+      agentId: Number(row.agent_id),
+      commissionRate: row.commission_rate,
+      commissionAmount: Number(row.commission_amount),
+      brokerageSplitPercent: row.brokerage_split_percent,
+      referralFeePercent: row.referral_fee_percent,
+      expenses: row.expenses,
+      notes: row.notes,
+      status: row.status,
+      paidDate: row.paid_date,
+      createdAt: row.created_at,
+    };
   }
 
   async updateCommissionEntry(id: number, data: any): Promise<any> {

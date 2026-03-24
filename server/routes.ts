@@ -12593,6 +12593,16 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/commissions/transaction/:transactionId", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const entry = await storage.getCommissionEntryByTransaction(Number(req.params.transactionId), req.user.id);
+      res.json(entry);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch commission" });
+    }
+  });
+
   app.get("/api/commissions/summary", async (req, res) => {
     if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
     try {

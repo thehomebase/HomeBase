@@ -162,29 +162,23 @@ export default function TransactionPage() {
   const { data: commissionEntry } = useQuery<any>({
     queryKey: ["/api/commissions/transaction", parsedId],
     queryFn: async () => {
-      const res = await fetch(`/api/commissions?transactionId=${parsedId}`);
+      const res = await fetch(`/api/commissions/transaction/${parsedId}`);
       if (!res.ok) return null;
-      const entries = await res.json();
-      return entries.find((e: any) => e.transaction_id === parsedId || e.transactionId === parsedId) || null;
+      return await res.json();
     },
     enabled: !!parsedId && isAgent,
   });
 
   useEffect(() => {
     if (commissionEntry) {
-      const rate = commissionEntry.commission_rate ?? commissionEntry.commissionRate;
-      const amount = commissionEntry.commission_amount ?? commissionEntry.commissionAmount;
-      const brokSplit = commissionEntry.brokerage_split_percent ?? commissionEntry.brokerageSplitPercent;
-      const refFee = commissionEntry.referral_fee_percent ?? commissionEntry.referralFeePercent;
-      const paidD = commissionEntry.paid_date ?? commissionEntry.paidDate;
       setCommissionForm({
-        commissionRate: rate?.toString() || "",
-        commissionAmount: amount ? String(amount / 100) : "",
-        brokerageSplitPercent: brokSplit?.toString() || "30",
-        referralFeePercent: refFee?.toString() || "0",
+        commissionRate: commissionEntry.commissionRate?.toString() || "",
+        commissionAmount: commissionEntry.commissionAmount ? String(commissionEntry.commissionAmount / 100) : "",
+        brokerageSplitPercent: commissionEntry.brokerageSplitPercent?.toString() || "30",
+        referralFeePercent: commissionEntry.referralFeePercent?.toString() || "0",
         notes: commissionEntry.notes || "",
         status: commissionEntry.status || "pending",
-        paidDate: paidD ? paidD.split("T")[0] : "",
+        paidDate: commissionEntry.paidDate ? commissionEntry.paidDate.split("T")[0] : "",
         expenses: (commissionEntry.expenses || []).map((e: any) => ({ ...e, amount: e.amount / 100 })),
       });
     }
