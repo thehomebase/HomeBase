@@ -314,24 +314,47 @@ export default function DataPage() {
       "Jan", "Feb", "Mar", "Apr", "May", "Jun",
       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
-    return allMonths.map((date, i) => {
+    const now = new Date();
+    const currentMonthIdx = now.getMonth();
+    let cumulativeEarnedNet = 0;
+    let cumulativeFullNet = 0;
+    let hasProjectedData = false;
+
+    const raw = allMonths.map((date, i) => {
       const m = commissionSummary.monthly.find(
         (cm: any) => cm.month === i + 1 && cm.year === currentYear
       );
-      const volume = Number(m?.volume || 0);
       const projectedAmt = (m?.projected || 0) / 100;
       const earnedAmt = ((m?.total || 0) - (m?.projected || 0)) / 100;
+      const netTotal = (m?.net_total || 0) / 100;
+      const netProjected = (m?.net_projected || 0) / 100;
+      const netEarned = netTotal - netProjected;
+      const isFutureMonth = i > currentMonthIdx;
+
+      cumulativeEarnedNet += netEarned;
+      cumulativeFullNet += netTotal;
+      if (projectedAmt > 0 || netProjected > 0) hasProjectedData = true;
+
       return {
         month: monthNames[i],
         earned: earnedAmt,
         projected: projectedAmt,
-        net: (m?.net_total || 0) / 100,
         deals: m?.deals || 0,
-        bench1: volume * 0.01,
-        bench2: volume * 0.02,
-        bench3: volume * 0.03,
+        cumulativeActual: isFutureMonth ? null : cumulativeEarnedNet,
+        cumulativeProjected: (isFutureMonth || netProjected > 0) ? cumulativeFullNet : null,
+        _isFuture: isFutureMonth,
+        _hasProjected: netProjected > 0,
       };
     });
+
+    if (hasProjectedData) {
+      const transitionIdx = raw.findIndex(r => r._hasProjected || r._isFuture);
+      if (transitionIdx > 0) {
+        raw[transitionIdx - 1].cumulativeProjected = raw[transitionIdx - 1].cumulativeActual;
+      }
+    }
+
+    return raw;
   }, [commissionSummary, currentYear, allMonths]);
 
   const isLoading = txLoading || clientsLoading || commLoading;
@@ -620,28 +643,20 @@ export default function DataPage() {
             <div className="flex items-center gap-3">
               <div className="flex flex-wrap gap-x-3 gap-y-1">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(142, 71%, 45%)" }} />
-                  <span className="text-[10px] text-muted-foreground">Gross</span>
+                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: "hsl(142, 71%, 45%)" }} />
+                  <span className="text-[10px] text-muted-foreground">Earned</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(142, 71%, 45%, 0.35)" }} />
+                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: "hsl(142, 71%, 45%, 0.35)" }} />
                   <span className="text-[10px] text-muted-foreground">Projected</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-3 h-0.5 rounded" style={{ backgroundColor: "hsl(217, 91%, 60%)" }} />
-                  <span className="text-[10px] text-muted-foreground">Net</span>
+                  <span className="text-[10px] text-muted-foreground">Cumulative Net</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-0.5 rounded border-dashed border-t-2" style={{ borderColor: "#f59e0b" }} />
-                  <span className="text-[10px] text-muted-foreground">1%</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-0.5 rounded border-dashed border-t-2" style={{ borderColor: "#f97316" }} />
-                  <span className="text-[10px] text-muted-foreground">2%</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-0.5 rounded border-dashed border-t-2" style={{ borderColor: "#ef4444" }} />
-                  <span className="text-[10px] text-muted-foreground">3%</span>
+                  <div className="w-3 h-0.5 rounded border-dashed border-t-2" style={{ borderColor: "hsl(217, 91%, 60%)" }} />
+                  <span className="text-[10px] text-muted-foreground">+ Projected</span>
                 </div>
               </div>
               {commissionSummary && commissionSummary.ytd_pending > 0 && (
@@ -652,16 +667,20 @@ export default function DataPage() {
               )}
             </div>
           </div>
-          <div className="h-[260px] w-full">
+          <div className="h-[280px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
                 data={commissionChartData}
                 margin={{ top: 5, right: 5, bottom: 0, left: -10 }}
               >
                 <defs>
-                  <linearGradient id="commGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0} />
+                  <linearGradient id="cumNetGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.18} />
+                    <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="cumProjectedGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.08} />
+                    <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis
@@ -672,10 +691,20 @@ export default function DataPage() {
                   tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                 />
                 <YAxis
+                  yAxisId="left"
                   tickFormatter={formatCurrency}
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  width={55}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tickFormatter={formatCurrency}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(217, 91%, 60%)" }}
                   width={55}
                 />
                 <RechartsTooltip
@@ -686,67 +715,57 @@ export default function DataPage() {
                     fontSize: "12px",
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
-                  formatter={(value: number, name: string) => {
+                  formatter={(value: number | null, name: string) => {
+                    if (value === null) return ["-", name];
                     if (name === "deals") return [value, "Deals"];
-                    const labels: Record<string, string> = { earned: "Gross Commission", projected: "Projected", net: "Net Income", bench1: "1% Benchmark", bench2: "2% Benchmark", bench3: "3% Benchmark" };
+                    const labels: Record<string, string> = {
+                      earned: "Monthly Earned",
+                      projected: "Monthly Projected",
+                      cumulativeActual: "Cumulative Net",
+                      cumulativeProjected: "Cumulative + Projected",
+                    };
                     return [formatFullCurrency(value), labels[name] || name];
                   }}
                 />
                 <Area
+                  yAxisId="right"
                   type="monotone"
-                  dataKey="earned"
-                  stroke="hsl(142, 71%, 45%)"
-                  strokeWidth={2}
-                  fill="url(#commGradient)"
-                  name="earned"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="projected"
-                  stroke="hsl(142, 71%, 45%)"
+                  dataKey="cumulativeProjected"
+                  stroke="hsl(217, 91%, 60%)"
                   strokeWidth={1.5}
                   strokeDasharray="5 3"
-                  fill="hsl(142, 71%, 45%)"
-                  fillOpacity={0.08}
-                  name="projected"
+                  fill="url(#cumProjectedGradient)"
+                  name="cumulativeProjected"
+                  connectNulls
                 />
-                <Line
+                <Area
+                  yAxisId="right"
                   type="monotone"
-                  dataKey="net"
+                  dataKey="cumulativeActual"
                   stroke="hsl(217, 91%, 60%)"
                   strokeWidth={2}
-                  dot={{ r: 3, fill: "hsl(217, 91%, 60%)" }}
-                  name="net"
+                  fill="url(#cumNetGradient)"
+                  name="cumulativeActual"
+                  connectNulls
                 />
-                <Line
-                  type="monotone"
-                  dataKey="bench1"
-                  stroke="#f59e0b"
-                  strokeWidth={1}
-                  strokeDasharray="6 3"
-                  dot={false}
-                  name="bench1"
-                  opacity={0.5}
+                <Bar
+                  yAxisId="left"
+                  dataKey="earned"
+                  fill="hsl(142, 71%, 45%)"
+                  radius={[3, 3, 0, 0]}
+                  name="earned"
+                  stackId="monthly"
+                  barSize={18}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="bench2"
-                  stroke="#f97316"
-                  strokeWidth={1}
-                  strokeDasharray="6 3"
-                  dot={false}
-                  name="bench2"
-                  opacity={0.5}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="bench3"
-                  stroke="#ef4444"
-                  strokeWidth={1}
-                  strokeDasharray="6 3"
-                  dot={false}
-                  name="bench3"
-                  opacity={0.5}
+                <Bar
+                  yAxisId="left"
+                  dataKey="projected"
+                  fill="hsl(142, 71%, 45%)"
+                  fillOpacity={0.3}
+                  radius={[3, 3, 0, 0]}
+                  name="projected"
+                  stackId="monthly"
+                  barSize={18}
                 />
               </ComposedChart>
             </ResponsiveContainer>

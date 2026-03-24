@@ -6419,7 +6419,16 @@ export class DatabaseStorage implements IStorage {
           )
         ), 0)::int as net_total,
         COALESCE(SUM(t.contract_price), 0)::bigint as volume,
-        COALESCE(SUM(CASE WHEN t.closing_date > NOW() THEN ce.commission_amount ELSE 0 END), 0)::int as projected
+        COALESCE(SUM(CASE WHEN t.closing_date > NOW() THEN ce.commission_amount ELSE 0 END), 0)::int as projected,
+        COALESCE(SUM(
+          CASE WHEN t.closing_date > NOW() THEN
+            GREATEST(0,
+              ce.commission_amount
+              * (1.0 - COALESCE(ce.brokerage_split_percent, 0) / 100.0)
+              * (1.0 - COALESCE(ce.referral_fee_percent, 0) / 100.0)
+            )
+          ELSE 0 END
+        ), 0)::int as net_projected
       FROM commission_entries ce
       JOIN transactions t ON ce.transaction_id = t.id
       WHERE ce.agent_id = ${agentId} AND EXTRACT(YEAR FROM COALESCE(t.closing_date, ce.created_at)) = EXTRACT(YEAR FROM NOW())
