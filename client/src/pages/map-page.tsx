@@ -621,7 +621,10 @@ export default function MapPage() {
     }
   }, [transactionsWithCoords.length, viewingsWithCoords.length]);
 
-  // Geocode clients when switching to clients filter - with caching
+  const clientAddressFingerprint = clients.map(c => 
+    `${c.id}:${c.street || (c as any).address || ''}:${c.city || ''}:${c.state || ''}:${c.zipCode || ''}`
+  ).join('|');
+
   useEffect(() => {
     if (mapDisplayFilter !== "clients" || !isAgent || clients.length === 0) return;
     
@@ -639,9 +642,7 @@ export default function MapPage() {
     const saveCache = (cache: Record<string, { lat: number; lon: number }>) => {
       try {
         localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-      } catch {
-        // Ignore cache save errors
-      }
+      } catch {}
     };
     
     const geocodeClients = async () => {
@@ -664,7 +665,7 @@ export default function MapPage() {
         }
         
         const fullAddress = addressParts.join(", ");
-        const cacheKey = fullAddress.toLowerCase().trim();
+        const cacheKey = `${client.id}:${fullAddress}`.toLowerCase().trim();
         
         if (cache[cacheKey]) {
           geocodedClients.push({
@@ -690,7 +691,7 @@ export default function MapPage() {
           if (response.ok) {
             const batchResults = await response.json() as Record<string, { lat: number; lon: number }>;
             for (const { client, address } of clientsToGeocode) {
-              const cacheKey = address.toLowerCase().trim();
+              const cacheKey = `${client.id}:${address}`.toLowerCase().trim();
               const coords = batchResults[address];
               if (coords) {
                 cache[cacheKey] = coords;
@@ -708,13 +709,11 @@ export default function MapPage() {
         }
       }
       
-      // Save updated cache
       saveCache(cache);
       
       setClientsWithCoords(geocodedClients);
       setIsGeocodingClients(false);
       
-      // Center map on first client with coordinates
       const firstWithCoords = geocodedClients.find(c => c.latitude && c.longitude);
       if (firstWithCoords && firstWithCoords.latitude && firstWithCoords.longitude) {
         setMapCenter([firstWithCoords.latitude, firstWithCoords.longitude]);
@@ -723,7 +722,7 @@ export default function MapPage() {
     };
     
     geocodeClients();
-  }, [mapDisplayFilter, clients, isAgent]);
+  }, [mapDisplayFilter, clientAddressFingerprint, isAgent]);
 
   const clientsWithValidCoords = clientsWithCoords.filter(c => c.latitude && c.longitude);
 
