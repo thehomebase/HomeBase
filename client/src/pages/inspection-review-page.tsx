@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -19,7 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import {
   ArrowLeft, Upload, FileText, Plus, Trash2, Save, Send,
   AlertTriangle, CheckCircle2, Circle, ShieldAlert, Loader2, Eye, BookOpen,
-  Bot, Sparkles, Shield, RotateCcw
+  Bot, Sparkles, Shield, RotateCcw, ChevronDown, ChevronRight, Image
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -43,9 +43,14 @@ const SEVERITIES = [
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
+  pending_review: "Pending",
   approved: "Approved",
   rejected: "Rejected",
   repaired: "Repaired",
+  sent_for_bids: "Sent for Bids",
+  bids_received: "Bids Received",
+  accepted: "Accepted",
+  declined: "Declined",
 };
 
 type ParsedItem = {
@@ -82,6 +87,20 @@ function SeverityBadge({ severity }: { severity: string }) {
   );
 }
 
+function getCategoryLabel(val: string) {
+  return CATEGORIES.find(c => c.value === val)?.label || val;
+}
+
+function groupByCategory<T extends { category: string }>(items: T[]): Record<string, T[]> {
+  const groups: Record<string, T[]> = {};
+  for (const item of items) {
+    const cat = item.category || "other";
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(item);
+  }
+  return groups;
+}
+
 export default function InspectionReviewPage() {
   const { id } = useParams<{ id: string }>();
   const transactionId = Number(id);
@@ -97,6 +116,9 @@ export default function InspectionReviewPage() {
   const [manualItem, setManualItem] = useState({ category: "other", description: "", severity: "moderate", location: "" });
   const [pdfViewerPage, setPdfViewerPage] = useState<number | null>(null);
   const [aiUsedForParse, setAiUsedForParse] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const { data: transaction } = useQuery<Transaction>({
     queryKey: ["/api/transactions", transactionId],
@@ -279,6 +301,33 @@ export default function InspectionReviewPage() {
     });
   };
 
+  const toggleCategory = (cat: string) => {
+    setCollapsedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  const openPageViewer = (page: number) => {
+    setImageLoading(true);
+    setImageError(false);
+    setPdfViewerPage(page);
+  };
+
+  const parsedByCategory = useMemo(() => groupByCategory(parsedItems), [parsedItems]);
+  const savedByCategory = useMemo(() => groupByCategory(savedItems), [savedItems]);
+
+  const sortedParsedCategories = useMemo(() =>
+    Object.keys(parsedByCategory).sort((a, b) => getCategoryLabel(a).localeCompare(getCategoryLabel(b))),
+    [parsedByCategory]
+  );
+  const sortedSavedCategories = useMemo(() =>
+    Object.keys(savedByCategory).sort((a, b) => getCategoryLabel(a).localeCompare(getCategoryLabel(b))),
+    [savedByCategory]
+  );
+
   if (!user) return null;
 
   return (
@@ -346,45 +395,80 @@ export default function InspectionReviewPage() {
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {parsedItems.map((item, idx) => (
-              <div key={idx} className="flex items-start gap-3 p-3 border rounded-lg">
-                <Checkbox
-                  checked={item.selected}
-                  onCheckedChange={() => {
-                    const updated = [...parsedItems];
-                    updated[idx] = { ...updated[idx], selected: !updated[idx].selected };
-                    setParsedItems(updated);
-                  }}
-                  className="mt-0.5"
-                />
-                <SeverityIcon severity={item.severity} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm leading-relaxed">{item.description}</p>
-                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                    <Badge variant="secondary" className="text-xs">
-                      {CATEGORIES.find(c => c.value === item.category)?.label || item.category}
-                    </Badge>
-                    <SeverityBadge severity={item.severity} />
-                    {item.location && (
-                      <Badge variant="outline" className="text-xs font-normal text-muted-foreground">{item.location}</Badge>
-                    )}
-                    {item.hasPhoto && (
-                      <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
-                        <Eye className="h-3 w-3 mr-1" />
-                        Photo
-                      </Badge>
-                    )}
-                    {item.pageNumber && (
-                      <Badge variant="outline" className="text-xs font-normal">
-                        <BookOpen className="h-3 w-3 mr-1" />
-                        Page {item.pageNumber}
-                      </Badge>
-                    )}
-                  </div>
+          <CardContent className="space-y-4">
+            {sortedParsedCategories.map(cat => {
+              const items = parsedByCategory[cat];
+              const isCollapsed = collapsedCategories.has(`parsed-${cat}`);
+              return (
+                <div key={cat} className="border rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors touch-manipulation"
+                    onClick={() => toggleCategory(`parsed-${cat}`)}
+                  >
+                    <div className="flex items-center gap-2">
+                      {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      <span className="font-semibold text-sm">{getCategoryLabel(cat)}</span>
+                      <Badge variant="secondary" className="text-xs">{items.length}</Badge>
+                    </div>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="divide-y">
+                      {items.map((item) => {
+                        const idx = parsedItems.indexOf(item);
+                        return (
+                          <div key={idx} className="p-3 space-y-2">
+                            <div className="flex items-start gap-3">
+                              <Checkbox
+                                checked={item.selected}
+                                onCheckedChange={() => {
+                                  const updated = [...parsedItems];
+                                  updated[idx] = { ...updated[idx], selected: !updated[idx].selected };
+                                  setParsedItems(updated);
+                                }}
+                                className="mt-0.5 shrink-0"
+                              />
+                              <SeverityIcon severity={item.severity} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm leading-relaxed">{item.description}</p>
+                                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                  <SeverityBadge severity={item.severity} />
+                                  {item.location && (
+                                    <Badge variant="outline" className="text-xs font-normal text-muted-foreground">{item.location}</Badge>
+                                  )}
+                                  {item.hasPhoto && (
+                                    <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      Photo
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            {item.pageNumber && (
+                              <div className="pl-10">
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-2 px-3 py-2.5 rounded-md border text-sm font-medium bg-primary/5 hover:bg-primary/10 active:bg-primary/15 border-primary/20 text-primary transition-colors touch-manipulation"
+                                  onClick={() => openPageViewer(item.pageNumber!)}
+                                >
+                                  {item.hasPhoto ? (
+                                    <Image className="h-4 w-4" />
+                                  ) : (
+                                    <BookOpen className="h-4 w-4" />
+                                  )}
+                                  {item.hasPhoto ? `View Photo — Page ${item.pageNumber}` : `View Page ${item.pageNumber}`}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
             <Separator />
             <div className="flex justify-between items-center">
               <Button variant="ghost" onClick={() => setParsedItems([])}>
@@ -462,128 +546,142 @@ export default function InspectionReviewPage() {
               <p className="text-sm">Upload an inspection report or add items manually.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {savedItems.map((item) => (
-                <div key={item.id} className="border rounded-lg hover:bg-muted/30 transition-colors overflow-hidden">
-                  <div className="p-4 space-y-2.5">
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        checked={selectedSavedItems.has(item.id)}
-                        onCheckedChange={() => toggleSavedItem(item.id)}
-                        className="mt-0.5 shrink-0"
-                        disabled={item.status !== "approved"}
-                      />
-                      <SeverityIcon severity={item.severity} />
-                      <p className="text-sm leading-relaxed flex-1">{item.description}</p>
-                    </div>
+            <div className="space-y-4">
+              {sortedSavedCategories.map(cat => {
+                const items = savedByCategory[cat];
+                const isCollapsed = collapsedCategories.has(`saved-${cat}`);
+                return (
+                  <div key={cat} className="border rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors touch-manipulation"
+                      onClick={() => toggleCategory(`saved-${cat}`)}
+                    >
+                      <div className="flex items-center gap-2">
+                        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        <span className="font-semibold text-sm">{getCategoryLabel(cat)}</span>
+                        <Badge variant="secondary" className="text-xs">{items.length}</Badge>
+                      </div>
+                    </button>
+                    {!isCollapsed && (
+                      <div className="divide-y">
+                        {items.map((item) => (
+                          <div key={item.id} className="hover:bg-muted/20 transition-colors">
+                            <div className="p-4 space-y-2.5">
+                              <div className="flex items-start gap-3">
+                                <Checkbox
+                                  checked={selectedSavedItems.has(item.id)}
+                                  onCheckedChange={() => toggleSavedItem(item.id)}
+                                  className="mt-0.5 shrink-0"
+                                  disabled={item.status !== "approved"}
+                                />
+                                <SeverityIcon severity={item.severity} />
+                                <p className="text-sm leading-relaxed flex-1">{item.description}</p>
+                              </div>
 
-                    <div className="flex items-center gap-1.5 flex-wrap pl-10">
-                      <Badge variant="secondary" className="text-xs">
-                        {CATEGORIES.find(c => c.value === item.category)?.label || item.category}
-                      </Badge>
-                      <SeverityBadge severity={item.severity} />
-                      <Badge variant="outline" className="text-xs">{STATUS_LABELS[item.status] || item.status}</Badge>
-                      {item.location && (
-                        <Badge variant="outline" className="text-xs font-normal text-muted-foreground">{item.location}</Badge>
-                      )}
-                    </div>
+                              <div className="flex items-center gap-1.5 flex-wrap pl-10">
+                                <SeverityBadge severity={item.severity} />
+                                <Badge variant="outline" className="text-xs">{STATUS_LABELS[item.status] || item.status}</Badge>
+                                {item.location && (
+                                  <Badge variant="outline" className="text-xs font-normal text-muted-foreground">{item.location}</Badge>
+                                )}
+                              </div>
 
-                    {item.pageNumber && (
-                      <button
-                        type="button"
-                        className="flex items-center gap-2 ml-10 mt-1 px-3 py-2 rounded-md border text-xs font-medium bg-muted/50 hover:bg-muted active:bg-muted transition-colors touch-manipulation"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPdfViewerPage(item.pageNumber!);
-                        }}
-                      >
-                        {(item as any).hasPhoto ? (
-                          <>
-                            <Eye className="h-4 w-4 text-blue-600" />
-                            <span>View Photo — Page {item.pageNumber}</span>
-                          </>
-                        ) : (
-                          <>
-                            <BookOpen className="h-4 w-4 text-muted-foreground" />
-                            <span>View Page {item.pageNumber}</span>
-                          </>
-                        )}
-                      </button>
-                    )}
+                              {item.pageNumber && (
+                                <div className="pl-10">
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center gap-2 px-3 py-2.5 rounded-md border text-sm font-medium bg-primary/5 hover:bg-primary/10 active:bg-primary/15 border-primary/20 text-primary transition-colors touch-manipulation"
+                                    onClick={() => openPageViewer(item.pageNumber!)}
+                                  >
+                                    {(item as any).hasPhoto ? (
+                                      <Image className="h-4 w-4" />
+                                    ) : (
+                                      <BookOpen className="h-4 w-4" />
+                                    )}
+                                    {(item as any).hasPhoto ? `View Photo — Page ${item.pageNumber}` : `View Page ${item.pageNumber}`}
+                                  </button>
+                                </div>
+                              )}
 
-                    {item.notes && (
-                      <p className="text-sm text-muted-foreground pl-10">{item.notes}</p>
-                    )}
+                              {item.notes && (
+                                <p className="text-sm text-muted-foreground pl-10">{item.notes}</p>
+                              )}
 
-                    {(item as any).repairRequested && (
-                      <div className="flex items-center gap-2 ml-10 p-2 rounded bg-muted/50 border flex-wrap">
-                        <span className="text-xs text-muted-foreground">Repair Status:</span>
-                        <Select
-                          value={(item as any).repairStatus || 'requested'}
-                          onValueChange={async (val) => {
-                            try {
-                              await apiRequest("PATCH", `/api/inspection-items/${item.id}/repair-status`, {
-                                repairStatus: val,
-                              });
-                              queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
-                              toast({ title: "Repair status updated" });
-                            } catch {
-                              toast({ title: "Failed to update", variant: "destructive" });
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="h-7 w-[140px] text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="requested">Requested</SelectItem>
-                            <SelectItem value="agreed">Seller Agreed</SelectItem>
-                            <SelectItem value="denied">Seller Denied</SelectItem>
-                            <SelectItem value="credit_offered">Credit Offered</SelectItem>
-                            <SelectItem value="resolved">Resolved</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {(item as any).repairStatus === 'credit_offered' && (
-                          <Input
-                            type="number"
-                            placeholder="Credit $"
-                            className="h-7 w-24 text-xs"
-                            defaultValue={(item as any).creditAmount || ''}
-                            onBlur={async (e) => {
-                              if (e.target.value) {
-                                try {
-                                  await apiRequest("PATCH", `/api/inspection-items/${item.id}/repair-status`, {
-                                    creditAmount: Number(e.target.value),
-                                  });
-                                  queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
-                                } catch {}
-                              }
-                            }}
-                          />
-                        )}
+                              {(item as any).repairRequested && (
+                                <div className="flex items-center gap-2 ml-10 p-2 rounded bg-muted/50 border flex-wrap">
+                                  <span className="text-xs text-muted-foreground">Repair Status:</span>
+                                  <Select
+                                    value={(item as any).repairStatus || 'requested'}
+                                    onValueChange={async (val) => {
+                                      try {
+                                        await apiRequest("PATCH", `/api/inspection-items/${item.id}/repair-status`, {
+                                          repairStatus: val,
+                                        });
+                                        queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
+                                        toast({ title: "Repair status updated" });
+                                      } catch {
+                                        toast({ title: "Failed to update", variant: "destructive" });
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-7 w-[140px] text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="requested">Requested</SelectItem>
+                                      <SelectItem value="agreed">Seller Agreed</SelectItem>
+                                      <SelectItem value="denied">Seller Denied</SelectItem>
+                                      <SelectItem value="credit_offered">Credit Offered</SelectItem>
+                                      <SelectItem value="resolved">Resolved</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {(item as any).repairStatus === 'credit_offered' && (
+                                    <Input
+                                      type="number"
+                                      placeholder="Credit $"
+                                      className="h-7 w-24 text-xs"
+                                      defaultValue={(item as any).creditAmount || ''}
+                                      onBlur={async (e) => {
+                                        if (e.target.value) {
+                                          try {
+                                            await apiRequest("PATCH", `/api/inspection-items/${item.id}/repair-status`, {
+                                              creditAmount: Number(e.target.value),
+                                            });
+                                            queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
+                                          } catch {}
+                                        }
+                                      }}
+                                    />
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 px-4 py-2 bg-muted/30 border-t">
+                              {item.status === "approved" && (
+                                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleSendBids(item)}>
+                                  <Send className="h-3 w-3 mr-1" />
+                                  Send for Bids
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-destructive hover:text-destructive"
+                                onClick={() => deleteItemMutation.mutate(item.id)}
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
-
-                  <div className="flex items-center justify-end gap-2 px-4 py-2 bg-muted/30 border-t">
-                    {item.status === "approved" && (
-                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleSendBids(item)}>
-                        <Send className="h-3 w-3 mr-1" />
-                        Send for Bids
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs text-destructive hover:text-destructive"
-                      onClick={() => deleteItemMutation.mutate(item.id)}
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -661,7 +759,7 @@ export default function InspectionReviewPage() {
                 <p className="font-medium text-sm">{vendorDialogItem.description}</p>
                 <div className="flex gap-2 mt-2">
                   <Badge variant="secondary" className="text-xs">
-                    {CATEGORIES.find(c => c.value === vendorDialogItem.category)?.label || vendorDialogItem.category}
+                    {getCategoryLabel(vendorDialogItem.category)}
                   </Badge>
                   <SeverityBadge severity={vendorDialogItem.severity} />
                 </div>
@@ -689,7 +787,7 @@ export default function InspectionReviewPage() {
                         <div>
                           <p className="text-sm font-medium">{v.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {CATEGORIES.find(c => c.value === v.category)?.label || v.category}
+                            {getCategoryLabel(v.category)}
                             {v.phone ? ` · ${v.phone}` : ""}
                           </p>
                         </div>
@@ -714,7 +812,7 @@ export default function InspectionReviewPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={pdfViewerPage !== null} onOpenChange={() => setPdfViewerPage(null)}>
+      <Dialog open={pdfViewerPage !== null} onOpenChange={() => { setPdfViewerPage(null); setImageLoading(false); setImageError(false); }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
@@ -722,27 +820,33 @@ export default function InspectionReviewPage() {
               Page {pdfViewerPage}
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-auto -mx-4 sm:-mx-6 px-4 sm:px-6">
+          <div className="flex-1 overflow-auto">
             {pdfViewerPage && (
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center justify-center bg-muted/30 rounded-lg" id={`loader-${pdfViewerPage}`}>
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-                <img
-                  key={`page-${pdfViewerPage}`}
-                  src={`/api/transactions/${transactionId}/inspection-pdf?page=${pdfViewerPage}&format=image&t=${Date.now()}`}
-                  alt={`Inspection Report Page ${pdfViewerPage}`}
-                  className="w-full h-auto rounded-lg border relative z-10"
-                  loading="eager"
-                  onLoad={(e) => {
-                    const loader = document.getElementById(`loader-${pdfViewerPage}`);
-                    if (loader) loader.style.display = 'none';
-                  }}
-                  onError={(e) => {
-                    const loader = document.getElementById(`loader-${pdfViewerPage}`);
-                    if (loader) loader.innerHTML = '<p class="text-sm text-muted-foreground">Unable to load page image</p>';
-                  }}
-                />
+              <div className="relative min-h-[200px]">
+                {imageLoading && !imageError && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-muted/30 rounded-lg z-20">
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <p className="text-sm text-muted-foreground">Rendering page...</p>
+                    </div>
+                  </div>
+                )}
+                {imageError ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <FileText className="h-12 w-12 mb-3 opacity-50" />
+                    <p className="font-medium">Unable to load page image</p>
+                    <p className="text-sm mt-1">The PDF page could not be rendered.</p>
+                  </div>
+                ) : (
+                  <img
+                    key={`page-img-${pdfViewerPage}`}
+                    src={`/api/transactions/${transactionId}/inspection-pdf?page=${pdfViewerPage}&format=image&t=${Date.now()}`}
+                    alt={`Inspection Report Page ${pdfViewerPage}`}
+                    className="w-full h-auto rounded-lg border"
+                    onLoad={() => setImageLoading(false)}
+                    onError={() => { setImageLoading(false); setImageError(true); }}
+                  />
+                )}
               </div>
             )}
           </div>
