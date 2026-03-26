@@ -19,10 +19,12 @@ export const pool = new Pool({
   max: 20
 });
 
-// Add error handler for the pool
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+pool.on('error', (err: any) => {
+  if (err?.code === '57P01') {
+    console.error('[DB] Neon connection terminated by server (normal for serverless) — pool will reconnect automatically');
+    return;
+  }
+  console.error('[DB] Unexpected pool error (non-fatal):', err?.message || err);
 });
 
 export const db = drizzle(pool, { schema });
