@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Calculator, Home, RefreshCw, DollarSign, TrendingUp, BookOpen, Mail, Check, X, ChevronDown, ChevronUp, Building2, Shield, Star, Landmark, Banknote, HelpCircle, Users, Plus, Pencil, Trash2, Phone, AtSign, Camera, User } from "lucide-react";
+import { Calculator, Home, RefreshCw, DollarSign, TrendingUp, BookOpen, Mail, Check, X, ChevronDown, ChevronUp, Building2, Shield, Star, Landmark, Banknote, HelpCircle, Users, Plus, Pencil, Trash2, Phone, AtSign, Camera, User, FileText, AlertTriangle, Printer } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -1308,6 +1309,9 @@ export default function CalculatorsPage() {
           <TabsTrigger value="lenders" className="flex-1 min-w-fit gap-1.5 text-xs sm:text-sm h-9">
             <Users className="h-3.5 w-3.5 hidden sm:inline" /> Lenders
           </TabsTrigger>
+          <TabsTrigger value="netsheet" className="flex-1 min-w-fit gap-1.5 text-xs sm:text-sm h-9">
+            <FileText className="h-3.5 w-3.5 hidden sm:inline" /> Net Sheet
+          </TabsTrigger>
         </TabsList>
 
         <div className="mt-6">
@@ -1317,8 +1321,256 @@ export default function CalculatorsPage() {
           <TabsContent value="rent"><RentVsBuyCalculator /></TabsContent>
           <TabsContent value="guide"><FinancingGuide /></TabsContent>
           <TabsContent value="lenders"><LenderComparison /></TabsContent>
+          <TabsContent value="netsheet"><NetSheetCalculator /></TabsContent>
         </div>
       </Tabs>
+    </div>
+  );
+}
+
+function NetSheetCalculator() {
+  const [mode, setMode] = useState<'seller' | 'buyer'>('seller');
+  const { toast } = useToast();
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const [seller, setSeller] = useState({
+    salePrice: 350000,
+    listingCommission: 3,
+    buyerAgentCommission: 3,
+    titlePolicy: 2100,
+    escrowFees: 500,
+    existingMortgage: 200000,
+    taxProration: 583,
+    hoaProration: 0,
+    repairCredits: 0,
+    homeWarranty: 500,
+    sellerConcessions: 0,
+    miscFees: 250,
+  });
+
+  const [buyer, setBuyer] = useState({
+    purchasePrice: 350000,
+    downPaymentPct: 20,
+    closingCostPct: 2.5,
+    prepaidPct: 1.5,
+    earnestMoney: 5000,
+    optionFee: 250,
+    inspectionCost: 500,
+    appraisalCost: 500,
+    homeInsurance: 1400,
+    titleInsurance: 1750,
+    surveyFee: 500,
+    otherFees: 0,
+  });
+
+  const sellerCalc = useMemo(() => {
+    const s = seller;
+    const listComm = Math.round(s.salePrice * s.listingCommission / 100);
+    const buyComm = Math.round(s.salePrice * s.buyerAgentCommission / 100);
+    const totalDeductions = listComm + buyComm + s.titlePolicy + s.escrowFees + s.existingMortgage +
+      s.taxProration + s.hoaProration + s.repairCredits + s.homeWarranty + s.sellerConcessions + s.miscFees;
+    const netProceeds = s.salePrice - totalDeductions;
+    return {
+      lines: [
+        { label: "Sale Price", amount: s.salePrice, type: 'credit' as const },
+        { label: `Listing Commission (${s.listingCommission}%)`, amount: -listComm, type: 'debit' as const },
+        { label: `Buyer Agent Commission (${s.buyerAgentCommission}%)`, amount: -buyComm, type: 'debit' as const },
+        { label: "Title Policy", amount: -s.titlePolicy, type: 'debit' as const },
+        { label: "Escrow / Closing Fees", amount: -s.escrowFees, type: 'debit' as const },
+        { label: "Existing Mortgage Payoff", amount: -s.existingMortgage, type: 'debit' as const },
+        { label: "Property Tax Proration", amount: -s.taxProration, type: 'debit' as const },
+        { label: "HOA Proration", amount: -s.hoaProration, type: 'debit' as const },
+        { label: "Repair Credits", amount: -s.repairCredits, type: 'debit' as const },
+        { label: "Home Warranty", amount: -s.homeWarranty, type: 'debit' as const },
+        { label: "Seller Concessions", amount: -s.sellerConcessions, type: 'debit' as const },
+        { label: "Miscellaneous Fees", amount: -s.miscFees, type: 'debit' as const },
+      ],
+      net: netProceeds,
+    };
+  }, [seller]);
+
+  const buyerCalc = useMemo(() => {
+    const b = buyer;
+    const downPayment = Math.round(b.purchasePrice * b.downPaymentPct / 100);
+    const loanAmount = b.purchasePrice - downPayment;
+    const closingCosts = Math.round(b.purchasePrice * b.closingCostPct / 100);
+    const prepaids = Math.round(b.purchasePrice * b.prepaidPct / 100);
+    const totalNeeded = downPayment + closingCosts + prepaids + b.inspectionCost + b.appraisalCost +
+      b.homeInsurance + b.titleInsurance + b.surveyFee + b.otherFees;
+    const credits = b.earnestMoney + b.optionFee;
+    const cashAtClosing = totalNeeded - credits;
+    return {
+      lines: [
+        { label: "Purchase Price", amount: b.purchasePrice, type: 'header' as const },
+        { label: "Loan Amount", amount: loanAmount, type: 'header' as const },
+        { label: `Down Payment (${b.downPaymentPct}%)`, amount: downPayment, type: 'debit' as const },
+        { label: `Closing Costs (${b.closingCostPct}%)`, amount: closingCosts, type: 'debit' as const },
+        { label: `Prepaids (${b.prepaidPct}%)`, amount: prepaids, type: 'debit' as const },
+        { label: "Inspection Cost", amount: b.inspectionCost, type: 'debit' as const },
+        { label: "Appraisal Fee", amount: b.appraisalCost, type: 'debit' as const },
+        { label: "Homeowner's Insurance", amount: b.homeInsurance, type: 'debit' as const },
+        { label: "Title Insurance", amount: b.titleInsurance, type: 'debit' as const },
+        { label: "Survey Fee", amount: b.surveyFee, type: 'debit' as const },
+        { label: "Other Fees", amount: b.otherFees, type: 'debit' as const },
+        { label: "Less: Earnest Money", amount: -b.earnestMoney, type: 'credit' as const },
+        { label: "Less: Option Fee", amount: -b.optionFee, type: 'credit' as const },
+      ],
+      net: cashAtClosing,
+    };
+  }, [buyer]);
+
+  const calc = mode === 'seller' ? sellerCalc : buyerCalc;
+
+  const handleEmailNetSheet = async () => {
+    try {
+      const summary = calc.lines
+        .map(l => `${l.label}: ${fmt(Math.abs(l.amount))}${l.amount < 0 ? ' (debit)' : ''}`)
+        .join('\n');
+      const netLabel = mode === 'seller' ? 'Estimated Net Proceeds' : 'Estimated Cash at Closing';
+      const body = `${mode === 'seller' ? 'Seller' : 'Buyer'} Net Sheet\n${'='.repeat(40)}\n\n${summary}\n\n${'─'.repeat(40)}\n${netLabel}: ${fmt(calc.net)}\n\nThis is an estimate only. Actual amounts may vary.`;
+
+      await navigator.clipboard.writeText(body);
+      toast({ title: "Net sheet copied to clipboard", description: "You can paste it into an email." });
+    } catch {
+      toast({ title: "Could not copy", variant: "destructive" });
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const InputField = ({ label, field, obj, setObj, isPercent }: {
+    label: string; field: string; obj: any; setObj: (fn: any) => void; isPercent?: boolean
+  }) => (
+    <div className="flex items-center justify-between gap-3 py-2 border-b border-border/30 last:border-0">
+      <Label className="text-sm text-muted-foreground flex-1 font-normal">{label}</Label>
+      <div className="flex items-center gap-1">
+        {!isPercent && <span className="text-xs text-muted-foreground">$</span>}
+        <Input
+          type="number"
+          className="w-32 h-8 text-right text-sm"
+          value={obj[field] || 0}
+          onChange={(e) => setObj((prev: any) => ({ ...prev, [field]: parseFloat(e.target.value) || 0 }))}
+        />
+        {isPercent && <span className="text-xs text-muted-foreground">%</span>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-bold">Net Sheet Calculator</h2>
+          <p className="text-sm text-muted-foreground">Estimate seller proceeds or buyer costs at closing</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={mode} onValueChange={(v) => setMode(v as 'seller' | 'buyer')}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="seller">Seller Net Sheet</SelectItem>
+              <SelectItem value="buyer">Buyer Net Sheet</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" ref={printRef}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{mode === 'seller' ? 'Seller' : 'Buyer'} Inputs</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-0">
+            {mode === 'seller' ? (
+              <>
+                <InputField label="Sale Price" field="salePrice" obj={seller} setObj={setSeller} />
+                <InputField label="Listing Commission" field="listingCommission" obj={seller} setObj={setSeller} isPercent />
+                <InputField label="Buyer Agent Commission" field="buyerAgentCommission" obj={seller} setObj={setSeller} isPercent />
+                <InputField label="Title Policy" field="titlePolicy" obj={seller} setObj={setSeller} />
+                <InputField label="Escrow / Closing Fees" field="escrowFees" obj={seller} setObj={setSeller} />
+                <InputField label="Existing Mortgage Payoff" field="existingMortgage" obj={seller} setObj={setSeller} />
+                <InputField label="Property Tax Proration" field="taxProration" obj={seller} setObj={setSeller} />
+                <InputField label="HOA Proration" field="hoaProration" obj={seller} setObj={setSeller} />
+                <InputField label="Repair Credits" field="repairCredits" obj={seller} setObj={setSeller} />
+                <InputField label="Home Warranty" field="homeWarranty" obj={seller} setObj={setSeller} />
+                <InputField label="Seller Concessions" field="sellerConcessions" obj={seller} setObj={setSeller} />
+                <InputField label="Miscellaneous Fees" field="miscFees" obj={seller} setObj={setSeller} />
+              </>
+            ) : (
+              <>
+                <InputField label="Purchase Price" field="purchasePrice" obj={buyer} setObj={setBuyer} />
+                <InputField label="Down Payment" field="downPaymentPct" obj={buyer} setObj={setBuyer} isPercent />
+                <InputField label="Closing Costs" field="closingCostPct" obj={buyer} setObj={setBuyer} isPercent />
+                <InputField label="Prepaids" field="prepaidPct" obj={buyer} setObj={setBuyer} isPercent />
+                <InputField label="Earnest Money" field="earnestMoney" obj={buyer} setObj={setBuyer} />
+                <InputField label="Option Fee" field="optionFee" obj={buyer} setObj={setBuyer} />
+                <InputField label="Inspection Cost" field="inspectionCost" obj={buyer} setObj={setBuyer} />
+                <InputField label="Appraisal Fee" field="appraisalCost" obj={buyer} setObj={setBuyer} />
+                <InputField label="Homeowner's Insurance" field="homeInsurance" obj={buyer} setObj={setBuyer} />
+                <InputField label="Title Insurance" field="titleInsurance" obj={buyer} setObj={setBuyer} />
+                <InputField label="Survey Fee" field="surveyFee" obj={buyer} setObj={setBuyer} />
+                <InputField label="Other Fees" field="otherFees" obj={buyer} setObj={setBuyer} />
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-6">
+              <div className="bg-primary/5 rounded-lg p-6 text-center mb-6">
+                <p className="text-sm text-muted-foreground mb-1">
+                  {mode === 'seller' ? 'Estimated Net Proceeds' : 'Estimated Cash Needed at Closing'}
+                </p>
+                <p className={`text-4xl font-bold ${mode === 'seller' && calc.net < 0 ? 'text-red-600' : 'text-primary'}`}>
+                  {fmt(Math.abs(calc.net))}
+                </p>
+                {mode === 'seller' && calc.net < 0 && (
+                  <p className="text-xs text-red-600 mt-2 flex items-center justify-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> Seller would owe at closing
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                {calc.lines.map((item, i) => (
+                  <div key={i} className={`flex justify-between text-sm py-1.5 ${
+                    item.type === 'header' ? 'font-medium border-b border-border/50 pb-2' :
+                    item.type === 'credit' ? 'text-green-600' : ''
+                  }`}>
+                    <span className={item.amount < 0 && item.type !== 'header' ? 'text-red-600' : ''}>{item.label}</span>
+                    <span className={`font-mono text-right ${item.amount < 0 && item.type !== 'header' ? 'text-red-600' : ''}`}>
+                      {item.amount < 0 ? '−' : ''}{fmt(Math.abs(item.amount))}
+                    </span>
+                  </div>
+                ))}
+                <div className="border-t-2 border-primary pt-3 mt-2 flex justify-between font-bold text-base">
+                  <span>{mode === 'seller' ? 'Est. Net Proceeds' : 'Est. Cash at Closing'}</span>
+                  <span className={`font-mono ${mode === 'seller' && calc.net < 0 ? 'text-red-600' : 'text-primary'}`}>
+                    {fmt(Math.abs(calc.net))}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={handleEmailNetSheet}>
+              <Mail className="h-4 w-4 mr-2" /> Copy for Email
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-2" /> Print
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground text-center">
+            This is an estimate only. Actual amounts may vary. Consult with your title company for final figures.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

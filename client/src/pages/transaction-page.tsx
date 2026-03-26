@@ -4,7 +4,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTransactionLock } from "@/hooks/use-transaction-lock";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock, FileSignature, Star, Search, DollarSign, Plus, X, ChevronDown, ChevronUp, Bell, BellOff } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, UserPlus, Pencil, Upload, Clock, Landmark, RefreshCw, UserCheck, Lock, FileSignature, Star, Search, DollarSign, Plus, X, ChevronDown, ChevronUp, Bell, BellOff, Shield, CheckCircle2, Circle, AlertTriangle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -907,6 +908,14 @@ export default function TransactionPage() {
             <FileSignature className="h-4 w-4 mr-2" />
             Signatures
           </TabsTrigger>
+          <TabsTrigger value="compliance" className="shrink-0">
+            <Shield className="h-4 w-4 mr-2" />
+            Compliance
+          </TabsTrigger>
+          <TabsTrigger value="net-sheet" className="shrink-0">
+            <DollarSign className="h-4 w-4 mr-2" />
+            Net Sheet
+          </TabsTrigger>
           <TabsTrigger value="inspection" className="shrink-0" asChild>
             <Link href={`/transactions/${parsedId}/inspection`}>
               <Search className="h-4 w-4 mr-2" />
@@ -939,6 +948,14 @@ export default function TransactionPage() {
 
         <TabsContent value="signatures">
           <FirmaEditor transactionId={parsedId} />
+        </TabsContent>
+
+        <TabsContent value="compliance">
+          <ComplianceChecklist transactionId={parsedId} readOnly={isReadOnly} />
+        </TabsContent>
+
+        <TabsContent value="net-sheet">
+          {transaction && <TransactionNetSheet transaction={transaction} />}
         </TabsContent>
       </Tabs>
 
@@ -1279,6 +1296,338 @@ function ClientNotificationStatus({ transactionId }: { transactionId: number }) 
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function ComplianceChecklist({ transactionId, readOnly }: { transactionId: number; readOnly: boolean }) {
+  const { toast } = useToast();
+  const [expandedPhase, setExpandedPhase] = useState<string | null>(null);
+
+  const { data: checklist, isLoading, isError, refetch } = useQuery<any>({
+    queryKey: ["/api/compliance-checklist", transactionId],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/compliance-checklist/${transactionId}`);
+      return res.json();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (items: any[]) => {
+      await apiRequest("PATCH", `/api/compliance-checklist/${transactionId}`, { items });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/compliance-checklist", transactionId] });
+    },
+    onError: () => {
+      toast({ title: "Failed to update", variant: "destructive" });
+    },
+  });
+
+  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading compliance checklist...</div>;
+
+  if (isError) return (
+    <Card><CardContent className="p-8 text-center space-y-3">
+      <AlertTriangle className="h-8 w-8 text-destructive mx-auto" />
+      <p className="text-sm text-muted-foreground">Failed to load compliance checklist.</p>
+      <Button variant="outline" size="sm" onClick={() => refetch()}>Try Again</Button>
+    </CardContent></Card>
+  );
+
+  const items = checklist?.items || [];
+  const phases = [...new Set(items.map((i: any) => i.phase))] as string[];
+  const completedCount = items.filter((i: any) => i.completed).length;
+  const requiredItems = items.filter((i: any) => i.required !== false);
+  const requiredComplete = requiredItems.filter((i: any) => i.completed).length;
+  const progress = items.length > 0 ? Math.round((completedCount / items.length) * 100) : 0;
+
+  const toggleItem = (itemId: string) => {
+    if (readOnly) return;
+    const updated = items.map((i: any) => i.id === itemId ? { ...i, completed: !i.completed } : i);
+    updateMutation.mutate(updated);
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold">Transaction Compliance</h3>
+            </div>
+            <Badge variant={progress === 100 ? "default" : "secondary"}>
+              {completedCount}/{items.length} Complete
+            </Badge>
+          </div>
+          <Progress value={progress} className="h-2 mb-2" />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{requiredComplete}/{requiredItems.length} required items complete</span>
+            <span>{progress}%</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {phases.map(phase => {
+        const phaseItems = items.filter((i: any) => i.phase === phase);
+        const phaseComplete = phaseItems.filter((i: any) => i.completed).length;
+        const isExpanded = expandedPhase === phase || expandedPhase === null;
+
+        return (
+          <Card key={phase}>
+            <CardContent className="p-0">
+              <button
+                onClick={() => setExpandedPhase(isExpanded && expandedPhase !== null ? null : phase)}
+                className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  {phaseComplete === phaseItems.length ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Circle className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="font-medium text-sm">{phase}</span>
+                  <Badge variant="outline" className="text-xs">{phaseComplete}/{phaseItems.length}</Badge>
+                </div>
+                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+              {isExpanded && (
+                <div className="px-4 pb-4 space-y-2">
+                  {phaseItems.map((item: any) => (
+                    <div key={item.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors">
+                      <Checkbox
+                        checked={item.completed}
+                        onCheckedChange={() => toggleItem(item.id)}
+                        disabled={readOnly}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm ${item.completed ? "line-through text-muted-foreground" : ""}`}>
+                          {item.text}
+                        </p>
+                      </div>
+                      {item.required !== false ? (
+                        <Badge variant="outline" className="text-xs text-red-600 border-red-200 shrink-0">Required</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs text-muted-foreground shrink-0">If Applicable</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function TransactionNetSheet({ transaction }: { transaction: any }) {
+  const isSeller = transaction.type === 'sell';
+  const contractPrice = transaction.contractPrice || 0;
+
+  const fmt = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+
+  const [values, setValues] = useState(() => {
+    if (isSeller) {
+      return {
+        salePrice: contractPrice,
+        listingCommission: transaction.listingAgentCommission || Math.round(contractPrice * 0.03),
+        buyerAgentCommission: transaction.buyerAgentCompensation || Math.round(contractPrice * 0.03),
+        titlePolicy: Math.round(contractPrice * 0.006),
+        escrowFees: 500,
+        existingMortgage: 0,
+        propertyTaxProration: Math.round(contractPrice * 0.02 / 12),
+        hoaProration: 0,
+        repairCredits: 0,
+        homeWarranty: transaction.homeWarranty || 0,
+        otherCredits: transaction.sellerConcessions || 0,
+        miscFees: 250,
+      };
+    } else {
+      return {
+        purchasePrice: contractPrice,
+        downPayment: transaction.downPayment || Math.round(contractPrice * 0.2),
+        loanAmount: contractPrice - (transaction.downPayment || Math.round(contractPrice * 0.2)),
+        closingCosts: Math.round(contractPrice * 0.025),
+        prepaids: Math.round(contractPrice * 0.015),
+        earnestMoney: transaction.earnestMoney || 0,
+        optionFee: transaction.optionFee || 0,
+        inspectionCost: 500,
+        appraisalCost: 500,
+        homeInsurance: Math.round(contractPrice * 0.004),
+        titleInsurance: Math.round(contractPrice * 0.005),
+        surveyFee: 500,
+        otherFees: 0,
+      };
+    }
+  });
+
+  const updateVal = (key: string, val: number) => {
+    setValues(prev => {
+      const next = { ...prev, [key]: val };
+      if (!isSeller && key === 'downPayment') {
+        (next as any).loanAmount = (next as any).purchasePrice - val;
+      }
+      if (!isSeller && key === 'purchasePrice') {
+        (next as any).loanAmount = val - (next as any).downPayment;
+      }
+      return next;
+    });
+  };
+
+  let netAmount = 0;
+  let totalDebits = 0;
+  let totalCredits = 0;
+  const lineItems: { label: string; amount: number; type: 'credit' | 'debit' | 'header' }[] = [];
+
+  if (isSeller) {
+    const v = values as any;
+    totalCredits = v.salePrice;
+    totalDebits = v.listingCommission + v.buyerAgentCommission + v.titlePolicy + v.escrowFees + v.existingMortgage +
+      v.propertyTaxProration + v.hoaProration + v.repairCredits + v.homeWarranty + v.otherCredits + v.miscFees;
+    netAmount = totalCredits - totalDebits;
+
+    lineItems.push(
+      { label: "Sale Price", amount: v.salePrice, type: 'credit' },
+      { label: "Listing Agent Commission", amount: -v.listingCommission, type: 'debit' },
+      { label: "Buyer Agent Commission", amount: -v.buyerAgentCommission, type: 'debit' },
+      { label: "Title Policy", amount: -v.titlePolicy, type: 'debit' },
+      { label: "Escrow / Closing Fees", amount: -v.escrowFees, type: 'debit' },
+      { label: "Existing Mortgage Payoff", amount: -v.existingMortgage, type: 'debit' },
+      { label: "Property Tax Proration", amount: -v.propertyTaxProration, type: 'debit' },
+      { label: "HOA Proration", amount: -v.hoaProration, type: 'debit' },
+      { label: "Repair Credits", amount: -v.repairCredits, type: 'debit' },
+      { label: "Home Warranty", amount: -v.homeWarranty, type: 'debit' },
+      { label: "Seller Concessions", amount: -v.otherCredits, type: 'debit' },
+      { label: "Misc Fees", amount: -v.miscFees, type: 'debit' },
+    );
+  } else {
+    const v = values as any;
+    totalDebits = v.downPayment + v.closingCosts + v.prepaids + v.inspectionCost + v.appraisalCost +
+      v.homeInsurance + v.titleInsurance + v.surveyFee + v.otherFees;
+    totalCredits = v.earnestMoney + v.optionFee;
+    netAmount = totalDebits - totalCredits;
+
+    lineItems.push(
+      { label: "Purchase Price", amount: v.purchasePrice, type: 'header' },
+      { label: "Loan Amount", amount: v.loanAmount, type: 'header' },
+      { label: "Down Payment", amount: v.downPayment, type: 'debit' },
+      { label: "Closing Costs (est.)", amount: v.closingCosts, type: 'debit' },
+      { label: "Prepaids (taxes, insurance escrow)", amount: v.prepaids, type: 'debit' },
+      { label: "Inspection Cost", amount: v.inspectionCost, type: 'debit' },
+      { label: "Appraisal Fee", amount: v.appraisalCost, type: 'debit' },
+      { label: "Homeowner's Insurance (annual)", amount: v.homeInsurance, type: 'debit' },
+      { label: "Title Insurance", amount: v.titleInsurance, type: 'debit' },
+      { label: "Survey Fee", amount: v.surveyFee, type: 'debit' },
+      { label: "Other Fees", amount: v.otherFees, type: 'debit' },
+      { label: "Less: Earnest Money (already paid)", amount: -v.earnestMoney, type: 'credit' },
+      { label: "Less: Option Fee (already paid)", amount: -v.optionFee, type: 'credit' },
+    );
+  }
+
+  const InputRow = ({ label, field, isPercent }: { label: string; field: string; isPercent?: boolean }) => (
+    <div className="flex items-center justify-between gap-4 py-2 border-b border-border/50">
+      <label className="text-sm text-muted-foreground flex-1">{label}</label>
+      <div className="flex items-center gap-1">
+        {!isPercent && <span className="text-xs text-muted-foreground">$</span>}
+        <Input
+          type="number"
+          className="w-28 h-8 text-right text-sm"
+          value={(values as any)[field] || 0}
+          onChange={(e) => updateVal(field, parseFloat(e.target.value) || 0)}
+        />
+        {isPercent && <span className="text-xs text-muted-foreground">%</span>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold">{isSeller ? "Seller" : "Buyer"} Net Sheet</h3>
+          </div>
+
+          <div className="bg-primary/5 rounded-lg p-4 mb-4 text-center">
+            <p className="text-sm text-muted-foreground mb-1">
+              {isSeller ? "Estimated Net Proceeds" : "Estimated Cash Needed at Closing"}
+            </p>
+            <p className={`text-3xl font-bold ${isSeller && netAmount < 0 ? "text-red-600" : "text-primary"}`}>
+              {fmt(Math.abs(netAmount))}
+            </p>
+            {isSeller && netAmount < 0 && (
+              <p className="text-xs text-red-600 mt-1 flex items-center justify-center gap-1">
+                <AlertTriangle className="h-3 w-3" /> Seller would owe at closing
+              </p>
+            )}
+          </div>
+
+          {isSeller ? (
+            <div className="space-y-0">
+              <InputRow label="Sale Price" field="salePrice" />
+              <InputRow label="Listing Agent Commission" field="listingCommission" />
+              <InputRow label="Buyer Agent Commission" field="buyerAgentCommission" />
+              <InputRow label="Title Policy" field="titlePolicy" />
+              <InputRow label="Escrow / Closing Fees" field="escrowFees" />
+              <InputRow label="Existing Mortgage Payoff" field="existingMortgage" />
+              <InputRow label="Property Tax Proration" field="propertyTaxProration" />
+              <InputRow label="HOA Proration" field="hoaProration" />
+              <InputRow label="Repair Credits" field="repairCredits" />
+              <InputRow label="Home Warranty" field="homeWarranty" />
+              <InputRow label="Seller Concessions" field="otherCredits" />
+              <InputRow label="Misc Fees" field="miscFees" />
+            </div>
+          ) : (
+            <div className="space-y-0">
+              <InputRow label="Purchase Price" field="purchasePrice" />
+              <InputRow label="Down Payment" field="downPayment" />
+              <InputRow label="Closing Costs (est.)" field="closingCosts" />
+              <InputRow label="Prepaids (taxes, insurance escrow)" field="prepaids" />
+              <InputRow label="Inspection Cost" field="inspectionCost" />
+              <InputRow label="Appraisal Fee" field="appraisalCost" />
+              <InputRow label="Homeowner's Insurance (annual)" field="homeInsurance" />
+              <InputRow label="Title Insurance" field="titleInsurance" />
+              <InputRow label="Survey Fee" field="surveyFee" />
+              <InputRow label="Other Fees" field="otherFees" />
+              <InputRow label="Earnest Money (credit)" field="earnestMoney" />
+              <InputRow label="Option Fee (credit)" field="optionFee" />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4">
+          <h4 className="font-semibold text-sm mb-3">Summary</h4>
+          <div className="space-y-1.5">
+            {lineItems.map((item, i) => (
+              <div key={i} className={`flex justify-between text-sm py-1 ${
+                item.type === 'header' ? 'font-medium border-b border-border/50' :
+                item.type === 'credit' ? 'text-green-600' : ''
+              }`}>
+                <span className={item.amount < 0 ? 'text-red-600' : ''}>{item.label}</span>
+                <span className={`font-mono ${item.amount < 0 ? 'text-red-600' : ''}`}>
+                  {fmt(Math.abs(item.amount))}
+                  {item.amount < 0 && item.type !== 'header' ? ' −' : ''}
+                </span>
+              </div>
+            ))}
+            <div className="border-t-2 border-primary pt-2 flex justify-between font-bold">
+              <span>{isSeller ? "Est. Net Proceeds" : "Est. Cash at Closing"}</span>
+              <span className={`font-mono ${isSeller && netAmount < 0 ? "text-red-600" : "text-primary"}`}>
+                {fmt(Math.abs(netAmount))}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <p className="text-xs text-muted-foreground text-center px-4">
+        This is an estimate only. Actual amounts may vary. Consult with your title company for final figures.
+      </p>
     </div>
   );
 }

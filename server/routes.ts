@@ -237,6 +237,46 @@ const BUYER_CHECKLIST_ITEMS = [
   { id: "begin-maintenance", text: "Begin maintenance and warranty registration", phase: "Post-Closing" }
 ];
 
+const BUYER_COMPLIANCE_ITEMS = [
+  { id: "comp-iabs", text: "Information About Brokerage Services (IABS)", phase: "Required at First Contact", required: true },
+  { id: "comp-buyer-rep", text: "Buyer Representation Agreement", phase: "Required at First Contact", required: true },
+  { id: "comp-wire-fraud", text: "Wire Fraud Notice / Advisory", phase: "Required at Contract", required: true },
+  { id: "comp-lead-paint", text: "Lead-Based Paint Disclosure (pre-1978 homes)", phase: "Required at Contract", required: false },
+  { id: "comp-mold-disclosure", text: "MUD / PID Disclosure (if applicable)", phase: "Required at Contract", required: false },
+  { id: "comp-hoa-addendum", text: "HOA / Property Owners Association Addendum", phase: "Required at Contract", required: false },
+  { id: "comp-t47", text: "T-47 Residential Real Property Affidavit", phase: "Required at Contract", required: true },
+  { id: "comp-survey", text: "Survey (existing or new ordered)", phase: "Due Diligence", required: true },
+  { id: "comp-option-fee", text: "Option Fee Receipt / Delivery Confirmation", phase: "Required at Contract", required: true },
+  { id: "comp-earnest-receipt", text: "Earnest Money Receipt / Delivery Confirmation", phase: "Required at Contract", required: true },
+  { id: "comp-title-commitment", text: "Title Commitment Received & Reviewed", phase: "Due Diligence", required: true },
+  { id: "comp-homeowner-insurance", text: "Homeowner's Insurance Binder", phase: "Pre-Closing", required: true },
+  { id: "comp-closing-disclosure", text: "Closing Disclosure Reviewed (3 days prior)", phase: "Pre-Closing", required: true },
+  { id: "comp-final-walkthrough", text: "Final Walk-Through Completed", phase: "Pre-Closing", required: true },
+  { id: "comp-funding-verification", text: "Funding / Wire Transfer Verification", phase: "Pre-Closing", required: true },
+  { id: "comp-settlement-stmt", text: "Settlement Statement Signed", phase: "Closing", required: true },
+  { id: "comp-deed-recorded", text: "Deed Recorded & Confirmed", phase: "Post-Closing", required: true },
+];
+
+const SELLER_COMPLIANCE_ITEMS = [
+  { id: "comp-iabs", text: "Information About Brokerage Services (IABS)", phase: "Required at First Contact", required: true },
+  { id: "comp-listing-agreement", text: "Listing Agreement Executed", phase: "Required at First Contact", required: true },
+  { id: "comp-seller-disclosure", text: "Seller's Disclosure Notice", phase: "Required at Listing", required: true },
+  { id: "comp-wire-fraud", text: "Wire Fraud Notice / Advisory", phase: "Required at Contract", required: true },
+  { id: "comp-lead-paint", text: "Lead-Based Paint Disclosure (pre-1978 homes)", phase: "Required at Contract", required: false },
+  { id: "comp-mold-disclosure", text: "MUD / PID Disclosure (if applicable)", phase: "Required at Contract", required: false },
+  { id: "comp-hoa-addendum", text: "HOA / Property Owners Association Addendum", phase: "Required at Contract", required: false },
+  { id: "comp-hoa-docs", text: "HOA Resale Certificate / Documents Delivered", phase: "Required at Contract", required: false },
+  { id: "comp-t47", text: "T-47 Residential Real Property Affidavit", phase: "Required at Contract", required: true },
+  { id: "comp-survey", text: "Survey Provided or Ordered", phase: "Due Diligence", required: true },
+  { id: "comp-option-fee-receipt", text: "Option Fee Received & Deposited", phase: "Required at Contract", required: true },
+  { id: "comp-earnest-receipt", text: "Earnest Money Received & Deposited", phase: "Required at Contract", required: true },
+  { id: "comp-title-commitment", text: "Title Commitment Received", phase: "Due Diligence", required: true },
+  { id: "comp-repair-amendments", text: "Repair Amendments / Agreements Signed", phase: "Due Diligence", required: false },
+  { id: "comp-closing-disclosure", text: "Closing Disclosure Reviewed", phase: "Pre-Closing", required: true },
+  { id: "comp-payoff-stmt", text: "Existing Mortgage Payoff Statement Ordered", phase: "Pre-Closing", required: true },
+  { id: "comp-settlement-stmt", text: "Settlement Statement Signed", phase: "Closing", required: true },
+  { id: "comp-deed-recorded", text: "Deed Recorded & Confirmed", phase: "Post-Closing", required: true },
+];
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -1351,6 +1391,62 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error updating checklist:', error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Error updating checklist' });
+    }
+  });
+
+  app.get("/api/compliance-checklist/:transactionId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const transactionId = parseInt(req.params.transactionId, 10);
+    try {
+      const { allowed, transaction } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+      if (!allowed || !transaction) return res.status(403).json({ error: "Not authorized" });
+
+      const compRole = transaction.type === 'sell' ? 'compliance_sell' : 'compliance_buy';
+      const checklist = await storage.getChecklist(transactionId, compRole);
+      if (!checklist) {
+        const defaultItems = (transaction.type === 'sell' ? SELLER_COMPLIANCE_ITEMS : BUYER_COMPLIANCE_ITEMS)
+          .map(item => ({ ...item, completed: false }));
+        return res.json({ transactionId, role: compRole, items: defaultItems });
+      }
+      res.json(checklist);
+    } catch (error) {
+      console.error('Error fetching compliance checklist:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance checklist' });
+    }
+  });
+
+  app.patch("/api/compliance-checklist/:transactionId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const transactionId = parseInt(req.params.transactionId, 10);
+    try {
+      const items = req.body.items;
+      if (!Array.isArray(items) || items.some((i: any) => typeof i.id !== 'string' || typeof i.completed !== 'boolean')) {
+        return res.status(400).json({ error: "Invalid items format" });
+      }
+
+      const { allowed, transaction, permissionLevel } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+      if (!allowed || !transaction || permissionLevel !== "full") return res.status(403).json({ error: "Not authorized" });
+      if (isTransactionLockedByOther(transactionId, req.user.id)) {
+        return res.status(423).json({ error: "Transaction is currently being edited by another user" });
+      }
+
+      const compRole = transaction.type === 'sell' ? 'compliance_sell' : 'compliance_buy';
+      let checklist = await storage.getChecklist(transactionId, compRole);
+      if (!checklist) {
+        const defaultItems = (transaction.type === 'sell' ? SELLER_COMPLIANCE_ITEMS : BUYER_COMPLIANCE_ITEMS)
+          .map(item => ({ ...item, completed: false }));
+        try {
+          checklist = await storage.createChecklist({ transactionId, role: compRole, items: defaultItems });
+        } catch (createError) {
+          checklist = await storage.getChecklist(transactionId, compRole);
+          if (!checklist) throw createError;
+        }
+      }
+      const updatedChecklist = await storage.updateChecklist(checklist.id, items);
+      res.json(updatedChecklist);
+    } catch (error) {
+      console.error('Error updating compliance checklist:', error);
+      res.status(500).json({ error: 'Failed to update compliance checklist' });
     }
   });
 
