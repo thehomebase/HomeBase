@@ -383,19 +383,20 @@ export async function parseInspectionWithAI(input: Buffer | string): Promise<{
     model: "gemini-2.5-flash",
     contents,
     config: {
-      maxOutputTokens: 8192,
+      maxOutputTokens: 16384,
       temperature: 0.1,
     },
   });
 
   const responseText = response.text || "";
+  console.log(`[AI Inspection Parser] Response length: ${responseText.length} chars`);
 
   let parsed: Record<string, unknown>;
   try {
     parsed = parseJSON(responseText);
   } catch (e) {
     console.error("[AI Inspection Parser] Response parse error:", e);
-    console.error("[AI Inspection Parser] Raw response preview:", responseText.substring(0, 500));
+    console.error("[AI Inspection Parser] Raw response preview:", responseText.substring(0, 1000));
     throw new Error("Failed to parse AI inspection extraction results");
   }
 

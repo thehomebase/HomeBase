@@ -7759,8 +7759,12 @@ export function registerRoutes(app: Express): Server {
           items = aiResult.items;
           aiUsed = true;
           console.log(`[InspectionParser] AI extracted ${items.length} items (with photo detection)`);
+          if (items.length === 0) {
+            console.log("[InspectionParser] AI returned 0 items, falling back to text extraction + regex");
+            throw new Error("AI returned no items");
+          }
         } catch (aiErr) {
-          console.error("[InspectionParser] AI parsing failed, falling back to text extraction + regex:", aiErr);
+          console.error("[InspectionParser] AI parsing failed or returned empty, falling back to text extraction + regex:", aiErr);
           try {
             const pdfParseModule = await import("pdf-parse");
             const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
@@ -7768,6 +7772,8 @@ export function registerRoutes(app: Express): Server {
             const rawText = pdfData.text || "";
             const { parseInspectionReport } = await import("./inspection-parser");
             items = parseInspectionReport(rawText);
+            aiUsed = false;
+            console.log(`[InspectionParser] Regex fallback extracted ${items.length} items`);
           } catch (fallbackErr) {
             console.error("[InspectionParser] Regex fallback also failed:", fallbackErr);
             return res.status(400).json({ error: 'Failed to parse inspection report' });
