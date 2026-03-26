@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, Component, type ReactNode, type ErrorInfo } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Camera, Shield, ShieldCheck, CheckCircle2, MapPin, Phone, Mail, Pencil,
   Building2, FileText, User as UserIcon, Star, ChevronLeft, ChevronRight,
-  Home, X, Eraser, CreditCard, ExternalLink, Loader2, Send, Globe
+  Home, X, Eraser, CreditCard, ExternalLink, Loader2, Send, Globe, AlertTriangle
 } from "lucide-react";
 import { SiFacebook, SiInstagram, SiX, SiLinkedin } from "react-icons/si";
 import { PhotoTouchup } from "@/components/photo-touchup";
@@ -22,6 +22,32 @@ import { PhotoPositionEditor } from "@/components/photo-position-editor";
 import { Move } from "lucide-react";
 import type { User } from "@shared/schema";
 import { useAgentProfileSchema } from "@/lib/schema-markup";
+
+class ProfileErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+  state = { hasError: false, error: null as Error | null };
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[ProfilePage] Render error:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full px-4 sm:px-8 py-12 max-w-lg mx-auto text-center">
+          <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-4" />
+          <h1 className="text-xl font-bold mb-2">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground mb-4">
+            There was an error loading this profile. Please try refreshing the page.
+          </p>
+          <p className="text-xs text-muted-foreground/60 font-mono mb-4">{this.state.error?.message}</p>
+          <Button onClick={() => window.location.reload()}>Refresh Page</Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 type PublicProfile = Omit<User, "password" | "emailVerificationToken" | "emailVerificationExpires" | "registrationIp">;
 
@@ -791,6 +817,14 @@ function ContactFormSection({ profileId, profileName }: { profileId: number; pro
 }
 
 export default function ProfilePage() {
+  return (
+    <ProfileErrorBoundary>
+      <ProfilePageContent />
+    </ProfileErrorBoundary>
+  );
+}
+
+function ProfilePageContent() {
   const [, params] = useRoute("/profile/:id");
   const { user } = useAuth();
   const { toast } = useToast();
