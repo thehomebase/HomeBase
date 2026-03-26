@@ -7824,14 +7824,14 @@ export function registerRoutes(app: Express): Server {
           const path = await import("path");
           const os = await import("os");
           const tmpDir = os.default.tmpdir();
-          const outputPrefix = path.default.join(tmpDir, `inspection-page-${transactionId}-${requestedPage}`);
-          const outputFile = `${outputPrefix}-${String(requestedPage).padStart(6, '0')}.png`;
+          const outputPrefix = path.default.join(tmpDir, `inspection-page-${transactionId}-p${requestedPage}`);
+          const outputFile = `${outputPrefix}.png`;
 
           console.log(`[InspectionPDF] Rendering page ${requestedPage} as image for transaction ${transactionId}`);
 
           if (!fs.default.existsSync(outputFile)) {
             console.log(`[InspectionPDF] Running pdftoppm: page=${requestedPage}, pdf=${pdfInfo.filePath}, output=${outputPrefix}`);
-            execSync(`pdftoppm -png -r 200 -f ${requestedPage} -l ${requestedPage} "${pdfInfo.filePath}" "${outputPrefix}"`, {
+            execSync(`pdftoppm -png -r 200 -singlefile -f ${requestedPage} -l ${requestedPage} "${pdfInfo.filePath}" "${outputPrefix}"`, {
               timeout: 15000,
             });
             console.log(`[InspectionPDF] pdftoppm completed, checking for output: ${outputFile}`);
