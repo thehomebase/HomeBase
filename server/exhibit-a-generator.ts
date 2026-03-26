@@ -154,24 +154,28 @@ function renderPageImage(pdfPath: string, pageNum: number, transactionId: number
   return null;
 }
 
-function cropImage(
+async function cropImage(
   inputPath: string,
   outputPath: string,
   yStartPercent: number,
   yEndPercent: number
-): boolean {
+): Promise<boolean> {
   try {
-    const result = execSync(`magick identify -format "%w %h" "${inputPath}"`, { timeout: 5000 });
-    const [imgW, imgH] = result.toString().trim().split(" ").map(Number);
+    const sharp = (await import("sharp")).default;
+    const metadata = await sharp(inputPath).metadata();
+    const imgW = metadata.width || 0;
+    const imgH = metadata.height || 0;
+    if (!imgW || !imgH) return false;
 
     const cropY = Math.floor(imgH * yStartPercent);
-    const cropH = Math.floor(imgH * (yEndPercent - yStartPercent));
-    const safeH = Math.max(cropH, 100);
+    const cropH = Math.max(Math.floor(imgH * (yEndPercent - yStartPercent)), 100);
+    const safeTop = Math.min(cropY, imgH - 1);
+    const safeHeight = Math.min(cropH, imgH - safeTop);
 
-    execSync(
-      `magick "${inputPath}" -crop ${imgW}x${safeH}+0+${cropY} +repage "${outputPath}"`,
-      { timeout: 10000 }
-    );
+    await sharp(inputPath)
+      .extract({ left: 0, top: safeTop, width: imgW, height: safeHeight })
+      .toFile(outputPath);
+
     return fs.existsSync(outputPath);
   } catch (err) {
     console.error("[ExhibitA] Image crop failed:", err);
