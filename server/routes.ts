@@ -7801,7 +7801,7 @@ export function registerRoutes(app: Express): Server {
       const transactionId = Number(req.params.id);
       const transaction = await storage.getTransaction(transactionId);
       if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
-      if (req.user.role === "agent") {
+      if (req.user.role === "agent" || req.user.role === "broker") {
         if (transaction.agentId !== req.user.id) {
           return res.status(403).json({ error: 'Not authorized' });
         }
@@ -7814,6 +7814,30 @@ export function registerRoutes(app: Express): Server {
       if (!fs.default.existsSync(pdfInfo.filePath)) {
         return res.status(404).json({ error: 'PDF file not found on disk' });
       }
+
+      const requestedPage = req.query.page ? Number(req.query.page) : null;
+      if (requestedPage && requestedPage > 0) {
+        try {
+          const { PDFDocument } = await import("pdf-lib");
+          const pdfBytes = fs.default.readFileSync(pdfInfo.filePath);
+          const srcDoc = await PDFDocument.load(pdfBytes);
+          const totalPages = srcDoc.getPageCount();
+          const pageIndex = Math.min(requestedPage, totalPages) - 1;
+
+          const newDoc = await PDFDocument.create();
+          const [copiedPage] = await newDoc.copyPages(srcDoc, [pageIndex]);
+          newDoc.addPage(copiedPage);
+          const singlePageBytes = await newDoc.save();
+
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `inline; filename="page-${requestedPage}.pdf"`);
+          res.setHeader('Content-Length', singlePageBytes.length.toString());
+          return res.end(Buffer.from(singlePageBytes));
+        } catch (pageErr) {
+          console.error('Error extracting PDF page, serving full PDF:', pageErr);
+        }
+      }
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="${pdfInfo.fileName}"`);
       const fileStream = fs.default.createReadStream(pdfInfo.filePath);

@@ -34,19 +34,17 @@ const CATEGORIES = [
 ];
 
 const SEVERITIES = [
-  { value: "minor", label: "Minor", color: "bg-blue-100 text-blue-800" },
-  { value: "moderate", label: "Moderate", color: "bg-yellow-100 text-yellow-800" },
-  { value: "major", label: "Major", color: "bg-orange-100 text-orange-800" },
-  { value: "safety", label: "Safety", color: "bg-red-100 text-red-800" },
+  { value: "safety", label: "Safety Hazard", color: "text-red-700 bg-red-50 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800" },
+  { value: "major", label: "Major", color: "text-orange-700 bg-orange-50 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800" },
+  { value: "moderate", label: "Moderate", color: "text-yellow-700 bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800" },
+  { value: "minor", label: "Minor", color: "text-green-700 bg-green-50 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800" },
 ];
 
 const STATUS_LABELS: Record<string, string> = {
-  pending_review: "Pending Review",
+  pending: "Pending",
   approved: "Approved",
-  sent_for_bids: "Sent for Bids",
-  bids_received: "Bids Received",
-  accepted: "Accepted",
-  declined: "Declined",
+  rejected: "Rejected",
+  repaired: "Repaired",
 };
 
 type ParsedItem = {
@@ -54,47 +52,50 @@ type ParsedItem = {
   description: string;
   severity: string;
   location: string;
-  pageNumber?: number;
-  hasPhoto?: boolean;
   selected: boolean;
+  pageNumber?: number | null;
+  hasPhoto?: boolean;
 };
 
 function SeverityIcon({ severity }: { severity: string }) {
   switch (severity) {
-    case "safety": return <ShieldAlert className="h-4 w-4 text-red-600" />;
-    case "major": return <AlertTriangle className="h-4 w-4 text-orange-600" />;
-    case "moderate": return <Circle className="h-4 w-4 text-yellow-600" />;
-    default: return <CheckCircle2 className="h-4 w-4 text-blue-600" />;
+    case "safety":
+      return <ShieldAlert className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />;
+    case "major":
+      return <AlertTriangle className="h-4 w-4 text-orange-600 shrink-0 mt-0.5" />;
+    case "moderate":
+      return <Circle className="h-4 w-4 text-yellow-600 shrink-0 mt-0.5" />;
+    case "minor":
+      return <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />;
+    default:
+      return <Circle className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />;
   }
 }
 
 function SeverityBadge({ severity }: { severity: string }) {
-  const s = SEVERITIES.find(sv => sv.value === severity);
-  return <Badge className={s?.color || ""}>{s?.label || severity}</Badge>;
+  const sev = SEVERITIES.find(s => s.value === severity);
+  return (
+    <Badge variant="outline" className={`text-xs ${sev?.color || ""}`}>
+      {sev?.label || severity}
+    </Badge>
+  );
 }
 
 export default function InspectionReviewPage() {
   const { id } = useParams<{ id: string }>();
+  const transactionId = Number(id);
   const { user } = useAuth();
   const { toast } = useToast();
-  const transactionId = id ? parseInt(id, 10) : null;
 
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
-  const [showParsed, setShowParsed] = useState(false);
-  const [isParsing, setIsParsing] = useState(false);
-  const [selectedSavedItems, setSelectedSavedItems] = useState<Set<number>>(new Set());
+  const [uploading, setUploading] = useState(false);
+  const [addingManual, setAddingManual] = useState(false);
   const [vendorDialogItem, setVendorDialogItem] = useState<InspectionItem | null>(null);
   const [selectedVendors, setSelectedVendors] = useState<Set<number>>(new Set());
-  const [bulkSendMode, setBulkSendMode] = useState(false);
-  const [addingManual, setAddingManual] = useState(false);
+  const [selectedSavedItems, setSelectedSavedItems] = useState<Set<number>>(new Set());
+  const [manualItem, setManualItem] = useState({ category: "other", description: "", severity: "moderate", location: "" });
   const [pdfViewerPage, setPdfViewerPage] = useState<number | null>(null);
-  const [manualItem, setManualItem] = useState({
-    category: "other",
-    description: "",
-    severity: "moderate",
-    location: "",
-    notes: "",
-  });
+  const [aiUsedForParse, setAiUsedForParse] = useState(false);
 
   const { data: transaction } = useQuery<Transaction>({
     queryKey: ["/api/transactions", transactionId],
@@ -122,68 +123,6 @@ export default function InspectionReviewPage() {
     },
   });
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !transactionId) return;
-
-    setIsParsing(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch(`/api/transactions/${transactionId}/parse-inspection`, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to parse inspection report");
-      }
-
-      const data = await response.json();
-      const items = data.items || [];
-      setParsedItems(items.map((item: any) => ({ ...item, selected: true })));
-      setShowParsed(true);
-      toast({ title: `Found ${items.length} repair items in the report` });
-    } catch (error: any) {
-      toast({ title: "Failed to parse report", description: error.message, variant: "destructive" });
-    } finally {
-      setIsParsing(false);
-      e.target.value = "";
-    }
-  };
-
-  const saveItemsMutation = useMutation({
-    mutationFn: async (items: any[]) => {
-      const res = await apiRequest("POST", `/api/transactions/${transactionId}/inspection-items`, { items });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
-      setParsedItems([]);
-      setShowParsed(false);
-      toast({ title: `Saved ${data.length} inspection items` });
-    },
-    onError: () => {
-      toast({ title: "Failed to save items", variant: "destructive" });
-    },
-  });
-
-  const updateItemMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const res = await apiRequest("PATCH", `/api/inspection-items/${id}`, data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
-      toast({ title: "Item updated" });
-    },
-    onError: () => {
-      toast({ title: "Failed to update item", variant: "destructive" });
-    },
-  });
-
   const deleteItemMutation = useMutation({
     mutationFn: async (itemId: number) => {
       await apiRequest("DELETE", `/api/inspection-items/${itemId}`);
@@ -192,8 +131,17 @@ export default function InspectionReviewPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
       toast({ title: "Item removed" });
     },
-    onError: () => {
-      toast({ title: "Failed to remove item", variant: "destructive" });
+  });
+
+  const saveItemsMutation = useMutation({
+    mutationFn: async (items: any[]) => {
+      const res = await apiRequest("POST", `/api/transactions/${transactionId}/inspection-items`, { items });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
+      setParsedItems([]);
+      toast({ title: "Items saved" });
     },
   });
 
@@ -209,56 +157,74 @@ export default function InspectionReviewPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
       setVendorDialogItem(null);
       setSelectedVendors(new Set());
-      toast({ title: "Bid requests sent to vendors" });
-    },
-    onError: () => {
-      toast({ title: "Failed to send bid requests", variant: "destructive" });
+      toast({ title: "Bid requests sent!" });
     },
   });
 
-  const handleSaveApproved = () => {
-    const selected = parsedItems.filter(item => item.selected);
-    if (selected.length === 0) {
-      toast({ title: "No items selected", variant: "destructive" });
-      return;
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/transactions/${transactionId}/parse-inspection`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Upload failed" }));
+        throw new Error(err.error || "Upload failed");
+      }
+      const data = await res.json();
+      setAiUsedForParse(!!data.aiUsed);
+      const items: ParsedItem[] = (data.items || []).map((item: any) => ({
+        category: item.category || "other",
+        description: item.description || "",
+        severity: item.severity || "moderate",
+        location: item.location || "",
+        selected: true,
+        pageNumber: item.pageNumber || null,
+        hasPhoto: item.hasPhoto || false,
+      }));
+      setParsedItems(items);
+      toast({ title: `Found ${items.length} items`, description: data.aiUsed ? "AI-powered extraction" : "Text pattern extraction" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
     }
-    const items = selected.map(item => ({
-      transactionId,
-      category: item.category,
-      description: item.description,
-      severity: item.severity,
-      location: item.location || null,
-      pageNumber: item.pageNumber || null,
-      hasPhoto: item.hasPhoto || false,
-      status: "approved",
-      notes: null,
-    }));
-    saveItemsMutation.mutate(items);
+  };
+
+  const handleSaveApproved = () => {
+    const approved = parsedItems
+      .filter(i => i.selected)
+      .map(item => ({
+        category: item.category,
+        description: item.description,
+        severity: item.severity,
+        location: item.location,
+        status: "approved",
+        pageNumber: item.pageNumber,
+        hasPhoto: item.hasPhoto || false,
+      }));
+    saveItemsMutation.mutate(approved);
   };
 
   const handleAddManual = () => {
-    if (!manualItem.description) return;
-    const items = [{
-      transactionId,
-      category: manualItem.category,
-      description: manualItem.description,
-      severity: manualItem.severity,
-      location: manualItem.location || null,
-      status: "approved",
-      notes: manualItem.notes || null,
-    }];
-    saveItemsMutation.mutate(items, {
-      onSuccess: () => {
-        setAddingManual(false);
-        setManualItem({ category: "other", description: "", severity: "moderate", location: "", notes: "" });
-      },
-    });
+    if (!manualItem.description.trim()) return;
+    saveItemsMutation.mutate([{ ...manualItem, status: "approved" }]);
+    setManualItem({ category: "other", description: "", severity: "moderate", location: "" });
+    setAddingManual(false);
   };
 
   const handleSendBids = (item: InspectionItem) => {
     setVendorDialogItem(item);
     setSelectedVendors(new Set());
   };
+
+  const [bulkSendMode, setBulkSendMode] = useState(false);
 
   const handleBulkSendBids = () => {
     const items = savedItems.filter(i => selectedSavedItems.has(i.id) && i.status === "approved");
@@ -272,8 +238,7 @@ export default function InspectionReviewPage() {
   };
 
   const confirmSendBids = async () => {
-    if (!vendorDialogItem || selectedVendors.size === 0) return;
-
+    if (!vendorDialogItem) return;
     if (bulkSendMode) {
       const items = savedItems.filter(i => selectedSavedItems.has(i.id) && i.status === "approved");
       for (const item of items) {
@@ -292,46 +257,31 @@ export default function InspectionReviewPage() {
     }
   };
 
-  const relevantContractors = vendorDialogItem
-    ? contractors.filter((c: Contractor) => {
-        const catMap: Record<string, string[]> = {
-          roof: ["roofer"],
-          plumbing: ["plumber"],
-          electrical: ["electrician"],
-          hvac: ["hvac"],
-          foundation: ["handyman", "other"],
-          exterior: ["painter", "handyman", "landscaper"],
-          interior: ["painter", "handyman"],
-          appliances: ["handyman", "other"],
-          other: ["handyman", "other"],
-        };
-        const matchingCategories = catMap[vendorDialogItem.category] || ["other"];
-        return matchingCategories.includes(c.category) || c.category === "other";
-      })
-    : [];
-
-  const toggleSavedItem = (itemId: number) => {
+  const toggleSavedItem = (id: number) => {
     setSelectedSavedItems(prev => {
       const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
-  const address = transaction ? `${transaction.streetName}, ${transaction.city}` : "";
+  if (!user) return null;
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="container max-w-4xl mx-auto py-6 px-4 space-y-6">
       <div className="flex items-center gap-4">
         <Link href={`/transactions/${transactionId}`}>
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Transaction
           </Button>
         </Link>
         <div>
           <h1 className="text-2xl font-bold">Inspection Review</h1>
-          {address && <p className="text-sm text-muted-foreground">{address}</p>}
+          {transaction && (
+            <p className="text-sm text-muted-foreground">{(transaction as any).propertyAddress || `Transaction #${transactionId}`}</p>
+          )}
         </div>
       </div>
 
@@ -342,171 +292,90 @@ export default function InspectionReviewPage() {
             Upload Inspection Report
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <Input
               type="file"
-              accept=".pdf"
-              onChange={handleFileUpload}
-              disabled={isParsing}
-              className="max-w-md"
+              accept=".pdf,.txt"
+              onChange={handleUpload}
+              disabled={uploading}
+              className="flex-1"
             />
-            {isParsing && (
-              <div className="flex items-center gap-2 text-muted-foreground">
+            {uploading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Parsing report...
+                Parsing...
               </div>
             )}
           </div>
-          <p className="text-sm text-muted-foreground mt-2">
-            Upload a PDF inspection report. AI will extract repair items for your review before anything is saved.
-          </p>
-          <div className="flex items-start gap-2 p-3 mt-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-            <Shield className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-green-700 dark:text-green-300">
-              <span className="font-medium">Privacy Protected:</span> Your report is processed in memory. AI reads the PDF directly (including photos) for accurate extraction. The AI provider does not retain or train on your document content.{" "}
-              <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline font-medium hover:text-green-900 dark:hover:text-green-100">Learn more</a>
-            </div>
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border">
+            <Bot className="h-5 w-5 text-primary shrink-0" />
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">AI-Powered Parsing:</span> Reports are analyzed by AI for accurate extraction including photo detection. Your documents are processed securely and not retained.
+            </p>
           </div>
         </CardContent>
       </Card>
 
-      {showParsed && parsedItems.length > 0 && (
-        <Card>
+      {parsedItems.length > 0 && (
+        <Card className="border-primary/30">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Parsed Items ({parsedItems.filter(i => i.selected).length} / {parsedItems.length} selected)
+                <Sparkles className="h-5 w-5 text-primary" />
+                Parsed Items ({parsedItems.length})
+                {aiUsedForParse && (
+                  <Badge variant="secondary" className="gap-1 ml-2">
+                    <Bot className="h-3 w-3" />
+                    AI
+                  </Badge>
+                )}
               </CardTitle>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setParsedItems(parsedItems.map(i => ({ ...i, selected: true })))}
-                >
-                  Select All
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setParsedItems(parsedItems.map(i => ({ ...i, selected: false })))}
-                >
-                  Deselect All
-                </Button>
-              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-start gap-2 p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
-              <Sparkles className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-purple-700 dark:text-purple-300">
-                <span className="font-medium">AI-Extracted Items</span>
-                <span> — These items were automatically extracted using AI, which analyzed both the text and photos in your report. Please review each item's category, severity, and description carefully before saving. Items marked with a "Photo" badge indicate the AI found a related photo in the report.</span>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-              <Shield className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-green-700 dark:text-green-300">
-                <span className="font-medium">Privacy Protected:</span> Sensitive data (SSNs, account numbers, emails) was automatically redacted before AI processing.{" "}
-                <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline font-medium hover:text-green-900 dark:hover:text-green-100">Learn more</a>
-              </div>
-            </div>
-
             {parsedItems.map((item, idx) => (
               <div key={idx} className="flex items-start gap-3 p-3 border rounded-lg">
                 <Checkbox
                   checked={item.selected}
-                  onCheckedChange={(checked) => {
+                  onCheckedChange={() => {
                     const updated = [...parsedItems];
-                    updated[idx] = { ...updated[idx], selected: !!checked };
+                    updated[idx] = { ...updated[idx], selected: !updated[idx].selected };
                     setParsedItems(updated);
                   }}
-                  className="mt-1"
+                  className="mt-0.5"
                 />
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Category</Label>
-                    <Select
-                      value={item.category}
-                      onValueChange={(val) => {
-                        const updated = [...parsedItems];
-                        updated[idx] = { ...updated[idx], category: val };
-                        setParsedItems(updated);
-                      }}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIES.map(c => (
-                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Severity</Label>
-                    <Select
-                      value={item.severity}
-                      onValueChange={(val) => {
-                        const updated = [...parsedItems];
-                        updated[idx] = { ...updated[idx], severity: val };
-                        setParsedItems(updated);
-                      }}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SEVERITIES.map(s => (
-                          <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label className="text-xs text-muted-foreground">Description</Label>
-                    <Input
-                      value={item.description}
-                      onChange={(e) => {
-                        const updated = [...parsedItems];
-                        updated[idx] = { ...updated[idx], description: e.target.value };
-                        setParsedItems(updated);
-                      }}
-                      className="h-8"
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-1 shrink-0 mt-2">
-                  {item.pageNumber && (
-                    <span className="text-xs text-muted-foreground">
-                      p.{item.pageNumber}
-                    </span>
-                  )}
-                  {item.hasPhoto && (
-                    <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
-                      <Eye className="h-3 w-3 mr-1" />
-                      Photo
+                <SeverityIcon severity={item.severity} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm leading-relaxed">{item.description}</p>
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    <Badge variant="secondary" className="text-xs">
+                      {CATEGORIES.find(c => c.value === item.category)?.label || item.category}
                     </Badge>
-                  )}
+                    <SeverityBadge severity={item.severity} />
+                    {item.location && (
+                      <Badge variant="outline" className="text-xs font-normal text-muted-foreground">{item.location}</Badge>
+                    )}
+                    {item.hasPhoto && (
+                      <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                        <Eye className="h-3 w-3 mr-1" />
+                        Photo
+                      </Badge>
+                    )}
+                    {item.pageNumber && (
+                      <Badge variant="outline" className="text-xs font-normal">
+                        <BookOpen className="h-3 w-3 mr-1" />
+                        Page {item.pageNumber}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0"
-                  onClick={() => setParsedItems(parsedItems.filter((_, i) => i !== idx))}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
               </div>
             ))}
-
             <Separator />
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => { setShowParsed(false); setParsedItems([]); }}>
-                Cancel
+            <div className="flex justify-between items-center">
+              <Button variant="ghost" onClick={() => setParsedItems([])}>
+                Discard All
               </Button>
               <Button onClick={handleSaveApproved} disabled={saveItemsMutation.isPending}>
                 {saveItemsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
@@ -550,26 +419,27 @@ export default function InspectionReviewPage() {
           ) : (
             <div className="space-y-3">
               {savedItems.map((item) => (
-                <div key={item.id} className="flex items-start gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <Checkbox
-                    checked={selectedSavedItems.has(item.id)}
-                    onCheckedChange={() => toggleSavedItem(item.id)}
-                    className="mt-1"
-                    disabled={item.status !== "approved"}
-                  />
-                  <SeverityIcon severity={item.severity} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className="font-medium">{item.description}</span>
+                <div key={item.id} className="border rounded-lg hover:bg-muted/30 transition-colors overflow-hidden">
+                  <div className="p-4 space-y-2.5">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={selectedSavedItems.has(item.id)}
+                        onCheckedChange={() => toggleSavedItem(item.id)}
+                        className="mt-0.5 shrink-0"
+                        disabled={item.status !== "approved"}
+                      />
+                      <SeverityIcon severity={item.severity} />
+                      <p className="text-sm leading-relaxed flex-1">{item.description}</p>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="secondary">
+
+                    <div className="flex items-center gap-1.5 flex-wrap pl-10">
+                      <Badge variant="secondary" className="text-xs">
                         {CATEGORIES.find(c => c.value === item.category)?.label || item.category}
                       </Badge>
                       <SeverityBadge severity={item.severity} />
-                      <Badge variant="outline">{STATUS_LABELS[item.status] || item.status}</Badge>
+                      <Badge variant="outline" className="text-xs">{STATUS_LABELS[item.status] || item.status}</Badge>
                       {item.location && (
-                        <span className="text-xs text-muted-foreground">{item.location}</span>
+                        <Badge variant="outline" className="text-xs font-normal text-muted-foreground">{item.location}</Badge>
                       )}
                       {(item as any).hasPhoto && (
                         <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
@@ -589,11 +459,13 @@ export default function InspectionReviewPage() {
                         </Button>
                       )}
                     </div>
+
                     {item.notes && (
-                      <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>
+                      <p className="text-sm text-muted-foreground pl-10">{item.notes}</p>
                     )}
+
                     {(item as any).repairRequested && (
-                      <div className="flex items-center gap-2 mt-2 p-2 rounded bg-muted/50 border">
+                      <div className="flex items-center gap-2 ml-10 p-2 rounded bg-muted/50 border flex-wrap">
                         <span className="text-xs text-muted-foreground">Repair Status:</span>
                         <Select
                           value={(item as any).repairStatus || 'requested'}
@@ -641,19 +513,22 @@ export default function InspectionReviewPage() {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
+
+                  <div className="flex items-center justify-end gap-2 px-4 py-2 bg-muted/30 border-t">
                     {item.status === "approved" && (
-                      <Button variant="outline" size="sm" onClick={() => handleSendBids(item)}>
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleSendBids(item)}>
                         <Send className="h-3 w-3 mr-1" />
                         Send for Bids
                       </Button>
                     )}
                     <Button
                       variant="ghost"
-                      size="icon"
+                      size="sm"
+                      className="h-7 text-xs text-destructive hover:text-destructive"
                       onClick={() => deleteItemMutation.mutate(item.id)}
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Remove
                     </Button>
                   </div>
                 </div>
@@ -698,12 +573,11 @@ export default function InspectionReviewPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Description *</Label>
+              <Label>Description</Label>
               <Textarea
                 value={manualItem.description}
                 onChange={(e) => setManualItem({ ...manualItem, description: e.target.value })}
-                placeholder="Describe the repair item..."
-                rows={3}
+                placeholder="Describe the issue..."
               />
             </div>
             <div className="space-y-2">
@@ -711,91 +585,72 @@ export default function InspectionReviewPage() {
               <Input
                 value={manualItem.location}
                 onChange={(e) => setManualItem({ ...manualItem, location: e.target.value })}
-                placeholder="e.g., Master bathroom, Kitchen"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Notes</Label>
-              <Textarea
-                value={manualItem.notes}
-                onChange={(e) => setManualItem({ ...manualItem, notes: e.target.value })}
-                placeholder="Additional notes..."
-                rows={2}
+                placeholder="e.g., Kitchen, Master Bathroom..."
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddingManual(false)}>Cancel</Button>
-            <Button onClick={handleAddManual} disabled={!manualItem.description || saveItemsMutation.isPending}>
-              {saveItemsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            <Button onClick={handleAddManual} disabled={!manualItem.description.trim()}>
+              <Plus className="h-4 w-4 mr-2" />
               Add Item
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!vendorDialogItem} onOpenChange={(open) => { if (!open) { setVendorDialogItem(null); setBulkSendMode(false); } }}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={vendorDialogItem !== null} onOpenChange={() => setVendorDialogItem(null)}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {bulkSendMode
-                ? `Send ${savedItems.filter(i => selectedSavedItems.has(i.id) && i.status === "approved").length} Items for Bids`
-                : "Select Vendors for Bid Request"}
-            </DialogTitle>
+            <DialogTitle>Send for Bids</DialogTitle>
           </DialogHeader>
           {vendorDialogItem && (
             <div className="space-y-4">
-              {!bulkSendMode && (
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="font-medium">{vendorDialogItem.description}</p>
-                  <div className="flex gap-2 mt-1">
-                    <Badge variant="secondary">
-                      {CATEGORIES.find(c => c.value === vendorDialogItem.category)?.label}
-                    </Badge>
-                    <SeverityBadge severity={vendorDialogItem.severity} />
-                  </div>
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="font-medium text-sm">{vendorDialogItem.description}</p>
+                <div className="flex gap-2 mt-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {CATEGORIES.find(c => c.value === vendorDialogItem.category)?.label || vendorDialogItem.category}
+                  </Badge>
+                  <SeverityBadge severity={vendorDialogItem.severity} />
                 </div>
-              )}
-
-              <div>
-                <Label className="mb-2 block">
-                  Select Vendors ({selectedVendors.size} selected)
-                  {relevantContractors.length === 0 && (
-                    <span className="text-muted-foreground ml-2">— showing all contractors</span>
-                  )}
-                </Label>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {(relevantContractors.length > 0 ? relevantContractors : contractors).map((c: Contractor) => (
-                    <div
-                      key={c.id}
-                      className="flex items-center gap-3 p-2 border rounded hover:bg-muted/50 cursor-pointer"
-                      onClick={() => {
-                        setSelectedVendors(prev => {
-                          const next = new Set(prev);
-                          if (next.has(c.id)) next.delete(c.id);
-                          else next.add(c.id);
-                          return next;
-                        });
-                      }}
-                    >
-                      <Checkbox checked={selectedVendors.has(c.id)} />
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">{c.category} {c.phone ? `· ${c.phone}` : ""}</p>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <Label>Select vendors to request bids from:</Label>
+                {contractors.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No vendors on your team. Add vendors in HomeBase Pros first.</p>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {contractors.map(v => (
+                      <div key={v.id} className="flex items-center gap-3 p-2 rounded hover:bg-muted/50">
+                        <Checkbox
+                          checked={selectedVendors.has(v.id)}
+                          onCheckedChange={() => {
+                            setSelectedVendors(prev => {
+                              const next = new Set(prev);
+                              if (next.has(v.id)) next.delete(v.id);
+                              else next.add(v.id);
+                              return next;
+                            });
+                          }}
+                        />
+                        <div>
+                          <p className="text-sm font-medium">{v.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {CATEGORIES.find(c => c.value === v.category)?.label || v.category}
+                            {v.phone ? ` · ${v.phone}` : ""}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {contractors.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No contractors found. Add contractors first.
-                    </p>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setVendorDialogItem(null); setBulkSendMode(false); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => setVendorDialogItem(null)}>Cancel</Button>
             <Button
               onClick={confirmSendBids}
               disabled={selectedVendors.size === 0 || sendBidsMutation.isPending}
@@ -818,7 +673,7 @@ export default function InspectionReviewPage() {
           </DialogHeader>
           <div className="flex-1 overflow-hidden">
             <iframe
-              src={`/api/transactions/${transactionId}/inspection-pdf${pdfViewerPage ? `#page=${pdfViewerPage}` : ""}`}
+              src={`/api/transactions/${transactionId}/inspection-pdf?page=${pdfViewerPage || 1}`}
               className="w-full h-full border rounded-lg"
               style={{ minHeight: "60vh" }}
               title="Inspection Report PDF"
