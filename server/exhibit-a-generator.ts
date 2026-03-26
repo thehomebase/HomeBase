@@ -552,7 +552,14 @@ export async function generateExhibitA(
       }
 
       if (!imageToEmbed) {
-        imageToEmbed = pageData.fullImage;
+        page.drawText(`[See Inspection Report Page ${item.pageNumber}]`, {
+          x: MARGIN,
+          y: y - 20,
+          size: 10,
+          font: helveticaOblique,
+          color: rgb(0.5, 0.5, 0.5),
+        });
+        continue;
       }
 
       try {
