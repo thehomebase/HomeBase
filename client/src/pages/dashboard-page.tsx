@@ -319,7 +319,7 @@ function PipelineWidget({ stages }: { stages: Record<string, number> }) {
     closed: "bg-green-600",
   };
 
-  const buyerStages = ["qualified_buyer", "active_search", "offer_submitted", "under_contract", "closing"];
+  const buyerStages = ["qualified_buyer", "active_search", "offer_submitted", "under_contract", "closed"];
   const sellerStages = ["prospect", "active_listing_prep", "live_listing", "under_contract", "closing", "closed"];
 
   const total = Object.values(stages).reduce((s, v) => s + v, 0);

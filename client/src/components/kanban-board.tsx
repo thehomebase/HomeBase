@@ -47,10 +47,10 @@ const buyerColumns = [
   { id: "active_search", title: "Active Search" },
   { id: "offer_submitted", title: "Offer Submitted" },
   { id: "under_contract", title: "Under Contract" },
-  { id: "closing", title: "Closing" },
+  { id: "closed", title: "Closed" },
 ];
 
-const BUYER_ADDRESS_STAGES = new Set(["offer_submitted", "under_contract", "closing"]);
+const BUYER_ADDRESS_STAGES = new Set(["offer_submitted", "under_contract", "closed"]);
 
 const sellerColumns = [
   { id: "prospect", title: "Prospect" },
