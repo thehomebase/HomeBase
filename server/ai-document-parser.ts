@@ -383,7 +383,7 @@ export async function parseInspectionWithAI(input: Buffer | string): Promise<{
     model: "gemini-2.5-flash",
     contents,
     config: {
-      maxOutputTokens: 16384,
+      maxOutputTokens: 32768,
       temperature: 0.1,
     },
   });

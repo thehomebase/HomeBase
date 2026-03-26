@@ -7766,12 +7766,8 @@ export function registerRoutes(app: Express): Server {
         } catch (aiErr) {
           console.error("[InspectionParser] AI parsing failed or returned empty, falling back to text extraction + regex:", aiErr);
           try {
-            const pdfParseModule = await import("pdf-parse");
-            const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
-            const pdfData = await pdfParseFn(req.file.buffer);
-            const rawText = pdfData.text || "";
-            const { parseInspectionReport } = await import("./inspection-parser");
-            items = parseInspectionReport(rawText);
+            const { parseInspectionPdf } = await import("./inspection-parser");
+            items = await parseInspectionPdf(req.file!.buffer);
             aiUsed = false;
             console.log(`[InspectionParser] Regex fallback extracted ${items.length} items`);
           } catch (fallbackErr) {
