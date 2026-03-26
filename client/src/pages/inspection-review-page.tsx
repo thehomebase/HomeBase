@@ -709,20 +709,23 @@ export default function InspectionReviewPage() {
       </Dialog>
 
       <Dialog open={pdfViewerPage !== null} onOpenChange={() => setPdfViewerPage(null)}>
-        <DialogContent className="max-w-4xl h-[80vh]">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
               Inspection Report {pdfViewerPage ? `- Page ${pdfViewerPage}` : ""}
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-hidden">
-            <iframe
-              src={`/api/transactions/${transactionId}/inspection-pdf?page=${pdfViewerPage || 1}`}
-              className="w-full h-full border rounded-lg"
-              style={{ minHeight: "60vh" }}
-              title="Inspection Report PDF"
-            />
+          <div className="flex-1 overflow-auto">
+            {pdfViewerPage && (
+              <img
+                key={`page-${pdfViewerPage}`}
+                src={`/api/transactions/${transactionId}/inspection-pdf?page=${pdfViewerPage}&format=image`}
+                alt={`Inspection Report Page ${pdfViewerPage}`}
+                className="w-full h-auto rounded-lg border"
+                loading="eager"
+              />
+            )}
           </div>
         </DialogContent>
       </Dialog>

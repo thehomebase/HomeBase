@@ -7816,6 +7816,34 @@ export function registerRoutes(app: Express): Server {
       }
 
       const requestedPage = req.query.page ? Number(req.query.page) : null;
+      const format = req.query.format as string || 'pdf';
+
+      if (requestedPage && requestedPage > 0 && format === 'image') {
+        try {
+          const { execSync } = await import("child_process");
+          const path = await import("path");
+          const os = await import("os");
+          const tmpDir = os.default.tmpdir();
+          const outputPrefix = path.default.join(tmpDir, `inspection-page-${transactionId}-${requestedPage}`);
+          const outputFile = `${outputPrefix}-${String(requestedPage).padStart(6, '0')}.png`;
+
+          if (!fs.default.existsSync(outputFile)) {
+            execSync(`pdftoppm -png -r 200 -f ${requestedPage} -l ${requestedPage} "${pdfInfo.filePath}" "${outputPrefix}"`, {
+              timeout: 15000,
+            });
+          }
+
+          if (fs.default.existsSync(outputFile)) {
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Cache-Control', 'private, max-age=3600');
+            const imgStream = fs.default.createReadStream(outputFile);
+            return imgStream.pipe(res);
+          }
+        } catch (imgErr) {
+          console.error('Error rendering PDF page as image:', imgErr);
+        }
+      }
+
       if (requestedPage && requestedPage > 0) {
         try {
           const { PDFDocument } = await import("pdf-lib");
