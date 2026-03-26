@@ -1718,17 +1718,56 @@ export class DatabaseStorage implements IStorage {
       }
 
       const upcomingDeadlines = await db.execute(sql`
-        SELECT d.name, d.deadline, d.status, t.street_name, t.id as transaction_id,
-          c.first_name as client_first_name, c.last_name as client_last_name
+        (SELECT d.name, d.deadline::timestamp as deadline, d.status, t.street_name, t.id as transaction_id,
+          c.first_name as client_first_name, c.last_name as client_last_name, 'document' as source
         FROM documents d
         JOIN transactions t ON d.transaction_id = t.id
         LEFT JOIN clients c ON c.id = t.client_id
         WHERE t.agent_id = ${userId}
         AND d.deadline IS NOT NULL
         AND d.deadline >= ${todayStart}::date
-        AND d.status != 'complete'
-        ORDER BY d.deadline ASC
-        LIMIT 5
+        AND d.status != 'complete')
+        UNION ALL
+        (SELECT 'Option Period Expiration' as name, t.option_period_expiration as deadline, t.status,
+          t.street_name, t.id as transaction_id,
+          c.first_name as client_first_name, c.last_name as client_last_name, 'transaction' as source
+        FROM transactions t
+        LEFT JOIN clients c ON c.id = t.client_id
+        WHERE t.agent_id = ${userId}
+        AND t.option_period_expiration IS NOT NULL
+        AND t.option_period_expiration >= ${todayStart}::timestamp
+        AND t.status NOT IN ('closed', 'cancelled', 'withdrawn'))
+        UNION ALL
+        (SELECT 'Closing Date' as name, t.closing_date as deadline, t.status,
+          t.street_name, t.id as transaction_id,
+          c.first_name as client_first_name, c.last_name as client_last_name, 'transaction' as source
+        FROM transactions t
+        LEFT JOIN clients c ON c.id = t.client_id
+        WHERE t.agent_id = ${userId}
+        AND t.closing_date IS NOT NULL
+        AND t.closing_date >= ${todayStart}::timestamp
+        AND t.status NOT IN ('closed', 'cancelled', 'withdrawn'))
+        UNION ALL
+        (SELECT 'Earnest Money Deposit Due' as name, em_deadline as deadline,
+          t.status, t.street_name, t.id as transaction_id,
+          c.first_name as client_first_name, c.last_name as client_last_name, 'transaction' as source
+        FROM (
+          SELECT *,
+            (contract_execution_date + INTERVAL '3 days' +
+              CASE WHEN EXTRACT(DOW FROM contract_execution_date + INTERVAL '3 days') = 0 THEN INTERVAL '1 day'
+                   WHEN EXTRACT(DOW FROM contract_execution_date + INTERVAL '3 days') = 6 THEN INTERVAL '2 days'
+                   ELSE INTERVAL '0 days' END
+            ) as em_deadline
+          FROM transactions
+          WHERE agent_id = ${userId}
+          AND contract_execution_date IS NOT NULL
+          AND earnest_money IS NOT NULL
+          AND status NOT IN ('closed', 'cancelled', 'withdrawn')
+        ) t
+        LEFT JOIN clients c ON c.id = t.client_id
+        WHERE t.em_deadline >= ${todayStart}::timestamp)
+        ORDER BY deadline ASC
+        LIMIT 10
       `);
 
       const recentActivity = await db.execute(sql`

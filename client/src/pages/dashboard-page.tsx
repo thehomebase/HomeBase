@@ -18,14 +18,16 @@ import {
   LayoutDashboard, TrendingUp, TrendingDown, Users, FileText, MessageSquare,
   Target, DollarSign, CalendarClock, ArrowRight, Plus, Send, Settings,
   X, Clock, AlertTriangle, Briefcase, Zap, CheckCircle2, Minus, Phone, Mail, TrendingUp as TrendUp, UserPlus,
-  Shield, Activity, Building2
+  Shield, Activity, Building2, ListTodo, Calendar, Circle
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const AGENT_WIDGETS = [
+  { id: "tasks", label: "My Tasks" },
   { id: "pipeline", label: "Deal Pipeline" },
   { id: "stats", label: "Key Metrics" },
   { id: "communications", label: "Communications" },
@@ -394,35 +396,137 @@ function PipelineWidget({ stages, buyerStages: buyerData, sellerStages: sellerDa
   );
 }
 
+function TasksWidget() {
+  const { data: tasks = [] } = useQuery<any[]>({ queryKey: ["/api/tasks"] });
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const toggleTask = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      await apiRequest("PATCH", `/api/tasks/${id}`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/badge-counts"] });
+    },
+  });
+
+  const activeTasks = (tasks as any[])
+    .filter(t => t.status !== "completed")
+    .sort((a, b) => {
+      const priorityOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+      const pa = priorityOrder[a.priority] ?? 2;
+      const pb = priorityOrder[b.priority] ?? 2;
+      if (pa !== pb) return pa - pb;
+      if (a.due_date && b.due_date) return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      if (a.due_date) return -1;
+      if (b.due_date) return 1;
+      return 0;
+    })
+    .slice(0, 5);
+
+  const priorityColors: Record<string, string> = {
+    urgent: "text-red-600",
+    high: "text-orange-500",
+    medium: "text-blue-500",
+    low: "text-gray-400",
+  };
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <ListTodo className="h-4 w-4 text-primary" />
+          <h3 className="font-semibold text-sm">My Tasks</h3>
+          {activeTasks.length > 0 && (
+            <Badge variant="secondary" className="text-xs h-5 px-1.5">{activeTasks.length}</Badge>
+          )}
+        </div>
+        <Link href="/tasks">
+          <Button variant="ghost" size="sm" className="text-xs h-7 px-2">View All</Button>
+        </Link>
+      </div>
+      {activeTasks.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-3">No active tasks</p>
+      ) : (
+        <div className="space-y-1">
+          {activeTasks.map((task) => {
+            const isOverdue = task.due_date && new Date(task.due_date) < new Date();
+            return (
+              <div key={task.id} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted/50 transition-colors group">
+                <Checkbox
+                  checked={false}
+                  onCheckedChange={() => toggleTask.mutate({ id: task.id, status: "completed" })}
+                  className="shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{task.title}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <Circle className={`h-2.5 w-2.5 fill-current ${priorityColors[task.priority] || priorityColors.medium}`} />
+                    <span className="text-xs text-muted-foreground capitalize">{task.priority}</span>
+                    {task.due_date && (
+                      <span className={`text-xs flex items-center gap-0.5 ${isOverdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
+                        <Calendar className="h-3 w-3" />
+                        {new Date(task.due_date).toLocaleDateString([], { month: "short", day: "numeric" })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function DeadlinesWidget({ deadlines }: { deadlines: any[] }) {
+  const getUrgency = (deadline: string) => {
+    const days = Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    if (days <= 0) return { bg: "bg-red-100 dark:bg-red-900/30", icon: "text-red-600", label: "text-red-600 font-semibold", text: "Today" };
+    if (days <= 2) return { bg: "bg-red-50 dark:bg-red-900/20", icon: "text-red-500", label: "text-red-500 font-medium", text: `${days}d` };
+    if (days <= 7) return { bg: "bg-amber-100 dark:bg-amber-900/30", icon: "text-amber-600", label: "text-amber-600", text: `${days}d` };
+    return { bg: "bg-blue-50 dark:bg-blue-900/20", icon: "text-blue-500", label: "text-muted-foreground", text: null };
+  };
+
   return (
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-3">
         <CalendarClock className="h-4 w-4 text-amber-500" />
         <h3 className="font-semibold text-sm">Upcoming Deadlines</h3>
+        {deadlines.length > 0 && (
+          <Badge variant="secondary" className="text-xs h-5 px-1.5">{deadlines.length}</Badge>
+        )}
       </div>
       {deadlines.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-3">No upcoming deadlines</p>
       ) : (
         <div className="space-y-2">
-          {deadlines.map((d, i) => (
-            <Link key={i} href={`/transactions/${d.transactionId}`}>
-              <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
-                <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+          {deadlines.map((d, i) => {
+            const urgency = getUrgency(d.deadline);
+            return (
+              <Link key={i} href={`/transactions/${d.transactionId}`}>
+                <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+                  <div className={`h-8 w-8 rounded-full ${urgency.bg} flex items-center justify-center shrink-0`}>
+                    <AlertTriangle className={`h-4 w-4 ${urgency.icon}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{d.name}</p>
+                    <p className="text-xs text-muted-foreground">{d.transactionStreet}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`text-xs ${urgency.label}`}>
+                      {new Date(d.deadline).toLocaleDateString([], { month: "short", day: "numeric" })}
+                    </p>
+                    {urgency.text && (
+                      <p className={`text-[10px] ${urgency.label}`}>{urgency.text}</p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{d.name}</p>
-                  <p className="text-xs text-muted-foreground">{d.transactionStreet}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xs font-medium">
-                    {new Date(d.deadline).toLocaleDateString([], { month: "short", day: "numeric" })}
-                  </p>
-                </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       )}
     </Card>
@@ -823,6 +927,12 @@ export default function DashboardPage() {
                 value={dashData.unreadMessages || 0}
                 accent="border-l-amber-500"
               />
+            </div>
+          )}
+
+          {isWidgetVisible("tasks") && (
+            <div className="mb-6">
+              <TasksWidget />
             </div>
           )}
 

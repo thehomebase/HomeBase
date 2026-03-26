@@ -14189,30 +14189,34 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: "Not authorized" });
       }
 
-      const allowedFields = ['title', 'description', 'status', 'priority', 'dueDate', 'assignedTo'];
-      const updates: string[] = [];
-      const values: any[] = [];
-      for (const key of allowedFields) {
-        if (req.body[key] !== undefined) {
-          const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
-          updates.push(`${dbKey} = $${values.length + 1}`);
-          values.push(key === 'dueDate' && req.body[key] ? new Date(req.body[key]) : req.body[key]);
-        }
-      }
+      const updateData: Record<string, any> = {};
+      if (req.body.title !== undefined) updateData.title = req.body.title;
+      if (req.body.description !== undefined) updateData.description = req.body.description;
+      if (req.body.status !== undefined) updateData.status = req.body.status;
+      if (req.body.priority !== undefined) updateData.priority = req.body.priority;
+      if (req.body.dueDate !== undefined) updateData.due_date = req.body.dueDate ? new Date(req.body.dueDate) : null;
+      if (req.body.assignedTo !== undefined) updateData.assigned_to = req.body.assignedTo;
+
       if (req.body.status === 'completed') {
-        updates.push(`completed_at = $${values.length + 1}`);
-        values.push(new Date());
+        updateData.completed_at = new Date();
       } else if (req.body.status && req.body.status !== 'completed') {
-        updates.push(`completed_at = NULL`);
+        updateData.completed_at = null;
       }
-      updates.push(`updated_at = $${values.length + 1}`);
-      values.push(new Date());
+      updateData.updated_at = new Date();
 
-      if (updates.length === 0) return res.json(task);
-
-      const setClauses = updates.join(', ');
-      values.push(taskId);
-      const result = await db.execute(sql.raw(`UPDATE tasks SET ${setClauses} WHERE id = $${values.length} RETURNING *`, values));
+      const result = await db.execute(sql`
+        UPDATE tasks SET
+          title = COALESCE(${updateData.title ?? null}, title),
+          description = COALESCE(${updateData.description ?? null}, description),
+          status = COALESCE(${updateData.status ?? null}, status),
+          priority = COALESCE(${updateData.priority ?? null}, priority),
+          due_date = ${updateData.due_date !== undefined ? updateData.due_date : sql`due_date`},
+          assigned_to = ${updateData.assigned_to !== undefined ? updateData.assigned_to : sql`assigned_to`},
+          completed_at = ${updateData.completed_at !== undefined ? updateData.completed_at : sql`completed_at`},
+          updated_at = ${updateData.updated_at}
+        WHERE id = ${taskId}
+        RETURNING *
+      `);
       res.json(result.rows[0]);
     } catch (error) {
       console.error("Update task error:", error);
