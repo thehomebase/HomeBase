@@ -561,7 +561,7 @@ export async function generateExhibitA(
         const yEndPct = region.yEnd / pageData.dimensions.height;
 
         const cropPath = path.join(tmpDir, `exhibita-crop-${transactionId}-item${item.id}.png`);
-        const cropped = cropImage(pageData.fullImage, cropPath, yStartPct, yEndPct);
+        const cropped = await cropImage(pageData.fullImage, cropPath, yStartPct, yEndPct);
         if (cropped) {
           imageToEmbed = cropPath;
         }
