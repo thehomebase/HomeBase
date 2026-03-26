@@ -100,7 +100,7 @@ function findItemRegion(
   const matchY = blocks[bestMatchIdx].yMin;
 
   let sectionStart = matchY;
-  let sectionEnd = matchY;
+  let lastTextEnd = blocks[bestMatchIdx].yMax;
 
   for (let i = bestMatchIdx - 1; i >= 0; i--) {
     const gap = sectionStart - blocks[i].yMax;
@@ -110,11 +110,23 @@ function findItemRegion(
   }
 
   for (let i = bestMatchIdx + 1; i < blocks.length; i++) {
-    const gap = blocks[i].yMin - sectionEnd;
+    const gap = blocks[i].yMin - lastTextEnd;
     if (gap > 50) break;
-    sectionEnd = blocks[i].yMax;
-    if (sectionEnd >= matchY + 250) break;
+    lastTextEnd = blocks[i].yMax;
+    if (lastTextEnd >= matchY + 250) break;
   }
+
+  let sectionEnd = lastTextEnd;
+  let nextSectionStart = pageHeightPt;
+  for (let i = bestMatchIdx + 1; i < blocks.length; i++) {
+    if (blocks[i].yMin > lastTextEnd + 50) {
+      nextSectionStart = blocks[i].yMin;
+      break;
+    }
+  }
+
+  const photoBuffer = Math.min(nextSectionStart - lastTextEnd, 350);
+  sectionEnd = lastTextEnd + Math.max(photoBuffer, 150);
 
   const padding = 20;
   return {
