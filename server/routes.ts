@@ -7882,6 +7882,60 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/transactions/:id/exhibit-a", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    try {
+      const transactionId = Number(req.params.id);
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
+      if (transaction.agentId !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+
+      const { itemIds } = req.body;
+      if (!Array.isArray(itemIds) || itemIds.length === 0 || !itemIds.every((id: any) => typeof id === 'number')) {
+        return res.status(400).json({ error: 'itemIds must be a non-empty array of numbers' });
+      }
+
+      const allItems = await storage.getInspectionItemsByTransaction(transactionId);
+      const selectedItems = allItems
+        .filter(item => itemIds.includes(item.id))
+        .map(item => ({
+          id: item.id,
+          category: item.category,
+          description: item.description,
+          severity: item.severity,
+          location: item.location,
+          pageNumber: item.pageNumber,
+          hasPhoto: item.hasPhoto || false,
+        }));
+
+      if (selectedItems.length === 0) {
+        return res.status(400).json({ error: 'No matching items found' });
+      }
+
+      const pdfInfo = await storage.getInspectionPdf(transactionId);
+      const fs = await import("fs");
+      const pdfPath = pdfInfo && fs.default.existsSync(pdfInfo.filePath) ? pdfInfo.filePath : null;
+
+      const propertyAddress = (transaction as any).propertyAddress || `Transaction #${transactionId}`;
+
+      const { generateExhibitA } = await import("./exhibit-a-generator");
+      const pdfBuffer = await generateExhibitA(selectedItems, pdfPath, transactionId, propertyAddress);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="Exhibit-A-${transactionId}.pdf"`);
+      res.setHeader('Content-Length', pdfBuffer.length.toString());
+      res.end(pdfBuffer);
+    } catch (error) {
+      console.error('Error generating Exhibit A:', error);
+      res.status(500).json({ error: 'Failed to generate Exhibit A' });
+    }
+  });
+
   app.post("/api/transactions/:id/inspection-items", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(401);
     try {

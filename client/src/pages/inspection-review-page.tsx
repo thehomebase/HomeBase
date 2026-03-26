@@ -19,7 +19,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import {
   ArrowLeft, Upload, FileText, Plus, Trash2, Save, Send,
   AlertTriangle, CheckCircle2, Circle, ShieldAlert, Loader2, Eye, BookOpen,
-  Bot, Sparkles, Shield, RotateCcw, ChevronDown, ChevronRight, Image
+  Bot, Sparkles, Shield, RotateCcw, ChevronDown, ChevronRight, Image,
+  Download, FileOutput
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -119,6 +120,7 @@ export default function InspectionReviewPage() {
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [generatingExhibitA, setGeneratingExhibitA] = useState(false);
 
   const { data: transaction } = useQuery<Transaction>({
     queryKey: ["/api/transactions", transactionId],
@@ -316,6 +318,48 @@ export default function InspectionReviewPage() {
     setPdfViewerPage(page);
   };
 
+  const handleGenerateExhibitA = async () => {
+    const itemIds = selectedSavedItems.size > 0
+      ? Array.from(selectedSavedItems)
+      : savedItems.filter(i => i.status === "approved").map(i => i.id);
+
+    if (itemIds.length === 0) {
+      toast({ title: "No items to include", description: "Select items or approve items first.", variant: "destructive" });
+      return;
+    }
+
+    setGeneratingExhibitA(true);
+    try {
+      const res = await fetch(`/api/transactions/${transactionId}/exhibit-a`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ itemIds }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Generation failed" }));
+        throw new Error(err.error || "Failed to generate document");
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Exhibit-A-${transactionId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({ title: "Exhibit A generated!", description: `Document with ${itemIds.length} repair item${itemIds.length !== 1 ? 's' : ''} downloaded.` });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setGeneratingExhibitA(false);
+    }
+  };
+
   const parsedByCategory = useMemo(() => groupByCategory(parsedItems), [parsedItems]);
   const savedByCategory = useMemo(() => groupByCategory(savedItems), [savedItems]);
 
@@ -497,6 +541,22 @@ export default function InspectionReviewPage() {
                 <Button size="sm" onClick={handleBulkSendBids}>
                   <Send className="h-4 w-4 mr-1" />
                   Send for Bids ({selectedSavedItems.size})
+                </Button>
+              )}
+              {savedItems.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerateExhibitA}
+                  disabled={generatingExhibitA}
+                  className="border-primary/30 text-primary hover:bg-primary/10"
+                >
+                  {generatingExhibitA ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <FileOutput className="h-4 w-4 mr-1" />
+                  )}
+                  {generatingExhibitA ? "Generating..." : selectedSavedItems.size > 0 ? `Exhibit A (${selectedSavedItems.size})` : "Exhibit A"}
                 </Button>
               )}
               {savedItems.length > 0 && (

@@ -28,7 +28,7 @@ Preferred communication style: Simple, everyday language.
 - **Key Models**: Users, transactions, clients, documents, checklists, contractors, messages, leads, referrals, drip campaigns, authorized_users, and specialized entities for vendor, lender, broker, homeowner functionalities.
 
 ### Key Features
-- **Transaction & Document Management**: AI-powered data extraction from PDFs (Gemini Flash, TREC regex fallback) for contracts and inspection reports, document signing link tracking, transaction timelines with risk alerts, client portal, templates, Kanban pipelines, document scanning, WebSocket-based optimistic locking.
+- **Transaction & Document Management**: AI-powered data extraction from PDFs (Gemini Flash, TREC regex fallback) for contracts and inspection reports, document signing link tracking, transaction timelines with risk alerts, client portal, templates, Kanban pipelines, document scanning, WebSocket-based optimistic locking. Exhibit A document generator with smart page cropping for repair requests.
 - **Client Management**: Client invitation, automated feedback with agent-controlled review requests, smart reminders, client linking, opt-in transaction status notifications (in-app, email, SMS, push).
 - **HomeBase Pros (Unified Vendor/Contractor Hub)**: Public marketplace for verified vendors, private contractor management, inspection bid system, vendor self-registration, referral-linked invites, and vendor-to-user matching with sync prompts and rating/review system.
 - **Communication Tools**: Encrypted private messaging, SMS via Twilio, Google OAuth email integration, call logging, communication metrics, snippet management.
