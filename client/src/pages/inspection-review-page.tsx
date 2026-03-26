@@ -486,24 +486,30 @@ export default function InspectionReviewPage() {
                       {item.location && (
                         <Badge variant="outline" className="text-xs font-normal text-muted-foreground">{item.location}</Badge>
                       )}
-                      {(item as any).hasPhoto && (
-                        <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
-                          <Eye className="h-3 w-3 mr-1" />
-                          Photo
-                        </Badge>
-                      )}
-                      {item.pageNumber && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2 text-xs"
-                          onClick={() => setPdfViewerPage(item.pageNumber!)}
-                        >
-                          <BookOpen className="h-3 w-3 mr-1" />
-                          Page {item.pageNumber}
-                        </Button>
-                      )}
                     </div>
+
+                    {item.pageNumber && (
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 ml-10 mt-1 px-3 py-2 rounded-md border text-xs font-medium bg-muted/50 hover:bg-muted active:bg-muted transition-colors touch-manipulation"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPdfViewerPage(item.pageNumber!);
+                        }}
+                      >
+                        {(item as any).hasPhoto ? (
+                          <>
+                            <Eye className="h-4 w-4 text-blue-600" />
+                            <span>View Photo — Page {item.pageNumber}</span>
+                          </>
+                        ) : (
+                          <>
+                            <BookOpen className="h-4 w-4 text-muted-foreground" />
+                            <span>View Page {item.pageNumber}</span>
+                          </>
+                        )}
+                      </button>
+                    )}
 
                     {item.notes && (
                       <p className="text-sm text-muted-foreground pl-10">{item.notes}</p>
@@ -709,22 +715,35 @@ export default function InspectionReviewPage() {
       </Dialog>
 
       <Dialog open={pdfViewerPage !== null} onOpenChange={() => setPdfViewerPage(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-base">
               <Eye className="h-5 w-5" />
-              Inspection Report {pdfViewerPage ? `- Page ${pdfViewerPage}` : ""}
+              Page {pdfViewerPage}
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto -mx-4 sm:-mx-6 px-4 sm:px-6">
             {pdfViewerPage && (
-              <img
-                key={`page-${pdfViewerPage}`}
-                src={`/api/transactions/${transactionId}/inspection-pdf?page=${pdfViewerPage}&format=image`}
-                alt={`Inspection Report Page ${pdfViewerPage}`}
-                className="w-full h-auto rounded-lg border"
-                loading="eager"
-              />
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center justify-center bg-muted/30 rounded-lg" id={`loader-${pdfViewerPage}`}>
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+                <img
+                  key={`page-${pdfViewerPage}`}
+                  src={`/api/transactions/${transactionId}/inspection-pdf?page=${pdfViewerPage}&format=image&t=${Date.now()}`}
+                  alt={`Inspection Report Page ${pdfViewerPage}`}
+                  className="w-full h-auto rounded-lg border relative z-10"
+                  loading="eager"
+                  onLoad={(e) => {
+                    const loader = document.getElementById(`loader-${pdfViewerPage}`);
+                    if (loader) loader.style.display = 'none';
+                  }}
+                  onError={(e) => {
+                    const loader = document.getElementById(`loader-${pdfViewerPage}`);
+                    if (loader) loader.innerHTML = '<p class="text-sm text-muted-foreground">Unable to load page image</p>';
+                  }}
+                />
+              </div>
             )}
           </div>
         </DialogContent>

@@ -7827,10 +7827,16 @@ export function registerRoutes(app: Express): Server {
           const outputPrefix = path.default.join(tmpDir, `inspection-page-${transactionId}-${requestedPage}`);
           const outputFile = `${outputPrefix}-${String(requestedPage).padStart(6, '0')}.png`;
 
+          console.log(`[InspectionPDF] Rendering page ${requestedPage} as image for transaction ${transactionId}`);
+
           if (!fs.default.existsSync(outputFile)) {
+            console.log(`[InspectionPDF] Running pdftoppm: page=${requestedPage}, pdf=${pdfInfo.filePath}, output=${outputPrefix}`);
             execSync(`pdftoppm -png -r 200 -f ${requestedPage} -l ${requestedPage} "${pdfInfo.filePath}" "${outputPrefix}"`, {
               timeout: 15000,
             });
+            console.log(`[InspectionPDF] pdftoppm completed, checking for output: ${outputFile}`);
+          } else {
+            console.log(`[InspectionPDF] Using cached image: ${outputFile}`);
           }
 
           if (fs.default.existsSync(outputFile)) {
