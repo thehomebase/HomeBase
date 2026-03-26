@@ -294,8 +294,8 @@ function CommunicationsWidget() {
   );
 }
 
-function PipelineWidget({ stages }: { stages: Record<string, number> }) {
-  const stageOrder = ["prospect", "qualified_buyer", "active_search", "active_listing_prep", "live_listing", "offer_submitted", "under_contract", "closing", "closed"];
+function PipelineWidget({ stages, buyerStages: buyerData, sellerStages: sellerData }: { stages: Record<string, number>; buyerStages?: Record<string, number>; sellerStages?: Record<string, number> }) {
+  const stageOrder = ["prospect", "qualified_buyer", "active_search", "active_listing_prep", "live_listing", "offer_submitted", "under_contract", "closed"];
   const stageLabels: Record<string, string> = {
     prospect: "Prospect",
     qualified_buyer: "Qualified Buyer",
@@ -304,7 +304,6 @@ function PipelineWidget({ stages }: { stages: Record<string, number> }) {
     live_listing: "Live Listing",
     offer_submitted: "Offer Submitted",
     under_contract: "Under Contract",
-    closing: "Closing",
     closed: "Closed",
   };
   const stageColors: Record<string, string> = {
@@ -315,12 +314,11 @@ function PipelineWidget({ stages }: { stages: Record<string, number> }) {
     live_listing: "bg-amber-400",
     offer_submitted: "bg-orange-400",
     under_contract: "bg-emerald-400",
-    closing: "bg-green-500",
     closed: "bg-green-600",
   };
 
-  const buyerStages = ["qualified_buyer", "active_search", "offer_submitted", "under_contract", "closed"];
-  const sellerStages = ["prospect", "active_listing_prep", "live_listing", "under_contract", "closing", "closed"];
+  const buyerStageKeys = ["qualified_buyer", "active_search", "offer_submitted", "under_contract", "closed"];
+  const sellerStageKeys = ["prospect", "active_listing_prep", "live_listing", "under_contract", "closed"];
 
   const total = Object.values(stages).reduce((s, v) => s + v, 0);
 
@@ -373,19 +371,19 @@ function PipelineWidget({ stages }: { stages: Record<string, number> }) {
           <div className="grid grid-cols-2 gap-3 md:hidden">
             <div className="space-y-1.5">
               <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider px-1">Buyers</p>
-              {buyerStages.map(stage => (
+              {buyerStageKeys.map(stage => (
                 <div key={`buyer-${stage}`} className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
                   <p className="text-[10px] text-muted-foreground leading-tight">{stageLabels[stage]}</p>
-                  <p className="text-sm font-bold">{stages[stage] || 0}</p>
+                  <p className="text-sm font-bold">{(buyerData?.[stage]) || 0}</p>
                 </div>
               ))}
             </div>
             <div className="space-y-1.5">
               <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider px-1">Sellers</p>
-              {sellerStages.map(stage => (
+              {sellerStageKeys.map(stage => (
                 <div key={`seller-${stage}`} className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
                   <p className="text-[10px] text-muted-foreground leading-tight">{stageLabels[stage]}</p>
-                  <p className="text-sm font-bold">{stages[stage] || 0}</p>
+                  <p className="text-sm font-bold">{(sellerData?.[stage]) || 0}</p>
                 </div>
               ))}
             </div>
@@ -830,7 +828,7 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             {isWidgetVisible("pipeline") && (
-              <PipelineWidget stages={dashData.transactions?.stages || {}} />
+              <PipelineWidget stages={dashData.transactions?.stages || {}} buyerStages={dashData.transactions?.buyerStages} sellerStages={dashData.transactions?.sellerStages} />
             )}
             {isWidgetVisible("leads") && (
               <LeadsWidget leads={dashData.leads || { new: 0, total: 0, converted: 0, conversionRate: 0 }} />

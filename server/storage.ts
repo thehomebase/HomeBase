@@ -1624,21 +1624,28 @@ export class DatabaseStorage implements IStorage {
 
     if (role === "agent" || role === "broker") {
       const txResult = await db.execute(sql`
-        SELECT status, COUNT(*)::int as count, COALESCE(SUM(contract_price), 0)::bigint as total_value
+        SELECT status, type, COUNT(*)::int as count, COALESCE(SUM(contract_price), 0)::bigint as total_value
         FROM transactions WHERE agent_id = ${userId}
-        GROUP BY status
+        GROUP BY status, type
       `);
       const stages: Record<string, number> = {};
+      const buyerStages: Record<string, number> = {};
+      const sellerStages: Record<string, number> = {};
       let activeCount = 0;
       let totalPipeline = 0;
       let closedCount = 0;
       for (const row of txResult.rows as any[]) {
-        stages[row.status] = row.count;
+        stages[row.status] = (stages[row.status] || 0) + row.count;
+        if (row.type === 'buy') {
+          buyerStages[row.status] = (buyerStages[row.status] || 0) + row.count;
+        } else {
+          sellerStages[row.status] = (sellerStages[row.status] || 0) + row.count;
+        }
         if (row.status !== "closed") {
           activeCount += row.count;
           totalPipeline += Number(row.total_value);
         } else {
-          closedCount = row.count;
+          closedCount += row.count;
         }
       }
 
@@ -1750,6 +1757,8 @@ export class DatabaseStorage implements IStorage {
           active: activeCount,
           closed: closedCount,
           stages,
+          buyerStages,
+          sellerStages,
           pipelineValue: totalPipeline,
           closingThisMonth: (closingThisMonth.rows[0] as any)?.count || 0,
           closedChangePercent: prevClosedCount > 0 ? Math.round(((closedCount - prevClosedCount) / prevClosedCount) * 100) : 0,
