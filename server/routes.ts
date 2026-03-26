@@ -1580,11 +1580,14 @@ export function registerRoutes(app: Express): Server {
       if (!contactId) {
         try {
           const clients = await storage.getClientsByAgent(req.user.id);
+          console.log(`[CommMetrics] User ${req.user.id}: found ${clients.length} clients`);
           const clientEmails = clients
             .map((c: any) => c.email)
             .filter((e: string | null | undefined): e is string => !!e && e.includes("@"));
+          console.log(`[CommMetrics] User ${req.user.id}: ${clientEmails.length} client emails with valid addresses`);
           if (clientEmails.length > 0) {
             const gmailCounts = await countGmailEmailsForClients(req.user.id, clientEmails);
+            console.log(`[CommMetrics] Gmail counts result:`, JSON.stringify(gmailCounts));
             if (!gmailCounts.error) {
               metrics.email = {
                 today: gmailCounts.today,
@@ -1593,10 +1596,12 @@ export function registerRoutes(app: Express): Server {
                 total: gmailCounts.total,
               };
               metrics.emailSource = "gmail";
+            } else {
+              console.log(`[CommMetrics] Gmail returned error: ${gmailCounts.error}`);
             }
           }
-        } catch (gmailErr) {
-          console.error("Gmail email count failed (non-blocking):", gmailErr);
+        } catch (gmailErr: any) {
+          console.error("[CommMetrics] Gmail email count failed:", gmailErr?.message, gmailErr?.stack?.substring(0, 300));
         }
       }
 

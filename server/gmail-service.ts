@@ -659,10 +659,16 @@ export async function countGmailEmailsForClients(
 ): Promise<{ total: number; today: number; thisWeek: number; thisMonth: number; error?: string }> {
   const zero = { total: 0, today: 0, thisWeek: 0, thisMonth: 0 };
   try {
-    if (!clientEmails.length) return zero;
+    if (!clientEmails.length) {
+      console.log(`[GmailCount] No client emails for user ${userId}`);
+      return zero;
+    }
+
+    console.log(`[GmailCount] Counting emails for user ${userId} with ${clientEmails.length} client emails`);
 
     const auth = await getAuthenticatedClient(userId);
     if (!auth) {
+      console.log(`[GmailCount] Gmail not connected for user ${userId}`);
       return { ...zero, error: "Gmail not connected" };
     }
 
@@ -678,18 +684,46 @@ export async function countGmailEmailsForClients(
       `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
 
     const limitedEmails = clientEmails.slice(0, 50);
-    const emailQuery = limitedEmails.map((e) => `from:${e} OR to:${e}`).join(" OR ");
+    const emailParts = limitedEmails.map((e) => `{from:${e} to:${e}}`);
 
     const countMessages = async (afterDate?: Date): Promise<number> => {
-      const q = afterDate ? `(${emailQuery}) after:${formatDate(afterDate)}` : `(${emailQuery})`;
+      let q: string;
+      if (emailParts.length <= 10) {
+        q = emailParts.join(" OR ");
+      } else {
+        const batches: string[][] = [];
+        for (let i = 0; i < emailParts.length; i += 10) {
+          batches.push(emailParts.slice(i, i + 10));
+        }
+        let total = 0;
+        for (const batch of batches) {
+          let bq = batch.join(" OR ");
+          if (afterDate) bq = `(${bq}) after:${formatDate(afterDate)}`;
+          try {
+            const res = await gmail.users.messages.list({
+              userId: "me",
+              q: bq,
+              maxResults: 1,
+            });
+            total += res.data.resultSizeEstimate || 0;
+          } catch (batchErr: any) {
+            console.error(`[GmailCount] Batch query error for user ${userId}:`, batchErr?.message);
+          }
+        }
+        return total;
+      }
+
+      if (afterDate) q = `(${q}) after:${formatDate(afterDate)}`;
       try {
         const res = await gmail.users.messages.list({
           userId: "me",
           q,
           maxResults: 1,
         });
-        return res.data.resultSizeEstimate || 0;
-      } catch {
+        const count = res.data.resultSizeEstimate || 0;
+        return count;
+      } catch (err: any) {
+        console.error(`[GmailCount] Query error for user ${userId}:`, err?.message, "Query:", q?.substring(0, 200));
         return 0;
       }
     };
@@ -701,9 +735,10 @@ export async function countGmailEmailsForClients(
       countMessages(monthStart),
     ]);
 
+    console.log(`[GmailCount] Results for user ${userId}: total=${total}, today=${today}, week=${thisWeek}, month=${thisMonth}`);
     return { total, today, thisWeek, thisMonth };
   } catch (error: any) {
-    console.error("Gmail email count error:", error?.message);
+    console.error("[GmailCount] Fatal error:", error?.message, error?.stack?.substring(0, 300));
     return { ...zero, error: error?.message || "Failed to count emails" };
   }
 }

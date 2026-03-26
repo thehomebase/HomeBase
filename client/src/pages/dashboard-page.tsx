@@ -318,6 +318,10 @@ function PipelineWidget({ stages }: { stages: Record<string, number> }) {
     closing: "bg-green-500",
     closed: "bg-green-600",
   };
+
+  const buyerStages = ["qualified_buyer", "active_search", "offer_submitted", "under_contract", "closing"];
+  const sellerStages = ["prospect", "active_listing_prep", "live_listing", "under_contract", "closing", "closed"];
+
   const total = Object.values(stages).reduce((s, v) => s + v, 0);
 
   return (
@@ -356,13 +360,35 @@ function PipelineWidget({ stages }: { stages: Record<string, number> }) {
               );
             })}
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+
+          <div className="hidden md:grid grid-cols-5 gap-2">
             {stageOrder.map(stage => (
               <div key={stage} className="text-center p-2 rounded-lg bg-muted/40">
                 <p className="text-lg font-bold">{stages[stage] || 0}</p>
                 <p className="text-[10px] text-muted-foreground leading-tight">{stageLabels[stage]}</p>
               </div>
             ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 md:hidden">
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider px-1">Buyers</p>
+              {buyerStages.map(stage => (
+                <div key={`buyer-${stage}`} className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
+                  <p className="text-[10px] text-muted-foreground leading-tight">{stageLabels[stage]}</p>
+                  <p className="text-sm font-bold">{stages[stage] || 0}</p>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider px-1">Sellers</p>
+              {sellerStages.map(stage => (
+                <div key={`seller-${stage}`} className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
+                  <p className="text-[10px] text-muted-foreground leading-tight">{stageLabels[stage]}</p>
+                  <p className="text-sm font-bold">{stages[stage] || 0}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </>
       )}
