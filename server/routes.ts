@@ -7926,7 +7926,8 @@ export function registerRoutes(app: Express): Server {
       const fs = await import("fs");
       const pdfPath = pdfInfo && fs.default.existsSync(pdfInfo.filePath) ? pdfInfo.filePath : null;
 
-      const propertyAddress = (transaction as any).propertyAddress || `Transaction #${transactionId}`;
+      const addressParts = [transaction.streetName, transaction.city, transaction.state, transaction.zipCode].filter(Boolean);
+      const propertyAddress = addressParts.length > 0 ? addressParts.join(", ") : `Transaction #${transactionId}`;
 
       const { generateExhibitA } = await import("./exhibit-a-generator");
       const pdfBuffer = await generateExhibitA(selectedItems, pdfPath, transactionId, propertyAddress);
