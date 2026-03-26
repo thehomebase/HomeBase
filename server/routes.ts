@@ -7934,6 +7934,20 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.delete("/api/transactions/:id/inspection-items", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);
+    try {
+      const transactionId = Number(req.params.id);
+      const { allowed, permissionLevel } = await verifyTransactionAccess(transactionId, req.user.id, req.user.role);
+      if (!allowed || permissionLevel === 'view') return res.status(403).json({ error: 'Not authorized' });
+      const count = await storage.deleteAllInspectionItems(transactionId);
+      res.json({ deleted: count });
+    } catch (error) {
+      console.error('Error clearing inspection items:', error);
+      res.status(500).json({ error: 'Failed to clear inspection items' });
+    }
+  });
+
   // ============ Bid Requests ============
   app.post("/api/inspection-items/:id/send-bids", async (req, res) => {
     if (!req.isAuthenticated() || (req.user.role !== "agent" && req.user.role !== "broker")) return res.sendStatus(401);

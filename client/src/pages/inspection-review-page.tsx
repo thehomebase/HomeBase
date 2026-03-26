@@ -15,10 +15,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import {
   ArrowLeft, Upload, FileText, Plus, Trash2, Save, Send,
   AlertTriangle, CheckCircle2, Circle, ShieldAlert, Loader2, Eye, BookOpen,
-  Bot, Sparkles, Shield
+  Bot, Sparkles, Shield, RotateCcw
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -130,6 +131,18 @@ export default function InspectionReviewPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
       toast({ title: "Item removed" });
+    },
+  });
+
+  const clearAllMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/transactions/${transactionId}/inspection-items`);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId, "inspection-items"] });
+      setSelectedSavedItems(new Set());
+      toast({ title: `Cleared ${data.deleted} inspection item${data.deleted !== 1 ? 's' : ''}` });
     },
   });
 
@@ -391,7 +404,7 @@ export default function InspectionReviewPage() {
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle>Inspection Items ({savedItems.length})</CardTitle>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button variant="outline" size="sm" onClick={() => setAddingManual(true)}>
                 <Plus className="h-4 w-4 mr-1" />
                 Add Item
@@ -401,6 +414,38 @@ export default function InspectionReviewPage() {
                   <Send className="h-4 w-4 mr-1" />
                   Send for Bids ({selectedSavedItems.size})
                 </Button>
+              )}
+              {savedItems.length > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Clear All
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Clear all inspection items?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently remove all {savedItems.length} inspection item{savedItems.length !== 1 ? 's' : ''} and any associated bid requests. You can re-upload the inspection report afterward if needed.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => clearAllMutation.mutate()}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {clearAllMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-2" />
+                        )}
+                        Clear All Items
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </div>
           </div>

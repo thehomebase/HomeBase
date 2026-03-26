@@ -235,6 +235,7 @@ export interface IStorage {
   getInspectionItemsByTransaction(transactionId: number): Promise<InspectionItem[]>;
   updateInspectionItem(id: number, data: Partial<InspectionItem>): Promise<InspectionItem>;
   deleteInspectionItem(id: number): Promise<void>;
+  deleteAllInspectionItems(transactionId: number): Promise<number>;
 
   // Bid request operations
   createBidRequest(request: InsertBidRequest): Promise<BidRequest>;
@@ -4227,6 +4228,17 @@ export class DatabaseStorage implements IStorage {
       await db.execute(sql`DELETE FROM inspection_items WHERE id = ${id}`);
     } catch (error) {
       console.error('Error in deleteInspectionItem:', error);
+      throw error;
+    }
+  }
+
+  async deleteAllInspectionItems(transactionId: number): Promise<number> {
+    try {
+      await db.execute(sql`DELETE FROM bid_requests WHERE inspection_item_id IN (SELECT id FROM inspection_items WHERE transaction_id = ${transactionId})`);
+      const result = await db.execute(sql`DELETE FROM inspection_items WHERE transaction_id = ${transactionId}`);
+      return result.rowCount || 0;
+    } catch (error) {
+      console.error('Error in deleteAllInspectionItems:', error);
       throw error;
     }
   }
