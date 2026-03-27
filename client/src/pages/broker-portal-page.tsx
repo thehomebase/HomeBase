@@ -21,8 +21,11 @@ import {
   Phone, Mail, MessageSquare, Calendar, Award, Crown, Medal,
   ChevronUp, ChevronDown, ChevronsUpDown, CheckCircle2, Clock,
   AlertTriangle, Info, MapPin, ArrowRight, UserCheck, RefreshCw,
-  Armchair, UserPlus, UserMinus, X
+  Armchair, UserPlus, UserMinus, X, BarChart3, Eye
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import { PieChart, Pie, Cell, Legend } from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import type { BrokerNotification, SalesCompetition } from "@shared/schema";
 
@@ -458,6 +461,8 @@ function CompetitionsTab() {
     conversions: "Most Conversions",
     commissions: "Highest Commissions",
     total_activity: "Total Activity",
+    deals_closed: "Deals Closed",
+    volume_closed: "Volume Closed",
   };
 
   return (
@@ -510,7 +515,9 @@ function CompetitionsTab() {
                     <SelectItem value="emails">Emails</SelectItem>
                     <SelectItem value="texts">Texts</SelectItem>
                     <SelectItem value="conversions">Conversions</SelectItem>
-                    <SelectItem value="commissions">Commissions</SelectItem>
+                    <SelectItem value="commissions">Commissions (GCI)</SelectItem>
+                    <SelectItem value="deals_closed">Deals Closed</SelectItem>
+                    <SelectItem value="volume_closed">Volume Closed ($)</SelectItem>
                     <SelectItem value="total_activity">Total Activity</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1061,6 +1068,305 @@ function TeamSeatsTab() {
   );
 }
 
+function LeaderboardTab() {
+  const [sortBy, setSortBy] = useState<'closedVolume' | 'closedDeals' | 'estimatedGCI' | 'totalActivity'>('closedVolume');
+  const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
+
+  const { data: leaderboard = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/broker/ytd-leaderboard"],
+  });
+
+  const { data: drilldown, isLoading: drilldownLoading } = useQuery<any>({
+    queryKey: ["/api/broker/agent", selectedAgentId, "drilldown"],
+    queryFn: async () => {
+      const res = await fetch(`/api/broker/agent/${selectedAgentId}/drilldown`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!selectedAgentId,
+  });
+
+  const sorted = [...leaderboard].sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
+  const rankIcons = [Crown, Medal, Award];
+  const rankColors = ["text-yellow-500", "text-gray-400", "text-amber-600"];
+
+  const stageLabels: Record<string, string> = {
+    prospect: 'Prospect', qualified_buyer: 'Qualified Buyer', active_search: 'Active Search',
+    active_listing_prep: 'Listing Prep', live_listing: 'Live Listing', offer_submitted: 'Offer Submitted',
+    under_contract: 'Under Contract', closing: 'Closing', closed: 'Closed',
+  };
+
+  if (isLoading) return <div className="space-y-4">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h3 className="font-semibold text-lg flex items-center gap-2"><Crown className="h-5 w-5 text-yellow-500" /> YTD Top Producers</h3>
+          <p className="text-sm text-muted-foreground">Year-to-date performance rankings — click an agent for details</p>
+        </div>
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="closedVolume">Volume Closed</SelectItem>
+            <SelectItem value="closedDeals">Deals Closed</SelectItem>
+            <SelectItem value="estimatedGCI">Est. GCI</SelectItem>
+            <SelectItem value="totalActivity">Activity</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {sorted.length === 0 ? (
+        <Card className="p-12 text-center">
+          <Crown className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+          <h3 className="font-semibold text-lg mb-1">No Agent Data Yet</h3>
+          <p className="text-sm text-muted-foreground">Add agents to your brokerage to see the leaderboard</p>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {sorted.map((entry, i) => {
+            const RankIcon = i < 3 ? rankIcons[i] : null;
+            return (
+              <Card
+                key={entry.agentId}
+                className={`cursor-pointer transition-all hover:shadow-md ${i === 0 ? "border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/10 dark:border-yellow-800" : ""}`}
+                onClick={() => setSelectedAgentId(entry.agentId)}
+              >
+                <div className="p-4 flex items-center gap-4">
+                  <div className="w-10 text-center shrink-0">
+                    {RankIcon ? (
+                      <RankIcon className={`h-6 w-6 mx-auto ${rankColors[i]}`} />
+                    ) : (
+                      <span className="text-lg font-bold text-muted-foreground">{i + 1}</span>
+                    )}
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0">
+                    {entry.firstName?.[0]}{entry.lastName?.[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">{entry.firstName} {entry.lastName}</p>
+                    <p className="text-xs text-muted-foreground">{entry.email}</p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-right shrink-0">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Volume</p>
+                      <p className={`font-bold text-sm ${sortBy === 'closedVolume' ? 'text-primary' : ''}`}>{formatCurrency(entry.closedVolume)}</p>
+                    </div>
+                    <div className="hidden sm:block">
+                      <p className="text-xs text-muted-foreground">Deals</p>
+                      <p className={`font-bold text-sm ${sortBy === 'closedDeals' ? 'text-primary' : ''}`}>{entry.closedDeals}</p>
+                    </div>
+                    <div className="hidden sm:block">
+                      <p className="text-xs text-muted-foreground">GCI</p>
+                      <p className={`font-bold text-sm ${sortBy === 'estimatedGCI' ? 'text-primary' : ''}`}>{formatCurrency(entry.estimatedGCI)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Active</p>
+                      <p className="font-bold text-sm">{entry.activeDeals}</p>
+                    </div>
+                  </div>
+                  <Eye className="h-4 w-4 text-muted-foreground shrink-0" />
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={!!selectedAgentId} onOpenChange={(open) => { if (!open) setSelectedAgentId(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          {drilldownLoading ? (
+            <div className="space-y-4 p-4">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+          ) : drilldown ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                    {drilldown.agent.firstName?.[0]}{drilldown.agent.lastName?.[0]}
+                  </div>
+                  <div>
+                    <p>{drilldown.agent.firstName} {drilldown.agent.lastName}</p>
+                    <p className="text-sm text-muted-foreground font-normal">{drilldown.agent.email}</p>
+                  </div>
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                <Card className="p-3 text-center">
+                  <p className="text-xs text-muted-foreground">YTD Volume</p>
+                  <p className="text-lg font-bold text-primary">{formatCurrency(drilldown.ytdClosedVolume)}</p>
+                </Card>
+                <Card className="p-3 text-center">
+                  <p className="text-xs text-muted-foreground">YTD Deals</p>
+                  <p className="text-lg font-bold">{drilldown.ytdClosedDeals}</p>
+                </Card>
+                <Card className="p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Est. GCI</p>
+                  <p className="text-lg font-bold text-emerald-600">{formatCurrency(drilldown.ytdGCI)}</p>
+                </Card>
+                <Card className="p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Conversion</p>
+                  <p className="text-lg font-bold">{drilldown.conversionRate}%</p>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <Card className="p-3">
+                  <p className="text-xs text-muted-foreground mb-2">Last 30 Days Activity</p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-sm"><span className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> Calls</span><span className="font-medium">{drilldown.last30Days.calls}</span></div>
+                    <div className="flex justify-between text-sm"><span className="flex items-center gap-1.5"><Mail className="h-3 w-3" /> Emails</span><span className="font-medium">{drilldown.last30Days.emails}</span></div>
+                    <div className="flex justify-between text-sm"><span className="flex items-center gap-1.5"><MessageSquare className="h-3 w-3" /> Texts</span><span className="font-medium">{drilldown.last30Days.texts}</span></div>
+                  </div>
+                </Card>
+                <Card className="p-3">
+                  <p className="text-xs text-muted-foreground mb-2">Portfolio</p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-sm"><span>Total Deals</span><span className="font-medium">{drilldown.totalDeals}</span></div>
+                    <div className="flex justify-between text-sm"><span>Closed</span><span className="font-medium">{drilldown.closedDeals}</span></div>
+                    <div className="flex justify-between text-sm"><span>Clients</span><span className="font-medium">{drilldown.totalClients}</span></div>
+                  </div>
+                </Card>
+              </div>
+
+              {drilldown.recentTransactions?.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-sm font-medium mb-2">Recent Transactions</p>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {drilldown.recentTransactions.map((tx: any) => (
+                      <div key={tx.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-sm">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{tx.address || `Transaction #${tx.id}`}</p>
+                          <p className="text-xs text-muted-foreground">{tx.type === 'buy' ? 'Buyer' : 'Seller'}</p>
+                        </div>
+                        <div className="text-right shrink-0 ml-3">
+                          <Badge variant="outline" className="text-xs">{stageLabels[tx.status] || tx.status}</Badge>
+                          {tx.contractPrice > 0 && <p className="text-xs text-muted-foreground mt-0.5">{formatCurrency(tx.contractPrice)}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">Agent not found</p>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function AnalyticsTab() {
+  const { data: analytics, isLoading } = useQuery<any>({
+    queryKey: ["/api/broker/analytics"],
+  });
+
+  const STAGE_COLORS = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+  if (isLoading) return <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32" />)}</div>;
+
+  const stats = analytics?.closedStats || { deals: 0, volume: 0, gci: 0 };
+  const stageData = analytics?.stageBreakdown || [];
+  const monthlyData = analytics?.monthlyVolume || [];
+  const pendingVolume = analytics?.pendingVolume || 0;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="font-semibold text-lg flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /> Brokerage Analytics</h3>
+        <p className="text-sm text-muted-foreground">Year-to-date performance and pipeline breakdown</p>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <MetricCard icon={DollarSign} label="YTD Closed Volume" value={formatCurrency(stats.volume)} accent="border-l-emerald-500" />
+        <MetricCard icon={Target} label="YTD Deals Closed" value={stats.deals} accent="border-l-blue-500" />
+        <MetricCard icon={TrendingUp} label="Est. GCI" value={formatCurrency(stats.gci)} accent="border-l-purple-500" />
+        <MetricCard icon={Clock} label="Pending Volume" value={formatCurrency(pendingVolume)} accent="border-l-amber-500" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-5">
+          <h4 className="font-semibold mb-4">Pipeline by Stage</h4>
+          {stageData.length > 0 ? (
+            <>
+              <div className="h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={stageData}
+                      dataKey="count"
+                      nameKey="stage"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={90}
+                      label={({ stage, count }) => `${stage}: ${count}`}
+                      labelLine={false}
+                    >
+                      {stageData.map((_: any, i: number) => (
+                        <Cell key={i} fill={STAGE_COLORS[i % STAGE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: any, name: any) => [value, name]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-1.5 mt-2">
+                {stageData.map((s: any, i: number) => (
+                  <div key={s.stage} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: STAGE_COLORS[i % STAGE_COLORS.length] }} />
+                      <span>{s.stage}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-medium">{s.count} deals</span>
+                      <span className="text-muted-foreground ml-2">{formatCurrency(s.volume)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-8">No transaction data</p>
+          )}
+        </Card>
+
+        <Card className="p-5">
+          <h4 className="font-semibold mb-4">Monthly Closed Volume (YTD)</h4>
+          {monthlyData.length > 0 ? (
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyData} margin={{ top: 0, right: 0, left: -10, bottom: 0 }}>
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => formatCurrency(v)} />
+                  <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                  <Bar dataKey="volume" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={40} name="Volume" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-8">No closed deals this year</p>
+          )}
+
+          {monthlyData.length > 0 && (
+            <div className="mt-4 pt-3 border-t">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Avg. per month</span>
+                <span className="font-medium">{formatCurrency(stats.volume / (monthlyData.length || 1))}</span>
+              </div>
+              <div className="flex justify-between text-sm mt-1">
+                <span className="text-muted-foreground">Avg. deals/month</span>
+                <span className="font-medium">{(stats.deals / (monthlyData.length || 1)).toFixed(1)}</span>
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export default function BrokerPortalPage() {
   const { user } = useAuth();
 
@@ -1072,24 +1378,32 @@ export default function BrokerPortalPage() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-5">
-          <TabsTrigger value="overview" className="gap-2">
+        <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1 rounded-lg max-w-3xl">
+          <TabsTrigger value="overview" className="gap-2 flex-1 min-w-fit">
             <Briefcase className="h-4 w-4" />
             <span className="hidden sm:inline">Overview</span>
           </TabsTrigger>
-          <TabsTrigger value="seats" className="gap-2">
+          <TabsTrigger value="leaderboard" className="gap-2 flex-1 min-w-fit">
+            <Crown className="h-4 w-4" />
+            <span className="hidden sm:inline">Leaderboard</span>
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="gap-2 flex-1 min-w-fit">
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Analytics</span>
+          </TabsTrigger>
+          <TabsTrigger value="seats" className="gap-2 flex-1 min-w-fit">
             <Armchair className="h-4 w-4" />
             <span className="hidden sm:inline">Team Seats</span>
           </TabsTrigger>
-          <TabsTrigger value="leads" className="gap-2">
+          <TabsTrigger value="leads" className="gap-2 flex-1 min-w-fit">
             <MapPin className="h-4 w-4" />
-            <span className="hidden sm:inline">Lead Routing</span>
+            <span className="hidden sm:inline">Leads</span>
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2">
+          <TabsTrigger value="notifications" className="gap-2 flex-1 min-w-fit">
             <Bell className="h-4 w-4" />
-            <span className="hidden sm:inline">Notifications</span>
+            <span className="hidden sm:inline">Alerts</span>
           </TabsTrigger>
-          <TabsTrigger value="competitions" className="gap-2">
+          <TabsTrigger value="competitions" className="gap-2 flex-1 min-w-fit">
             <Trophy className="h-4 w-4" />
             <span className="hidden sm:inline">Competitions</span>
           </TabsTrigger>
@@ -1097,6 +1411,14 @@ export default function BrokerPortalPage() {
 
         <TabsContent value="overview">
           <OverviewTab />
+        </TabsContent>
+
+        <TabsContent value="leaderboard">
+          <LeaderboardTab />
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <AnalyticsTab />
         </TabsContent>
 
         <TabsContent value="seats">

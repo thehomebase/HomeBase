@@ -468,6 +468,9 @@ export interface IStorage {
   createSalesCompetition(data: InsertSalesCompetition): Promise<SalesCompetition>;
   getSalesCompetitions(brokerId: number): Promise<SalesCompetition[]>;
   getCompetitionLeaderboard(competitionId: number, metric: string, brokerageId: number): Promise<any[]>;
+  getBrokerYTDLeaderboard(brokerageId: number): Promise<any[]>;
+  getBrokerAnalytics(brokerageId: number): Promise<any>;
+  getAgentDrilldown(agentId: number, brokerageId: number): Promise<any>;
 
   createTransactionTemplate(data: any): Promise<any>;
   getTransactionTemplatesByAgent(agentId: number): Promise<any[]>;
@@ -6259,6 +6262,12 @@ export class DatabaseStorage implements IStorage {
       } else if (metric === 'commissions') {
         const r = await db.execute(sql`SELECT COALESCE(SUM(contract_price), 0) as total FROM transactions WHERE agent_id = ${agent.id} AND status = 'closed' AND updated_at >= ${startDate} AND updated_at <= ${endDate}`);
         score = Math.round(Number((r.rows[0] as any).total) * 0.03) || 0;
+      } else if (metric === 'deals_closed') {
+        const r = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE agent_id = ${agent.id} AND status = 'closed' AND updated_at >= ${startDate} AND updated_at <= ${endDate}`);
+        score = Number((r.rows[0] as any).count) || 0;
+      } else if (metric === 'volume_closed') {
+        const r = await db.execute(sql`SELECT COALESCE(SUM(contract_price), 0) as total FROM transactions WHERE agent_id = ${agent.id} AND status = 'closed' AND updated_at >= ${startDate} AND updated_at <= ${endDate}`);
+        score = Number((r.rows[0] as any).total) || 0;
       }
       leaderboard.push({
         agentId: agent.id,
@@ -6271,6 +6280,163 @@ export class DatabaseStorage implements IStorage {
 
     leaderboard.sort((a, b) => b.score - a.score);
     return leaderboard.map((entry, index) => ({ ...entry, rank: index + 1 }));
+  }
+
+  async getBrokerYTDLeaderboard(brokerageId: number): Promise<any[]> {
+    const yearStart = new Date(new Date().getFullYear(), 0, 1);
+    const agentsResult = await db.execute(sql`SELECT id, first_name, last_name, email FROM users WHERE brokerage_id = ${brokerageId} AND role = 'agent'`);
+    const agents = agentsResult.rows as any[];
+    const leaderboard = [];
+    for (const agent of agents) {
+      const closedResult = await db.execute(sql`
+        SELECT COUNT(*) as deals, COALESCE(SUM(contract_price), 0) as volume 
+        FROM transactions WHERE agent_id = ${agent.id} AND status = 'closed' AND updated_at >= ${yearStart}
+      `);
+      const activeResult = await db.execute(sql`
+        SELECT COUNT(*) as count FROM transactions WHERE agent_id = ${agent.id} AND status != 'closed'
+      `);
+      const commResult = await db.execute(sql`
+        SELECT COUNT(*) as count FROM communications WHERE agent_id = ${agent.id} AND created_at >= ${yearStart}
+      `);
+      const clientResult = await db.execute(sql`
+        SELECT COUNT(*) as count FROM clients WHERE agent_id = ${agent.id}
+      `);
+      const row = closedResult.rows[0] as any;
+      const volume = Number(row.volume) || 0;
+      leaderboard.push({
+        agentId: agent.id,
+        firstName: agent.first_name,
+        lastName: agent.last_name,
+        email: agent.email,
+        closedDeals: Number(row.deals) || 0,
+        closedVolume: volume,
+        estimatedGCI: Math.round(volume * 0.03),
+        activeDeals: Number((activeResult.rows[0] as any).count) || 0,
+        totalActivity: Number((commResult.rows[0] as any).count) || 0,
+        totalClients: Number((clientResult.rows[0] as any).count) || 0,
+      });
+    }
+    leaderboard.sort((a, b) => b.closedVolume - a.closedVolume);
+    return leaderboard.map((entry, index) => ({ ...entry, rank: index + 1 }));
+  }
+
+  async getBrokerAnalytics(brokerageId: number): Promise<any> {
+    const agentsResult = await db.execute(sql`SELECT id FROM users WHERE brokerage_id = ${brokerageId} AND role = 'agent'`);
+    const agentIds = (agentsResult.rows as any[]).map(r => r.id);
+    if (agentIds.length === 0) return { stageBreakdown: [], monthlyVolume: [], closedStats: { deals: 0, volume: 0, gci: 0 } };
+
+    const yearStart = new Date(new Date().getFullYear(), 0, 1);
+
+    const stageResult = await db.execute(sql`
+      SELECT status, COUNT(*) as count, COALESCE(SUM(contract_price), 0) as volume
+      FROM transactions WHERE agent_id = ANY(${agentIds})
+      GROUP BY status ORDER BY count DESC
+    `);
+
+    const closedYTD = await db.execute(sql`
+      SELECT COUNT(*) as deals, COALESCE(SUM(contract_price), 0) as volume
+      FROM transactions WHERE agent_id = ANY(${agentIds}) AND status = 'closed' AND updated_at >= ${yearStart}
+    `);
+
+    const monthlyResult = await db.execute(sql`
+      SELECT to_char(updated_at, 'Mon') as month, EXTRACT(MONTH FROM updated_at) as month_num,
+             COUNT(*) as deals, COALESCE(SUM(contract_price), 0) as volume
+      FROM transactions WHERE agent_id = ANY(${agentIds}) AND status = 'closed' AND updated_at >= ${yearStart}
+      GROUP BY to_char(updated_at, 'Mon'), EXTRACT(MONTH FROM updated_at)
+      ORDER BY month_num
+    `);
+
+    const pendingVolume = await db.execute(sql`
+      SELECT COALESCE(SUM(contract_price), 0) as volume
+      FROM transactions WHERE agent_id = ANY(${agentIds}) AND status IN ('under_contract', 'closing')
+    `);
+
+    const closedRow = closedYTD.rows[0] as any;
+    const vol = Number(closedRow.volume) || 0;
+
+    const stageLabels: Record<string, string> = {
+      prospect: 'Prospect', qualified_buyer: 'Qualified Buyer', active_search: 'Active Search',
+      active_listing_prep: 'Listing Prep', live_listing: 'Live Listing', offer_submitted: 'Offer Submitted',
+      under_contract: 'Under Contract', closing: 'Closing', closed: 'Closed',
+    };
+
+    return {
+      stageBreakdown: (stageResult.rows as any[]).map(r => ({
+        stage: stageLabels[r.status] || r.status,
+        status: r.status,
+        count: Number(r.count),
+        volume: Number(r.volume) || 0,
+      })),
+      monthlyVolume: (monthlyResult.rows as any[]).map(r => ({
+        month: r.month,
+        deals: Number(r.deals),
+        volume: Number(r.volume) || 0,
+      })),
+      closedStats: {
+        deals: Number(closedRow.deals) || 0,
+        volume: vol,
+        gci: Math.round(vol * 0.03),
+      },
+      pendingVolume: Number((pendingVolume.rows[0] as any).volume) || 0,
+    };
+  }
+
+  async getAgentDrilldown(agentId: number, brokerageId: number): Promise<any> {
+    const agent = await db.execute(sql`SELECT id, first_name, last_name, email, phone FROM users WHERE id = ${agentId} AND brokerage_id = ${brokerageId} AND role = 'agent'`);
+    if (agent.rows.length === 0) return null;
+    const a = agent.rows[0] as any;
+
+    const yearStart = new Date(new Date().getFullYear(), 0, 1);
+
+    const txResult = await db.execute(sql`
+      SELECT id, street_name, city, state, zip_code, status, type, contract_price, closing_date, updated_at
+      FROM transactions WHERE agent_id = ${agentId} ORDER BY updated_at DESC LIMIT 20
+    `);
+
+    const closedYTD = await db.execute(sql`
+      SELECT COUNT(*) as deals, COALESCE(SUM(contract_price), 0) as volume
+      FROM transactions WHERE agent_id = ${agentId} AND status = 'closed' AND updated_at >= ${yearStart}
+    `);
+
+    const allTx = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE agent_id = ${agentId}`);
+    const closedAll = await db.execute(sql`SELECT COUNT(*) as count FROM transactions WHERE agent_id = ${agentId} AND status = 'closed'`);
+
+    const recentComms = await db.execute(sql`
+      SELECT type, COUNT(*) as count FROM communications 
+      WHERE agent_id = ${agentId} AND created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY type
+    `);
+
+    const clientCount = await db.execute(sql`SELECT COUNT(*) as count FROM clients WHERE agent_id = ${agentId}`);
+
+    const commsByType: Record<string, number> = {};
+    for (const r of recentComms.rows as any[]) {
+      commsByType[r.type] = Number(r.count) || 0;
+    }
+
+    const closedRow = closedYTD.rows[0] as any;
+    const totalTx = Number((allTx.rows[0] as any).count) || 0;
+    const closedTx = Number((closedAll.rows[0] as any).count) || 0;
+
+    return {
+      agent: { id: a.id, firstName: a.first_name, lastName: a.last_name, email: a.email, phone: a.phone },
+      ytdClosedDeals: Number(closedRow.deals) || 0,
+      ytdClosedVolume: Number(closedRow.volume) || 0,
+      ytdGCI: Math.round(Number(closedRow.volume || 0) * 0.03),
+      totalDeals: totalTx,
+      closedDeals: closedTx,
+      conversionRate: totalTx > 0 ? Math.round((closedTx / totalTx) * 100) : 0,
+      totalClients: Number((clientCount.rows[0] as any).count) || 0,
+      last30Days: { calls: commsByType['call'] || 0, emails: commsByType['email'] || 0, texts: commsByType['sms'] || 0 },
+      recentTransactions: (txResult.rows as any[]).map(t => ({
+        id: t.id,
+        address: [t.street_name, t.city, t.state].filter(Boolean).join(', '),
+        status: t.status,
+        type: t.type,
+        contractPrice: Number(t.contract_price) || 0,
+        closingDate: t.closing_date,
+      })),
+    };
   }
 
   async getBrokerageLeads(brokerageId: number): Promise<any[]> {

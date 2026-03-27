@@ -12606,6 +12606,44 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/broker/ytd-leaderboard", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const leaderboard = await storage.getBrokerYTDLeaderboard(req.user.id);
+      res.json(leaderboard);
+    } catch (error) {
+      console.error("Error fetching YTD leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
+  app.get("/api/broker/analytics", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const analytics = await storage.getBrokerAnalytics(req.user.id);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching broker analytics:", error);
+      res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
+  app.get("/api/broker/agent/:id/drilldown", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const agentId = Number(req.params.id);
+      const drilldown = await storage.getAgentDrilldown(agentId, req.user.id);
+      if (!drilldown) return res.status(404).json({ error: "Agent not found in your brokerage" });
+      res.json(drilldown);
+    } catch (error) {
+      console.error("Error fetching agent drilldown:", error);
+      res.status(500).json({ error: "Failed to fetch agent details" });
+    }
+  });
+
   app.get("/api/broker/competitions/:id/leaderboard", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     if (req.user.role !== "broker") return res.sendStatus(403);
