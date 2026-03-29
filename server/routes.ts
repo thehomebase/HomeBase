@@ -14097,7 +14097,7 @@ export function registerRoutes(app: Express): Server {
 
       const result = await db.execute(sql`
         INSERT INTO leads (first_name, last_name, email, phone, source, zip_code, assigned_agent_id, status, type, message, budget, timeframe, created_at, assigned_at)
-        VALUES (${firstName}, ${lastName}, ${email || ''}, ${phone || null}, ${source || 'api'}, ${zipCode || null}, ${userId}, 'new', ${type || 'buyer'}, ${message || notes || null}, ${budget || null}, ${timeframe || null}, NOW(), NOW())
+        VALUES (${firstName}, ${lastName}, ${email || ''}, ${phone || null}, ${source || 'api'}, ${zipCode || ''}, ${userId}, 'new', ${type || 'buyer'}, ${message || notes || null}, ${budget || null}, ${timeframe || null}, NOW(), NOW())
         RETURNING *
       `);
       fireWebhook("new_lead", result.rows[0]);
