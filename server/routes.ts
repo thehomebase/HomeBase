@@ -14081,7 +14081,7 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/v1/leads", apiKeyAuthMiddleware, async (req, res) => {
     try {
       const userId = (req as any).apiKeyUserId;
-      const leads = await db.execute(sql`SELECT * FROM leads WHERE agent_id = ${userId} ORDER BY created_at DESC LIMIT 100`);
+      const leads = await db.execute(sql`SELECT * FROM leads WHERE assigned_agent_id = ${userId} ORDER BY created_at DESC LIMIT 100`);
       res.json(leads.rows);
     } catch (error) {
       console.error("API v1 error:", error);
@@ -14092,18 +14092,18 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/v1/leads", apiKeyAuthMiddleware, async (req, res) => {
     try {
       const userId = (req as any).apiKeyUserId;
-      const { firstName, lastName, email, phone, source, zipCode, notes } = req.body;
+      const { firstName, lastName, email, phone, source, zipCode, notes, type, message, budget, timeframe } = req.body;
       if (!firstName || !lastName) return res.status(400).json({ error: "firstName and lastName are required" });
 
       const result = await db.execute(sql`
-        INSERT INTO leads (first_name, last_name, email, phone, source, zip_code, notes, agent_id, status, created_at)
-        VALUES (${firstName}, ${lastName}, ${email || null}, ${phone || null}, ${source || 'api'}, ${zipCode || null}, ${notes || null}, ${userId}, 'new', NOW())
+        INSERT INTO leads (first_name, last_name, email, phone, source, zip_code, assigned_agent_id, status, type, message, budget, timeframe, created_at, assigned_at)
+        VALUES (${firstName}, ${lastName}, ${email || ''}, ${phone || null}, ${source || 'api'}, ${zipCode || null}, ${userId}, 'new', ${type || 'buyer'}, ${message || notes || null}, ${budget || null}, ${timeframe || null}, NOW(), NOW())
         RETURNING *
       `);
       fireWebhook("new_lead", result.rows[0]);
       res.status(201).json(result.rows[0]);
     } catch (error) {
-      console.error("API v1 error:", error);
+      console.error("API v1 leads error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -14148,11 +14148,18 @@ export function registerRoutes(app: Express): Server {
     try {
       const agentId = (req as any).apiKeyUserId;
       const data = req.body;
-      const client = await storage.createClient({ ...data, agentId });
+      if (!data.firstName || !data.lastName) return res.status(400).json({ error: "firstName and lastName are required" });
+      const client = await storage.createClient({
+        ...data,
+        agentId,
+        type: data.type || ["buyer"],
+        status: data.status || "active",
+        labels: data.labels || [],
+      });
       fireWebhook("client_created", client);
       res.status(201).json(client);
     } catch (error) {
-      console.error("API v1 error:", error);
+      console.error("API v1 clients error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
