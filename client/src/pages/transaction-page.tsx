@@ -772,8 +772,10 @@ export default function TransactionPage() {
                       onChange={(e) => {
                         const rate = e.target.value;
                         const contractPrice = transaction?.contractPrice || 0;
-                        const autoAmount = rate && contractPrice ? ((parseFloat(rate) / 100) * contractPrice).toFixed(2) : commissionForm.commissionAmount;
-                        setCommissionForm({ ...commissionForm, commissionRate: rate, commissionAmount: autoAmount });
+                        setCommissionForm(prev => {
+                          const autoAmount = rate && contractPrice ? ((parseFloat(rate) / 100) * contractPrice).toFixed(2) : prev.commissionAmount;
+                          return { ...prev, commissionRate: rate, commissionAmount: autoAmount };
+                        });
                       }}
                       disabled={isReadOnly}
                     />
@@ -788,8 +790,10 @@ export default function TransactionPage() {
                       onChange={(e) => {
                         const amount = e.target.value;
                         const contractPrice = transaction?.contractPrice || 0;
-                        const autoRate = amount && contractPrice ? ((parseFloat(amount) / contractPrice) * 100).toFixed(2) : commissionForm.commissionRate;
-                        setCommissionForm({ ...commissionForm, commissionAmount: amount, commissionRate: autoRate });
+                        setCommissionForm(prev => {
+                          const autoRate = amount && contractPrice ? ((parseFloat(amount) / contractPrice) * 100).toFixed(2) : prev.commissionRate;
+                          return { ...prev, commissionAmount: amount, commissionRate: autoRate };
+                        });
                       }}
                       disabled={isReadOnly}
                     />
