@@ -182,8 +182,21 @@ export default function TransactionPage() {
         paidDate: commissionEntry.paidDate ? commissionEntry.paidDate.split("T")[0] : "",
         expenses: (commissionEntry.expenses || []).map((e: any) => ({ ...e, amount: e.amount / 100 })),
       });
+    } else if (transaction) {
+      const txnCommission = transaction.type === "sell"
+        ? (transaction as any).listingAgentCommission
+        : (transaction as any).buyerAgentCompensation;
+      if (txnCommission && txnCommission > 0) {
+        const contractPrice = transaction.contractPrice || 0;
+        const rate = contractPrice > 0 ? ((txnCommission / contractPrice) * 100).toFixed(2) : "";
+        setCommissionForm(prev => ({
+          ...prev,
+          commissionAmount: txnCommission.toString(),
+          commissionRate: rate,
+        }));
+      }
     }
-  }, [commissionEntry]);
+  }, [commissionEntry, transaction]);
 
   const saveCommissionMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -207,9 +220,10 @@ export default function TransactionPage() {
   });
 
   const handleSaveCommission = () => {
+    const commissionDollars = parseFloat(commissionForm.commissionAmount || "0");
     saveCommissionMutation.mutate({
       commissionRate: commissionForm.commissionRate,
-      commissionAmount: Math.round(parseFloat(commissionForm.commissionAmount || "0") * 100),
+      commissionAmount: Math.round(commissionDollars * 100),
       brokerageSplitPercent: commissionForm.brokerageSplitPercent,
       referralFeePercent: commissionForm.referralFeePercent || "0",
       expenses: commissionForm.expenses.map(e => ({ description: e.description, amount: Math.round(e.amount * 100) })),
@@ -217,6 +231,18 @@ export default function TransactionPage() {
       status: commissionForm.status,
       paidDate: commissionForm.status === "paid" && commissionForm.paidDate ? commissionForm.paidDate : null,
     });
+    if (commissionDollars > 0 && transaction) {
+      const txnUpdate: Record<string, unknown> = {};
+      const txnType = transaction.type;
+      if (txnType === "sell") {
+        txnUpdate.listingAgentCommission = Math.round(commissionDollars);
+      } else {
+        txnUpdate.buyerAgentCompensation = Math.round(commissionDollars);
+      }
+      apiRequest("PATCH", `/api/transactions/${parsedId}`, txnUpdate).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/transactions", parsedId] });
+      });
+    }
   };
 
   const { data: lenderStatus } = useQuery<{
@@ -341,6 +367,27 @@ export default function TransactionPage() {
     }
 
     updateMutation.mutate(updateData as Partial<Transaction>);
+
+    const newCommAmt = editForm.type === "sell"
+      ? parseInt(editForm.listingAgentCommission || "0")
+      : parseInt(editForm.buyerAgentCompensation || "0");
+    if (newCommAmt > 0) {
+      const contractPrice = parseInt(editForm.contractPrice || "0");
+      const rate = contractPrice > 0 ? ((newCommAmt / contractPrice) * 100).toFixed(2) : commissionForm.commissionRate;
+      setCommissionForm(prev => ({
+        ...prev,
+        commissionAmount: newCommAmt.toString(),
+        commissionRate: rate,
+      }));
+      if (commissionEntry) {
+        apiRequest("PATCH", `/api/commissions/${commissionEntry.id}`, {
+          commissionRate: rate,
+          commissionAmount: Math.round(newCommAmt * 100),
+        }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/commissions/transaction", parsedId] });
+        });
+      }
+    }
   };
 
   if (!user) {
@@ -738,7 +785,12 @@ export default function TransactionPage() {
                       step="0.01"
                       placeholder="e.g. 15000"
                       value={commissionForm.commissionAmount}
-                      onChange={(e) => setCommissionForm({ ...commissionForm, commissionAmount: e.target.value })}
+                      onChange={(e) => {
+                        const amount = e.target.value;
+                        const contractPrice = transaction?.contractPrice || 0;
+                        const autoRate = amount && contractPrice ? ((parseFloat(amount) / contractPrice) * 100).toFixed(2) : commissionForm.commissionRate;
+                        setCommissionForm({ ...commissionForm, commissionAmount: amount, commissionRate: autoRate });
+                      }}
                       disabled={isReadOnly}
                     />
                   </div>
