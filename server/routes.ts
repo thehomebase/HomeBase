@@ -584,6 +584,15 @@ export function registerRoutes(app: Express): Server {
         throw new Error('Failed to create client record');
       }
 
+      if (client.email) {
+        const matchingUser = await db.execute(sql`
+          SELECT id FROM users WHERE LOWER(email) = LOWER(${client.email}) AND role = 'client' AND client_record_id IS NULL LIMIT 1
+        `);
+        if (matchingUser.rows.length > 0) {
+          await db.execute(sql`UPDATE users SET client_record_id = ${client.id} WHERE id = ${(matchingUser.rows[0] as any).id}`);
+        }
+      }
+
       fireWebhook("client_created", client);
       res.status(201).json(client);
     } catch (error) {

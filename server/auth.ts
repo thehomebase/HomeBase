@@ -5,6 +5,8 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual, createHash } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import { User as SelectUser } from "@shared/schema";
 import { verifyRecaptcha, verifyRecaptchaRegister } from "./recaptcha";
 import { generateSecret, generateSync, verifySync, generateURI } from "otplib";
@@ -331,6 +333,16 @@ export function setupAuth(app: Express) {
       user.emailVerificationExpires = verificationExpires;
 
       recordRegistrationAttempt(clientIp);
+
+      if (role === 'client') {
+        const matchingClient = await db.execute(sql`
+          SELECT id FROM clients WHERE LOWER(email) = LOWER(${req.body.email}) LIMIT 1
+        `);
+        if (matchingClient.rows.length > 0) {
+          await storage.updateUser(user.id, { clientRecordId: (matchingClient.rows[0] as any).id });
+          user.clientRecordId = (matchingClient.rows[0] as any).id;
+        }
+      }
 
       console.log('User created successfully:', { id: user.id, email: user.email });
 
