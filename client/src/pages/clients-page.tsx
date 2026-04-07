@@ -41,7 +41,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from "framer-motion";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Pencil, X, ChevronRight, GripVertical, List, LayoutGrid, ArrowUpAZ, ArrowDownZA, Tag } from "lucide-react";
+import { Pencil, X, ChevronRight, GripVertical, List, LayoutGrid, ArrowUpAZ, ArrowDownZA, Tag, Home, ExternalLink } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
@@ -219,6 +219,63 @@ const ClientCard = ({ client, onSelect, onEdit }: {
         </CardContent>
       )}
     </Card>
+  );
+};
+
+const ClientSavedListings = ({ clientId }: { clientId: number }) => {
+  const { data: savedListings, isLoading } = useQuery<any[]>({
+    queryKey: ['/api/clients', clientId, 'saved-properties'],
+    queryFn: async () => {
+      const res = await fetch(`/api/clients/${clientId}/saved-properties`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!clientId,
+  });
+
+  if (isLoading) return null;
+  if (!savedListings || savedListings.length === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-medium flex items-center gap-2">
+        <Home className="h-4 w-4 text-rose-500" />
+        Saved Listings ({savedListings.length})
+      </h3>
+      <div className="space-y-2">
+        {savedListings.map((listing: any) => (
+          <div key={listing.id} className="border rounded-lg p-3 space-y-1">
+            <div className="flex items-start justify-between">
+              <div className="font-medium text-sm">{listing.streetAddress || 'Unknown Address'}</div>
+              {listing.url && (
+                <a href={listing.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )}
+            </div>
+            {(listing.city || listing.state || listing.zipCode) && (
+              <div className="text-xs text-muted-foreground">
+                {[listing.city, listing.state, listing.zipCode].filter(Boolean).join(', ')}
+              </div>
+            )}
+            {listing.notes && (
+              <div className="text-xs text-muted-foreground mt-1">{listing.notes}</div>
+            )}
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-muted-foreground capitalize">{listing.source}</span>
+              {listing.showingRequested && (
+                <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">Showing Requested</span>
+              )}
+              {listing.createdAt && (
+                <span className="text-xs text-muted-foreground">
+                  {new Date(listing.createdAt).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 
@@ -698,6 +755,9 @@ const ClientDetailsPanel = ({
               </div>
             )}
           </div>
+
+          {/* Saved Listings */}
+          <ClientSavedListings clientId={editingClient.id} />
 
           {/* Link Client Dialog */}
           <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>

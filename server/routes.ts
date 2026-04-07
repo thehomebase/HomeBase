@@ -3273,10 +3273,47 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json(parsed.error);
       }
       const property = await storage.createSavedProperty(parsed.data);
+
+      if (req.user.role === 'client' && req.user.clientRecordId) {
+        const clientRecord = await storage.getClient(req.user.clientRecordId);
+        if (clientRecord?.agentId) {
+          const addr = parsed.data.streetAddress || 'a listing';
+          await storage.createNotification({
+            userId: clientRecord.agentId,
+            type: 'client_saved_listing',
+            title: `${req.user.firstName} ${req.user.lastName} saved ${addr}`,
+            message: `Your client favorited a property: ${parsed.data.streetAddress || ''}, ${parsed.data.city || ''} ${parsed.data.state || ''} ${parsed.data.zipCode || ''}`.trim(),
+            relatedId: property.id,
+          });
+        }
+      }
+
       res.status(201).json(property);
     } catch (error) {
       console.error('Error saving property:', error);
       res.status(500).json({ error: 'Failed to save property' });
+    }
+  });
+
+  app.get("/api/clients/:clientId/saved-properties", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const clientId = parseInt(req.params.clientId);
+      const client = await storage.getClient(clientId);
+      if (!client || client.agentId !== req.user.id) return res.status(404).json({ error: "Client not found" });
+
+      const userResult = await db.execute(sql`
+        SELECT id FROM users WHERE client_record_id = ${clientId} AND role = 'client' LIMIT 1
+      `);
+      if (userResult.rows.length === 0) return res.json([]);
+
+      const buyerUserId = (userResult.rows[0] as any).id;
+      const properties = await storage.getSavedPropertiesByUser(buyerUserId);
+      res.json(properties);
+    } catch (error) {
+      console.error('Error fetching client saved properties:', error);
+      res.status(500).json({ error: 'Failed to fetch client saved properties' });
     }
   });
 
