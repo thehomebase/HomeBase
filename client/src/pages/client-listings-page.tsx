@@ -149,7 +149,7 @@ export default function ClientListingsPage() {
   }
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-6 pb-8 px-4 sm:px-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Home className="h-6 w-6" />
