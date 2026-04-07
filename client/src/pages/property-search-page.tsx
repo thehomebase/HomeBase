@@ -1,4 +1,4 @@
-import { useState, useRef, lazy, Suspense, useEffect, useCallback } from "react";
+import { useState, useRef, lazy, Suspense, useEffect, useCallback, Fragment } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1025,6 +1025,22 @@ export default function PropertySearchPage() {
     },
   });
 
+  const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
+  const [noteText, setNoteText] = useState("");
+
+  const notesMutation = useMutation({
+    mutationFn: async ({ id, buyerNotes }: { id: number; buyerNotes: string }) => {
+      await apiRequest("PATCH", `/api/saved-properties/${id}/notes`, { buyerNotes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-properties"] });
+      toast({ title: "Note saved" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save note.", variant: "destructive" });
+    },
+  });
+
   const filteredListings = (rentcastResults?.listings || []).filter(listing => {
     const minP = parsePriceInput(rcMinPrice);
     const maxP = parsePriceInput(rcMaxPrice);
@@ -1527,8 +1543,8 @@ export default function PropertySearchPage() {
                     const priceMatch = notesParts.find(p => p.startsWith("$"));
                     const bedBathMatch = notesParts.find(p => /\d+bd\/\d+ba/.test(p));
                     const sqftMatch = notesParts.find(p => /sqft/i.test(p));
-                    return (
-                      <tr key={prop.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? '' : 'bg-muted/10'}`}>
+                    return (<Fragment key={prop.id}>
+                      <tr className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${i % 2 === 0 ? '' : 'bg-muted/10'}`}>
                         <td className="px-3 py-2.5">
                           <div className="font-medium truncate max-w-[220px]">{prop.streetAddress || formatAddress(prop)}</div>
                           <div className="text-xs text-muted-foreground">
@@ -1537,6 +1553,12 @@ export default function PropertySearchPage() {
                           <div className="sm:hidden text-xs text-muted-foreground mt-0.5">
                             {[priceMatch, bedBathMatch, sqftMatch].filter(Boolean).join(" · ")}
                           </div>
+                          {prop.buyerNotes && (
+                            <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5 truncate max-w-[220px]" title={prop.buyerNotes}>
+                              <FileText className="h-3 w-3 inline mr-0.5" />
+                              {prop.buyerNotes.length > 40 ? prop.buyerNotes.substring(0, 40) + '...' : prop.buyerNotes}
+                            </div>
+                          )}
                         </td>
                         <td className="px-3 py-2.5 text-right font-semibold text-primary whitespace-nowrap hidden sm:table-cell">
                           {priceMatch || "—"}
@@ -1574,6 +1596,22 @@ export default function PropertySearchPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              className={`h-7 w-7 ${prop.buyerNotes ? 'text-blue-600' : ''}`}
+                              onClick={() => {
+                                if (expandedNoteId === prop.id) {
+                                  setExpandedNoteId(null);
+                                } else {
+                                  setExpandedNoteId(prop.id);
+                                  setNoteText(prop.buyerNotes || "");
+                                }
+                              }}
+                              title="Add/edit notes"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               className="h-7 w-7"
                               onClick={() => window.open(prop.url, "_blank", "noopener,noreferrer")}
                             >
@@ -1590,7 +1628,44 @@ export default function PropertySearchPage() {
                           </div>
                         </td>
                       </tr>
-                    );
+                      {expandedNoteId === prop.id && (
+                        <tr className="bg-muted/20">
+                          <td colSpan={7} className="px-3 py-3">
+                            <div className="space-y-2">
+                              <Label className="text-xs font-medium">My Notes & Questions</Label>
+                              <Textarea
+                                placeholder="Add your notes, questions for your agent, or thoughts about this property..."
+                                value={noteText}
+                                onChange={(e) => setNoteText(e.target.value)}
+                                rows={3}
+                                className="text-sm"
+                              />
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => setExpandedNoteId(null)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => {
+                                    notesMutation.mutate({ id: prop.id, buyerNotes: noteText });
+                                    setExpandedNoteId(null);
+                                  }}
+                                  disabled={notesMutation.isPending}
+                                >
+                                  {notesMutation.isPending ? "Saving..." : "Save Note"}
+                                </Button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>);
                   })}
                 </tbody>
               </table>

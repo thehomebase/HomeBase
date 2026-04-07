@@ -261,6 +261,12 @@ const ClientSavedListings = ({ clientId }: { clientId: number }) => {
             {listing.notes && (
               <div className="text-xs text-muted-foreground mt-1">{listing.notes}</div>
             )}
+            {listing.buyerNotes && (
+              <div className="text-xs bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded p-2 mt-1.5">
+                <span className="font-medium text-blue-700 dark:text-blue-400">Client's Note: </span>
+                {listing.buyerNotes}
+              </div>
+            )}
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs text-muted-foreground capitalize">{listing.source}</span>
               {listing.showingRequested && (

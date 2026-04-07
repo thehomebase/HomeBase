@@ -3363,6 +3363,43 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.patch("/api/saved-properties/:id/notes", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { buyerNotes } = req.body;
+      if (typeof buyerNotes !== "string") {
+        return res.status(400).json({ error: "buyerNotes must be a string" });
+      }
+      const id = Number(req.params.id);
+      const result = await db.execute(sql`
+        UPDATE saved_properties SET buyer_notes = ${buyerNotes}
+        WHERE id = ${id} AND user_id = ${req.user.id}
+        RETURNING *
+      `);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Property not found" });
+
+      if (req.user.role === 'client' && req.user.clientRecordId && buyerNotes.trim()) {
+        const clientRecord = await storage.getClient(req.user.clientRecordId);
+        if (clientRecord?.agentId) {
+          const prop = result.rows[0] as any;
+          const addr = prop.street_address || 'a saved listing';
+          await storage.createNotification({
+            userId: clientRecord.agentId,
+            type: 'client_listing_note',
+            title: `${req.user.firstName} ${req.user.lastName} added a note on ${addr}`,
+            message: buyerNotes.length > 200 ? buyerNotes.substring(0, 200) + '...' : buyerNotes,
+            relatedId: id,
+          });
+        }
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error('Error updating buyer notes:', error);
+      res.status(500).json({ error: 'Failed to update notes' });
+    }
+  });
+
   app.delete("/api/saved-properties/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {

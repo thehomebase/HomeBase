@@ -3692,7 +3692,8 @@ export class DatabaseStorage implements IStorage {
       const result = await db.execute(sql`
         SELECT id, user_id as "userId", url, source, 
                street_address as "streetAddress", city, state, 
-               zip_code as "zipCode", notes, showing_requested as "showingRequested",
+               zip_code as "zipCode", notes, buyer_notes as "buyerNotes",
+               showing_requested as "showingRequested",
                created_at as "createdAt"
         FROM saved_properties
         WHERE user_id = ${userId}
@@ -3708,6 +3709,7 @@ export class DatabaseStorage implements IStorage {
         state: row.state ? String(row.state) : null,
         zipCode: row.zipCode ? String(row.zipCode) : null,
         notes: row.notes ? String(row.notes) : null,
+        buyerNotes: row.buyerNotes ? String(row.buyerNotes) : null,
         showingRequested: Boolean(row.showingRequested),
         createdAt: row.createdAt ? new Date(row.createdAt) : null,
       }));
