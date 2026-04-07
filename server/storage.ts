@@ -3693,6 +3693,7 @@ export class DatabaseStorage implements IStorage {
         SELECT id, user_id as "userId", url, source, 
                street_address as "streetAddress", city, state, 
                zip_code as "zipCode", notes, buyer_notes as "buyerNotes",
+               agent_notes as "agentNotes", agent_documents as "agentDocuments",
                showing_requested as "showingRequested",
                created_at as "createdAt"
         FROM saved_properties
@@ -3710,6 +3711,8 @@ export class DatabaseStorage implements IStorage {
         zipCode: row.zipCode ? String(row.zipCode) : null,
         notes: row.notes ? String(row.notes) : null,
         buyerNotes: row.buyerNotes ? String(row.buyerNotes) : null,
+        agentNotes: row.agentNotes ? String(row.agentNotes) : null,
+        agentDocuments: row.agentDocuments || [],
         showingRequested: Boolean(row.showingRequested),
         createdAt: row.createdAt ? new Date(row.createdAt) : null,
       }));

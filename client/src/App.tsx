@@ -22,6 +22,7 @@ import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import TransactionsPage from "@/pages/transactions-page";
 import ClientsPage from "@/pages/clients-page";
+import ClientListingsPage from "@/pages/client-listings-page";
 import TransactionPage from "@/pages/transaction-page";
 import CalendarPage from "@/pages/calendar-page";
 import FormsLibraryPage from "@/pages/forms-library-page";
@@ -347,6 +348,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                               <Link href="/clients" className="flex items-center gap-2">
                                 <Users className="h-4 w-4" />
                                 <span>Clients</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                          <SidebarMenuItem>
+                            <SidebarMenuButton asChild tooltip="Client Listings">
+                              <Link href="/client-listings" className="flex items-center gap-2">
+                                <Home className="h-4 w-4" />
+                                <span>Client Listings</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
@@ -945,6 +954,9 @@ function Router() {
           <Route path="/clients">
             <ProtectedRoute path="/clients" component={ClientsPage} />
           </Route>
+          <Route path="/client-listings">
+            <ProtectedRoute path="/client-listings" component={ClientListingsPage} />
+          </Route>
           <Route path="/clients/:id">
             <ProtectedRoute path="/clients/:id" component={ClientPage} />
           </Route>
@@ -1013,6 +1025,9 @@ function Router() {
           </Route>
           <Route path="/clients">
             <ProtectedRoute path="/clients" component={ClientsPage} />
+          </Route>
+          <Route path="/client-listings">
+            <ProtectedRoute path="/client-listings" component={ClientListingsPage} />
           </Route>
           <Route path="/clients/:id">
             <ProtectedRoute path="/clients/:id" component={ClientPage} />

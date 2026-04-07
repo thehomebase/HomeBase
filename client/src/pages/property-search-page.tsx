@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Eye, Map, Droplets, Phone, Mail, MessageSquare, Clock, FileText, ChevronDown, Send, Smartphone, Wifi, X } from "lucide-react";
+import { Search, ExternalLink, Home, DollarSign, BedDouble, Bath, Building2, Heart, Trash2, Loader2, MapPin, AlertTriangle, Database, Calendar, Ruler, LayoutGrid, List, CheckSquare, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Eye, Map, Droplets, Phone, Mail, MessageSquare, Clock, FileText, ChevronDown, Send, Smartphone, Wifi, X, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1631,36 +1631,65 @@ export default function PropertySearchPage() {
                       {expandedNoteId === prop.id && (
                         <tr className="bg-muted/20">
                           <td colSpan={7} className="px-3 py-3">
-                            <div className="space-y-2">
-                              <Label className="text-xs font-medium">My Notes & Questions</Label>
-                              <Textarea
-                                placeholder="Add your notes, questions for your agent, or thoughts about this property..."
-                                value={noteText}
-                                onChange={(e) => setNoteText(e.target.value)}
-                                rows={3}
-                                className="text-sm"
-                              />
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 text-xs"
-                                  onClick={() => setExpandedNoteId(null)}
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  className="h-7 text-xs"
-                                  onClick={() => {
-                                    notesMutation.mutate({ id: prop.id, buyerNotes: noteText });
-                                    setExpandedNoteId(null);
-                                  }}
-                                  disabled={notesMutation.isPending}
-                                >
-                                  {notesMutation.isPending ? "Saving..." : "Save Note"}
-                                </Button>
+                            <div className="space-y-3">
+                              <div className="space-y-2">
+                                <Label className="text-xs font-medium">My Notes & Questions</Label>
+                                <Textarea
+                                  placeholder="Add your notes, questions for your agent, or thoughts about this property..."
+                                  value={noteText}
+                                  onChange={(e) => setNoteText(e.target.value)}
+                                  rows={3}
+                                  className="text-sm"
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    onClick={() => setExpandedNoteId(null)}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    onClick={() => {
+                                      notesMutation.mutate({ id: prop.id, buyerNotes: noteText });
+                                      setExpandedNoteId(null);
+                                    }}
+                                    disabled={notesMutation.isPending}
+                                  >
+                                    {notesMutation.isPending ? "Saving..." : "Save Note"}
+                                  </Button>
+                                </div>
                               </div>
+                              {prop.agentNotes && (
+                                <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded p-2.5">
+                                  <span className="text-xs font-semibold text-green-700 dark:text-green-400">Agent's Response: </span>
+                                  <p className="text-sm mt-0.5">{prop.agentNotes}</p>
+                                </div>
+                              )}
+                              {prop.agentDocuments && (prop.agentDocuments as any[]).length > 0 && (
+                                <div className="space-y-1.5">
+                                  <Label className="text-xs font-medium">Documents from Agent</Label>
+                                  {(prop.agentDocuments as any[]).map((doc: any, idx: number) => (
+                                    <div key={idx} className="flex items-center justify-between border rounded px-2.5 py-1.5 text-sm">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span className="truncate">{doc.name}</span>
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={() => window.open(`/api/saved-properties/${prop.id}/documents/${idx}/download`, "_blank")}
+                                      >
+                                        <Download className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>

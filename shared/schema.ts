@@ -400,6 +400,8 @@ export const savedProperties = pgTable("saved_properties", {
   zipCode: text("zip_code"),
   notes: text("notes"),
   buyerNotes: text("buyer_notes"),
+  agentNotes: text("agent_notes"),
+  agentDocuments: json("agent_documents").default([]),
   showingRequested: boolean("showing_requested").notNull().default(false),
   lastKnownPrice: integer("last_known_price"),
   listingId: text("listing_id"),

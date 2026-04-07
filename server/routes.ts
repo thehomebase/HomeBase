@@ -3400,6 +3400,206 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.get("/api/agent/client-listings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const result = await db.execute(sql`
+        SELECT sp.id, sp.user_id as "userId", sp.url, sp.source,
+               sp.street_address as "streetAddress", sp.city, sp.state,
+               sp.zip_code as "zipCode", sp.notes, sp.buyer_notes as "buyerNotes",
+               sp.agent_notes as "agentNotes", sp.agent_documents as "agentDocuments",
+               sp.showing_requested as "showingRequested",
+               sp.created_at as "createdAt",
+               c.id as "clientId", c.first_name as "clientFirstName", c.last_name as "clientLastName",
+               c.email as "clientEmail", c.phone as "clientPhone"
+        FROM saved_properties sp
+        JOIN users u ON u.id = sp.user_id AND u.role = 'client'
+        JOIN clients c ON c.id = u.client_record_id
+        WHERE c.agent_id = ${req.user.id}
+        ORDER BY sp.showing_requested DESC, sp.created_at DESC
+      `);
+      const sanitized = result.rows.map((row: any) => ({
+        ...row,
+        agentDocuments: (row.agentDocuments || []).map((doc: any) => ({
+          name: doc.name,
+          fileName: doc.fileName,
+          mimeType: doc.mimeType,
+          fileSize: doc.fileSize,
+          uploadedAt: doc.uploadedAt,
+          category: doc.category,
+        })),
+      }));
+      res.json(sanitized);
+    } catch (error) {
+      console.error('Error fetching agent client listings:', error);
+      res.status(500).json({ error: 'Failed to fetch client listings' });
+    }
+  });
+
+  app.patch("/api/saved-properties/:id/agent-notes", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const { agentNotes } = req.body;
+      if (typeof agentNotes !== "string") {
+        return res.status(400).json({ error: "agentNotes must be a string" });
+      }
+      const id = Number(req.params.id);
+      const verify = await db.execute(sql`
+        SELECT sp.id FROM saved_properties sp
+        JOIN users u ON u.id = sp.user_id AND u.role = 'client'
+        JOIN clients c ON c.id = u.client_record_id
+        WHERE sp.id = ${id} AND c.agent_id = ${req.user.id}
+      `);
+      if (verify.rows.length === 0) return res.status(404).json({ error: "Property not found" });
+
+      const result = await db.execute(sql`
+        UPDATE saved_properties SET agent_notes = ${agentNotes}
+        WHERE id = ${id} RETURNING *
+      `);
+
+      const prop = result.rows[0] as any;
+      if (agentNotes.trim()) {
+        const userResult = await db.execute(sql`
+          SELECT id FROM users WHERE id = ${prop.user_id}
+        `);
+        if (userResult.rows.length > 0) {
+          const addr = prop.street_address || 'a saved listing';
+          await storage.createNotification({
+            userId: Number((userResult.rows[0] as any).id),
+            type: 'agent_listing_reply',
+            title: `Your agent replied about ${addr}`,
+            message: agentNotes.length > 200 ? agentNotes.substring(0, 200) + '...' : agentNotes,
+            relatedId: id,
+          });
+        }
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error('Error updating agent notes:', error);
+      res.status(500).json({ error: 'Failed to update agent notes' });
+    }
+  });
+
+  const listingDocUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 25 * 1024 * 1024 },
+  });
+
+  app.post("/api/saved-properties/:id/documents", listingDocUpload.single("file"), async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    try {
+      const id = Number(req.params.id);
+      const verify = await db.execute(sql`
+        SELECT sp.id, sp.agent_documents FROM saved_properties sp
+        JOIN users u ON u.id = sp.user_id AND u.role = 'client'
+        JOIN clients c ON c.id = u.client_record_id
+        WHERE sp.id = ${id} AND c.agent_id = ${req.user.id}
+      `);
+      if (verify.rows.length === 0) return res.status(404).json({ error: "Property not found" });
+
+      const existingDocs = (verify.rows[0] as any).agent_documents || [];
+      const fileBase64 = req.file.buffer.toString('base64');
+      const newDoc = {
+        name: req.body.name || req.file.originalname,
+        fileName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        fileSize: req.file.size,
+        fileData: fileBase64,
+        uploadedAt: new Date().toISOString(),
+        category: req.body.category || 'general',
+      };
+      const updatedDocs = [...existingDocs, newDoc];
+
+      await db.execute(sql`
+        UPDATE saved_properties SET agent_documents = ${JSON.stringify(updatedDocs)}::jsonb
+        WHERE id = ${id}
+      `);
+
+      const prop = verify.rows[0] as any;
+      const spResult = await db.execute(sql`
+        SELECT user_id FROM saved_properties WHERE id = ${id}
+      `);
+      if (spResult.rows.length > 0) {
+        await storage.createNotification({
+          userId: Number((spResult.rows[0] as any).user_id),
+          type: 'agent_listing_document',
+          title: `Your agent uploaded a document`,
+          message: `${newDoc.name} was added to one of your saved listings`,
+          relatedId: id,
+        });
+      }
+
+      res.json({ success: true, document: { ...newDoc, fileData: undefined } });
+    } catch (error) {
+      console.error('Error uploading listing document:', error);
+      res.status(500).json({ error: 'Failed to upload document' });
+    }
+  });
+
+  app.get("/api/saved-properties/:id/documents/:docIndex/download", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const id = Number(req.params.id);
+      const docIndex = Number(req.params.docIndex);
+
+      const result = await db.execute(sql`
+        SELECT sp.agent_documents, sp.user_id FROM saved_properties sp
+        LEFT JOIN users u ON u.id = sp.user_id
+        LEFT JOIN clients c ON c.id = u.client_record_id
+        WHERE sp.id = ${id}
+          AND (sp.user_id = ${req.user.id} OR c.agent_id = ${req.user.id})
+      `);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Property not found" });
+
+      const docs = (result.rows[0] as any).agent_documents || [];
+      if (docIndex < 0 || docIndex >= docs.length) return res.status(404).json({ error: "Document not found" });
+
+      const doc = docs[docIndex];
+      const buffer = Buffer.from(doc.fileData, 'base64');
+      res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${doc.fileName}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error('Error downloading listing document:', error);
+      res.status(500).json({ error: 'Failed to download document' });
+    }
+  });
+
+  app.delete("/api/saved-properties/:id/documents/:docIndex", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    if (req.user.role !== "agent" && req.user.role !== "broker") return res.sendStatus(403);
+    try {
+      const id = Number(req.params.id);
+      const docIndex = Number(req.params.docIndex);
+
+      const verify = await db.execute(sql`
+        SELECT sp.agent_documents FROM saved_properties sp
+        JOIN users u ON u.id = sp.user_id AND u.role = 'client'
+        JOIN clients c ON c.id = u.client_record_id
+        WHERE sp.id = ${id} AND c.agent_id = ${req.user.id}
+      `);
+      if (verify.rows.length === 0) return res.status(404).json({ error: "Property not found" });
+
+      const docs = (verify.rows[0] as any).agent_documents || [];
+      if (docIndex < 0 || docIndex >= docs.length) return res.status(404).json({ error: "Document not found" });
+
+      docs.splice(docIndex, 1);
+      await db.execute(sql`
+        UPDATE saved_properties SET agent_documents = ${JSON.stringify(docs)}::jsonb
+        WHERE id = ${id}
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting listing document:', error);
+      res.status(500).json({ error: 'Failed to delete document' });
+    }
+  });
+
   app.delete("/api/saved-properties/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
