@@ -334,16 +334,6 @@ export function setupAuth(app: Express) {
 
       recordRegistrationAttempt(clientIp);
 
-      if (role === 'client') {
-        const matchingClient = await db.execute(sql`
-          SELECT id FROM clients WHERE LOWER(email) = LOWER(${req.body.email}) LIMIT 1
-        `);
-        if (matchingClient.rows.length > 0) {
-          await storage.updateUser(user.id, { clientRecordId: (matchingClient.rows[0] as any).id });
-          user.clientRecordId = (matchingClient.rows[0] as any).id;
-        }
-      }
-
       console.log('User created successfully:', { id: user.id, email: user.email });
 
       const emailResult = await sendVerificationEmail(
@@ -434,6 +424,16 @@ export function setupAuth(app: Express) {
         emailVerificationToken: null,
         emailVerificationExpires: null,
       });
+
+      if (user.role === 'client' && !user.clientRecordId) {
+        const matchingClient = await db.execute(sql`
+          SELECT id FROM clients WHERE LOWER(email) = LOWER(${user.email}) LIMIT 1
+        `);
+        if (matchingClient.rows.length > 0) {
+          await storage.updateUser(user.id, { clientRecordId: (matchingClient.rows[0] as any).id });
+          updatedUser.clientRecordId = (matchingClient.rows[0] as any).id;
+        }
+      }
 
       sendWelcomeEmail(user.email, user.firstName, user.role).catch((err) =>
         console.error("Failed to send welcome email:", err)
