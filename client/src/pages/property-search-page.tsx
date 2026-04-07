@@ -1559,6 +1559,20 @@ export default function PropertySearchPage() {
                               {prop.buyerNotes.length > 40 ? prop.buyerNotes.substring(0, 40) + '...' : prop.buyerNotes}
                             </div>
                           )}
+                          {(prop.agentNotes || (prop.agentDocuments && (prop.agentDocuments as any[]).length > 0)) && (
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              {prop.agentNotes && (
+                                <Badge variant="outline" className="text-[10px] border-green-500 text-green-600 dark:text-green-400 h-5 px-1.5">
+                                  Agent replied
+                                </Badge>
+                              )}
+                              {prop.agentDocuments && (prop.agentDocuments as any[]).length > 0 && (
+                                <Badge variant="outline" className="text-[10px] border-purple-500 text-purple-600 dark:text-purple-400 h-5 px-1.5">
+                                  {(prop.agentDocuments as any[]).length} doc{(prop.agentDocuments as any[]).length > 1 ? 's' : ''}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="px-3 py-2.5 text-right font-semibold text-primary whitespace-nowrap hidden sm:table-cell">
                           {priceMatch || "—"}
