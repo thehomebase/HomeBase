@@ -113,6 +113,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
     return [
       { icon: FileText, label: "Deals", href: "/transactions", id: "transactions" },
       { icon: Users, label: "Clients", href: "/clients", id: "clients" },
+      { icon: Home, label: "Client Listings", href: "/client-listings", id: "client-listings" },
       { icon: MessageSquare, label: "Messages", href: "/messages", id: "messages" },
       { icon: Briefcase, label: "Broker Portal", href: "/broker-portal", id: "broker-portal" },
       { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
@@ -160,6 +161,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
   return [
     { icon: FileText, label: "Deals", href: "/transactions", id: "transactions" },
     { icon: Users, label: "Clients", href: "/clients", id: "clients" },
+    { icon: Home, label: "Client Listings", href: "/client-listings", id: "client-listings" },
     { icon: MessageSquare, label: "Messages", href: "/messages", id: "messages" },
     { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
     { icon: DollarSign, label: "Commissions", href: "/commissions", id: "commissions" },
@@ -290,6 +292,7 @@ function getCategorizedItems(role: string | undefined): NavCategory[] {
       { label: "Transactions", items: [
         { icon: FileText, label: "Deals", href: "/transactions", id: "transactions" },
         { icon: Users, label: "Clients", href: "/clients", id: "clients" },
+        { icon: Home, label: "Client Listings", href: "/client-listings", id: "client-listings" },
         { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
         { icon: DollarSign, label: "Commissions", href: "/commissions", id: "commissions" },
         { icon: Briefcase, label: "Broker Portal", href: "/broker-portal", id: "broker-portal" },
@@ -333,6 +336,7 @@ function getCategorizedItems(role: string | undefined): NavCategory[] {
     { label: "Transactions", items: [
       { icon: FileText, label: "Deals", href: "/transactions", id: "transactions" },
       { icon: Users, label: "Clients", href: "/clients", id: "clients" },
+      { icon: Home, label: "Client Listings", href: "/client-listings", id: "client-listings" },
       { icon: ListTodo, label: "Tasks", href: "/tasks", id: "tasks" },
       { icon: DollarSign, label: "Commissions", href: "/commissions", id: "commissions" },
     ]},
