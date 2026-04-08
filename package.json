@@ -92,6 +92,7 @@
     "drizzle-zod": "^0.7.1",
     "embla-carousel-react": "^8.3.0",
     "esri-leaflet": "^3.0.19",
+    "exceljs": "^4.4.0",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "framer-motion": "^11.13.1",
@@ -139,7 +140,6 @@
     "web-push": "^3.6.7",
     "wouter": "^3.3.5",
     "ws": "^8.18.1",
-    "xlsx": "^0.18.5",
     "zod": "^3.25.76",
     "zod-validation-error": "^3.5.4",
     "zustand": "^5.0.3"
@@ -172,7 +172,6 @@
   "overrides": {
     "express": {
       "path-to-regexp": "0.1.13"
-    },
-    "lodash": "4.18.1"
+    }
   }
 }

@@ -9,7 +9,7 @@ import { z } from "zod";
 import { insertTransactionSchema, insertChecklistSchema, insertMessageSchema, insertClientSchema, insertContractorSchema, insertContractorReviewSchema, insertPropertyViewingSchema, insertPropertyFeedbackSchema, insertSavedPropertySchema, insertCommunicationSchema, insertInspectionItemSchema, insertBidRequestSchema, insertBidSchema, insertHomeownerHomeSchema, insertMaintenanceRecordSchema, insertHomeTeamMemberSchema, insertDripCampaignSchema, insertDripStepSchema, insertDripEnrollmentSchema, insertClientSpecialDateSchema, insertLeadZipCodeSchema, insertLeadSchema, insertAgentReviewSchema, insertVendorRatingSchema, listingPhotos, formTemplates, homeExpenses, insertHomeExpenseSchema, homeMaintenanceReminders, insertHomeMaintenanceReminderSchema, homeEquityProfiles, insertHomeEquityProfileSchema, homeWarrantyItems, insertHomeWarrantyItemSchema, homeImprovements, insertHomeImprovementSchema, insertEstimateRequestSchema, insertLenderEstimateSchema } from "@shared/schema";
 import ical from "ical-generator";
 import multer from "multer";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { parseContract } from "./contract-parser";
 import { sendSMS, sendSMSFromNumber, isTwilioConfigured, getTwilioPhoneNumber, isOptOutMessage, isOptInMessage, normalizePhoneNumber, validateTwilioWebhook, isBlockedNumber, containsThreateningContent, searchAvailableNumbers, purchasePhoneNumber, releasePhoneNumber } from "./twilio-service";
 import { getAuthUrl, handleCallback, getGmailStatus, disconnectGmail, sendGmailEmail, getGmailMessages, getGmailInbox, getGmailMessageDetail, getSignature, batchModifyMessages, trashMessages, getGmailLabels, syncTransactionToGoogleCalendar, syncAllTransactionsToGoogleCalendar, countGmailEmailsForClients, type EmailAttachment } from "./gmail-service";
@@ -802,10 +802,31 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: 'File must be a valid Excel (.xlsx, .xls) or CSV file' });
       }
 
-      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json(worksheet) as Record<string, any>[];
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(req.file.buffer);
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
+        return res.status(400).json({ error: 'Spreadsheet has no worksheets' });
+      }
+      const data: Record<string, any>[] = [];
+      const headers: string[] = [];
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) {
+          row.eachCell((cell, colNumber) => {
+            headers[colNumber] = String(cell.value || '').trim();
+          });
+        } else {
+          const rowData: Record<string, any> = {};
+          row.eachCell((cell, colNumber) => {
+            if (headers[colNumber]) {
+              rowData[headers[colNumber]] = cell.value;
+            }
+          });
+          if (Object.keys(rowData).length > 0) {
+            data.push(rowData);
+          }
+        }
+      });
 
       if (data.length === 0) {
         return res.status(400).json({ error: 'Spreadsheet is empty' });
@@ -14546,19 +14567,27 @@ export function registerRoutes(app: Express): Server {
       }));
 
       if (format === "xlsx") {
-        const worksheet = XLSX.utils.json_to_sheet(rows);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Clients");
-        const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Clients");
+        if (rows.length > 0) {
+          worksheet.columns = Object.keys(rows[0]).map(key => ({ header: key, key }));
+          rows.forEach(row => worksheet.addRow(row));
+        }
+        const buffer = await workbook.xlsx.writeBuffer();
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename="clients_export.xlsx"`);
-        res.send(buffer);
+        res.send(Buffer.from(buffer));
       } else {
-        const worksheet = XLSX.utils.json_to_sheet(rows);
-        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Clients");
+        if (rows.length > 0) {
+          worksheet.columns = Object.keys(rows[0]).map(key => ({ header: key, key }));
+          rows.forEach(row => worksheet.addRow(row));
+        }
+        const csvBuffer = await workbook.csv.writeBuffer();
         res.setHeader("Content-Type", "text/csv");
         res.setHeader("Content-Disposition", `attachment; filename="clients_export.csv"`);
-        res.send(csv);
+        res.send(csvBuffer);
       }
     } catch (error) {
       console.error("Export clients error:", error);
