@@ -88,7 +88,7 @@
     "date-fns": "^3.6.0",
     "dompurify": "^3.3.1",
     "dotenv": "^16.4.7",
-    "drizzle-orm": "^0.39.1",
+    "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.7.1",
     "embla-carousel-react": "^8.3.0",
     "esri-leaflet": "^3.0.19",
@@ -101,6 +101,7 @@
     "leaflet": "^1.9.4",
     "leaflet-draw": "^1.0.4",
     "leaflet.heat": "^0.2.0",
+    "lodash": "^4.18.1",
     "lucide-react": "^0.453.0",
     "mapbox-gl": "^3.17.0",
     "memorystore": "^1.6.7",
@@ -169,6 +170,9 @@
     "bufferutil": "^4.0.8"
   },
   "overrides": {
-    "path-to-regexp": "0.1.13"
+    "express": {
+      "path-to-regexp": "0.1.13"
+    },
+    "lodash": "4.18.1"
   }
 }
