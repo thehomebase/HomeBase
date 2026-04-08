@@ -114,6 +114,7 @@
     "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
     "passport-local": "^1.0.0",
+    "path-to-regexp": "^0.1.13",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
     "qrcode": "^1.5.4",
@@ -166,5 +167,8 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
+  },
+  "overrides": {
+    "path-to-regexp": "0.1.13"
   }
 }
