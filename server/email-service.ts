@@ -1,5 +1,12 @@
 import sgMail from "@sendgrid/mail";
 
+function maskEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!domain) return "***";
+  const masked = local.length <= 2 ? "*".repeat(local.length) : local[0] + "*".repeat(local.length - 2) + local[local.length - 1];
+  return `${masked}@${domain}`;
+}
+
 let initialized = false;
 
 function ensureInitialized() {
@@ -79,7 +86,7 @@ export async function sendVerificationEmail(
 
   try {
     await sgMail.send(msg);
-    console.log(`Verification email sent to ${to}`);
+    console.log(`Verification email sent to ${maskEmail(to)}`);
     return { success: true };
   } catch (error: any) {
     console.error("SendGrid verification email error:", error?.response?.body || error.message);
@@ -195,7 +202,7 @@ export async function sendWelcomeEmail(
 
   try {
     await sgMail.send(msg);
-    console.log(`Welcome email sent to ${to}`);
+    console.log(`Welcome email sent to ${maskEmail(to)}`);
     return { success: true };
   } catch (error: any) {
     console.error("SendGrid welcome email error:", error?.response?.body || error.message);
@@ -296,7 +303,7 @@ export async function sendReviewRequestEmail(
 
   try {
     await sgMail.send(msg);
-    console.log(`Review request email sent to ${to} for ${address}`);
+    console.log(`Review request email sent to ${maskEmail(to)} for ${address}`);
     return { success: true };
   } catch (error: any) {
     console.error("SendGrid review request email error:", error?.response?.body || error.message);
@@ -338,7 +345,7 @@ export async function sendSigningEmail(
 
   try {
     await sgMail.send(msg);
-    console.log(`Signing email sent to ${to} for "${documentTitle}"`);
+    console.log(`Signing email sent to ${maskEmail(to)} for "${documentTitle}"`);
     return { success: true };
   } catch (error: any) {
     console.error("SendGrid signing email error:", error?.response?.body || error.message);
@@ -385,7 +392,7 @@ export async function sendTransactionStatusEmail(
 
   try {
     await sgMail.send(msg);
-    console.log(`Transaction status email sent to ${to} for "${propertyAddress}"`);
+    console.log(`Transaction status email sent to ${maskEmail(to)} for "${propertyAddress}"`);
     return { success: true };
   } catch (error: any) {
     console.error("SendGrid transaction status email error:", error?.response?.body || error.message);

@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import { encryptToken, decryptToken, isEncrypted } from "./encryption";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
@@ -62,13 +63,15 @@ export async function handleCallback(code: string, userId: number, requestHost?:
     ? new Date(tokens.expiry_date)
     : new Date(Date.now() + 3600 * 1000);
 
+  const encAccessToken = encryptToken(tokens.access_token!);
+  const encRefreshToken = tokens.refresh_token ? encryptToken(tokens.refresh_token) : null;
   await db.execute(sql`
     INSERT INTO google_tokens (user_id, access_token, refresh_token, token_expiry, email, updated_at)
-    VALUES (${userId}, ${tokens.access_token!}, ${tokens.refresh_token}, ${tokenExpiry}, ${email}, NOW())
+    VALUES (${userId}, ${encAccessToken}, ${encRefreshToken}, ${tokenExpiry}, ${email}, NOW())
     ON CONFLICT (user_id)
     DO UPDATE SET
-      access_token = ${tokens.access_token!},
-      refresh_token = ${tokens.refresh_token},
+      access_token = ${encAccessToken},
+      refresh_token = ${encRefreshToken},
       token_expiry = ${tokenExpiry},
       email = ${email},
       updated_at = NOW()
@@ -88,10 +91,14 @@ async function getAuthenticatedClient(userId: number) {
   }
 
   const row = result.rows[0];
+  const rawAccessToken = (row.access_token as string) || "";
+  const rawRefreshToken = (row.refresh_token as string) || "";
+  const accessToken = rawAccessToken && isEncrypted(rawAccessToken) ? decryptToken(rawAccessToken) : rawAccessToken;
+  const refreshToken = rawRefreshToken && isEncrypted(rawRefreshToken) ? decryptToken(rawRefreshToken) : rawRefreshToken;
   const oauth2Client = getOAuth2Client();
   oauth2Client.setCredentials({
-    access_token: row.access_token as string,
-    refresh_token: row.refresh_token as string,
+    access_token: accessToken,
+    refresh_token: refreshToken,
     expiry_date: new Date(row.token_expiry as string).getTime(),
   });
 
@@ -104,9 +111,10 @@ async function getAuthenticatedClient(userId: number) {
         ? new Date(credentials.expiry_date)
         : new Date(Date.now() + 3600 * 1000);
 
+      const encNewAccessToken = encryptToken(credentials.access_token!);
       await db.execute(sql`
         UPDATE google_tokens
-        SET access_token = ${credentials.access_token!},
+        SET access_token = ${encNewAccessToken},
             token_expiry = ${newExpiry},
             updated_at = NOW()
         WHERE user_id = ${userId}

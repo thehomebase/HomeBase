@@ -80,7 +80,7 @@ async function executeStep(step: DripStep, enrollment: DripEnrollment, variables
     }
     const result = await sendGmailEmail(enrollment.agentId, client.email, subject || "Update from your agent", content);
     if (result.success) {
-      console.log(`[DripScheduler] Email sent to ${client.email} for enrollment ${enrollment.id}`);
+      console.log(`[DripScheduler] Email sent for enrollment ${enrollment.id}`);
       await storage.createCommunication({
         clientId: enrollment.clientId,
         agentId: enrollment.agentId,

@@ -6791,7 +6791,7 @@ export function registerRoutes(app: Express): Server {
               const result = await sendSigningEmail(signer.email, signer.name, title, senderName, signingLink);
               if (result.success) emailsSent++;
             } catch (emailErr: any) {
-              console.error(`Failed to send email to ${signer.email}:`, emailErr?.message);
+              console.error(`Failed to send signing email to signer:`, emailErr?.message);
             }
           }
         }
@@ -14034,7 +14034,7 @@ export function registerRoutes(app: Express): Server {
 
       const result = await sendGmailEmail(req.user.id, to, subject, body || "", undefined, [attachment]);
       if (result.success) {
-        console.log(`[Audit] Document emailed: id=${doc.id}, user=${req.user.id}, to=${to}`);
+        console.log(`[Audit] Document emailed: id=${doc.id}, user=${req.user.id}`);
         res.json({ success: true, messageId: result.messageId });
       } else {
         res.status(500).json({ error: result.error || "Failed to send email" });

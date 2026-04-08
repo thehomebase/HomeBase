@@ -28,6 +28,50 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const mfaPendingLogins = new Map<string, { userId: number; createdAt: number; attempts: number }>();
 const MFA_MAX_ATTEMPTS = 5;
 
+const loginFailures = new Map<string, { count: number; firstFailure: number; lockedUntil: number | null }>();
+const MAX_LOGIN_FAILURES = 5;
+const LOGIN_LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+const LOGIN_FAILURE_WINDOW_MS = 30 * 60 * 1000;
+
+function isAccountLocked(email: string): { locked: boolean; remainingMs?: number } {
+  const key = email.toLowerCase();
+  const record = loginFailures.get(key);
+  if (!record?.lockedUntil) return { locked: false };
+  const now = Date.now();
+  if (now >= record.lockedUntil) {
+    loginFailures.delete(key);
+    return { locked: false };
+  }
+  return { locked: true, remainingMs: record.lockedUntil - now };
+}
+
+function recordLoginFailure(email: string): boolean {
+  const key = email.toLowerCase();
+  const now = Date.now();
+  const record = loginFailures.get(key);
+  if (!record || now - record.firstFailure > LOGIN_FAILURE_WINDOW_MS) {
+    loginFailures.set(key, { count: 1, firstFailure: now, lockedUntil: null });
+    return false;
+  }
+  record.count++;
+  if (record.count >= MAX_LOGIN_FAILURES) {
+    record.lockedUntil = now + LOGIN_LOCKOUT_DURATION_MS;
+    return true;
+  }
+  return false;
+}
+
+function clearLoginFailures(email: string): void {
+  loginFailures.delete(email.toLowerCase());
+}
+
+function maskEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!domain) return "***";
+  const masked = local.length <= 2 ? "*".repeat(local.length) : local[0] + "*".repeat(local.length - 2) + local[local.length - 1];
+  return `${masked}@${domain}`;
+}
+
 function getClientIp(req: import('express').Request): string {
   const forwarded = req.headers['x-forwarded-for'];
   if (typeof forwarded === 'string') {
@@ -152,16 +196,23 @@ export function setupAuth(app: Express) {
       { usernameField: 'email' },
       async (email, password, done) => {
         try {
-          console.log('Attempting login with email:', email);
+          const lockStatus = isAccountLocked(email);
+          if (lockStatus.locked) {
+            const mins = Math.ceil((lockStatus.remainingMs || 0) / 60000);
+            return done(null, false, { message: `Account temporarily locked. Try again in ${mins} minutes.` });
+          }
           const user = await storage.getUserByEmail(email);
           if (!user || !(await comparePasswords(password, user.password))) {
-            console.log('Login failed: Invalid credentials');
+            const locked = recordLoginFailure(email);
+            if (locked) {
+              return done(null, false, { message: "Too many failed attempts. Account locked for 15 minutes." });
+            }
             return done(null, false);
           }
-          console.log('Login successful for user:', user.id);
+          clearLoginFailures(email);
           return done(null, user);
         } catch (error) {
-          console.error('Error in LocalStrategy:', error);
+          console.error('Error in LocalStrategy');
           return done(error);
         }
       }
@@ -169,32 +220,30 @@ export function setupAuth(app: Express) {
   );
 
   passport.serializeUser((user: Express.User, done) => {
-    console.log('Serializing user:', user.id);
     done(null, user.id);
   });
 
   passport.deserializeUser(async (id: string | number, done) => {
     try {
-      console.log('Deserializing user:', id);
       const userId = typeof id === 'string' ? parseInt(id) : id;
       const user = await storage.getUser(userId);
       if (!user) {
-        console.log('User not found during deserialization:', id);
         return done(null, false);
       }
-      console.log('User deserialized successfully:', user.id);
       done(null, user);
     } catch (error) {
-      console.error('Error in deserializeUser:', error);
+      console.error('Error in deserializeUser');
       done(error, null);
     }
   });
 
   app.post("/api/login", verifyRecaptcha, (req, res, next) => {
-    passport.authenticate("local", (err: any, user: SelectUser | false) => {
+    passport.authenticate("local", (err: any, user: SelectUser | false, info: any) => {
       if (err) return next(err);
       if (!user) {
-        return res.status(401).json({ error: "Invalid email or password" });
+        const message = info?.message || "Invalid email or password";
+        const status = message.includes("locked") ? 429 : 401;
+        return res.status(status).json({ error: message });
       }
 
       if (user.accountStatus === "suspended") {
@@ -214,7 +263,6 @@ export function setupAuth(app: Express) {
 
       req.login(user, (err) => {
         if (err) return next(err);
-        console.log('Login successful, sending user data');
         const { password, totpSecret, ...userWithoutSensitive } = user;
         res.status(200).json(userWithoutSensitive);
       });
@@ -222,20 +270,10 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/logout", (req, res, next) => {
-    const userId = req.user?.id;
-    console.log('Logout request for user:', userId);
-
     req.logout((err) => {
-      if (err) {
-        console.error('Logout error:', err);
-        return next(err);
-      }
+      if (err) return next(err);
       req.session.destroy((err) => {
-        if (err) {
-          console.error('Session destruction error:', err);
-          return next(err);
-        }
-        console.log('Logout successful for user:', userId);
+        if (err) return next(err);
         res.sendStatus(200);
       });
     });
@@ -243,27 +281,21 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) {
-      console.log('Unauthenticated user request to /api/user');
       return res.sendStatus(401);
     }
-    console.log('Authenticated user request:', req.user?.id);
     const { password, totpSecret, ...userWithoutSensitive } = req.user;
     res.json(userWithoutSensitive);
   });
 
   app.post("/api/register", verifyRecaptchaRegister, async (req, res, next) => {
     try {
-      console.log('Registration request body:', req.body);
-
       const clientIp = getClientIp(req);
 
       if (!checkRegistrationRateLimit(clientIp)) {
-        console.log('Rate limit exceeded for IP:', clientIp);
         return res.status(429).json({ error: "Too many registration attempts. Please try again later." });
       }
 
       if (!req.body.email || !req.body.password || !req.body.firstName || !req.body.lastName) {
-        console.error('Missing required fields');
         return res.status(400).json({
           error: 'Missing required fields',
           required: ['email', 'password', 'firstName', 'lastName'],
@@ -273,7 +305,6 @@ export function setupAuth(app: Express) {
 
       const existingUser = await storage.getUserByEmail(req.body.email);
       if (existingUser) {
-        console.log('Email already exists:', req.body.email);
         return res.status(400).json({ error: "Email already exists" });
       }
 
@@ -334,7 +365,7 @@ export function setupAuth(app: Express) {
 
       recordRegistrationAttempt(clientIp);
 
-      console.log('User created successfully:', { id: user.id, email: user.email });
+      console.log('User created successfully:', user.id);
 
       const emailResult = await sendVerificationEmail(
         req.body.email,
@@ -471,7 +502,7 @@ export function setupAuth(app: Express) {
         emailVerificationExpires: verificationExpires,
       });
 
-      console.log('Verification code resent for user', user.email);
+      console.log('Verification code resent for user', user.id);
 
       const emailResult = await sendVerificationEmail(
         user.email,

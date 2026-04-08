@@ -19,7 +19,7 @@ Preferred communication style: Simple, everyday language.
 - **Runtime**: Node.js with Express (TypeScript)
 - **API Design**: RESTful
 - **Authentication**: Passport.js (local, session-based)
-- **Security**: Tiered IP-based rate limiting, email verification, ownership checks, scrypt hashing, reCAPTCHA v3, optional TOTP MFA, CSRF protection, mass assignment prevention, file upload validation, sanitized errors, tightened DOMPurify.
+- **Security**: Tiered IP-based rate limiting, email verification, ownership checks, scrypt hashing, reCAPTCHA v3, optional TOTP MFA, CSRF protection, mass assignment prevention, file upload validation, sanitized errors, tightened DOMPurify, account lockout (5 failures → 15 min lock), encrypted API tokens at rest (AES-256-GCM for Google/SignNow tokens), masked PII in logs.
 - **Session Storage**: PostgreSQL-backed sessions.
 
 ### Data Storage

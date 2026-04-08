@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import { encryptToken, decryptToken, isEncrypted } from "./encryption";
 
 const SIGNNOW_API_BASE = "https://api.signnow.com";
 const SIGNNOW_AUTH_URL = "https://app.signnow.com/authorize";
@@ -80,13 +81,15 @@ export async function handleSignNowCallback(code: string, userId: number): Promi
     console.error("Failed to fetch SignNow user info:", e);
   }
 
+  const encAccessToken = encryptToken(accessToken);
+  const encRefreshToken = refreshToken ? encryptToken(refreshToken) : null;
   await db.execute(sql`
     INSERT INTO signnow_tokens (user_id, access_token, refresh_token, token_expiry, email, updated_at)
-    VALUES (${userId}, ${accessToken}, ${refreshToken}, ${tokenExpiry}, ${email}, NOW())
+    VALUES (${userId}, ${encAccessToken}, ${encRefreshToken || ''}, ${tokenExpiry}, ${email}, NOW())
     ON CONFLICT (user_id)
     DO UPDATE SET
-      access_token = ${accessToken},
-      refresh_token = ${refreshToken},
+      access_token = ${encAccessToken},
+      refresh_token = COALESCE(${encRefreshToken}, signnow_tokens.refresh_token),
       token_expiry = ${tokenExpiry},
       email = ${email},
       updated_at = NOW()
@@ -104,10 +107,14 @@ async function getAccessToken(userId: number): Promise<string | null> {
   if (result.rows.length === 0) return null;
 
   const row = result.rows[0] as any;
+  const rawAccessToken = (row.access_token as string) || "";
+  const rawRefreshToken = (row.refresh_token as string) || "";
+  const accessTokenDecrypted = rawAccessToken && isEncrypted(rawAccessToken) ? decryptToken(rawAccessToken) : rawAccessToken;
+  const refreshTokenDecrypted = rawRefreshToken && isEncrypted(rawRefreshToken) ? decryptToken(rawRefreshToken) : rawRefreshToken;
   const expiry = new Date(row.token_expiry);
 
   if (expiry > new Date(Date.now() + 60_000)) {
-    return row.access_token;
+    return accessTokenDecrypted;
   }
 
   try {
@@ -119,7 +126,7 @@ async function getAccessToken(userId: number): Promise<string | null> {
       },
       body: new URLSearchParams({
         grant_type: "refresh_token",
-        refresh_token: row.refresh_token,
+        refresh_token: refreshTokenDecrypted,
       }),
     });
 
@@ -131,10 +138,12 @@ async function getAccessToken(userId: number): Promise<string | null> {
     const tokens = await tokenRes.json();
     const newExpiry = new Date(Date.now() + (tokens.expires_in || 3600) * 1000);
 
+    const encNewAccess = encryptToken(tokens.access_token);
+    const encNewRefresh = tokens.refresh_token ? encryptToken(tokens.refresh_token) : null;
     await db.execute(sql`
       UPDATE signnow_tokens
-      SET access_token = ${tokens.access_token},
-          refresh_token = COALESCE(${tokens.refresh_token || null}, refresh_token),
+      SET access_token = ${encNewAccess},
+          refresh_token = COALESCE(${encNewRefresh}, refresh_token),
           token_expiry = ${newExpiry},
           updated_at = NOW()
       WHERE user_id = ${userId}
