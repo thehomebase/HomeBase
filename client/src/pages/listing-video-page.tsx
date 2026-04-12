@@ -38,6 +38,7 @@ interface VideoSettings {
   photoDuration: number;
   showCaptions: boolean;
   brandingPosition: string;
+  transitionStyle: string;
 }
 
 interface PropertyDetails {
@@ -547,10 +548,11 @@ export default function ListingVideoPage() {
   const [settings, setSettings] = useState<VideoSettings>({
     aspectRatio: "16:9",
     musicTrack: "none",
-    transitionDuration: 1.2,
+    transitionDuration: 1.5,
     photoDuration: 5,
     showCaptions: true,
     brandingPosition: "bottom-right",
+    transitionStyle: "cinematic",
   });
   const [activeTab, setActiveTab] = useState("upload");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
