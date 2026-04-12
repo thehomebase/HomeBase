@@ -15740,6 +15740,68 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/listing-videos/generate-3d-clip", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const role = req.user!.role;
+    if (role !== "agent" && role !== "broker") return res.status(403).json({ error: "Agent or broker only" });
+
+    const falKey = process.env.FAL_KEY;
+    if (!falKey) return res.status(500).json({ error: "3D video service not configured" });
+
+    try {
+      const { imageDataUrl, motionType, duration } = req.body;
+      if (!imageDataUrl || typeof imageDataUrl !== "string" || !imageDataUrl.startsWith("data:image/")) {
+        return res.status(400).json({ error: "Invalid image data" });
+      }
+
+      const clipDuration = Math.min(Math.max(duration || 4, 2), 8);
+      const numFrames = Math.round(clipDuration * 24);
+
+      const motionPrompts: Record<string, string> = {
+        "walk-forward": "Slow cinematic camera push forward into the room, smooth steady movement, 3D parallax depth effect, static scene",
+        "walk-right": "Slow cinematic camera dolly right through the space, smooth lateral tracking shot, 3D parallax depth effect, static scene",
+        "walk-left": "Slow cinematic camera dolly left through the space, smooth lateral tracking shot, 3D parallax depth effect, static scene",
+        "reveal": "Slow cinematic camera pull back to reveal the full room, smooth zoom out, 3D parallax depth effect, static scene",
+        "drift-right": "Gentle cinematic camera drift to the right with subtle movement, smooth floating motion, 3D parallax depth effect, static scene",
+        "drift-left": "Gentle cinematic camera drift to the left with subtle movement, smooth floating motion, 3D parallax depth effect, static scene",
+        "push-in": "Dramatic slow cinematic camera push toward the focal point, smooth zoom in, 3D parallax depth effect, static scene",
+        "pull-out": "Slow cinematic camera pulling back, revealing the grandeur of the space, smooth zoom out, 3D parallax depth effect, static scene",
+        "rise-up": "Slow cinematic camera rising upward, revealing the height of the room, smooth vertical movement, 3D parallax depth effect, static scene",
+        "pan-right": "Slow cinematic camera pan to the right, smooth horizontal rotation, 3D parallax depth effect, static scene",
+        "pan-left": "Slow cinematic camera pan to the left, smooth horizontal rotation, 3D parallax depth effect, static scene",
+        "zoom-in": "Slow cinematic camera zoom into the focal point, smooth zoom, 3D parallax depth effect, static scene",
+        "zoom-out": "Slow cinematic camera zoom out from the scene, smooth zoom, 3D parallax depth effect, static scene",
+      };
+
+      const prompt = motionPrompts[motionType] || motionPrompts["walk-forward"];
+
+      const { fal } = await import("@fal-ai/client");
+      fal.config({ credentials: falKey });
+
+      console.log(`[Fal.ai 3D clip] Generating ${clipDuration}s clip (${numFrames} frames) for motion: ${motionType}`);
+
+      const result: any = await fal.subscribe("fal-ai/longcat-video/image-to-video/480p", {
+        input: {
+          image_url: imageDataUrl,
+          prompt,
+          num_frames: numFrames,
+          negative_prompt: "blurry, distorted, morphing, changing objects, hallucination, artifacts, glitch, low quality, moving objects, people appearing",
+        },
+      });
+
+      const videoUrl = result?.data?.video?.url;
+      if (!videoUrl) {
+        return res.status(500).json({ error: "No video returned from service" });
+      }
+
+      console.log(`[Fal.ai 3D clip] Generated successfully: ${videoUrl}`);
+      res.json({ videoUrl });
+    } catch (error: any) {
+      console.error("[Fal.ai 3D clip] Error:", error?.message || error);
+      res.status(500).json({ error: error?.message || "3D video clip generation failed" });
+    }
+  });
+
   app.post("/api/listing-videos/analyze-photos", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const role = req.user!.role;
