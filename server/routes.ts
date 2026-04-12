@@ -15778,11 +15778,25 @@ export function registerRoutes(app: Express): Server {
       const { fal } = await import("@fal-ai/client");
       fal.config({ credentials: falKey });
 
+      console.log(`[Fal.ai 3D clip] Uploading image to fal.ai storage...`);
+      const base64Match = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+      let hostedImageUrl = imageDataUrl;
+      if (base64Match) {
+        const mimeType = base64Match[1];
+        const base64Data = base64Match[2];
+        const buffer = Buffer.from(base64Data, "base64");
+        const blob = new Blob([buffer], { type: mimeType });
+        const ext = mimeType.split("/")[1] || "jpg";
+        const file = new File([blob], `photo.${ext}`, { type: mimeType });
+        hostedImageUrl = await fal.storage.upload(file);
+        console.log(`[Fal.ai 3D clip] Image uploaded: ${hostedImageUrl.slice(0, 80)}...`);
+      }
+
       console.log(`[Fal.ai 3D clip] Generating ${clipDuration}s clip (${numFrames} frames) for motion: ${motionType}`);
 
       const result: any = await fal.subscribe("fal-ai/longcat-video/image-to-video/480p", {
         input: {
-          image_url: imageDataUrl,
+          image_url: hostedImageUrl,
           prompt,
           num_frames: numFrames,
           negative_prompt: "blurry, distorted, morphing, changing objects, hallucination, artifacts, glitch, low quality, moving objects, people appearing",

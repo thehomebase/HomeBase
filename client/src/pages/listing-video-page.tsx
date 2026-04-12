@@ -1246,9 +1246,10 @@ export default function ListingVideoPage() {
           photo.videoClipUrl = data.videoUrl;
         } catch (err: any) {
           console.error(`3D clip generation failed for photo ${photo.id}:`, err);
+          const msg = err?.name === "AbortError" ? "Timed out (3 min limit)" : (err?.message || "Could not generate 3D clip");
           toast({
             title: `Photo ${i + 1} failed`,
-            description: err?.message || "Could not generate 3D clip",
+            description: msg,
             variant: "destructive",
           });
         }
