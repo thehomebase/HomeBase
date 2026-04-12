@@ -15698,6 +15698,48 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/listing-videos/generate-depth", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const role = req.user!.role;
+    if (role !== "agent" && role !== "broker") return res.status(403).json({ error: "Agent or broker only" });
+
+    const falKey = process.env.FAL_KEY;
+    if (!falKey) return res.status(500).json({ error: "Depth generation service not configured" });
+
+    try {
+      const { imageDataUrl } = req.body;
+      if (!imageDataUrl || typeof imageDataUrl !== "string" || !imageDataUrl.startsWith("data:image/")) {
+        return res.status(400).json({ error: "Invalid image data" });
+      }
+
+      const { fal } = await import("@fal-ai/client");
+      fal.config({ credentials: falKey });
+
+      const result: any = await fal.subscribe("fal-ai/image-preprocessors/depth-anything/v2", {
+        input: {
+          image_url: imageDataUrl,
+        },
+      });
+
+      const depthImageUrl = result?.data?.image?.url;
+      if (!depthImageUrl) {
+        return res.status(500).json({ error: "No depth map returned from service" });
+      }
+
+      const response = await fetch(depthImageUrl);
+      if (!response.ok) throw new Error("Failed to download depth map");
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const base64 = buffer.toString("base64");
+      const contentType = response.headers.get("content-type") || "image/png";
+      const depthDataUrl = `data:${contentType};base64,${base64}`;
+
+      res.json({ depthDataUrl });
+    } catch (error: any) {
+      console.error("[Fal.ai depth] Error:", error?.message || error);
+      res.status(500).json({ error: "Depth map generation failed" });
+    }
+  });
+
   app.post("/api/listing-videos/analyze-photos", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const role = req.user!.role;

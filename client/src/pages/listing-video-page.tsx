@@ -1011,9 +1011,29 @@ export default function ListingVideoPage() {
     setDepthProgress({ current: 0, total: photos.length, modelLoading: true, modelPercent: 0 });
 
     try {
-      await getDepthPipeline((pct: number) => {
-        setDepthProgress(prev => ({ ...prev, modelPercent: Math.round(pct) }));
-      });
+      let useServerApi = true;
+      try {
+        const testRes = await fetch("/api/listing-videos/generate-depth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ imageDataUrl: "data:image/png;base64,iVBORw0KGgo=" }),
+        });
+        if (testRes.status === 500) {
+          const testData = await testRes.json();
+          if (testData.error === "Depth generation service not configured") {
+            useServerApi = false;
+          }
+        }
+      } catch {
+        useServerApi = false;
+      }
+
+      if (!useServerApi) {
+        await getDepthPipeline((pct: number) => {
+          setDepthProgress(prev => ({ ...prev, modelPercent: Math.round(pct) }));
+        });
+      }
       setDepthProgress(prev => ({ ...prev, modelLoading: false }));
 
       const updatedPhotos = [...photos];
@@ -1023,8 +1043,20 @@ export default function ListingVideoPage() {
         if (!photo.dataUrl) continue;
 
         try {
-          const result = await estimateDepth(photo.dataUrl);
-          photo.depthMapUrl = depthCanvasToDataUrl(result.depthCanvas);
+          if (useServerApi) {
+            const res = await fetch("/api/listing-videos/generate-depth", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ imageDataUrl: photo.dataUrl }),
+            });
+            if (!res.ok) throw new Error("Server depth generation failed");
+            const data = await res.json();
+            photo.depthMapUrl = data.depthDataUrl;
+          } else {
+            const result = await estimateDepth(photo.dataUrl);
+            photo.depthMapUrl = depthCanvasToDataUrl(result.depthCanvas);
+          }
         } catch (err) {
           console.error(`Depth estimation failed for photo ${photo.id}:`, err);
         }
@@ -1039,7 +1071,7 @@ export default function ListingVideoPage() {
       console.error("Depth generation error:", error);
       toast({
         title: "Depth map generation failed",
-        description: error?.message || "Your browser may not support WebGPU. Falling back to standard motion.",
+        description: error?.message || "Depth generation service unavailable. Please try again.",
         variant: "destructive",
       });
     } finally {
