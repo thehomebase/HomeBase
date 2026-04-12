@@ -19,6 +19,13 @@ import {
   Music, Type, Image, Settings, Plus, X, Loader2, Eye
 } from "lucide-react";
 
+interface DepthZone {
+  region: "foreground" | "midground" | "background";
+  yStart: number;
+  yEnd: number;
+  depthFactor: number;
+}
+
 interface PhotoItem {
   id: string;
   filename: string;
@@ -29,6 +36,7 @@ interface PhotoItem {
   caption: string;
   roomType?: string;
   focusPoint?: { x: number; y: number };
+  depthZones?: DepthZone[];
 }
 
 interface VideoSettings {
@@ -164,6 +172,67 @@ function VideoComposer({
     }
   };
 
+  const computeImageLayout = (img: HTMLImageElement, w: number, h: number, scale: number) => {
+    const imgAspect = img.width / img.height;
+    const canvasAspect = w / h;
+    let drawW: number, drawH: number;
+    if (imgAspect > canvasAspect) {
+      drawH = h * scale;
+      drawW = drawH * imgAspect;
+    } else {
+      drawW = w * scale;
+      drawH = drawW / imgAspect;
+    }
+    return { drawW, drawH };
+  };
+
+  const clampDraw = (drawX: number, drawY: number, drawW: number, drawH: number, w: number, h: number) => {
+    const maxOffsetX = drawW - w;
+    const maxOffsetY = drawH - h;
+    return {
+      x: Math.min(0, Math.max(-maxOffsetX, drawX)),
+      y: Math.min(0, Math.max(-maxOffsetY, drawY)),
+    };
+  };
+
+  const getDepthZones = (photo: PhotoItem): DepthZone[] => {
+    if (photo.depthZones && photo.depthZones.length > 0) return photo.depthZones;
+    const isExterior = photo.roomType?.includes("exterior") || photo.roomType?.includes("backyard") || photo.roomType?.includes("pool") || photo.roomType?.includes("front");
+    if (isExterior) {
+      return [
+        { region: "background", yStart: 0, yEnd: 45, depthFactor: 0.3 },
+        { region: "midground", yStart: 30, yEnd: 75, depthFactor: 0.7 },
+        { region: "foreground", yStart: 60, yEnd: 100, depthFactor: 1.6 },
+      ];
+    }
+    return [
+      { region: "background", yStart: 0, yEnd: 40, depthFactor: 0.35 },
+      { region: "midground", yStart: 25, yEnd: 80, depthFactor: 0.75 },
+      { region: "foreground", yStart: 65, yEnd: 100, depthFactor: 1.5 },
+    ];
+  };
+
+  const offscreenRef = useRef<HTMLCanvasElement | null>(null);
+  const layerRef = useRef<HTMLCanvasElement | null>(null);
+
+  const getOffscreen = (w: number, h: number) => {
+    if (!offscreenRef.current) offscreenRef.current = document.createElement("canvas");
+    if (offscreenRef.current.width !== w || offscreenRef.current.height !== h) {
+      offscreenRef.current.width = w;
+      offscreenRef.current.height = h;
+    }
+    return offscreenRef.current;
+  };
+
+  const getLayerCanvas = (w: number, h: number) => {
+    if (!layerRef.current) layerRef.current = document.createElement("canvas");
+    if (layerRef.current.width !== w || layerRef.current.height !== h) {
+      layerRef.current.width = w;
+      layerRef.current.height = h;
+    }
+    return layerRef.current;
+  };
+
   const drawImageWithMotion = (
     ctx: CanvasRenderingContext2D,
     img: HTMLImageElement,
@@ -172,38 +241,99 @@ function VideoComposer({
     motionType: string,
     motionProgress: number,
     alpha: number,
-    focusPoint?: { x: number; y: number }
+    focusPoint?: { x: number; y: number },
+    photo?: PhotoItem
   ) => {
     const transform = getMotionTransform(motionType, motionProgress, focusPoint);
-    ctx.save();
-    ctx.globalAlpha = alpha;
-
-    const imgAspect = img.width / img.height;
-    const canvasAspect = w / h;
-    let drawW: number, drawH: number;
-
-    if (imgAspect > canvasAspect) {
-      drawH = h * transform.scale;
-      drawW = drawH * imgAspect;
-    } else {
-      drawW = w * transform.scale;
-      drawH = drawW / imgAspect;
-    }
+    const { drawW, drawH } = computeImageLayout(img, w, h, transform.scale);
 
     const pivotX = w * transform.originX;
     const pivotY = h * transform.originY;
     const imgPivotX = drawW * transform.originX;
     const imgPivotY = drawH * transform.originY;
-    let drawX = pivotX - imgPivotX + transform.x * w;
-    let drawY = pivotY - imgPivotY + transform.y * h;
+    const baseDrawX = pivotX - imgPivotX + transform.x * w;
+    const baseDrawY = pivotY - imgPivotY + transform.y * h;
 
-    const maxOffsetX = drawW - w;
-    const maxOffsetY = drawH - h;
-    drawX = Math.min(0, Math.max(-maxOffsetX, drawX));
-    drawY = Math.min(0, Math.max(-maxOffsetY, drawY));
+    const depthZones = photo ? getDepthZones(photo) : [];
+    const hasMotion = Math.abs(transform.x) > 0.002 || Math.abs(transform.y) > 0.002 || transform.scale > 1.15;
+    const hasParallax = depthZones.length > 0 && hasMotion;
 
-    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+    if (!hasParallax) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const clamped = clampDraw(baseDrawX, baseDrawY, drawW, drawH, w, h);
+      ctx.drawImage(img, clamped.x, clamped.y, drawW, drawH);
+      ctx.restore();
+      return;
+    }
+
+    try {
+    const offscreen = getOffscreen(w, h);
+    const oCtx = offscreen.getContext("2d")!;
+    oCtx.clearRect(0, 0, w, h);
+
+    const baseClamped = clampDraw(baseDrawX, baseDrawY, drawW, drawH, w, h);
+    oCtx.drawImage(img, baseClamped.x, baseClamped.y, drawW, drawH);
+
+    const layerCanvas = getLayerCanvas(w, h);
+    const lCtx = layerCanvas.getContext("2d")!;
+
+    for (const zone of depthZones) {
+      if (Math.abs(zone.depthFactor - 1) < 0.05) continue;
+
+      const zoneYStart = Math.min(zone.yStart, zone.yEnd);
+      const zoneYEnd = Math.max(zone.yStart, zone.yEnd);
+      if (zoneYEnd - zoneYStart < 2) continue;
+
+      const scaleExtra = (transform.scale - 1) * (zone.depthFactor - 1) * 0.15;
+      const layerScale = transform.scale + scaleExtra;
+      const { drawW: lDrawW, drawH: lDrawH } = computeImageLayout(img, w, h, layerScale);
+
+      const extraX = transform.x * w * (zone.depthFactor - 1);
+      const extraY = transform.y * h * (zone.depthFactor - 1);
+      const lPivotX = w * transform.originX;
+      const lPivotY = h * transform.originY;
+      const layerX = lPivotX - lDrawW * transform.originX + transform.x * w + extraX;
+      const layerY = lPivotY - lDrawH * transform.originY + transform.y * h + extraY;
+      const clamped = clampDraw(layerX, layerY, lDrawW, lDrawH, w, h);
+
+      lCtx.clearRect(0, 0, w, h);
+
+      const yTop = h * (zoneYStart / 100);
+      const yBot = h * (zoneYEnd / 100);
+      const feather = h * 0.1;
+      const gradTop = Math.max(0, yTop - feather);
+      const gradBot = Math.min(h, yBot + feather);
+      const range = gradBot - gradTop;
+      if (range < 1) continue;
+
+      const grad = lCtx.createLinearGradient(0, gradTop, 0, gradBot);
+      const featherRatio = Math.min(0.45, feather / range);
+      grad.addColorStop(0, "rgba(0,0,0,0)");
+      grad.addColorStop(featherRatio, "rgba(0,0,0,1)");
+      grad.addColorStop(1 - featherRatio, "rgba(0,0,0,1)");
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+
+      lCtx.fillStyle = grad;
+      lCtx.fillRect(0, gradTop, w, range);
+      lCtx.globalCompositeOperation = "source-in";
+      lCtx.drawImage(img, clamped.x, clamped.y, lDrawW, lDrawH);
+      lCtx.globalCompositeOperation = "source-over";
+
+      oCtx.drawImage(layerCanvas, 0, 0);
+    }
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(offscreen, 0, 0);
     ctx.restore();
+    } catch {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const clamped = clampDraw(baseDrawX, baseDrawY, drawW, drawH, w, h);
+      ctx.drawImage(img, clamped.x, clamped.y, drawW, drawH);
+      ctx.restore();
+    }
   };
 
   const drawCaptionOverlay = (
@@ -344,9 +474,23 @@ function VideoComposer({
     const isTransitioning = photoProgress > (1 - transRatio);
     const transProgress = isTransitioning ? (photoProgress - (1 - transRatio)) / transRatio : 0;
 
+    const transEase = transProgress * transProgress * (3 - 2 * transProgress);
+
     if (currentImg) {
-      const alpha = isTransitioning ? 1 - transProgress : 1;
-      drawImageWithMotion(ctx, currentImg, w, h, currentPhoto.motionType, photoProgress, alpha, currentPhoto.focusPoint);
+      if (isTransitioning && settings.transitionStyle === "cinematic") {
+        const outScale = 1 + transEase * 0.15;
+        const outAlpha = 1 - transEase;
+        ctx.save();
+        ctx.globalAlpha = outAlpha;
+        ctx.translate(w / 2, h / 2);
+        ctx.scale(outScale, outScale);
+        ctx.translate(-w / 2, -h / 2);
+        drawImageWithMotion(ctx, currentImg, w, h, currentPhoto.motionType, photoProgress, 1, currentPhoto.focusPoint, currentPhoto);
+        ctx.restore();
+      } else {
+        const alpha = isTransitioning ? 1 - transEase : 1;
+        drawImageWithMotion(ctx, currentImg, w, h, currentPhoto.motionType, photoProgress, alpha, currentPhoto.focusPoint, currentPhoto);
+      }
     }
 
     if (isTransitioning) {
@@ -354,7 +498,18 @@ function VideoComposer({
       const nextPhoto = photos[nextIdx];
       const nextImg = loadedImagesRef.current.get(nextPhoto?.id);
       if (nextImg) {
-        drawImageWithMotion(ctx, nextImg, w, h, nextPhoto.motionType, transProgress * 0.1, transProgress, nextPhoto.focusPoint);
+        if (settings.transitionStyle === "cinematic") {
+          const inScale = 1.12 - transEase * 0.12;
+          ctx.save();
+          ctx.globalAlpha = transEase;
+          ctx.translate(w / 2, h / 2);
+          ctx.scale(inScale, inScale);
+          ctx.translate(-w / 2, -h / 2);
+          drawImageWithMotion(ctx, nextImg, w, h, nextPhoto.motionType, transEase * 0.08, 1, nextPhoto.focusPoint, nextPhoto);
+          ctx.restore();
+        } else {
+          drawImageWithMotion(ctx, nextImg, w, h, nextPhoto.motionType, transEase * 0.1, transEase, nextPhoto.focusPoint, nextPhoto);
+        }
       }
     }
 
@@ -662,6 +817,7 @@ export default function ListingVideoPage() {
             photo.caption = analysis.caption;
             photo.roomType = analysis.roomType;
             if (analysis.focusPoint) photo.focusPoint = analysis.focusPoint;
+            if (analysis.depthZones && Array.isArray(analysis.depthZones)) photo.depthZones = analysis.depthZones;
           }
         });
 
@@ -1071,6 +1227,22 @@ export default function ListingVideoPage() {
                         onChange={(e) => setSettings(s => ({ ...s, transitionDuration: parseFloat(e.target.value) }))}
                         className="w-full mt-1"
                       />
+                    </div>
+
+                    <div>
+                      <Label className="text-xs">Transition Style</Label>
+                      <Select
+                        value={settings.transitionStyle}
+                        onValueChange={(v) => setSettings(s => ({ ...s, transitionStyle: v }))}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cinematic">Cinematic (Parallax Depth)</SelectItem>
+                          <SelectItem value="crossfade">Classic Crossfade</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <Separator />

@@ -15745,6 +15745,12 @@ export function registerRoutes(app: Express): Server {
      * "zoom-in" - direct zoom toward focal point (good for: detail shots, unique features)
    - caption: a short, elegant one-line description for this room (e.g., "Sun-drenched living room with vaulted ceilings")
    - focusPoint: where the camera should focus/move toward as {x: 0-100, y: 0-100} percentage. Pick the most visually interesting element.
+   - depthZones: analyze where foreground, midground, and background regions are in the image for parallax depth effect. Return 3 zones as an array. Each zone has:
+     * region: "foreground" | "midground" | "background"
+     * yStart: top of this zone as % (0-100) of image height
+     * yEnd: bottom of this zone as % (0-100) of image height
+     * depthFactor: how much this layer should move relative to the camera. Background moves less (0.2-0.4), midground moves normally (0.6-0.8), foreground moves more (1.3-1.8). Higher = moves more.
+     Zones should overlap slightly for smooth blending. For example, a kitchen with counters in the foreground, cabinets in the mid, and ceiling/backsplash in the background.
 
 2. Suggest the optimal photo ordering for a natural walkthrough flow (exterior first, then entry, main living areas, kitchen, bedrooms, bathrooms, backyard/pool last).
 
@@ -15754,6 +15760,7 @@ GUIDELINES:
 - Use "walk-forward" for entryways and first views of rooms
 - Alternate between different motion types to keep the video dynamic
 - Never use the same motion type on consecutive photos
+- For depthZones: look at actual image content. Floors, counters, furniture in lower portion = foreground (depthFactor 1.3-1.8). Walls, windows, fixtures = midground (0.6-0.8). Ceilings, sky, distant walls = background (0.2-0.4). Zones should overlap by ~10-15% for smooth blending.
 
 Return ONLY valid JSON in this exact format:
 {
@@ -15763,7 +15770,12 @@ Return ONLY valid JSON in this exact format:
       "roomType": "living_room",
       "motionType": "walk-forward",
       "caption": "Spacious living room with natural light",
-      "focusPoint": {"x": 60, "y": 50}
+      "focusPoint": {"x": 60, "y": 50},
+      "depthZones": [
+        {"region": "background", "yStart": 0, "yEnd": 40, "depthFactor": 0.3},
+        {"region": "midground", "yStart": 25, "yEnd": 75, "depthFactor": 0.7},
+        {"region": "foreground", "yStart": 60, "yEnd": 100, "depthFactor": 1.5}
+      ]
     }
   ],
   "suggestedOrder": ["<photo id 1>", "<photo id 2>", ...]
@@ -15792,12 +15804,25 @@ Return ONLY valid JSON in this exact format:
       const analysis = JSON.parse(text);
 
       const validMotions = new Set(["walk-forward","walk-right","walk-left","reveal","drift-right","drift-left","push-in","pull-out","rise-up","pan-right","pan-left","zoom-in","zoom-out","pan-up","pan-down"]);
+      const validRegions = new Set(["foreground", "midground", "background"]);
       if (analysis.analyses && Array.isArray(analysis.analyses)) {
         for (const a of analysis.analyses) {
           if (!validMotions.has(a.motionType)) a.motionType = "walk-forward";
           if (a.focusPoint) {
             a.focusPoint.x = Math.max(0, Math.min(100, Number(a.focusPoint.x) || 50));
             a.focusPoint.y = Math.max(0, Math.min(100, Number(a.focusPoint.y) || 50));
+          }
+          if (Array.isArray(a.depthZones)) {
+            a.depthZones = a.depthZones.filter((z: any) => validRegions.has(z.region)).map((z: any) => {
+              const ys = Math.max(0, Math.min(100, Number(z.yStart) || 0));
+              const ye = Math.max(0, Math.min(100, Number(z.yEnd) || 100));
+              return {
+                region: z.region,
+                yStart: Math.min(ys, ye),
+                yEnd: Math.max(ys, ye),
+                depthFactor: Math.max(0.1, Math.min(2.5, Number(z.depthFactor) || 1)),
+              };
+            }).filter((z: any) => z.yEnd - z.yStart >= 2);
           }
         }
       }
