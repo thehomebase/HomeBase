@@ -15602,7 +15602,16 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/listing-videos", upload.array("photos", 15), async (req, res) => {
+  app.post("/api/listing-videos", (req, res, next) => {
+    upload.array("photos", 15)(req, res, (err: any) => {
+      if (err) {
+        if (err.code === "LIMIT_FILE_COUNT") return res.status(400).json({ error: "Too many files. Maximum 15 photos allowed." });
+        if (err.code === "LIMIT_FILE_SIZE") return res.status(400).json({ error: "File too large. Maximum 25MB per file." });
+        return res.status(400).json({ error: err.message || "Upload error" });
+      }
+      next();
+    });
+  }, async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const role = req.user!.role;
     if (role !== "agent" && role !== "broker") return res.status(403).json({ error: "Agent or broker only" });

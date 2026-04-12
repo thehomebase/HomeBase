@@ -536,7 +536,10 @@ export default function ListingVideoPage() {
         body: formData,
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Upload failed");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Upload failed");
+      }
       return res.json();
     },
     onSuccess: (data) => {
@@ -550,8 +553,8 @@ export default function ListingVideoPage() {
       if (data.settings) setSettings(data.settings);
       setActiveTab("photos");
     },
-    onError: () => {
-      toast({ title: "Upload failed", description: "Please try again.", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Upload failed", description: error.message || "Please try again.", variant: "destructive" });
     },
   });
 
@@ -589,6 +592,10 @@ export default function ListingVideoPage() {
 
   const handleFileUpload = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;
+    if (files.length > 15) {
+      toast({ title: "Too many photos", description: "Maximum 15 photos allowed. Please select fewer photos.", variant: "destructive" });
+      return;
+    }
     const formData = new FormData();
     Array.from(files).forEach(file => formData.append("photos", file));
     formData.append("title", title || "Untitled Video");
