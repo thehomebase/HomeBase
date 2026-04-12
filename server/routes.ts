@@ -15754,23 +15754,23 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid image data" });
       }
 
-      const clipDuration = Math.min(Math.max(duration || 4, 2), 8);
-      const numFrames = Math.min(Math.round(clipDuration * 12), 49);
+      const clipDuration = Math.min(Math.max(duration || 3, 2), 3);
+      const numFrames = Math.min(Math.round(clipDuration * 8), 25);
 
       const motionPrompts: Record<string, string> = {
-        "walk-forward": "Slow cinematic camera push forward into the room, smooth steady movement, 3D parallax depth effect, static scene",
-        "walk-right": "Slow cinematic camera dolly right through the space, smooth lateral tracking shot, 3D parallax depth effect, static scene",
-        "walk-left": "Slow cinematic camera dolly left through the space, smooth lateral tracking shot, 3D parallax depth effect, static scene",
-        "reveal": "Slow cinematic camera pull back to reveal the full room, smooth zoom out, 3D parallax depth effect, static scene",
-        "drift-right": "Gentle cinematic camera drift to the right with subtle movement, smooth floating motion, 3D parallax depth effect, static scene",
-        "drift-left": "Gentle cinematic camera drift to the left with subtle movement, smooth floating motion, 3D parallax depth effect, static scene",
-        "push-in": "Dramatic slow cinematic camera push toward the focal point, smooth zoom in, 3D parallax depth effect, static scene",
-        "pull-out": "Slow cinematic camera pulling back, revealing the grandeur of the space, smooth zoom out, 3D parallax depth effect, static scene",
-        "rise-up": "Slow cinematic camera rising upward, revealing the height of the room, smooth vertical movement, 3D parallax depth effect, static scene",
-        "pan-right": "Slow cinematic camera pan to the right, smooth horizontal rotation, 3D parallax depth effect, static scene",
-        "pan-left": "Slow cinematic camera pan to the left, smooth horizontal rotation, 3D parallax depth effect, static scene",
-        "zoom-in": "Slow cinematic camera zoom into the focal point, smooth zoom, 3D parallax depth effect, static scene",
-        "zoom-out": "Slow cinematic camera zoom out from the scene, smooth zoom, 3D parallax depth effect, static scene",
+        "walk-forward": "Very subtle gentle camera push forward, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "walk-right": "Very subtle gentle camera drift slightly right, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "walk-left": "Very subtle gentle camera drift slightly left, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "reveal": "Very subtle gentle camera pull back slightly, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "drift-right": "Very subtle gentle camera drift slightly right, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "drift-left": "Very subtle gentle camera drift slightly left, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "push-in": "Very subtle gentle camera push forward slightly, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "pull-out": "Very subtle gentle camera pull back slightly, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "rise-up": "Very subtle gentle camera rise upward slightly, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "pan-right": "Very subtle gentle camera pan slightly right, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "pan-left": "Very subtle gentle camera pan slightly left, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "zoom-in": "Very subtle gentle camera zoom in slightly, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "zoom-out": "Very subtle gentle camera zoom out slightly, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
       };
 
       const prompt = motionPrompts[motionType] || motionPrompts["walk-forward"];
@@ -15799,7 +15799,7 @@ export function registerRoutes(app: Express): Server {
           image_url: hostedImageUrl,
           prompt,
           num_frames: numFrames,
-          negative_prompt: "blurry, distorted, morphing, changing objects, hallucination, artifacts, glitch, low quality, moving objects, people appearing",
+          negative_prompt: "new objects, added elements, fence, furniture changes, morphing, changing objects, hallucination, artifacts, glitch, distortion, people appearing, moving objects, new details, invented elements, extra objects, modifications to scene",
         },
         logs: true,
         onQueueUpdate: (update: any) => {
