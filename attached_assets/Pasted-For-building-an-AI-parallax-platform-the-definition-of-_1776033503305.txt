@@ -1,0 +1,30 @@
+For building an AI parallax platform, the definition of "best" means high-quality, professional results (no weird AI artifacts or melting walls), and "cheapest" means keeping your GPU compute costs to fractions of a cent per video. 
+
+To achieve the best balance of both, **do not use Video Diffusion models (like Runway or SVD).** They are expensive (around $0.05 to $0.20 per video) and can hallucinate. 
+
+The absolute best and cheapest path for a SaaS platform is the **Depth-Map Pipeline hosted on Serverless GPUs**. Here is the exact stack you should use:
+
+### 1. The Core Engine: ComfyUI (Free/Open Source)
+Instead of writing complex PyTorch code from scratch, use **ComfyUI**. It is a visual node-based engine for AI generation that you can run completely headless (without a user interface) as an API. 
+* **The Workflow:** You will string together "Depth Anything V2" (to get the depth map), a standard image node, and a 3D-motion node. 
+* **Why it's the best:** It’s open-source, highly modular, and the community constantly updates the nodes. You can build your parallax effect visually until it looks perfect, and then export that exact workflow as a JSON API payload.
+
+### 2. The Compute: RunPod Serverless or Fal.ai (Cheapest Hosting)
+You need GPUs to run this, but keeping a GPU server running 24/7 is too expensive for a new startup. You want "Serverless GPUs"—you only pay for the exact seconds the GPU is generating a video.
+
+* **Option A: RunPod Serverless (Absolute Cheapest):** You can rent virtual GPUs (like an RTX 4090) for around $0.40 to $0.60 per *hour*. Since a depth-map parallax video only takes about 2 to 5 seconds to process, **your cost per video is roughly $0.0005**. You package your ComfyUI workflow into a Docker container and upload it to RunPod.
+* **Option B: Fal.ai or Replicate (Best for Speed of Development):** If you don't want to mess with Docker containers, use a managed API like Fal.ai or Replicate. You pay a slightly higher premium per second of compute, but they manage all the infrastructure. You can literally just search their library for "3d photo" or "depth map," find an existing model, and plug their API key into your app today.
+
+### 3. The App Logic: Vercel + Supabase (Free Tier Friendly)
+To build the actual website where users upload photos and pay you:
+* **Frontend/Backend:** Use **Next.js** hosted on **Vercel**. Vercel’s free tier is incredibly generous for starting out.
+* **Database & Auth:** Use **Supabase**. It gives you user logins, a PostgreSQL database to track who generated what, and secure S3-compatible cloud storage to hold the uploaded images and the final `.mp4` videos.
+
+### Summary of the "Best & Cheapest" Stack:
+1. **User uploads photo** to your Next.js website (Vercel).
+2. **Photo is saved** to Supabase Storage.
+3. Your app pings **RunPod Serverless** with the image URL.
+4. RunPod wakes up, runs a **Depth Anything V2** workflow via ComfyUI, renders the 3D pan, and saves the video back to Supabase.
+5. **Cost:** Less than 1 cent per generation. 
+
+Are you familiar with Python or JavaScript to stitch these API calls together, or are you looking for a more no-code approach to get the MVP off the ground?
