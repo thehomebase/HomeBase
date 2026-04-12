@@ -1,101 +1,31 @@
 import * as THREE from "three";
 
-const PARALLAX_VERTEX = `
-varying vec2 vUv;
-void main() {
-  vUv = uv;
-  gl_Position = vec4(position, 1.0);
-}
-`;
-
-const PARALLAX_FRAGMENT = `
-precision highp float;
-uniform sampler2D uTexture;
-uniform sampler2D uDepthMap;
-uniform vec2 uOffset;
-uniform float uDepthScale;
-uniform float uZoom;
-uniform vec2 uFocus;
-uniform float uRotation;
-uniform float uTiltX;
-uniform float uTiltY;
-uniform vec2 uResolution;
-varying vec2 vUv;
-
-float sampleDepthBlurred(vec2 uv) {
-  vec2 texel = 1.0 / uResolution;
-  float d = 0.0;
-  float total = 0.0;
-  for (float x = -2.0; x <= 2.0; x += 1.0) {
-    for (float y = -2.0; y <= 2.0; y += 1.0) {
-      float w = 1.0 / (1.0 + abs(x) + abs(y));
-      d += texture2D(uDepthMap, clamp(uv + vec2(x, y) * texel * 3.0, 0.0, 1.0)).r * w;
-      total += w;
-    }
-  }
-  return d / total;
-}
-
-void main() {
-  vec2 centeredUv = vUv - 0.5;
-
-  float cosR = cos(uRotation);
-  float sinR = sin(uRotation);
-  centeredUv = vec2(
-    centeredUv.x * cosR - centeredUv.y * sinR,
-    centeredUv.x * sinR + centeredUv.y * cosR
-  );
-
-  centeredUv.x += centeredUv.y * uTiltX * 0.15;
-  centeredUv.y += centeredUv.x * uTiltY * 0.15;
-
-  vec2 baseUv = centeredUv / uZoom + 0.5 + uFocus;
-
-  float depth = sampleDepthBlurred(baseUv);
-
-  float nearFar = smoothstep(0.0, 1.0, depth);
-  float displacement = (nearFar - 0.5) * uDepthScale;
-
-  vec2 displaced = baseUv + uOffset * displacement;
-
-  float depth2 = sampleDepthBlurred(displaced);
-  float displacement2 = (smoothstep(0.0, 1.0, depth2) - 0.5) * uDepthScale;
-  displaced = baseUv + uOffset * displacement2;
-
-  vec2 edgeDist = abs(displaced - 0.5) * 2.0;
-  float edgeFade = 1.0 - smoothstep(0.85, 1.0, max(edgeDist.x, edgeDist.y));
-
-  float borderDist = min(min(displaced.x, 1.0 - displaced.x), min(displaced.y, 1.0 - displaced.y));
-  float borderFade = smoothstep(0.0, 0.03, borderDist);
-
-  vec4 color = texture2D(uTexture, clamp(displaced, 0.002, 0.998));
-
-  color.rgb *= edgeFade * borderFade;
-
-  gl_FragColor = color;
-}
-`;
+const NUM_LAYERS = 8;
+const DEPTH_SPREAD = 3.0;
+const DILATION_RADIUS = 18;
+const CAM_Z = 5;
+const FOV = 45;
 
 export class ParallaxRenderer {
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
-  private camera: THREE.OrthographicCamera;
-  private mesh: THREE.Mesh | null = null;
-  private material: THREE.ShaderMaterial | null = null;
+  private camera: THREE.PerspectiveCamera;
+  private layerMeshes: THREE.Mesh[] = [];
+  private layerTextures: THREE.Texture[] = [];
   private canvas: HTMLCanvasElement;
   private width: number;
   private height: number;
-  private photoTexture: THREE.Texture | null = null;
-  private depthTexture: THREE.Texture | null = null;
+  private aspect: number;
 
   constructor(canvas: HTMLCanvasElement, width: number, height: number) {
     this.canvas = canvas;
     this.width = width;
     this.height = height;
+    this.aspect = width / height;
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: false,
+      antialias: true,
       alpha: false,
       preserveDrawingBuffer: true,
     });
@@ -104,240 +34,336 @@ export class ParallaxRenderer {
     this.renderer.setClearColor(0x000000);
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.camera = new THREE.PerspectiveCamera(FOV, this.aspect, 0.1, 100);
+    this.camera.position.set(0, 0, CAM_Z);
+    this.camera.lookAt(0, 0, 0);
+  }
+
+  private clearLayers() {
+    for (const mesh of this.layerMeshes) {
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+      this.scene.remove(mesh);
+    }
+    for (const tex of this.layerTextures) {
+      tex.dispose();
+    }
+    this.layerMeshes = [];
+    this.layerTextures = [];
   }
 
   setPhoto(imageDataUrl: string, depthDataUrl: string | null): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.photoTexture) this.photoTexture.dispose();
-      if (this.depthTexture) this.depthTexture.dispose();
-      if (this.mesh) {
-        this.scene.remove(this.mesh);
-        this.mesh.geometry.dispose();
-        this.mesh = null;
-      }
-      if (this.material) {
-        this.material.dispose();
-        this.material = null;
-      }
+      this.clearLayers();
 
-      const loader = new THREE.TextureLoader();
-
-      const loadTexture = (url: string): Promise<THREE.Texture> =>
-        new Promise((res, rej) => {
-          loader.load(url, (tex) => {
-            tex.minFilter = THREE.LinearFilter;
-            tex.magFilter = THREE.LinearFilter;
-            tex.wrapS = THREE.ClampToEdgeWrapping;
-            tex.wrapT = THREE.ClampToEdgeWrapping;
-            res(tex);
-          }, undefined, rej);
-        });
-
-      loadTexture(imageDataUrl)
-        .then((photoTex) => {
-          photoTex.colorSpace = THREE.SRGBColorSpace;
-          this.photoTexture = photoTex;
-
-          if (depthDataUrl) {
-            return loadTexture(depthDataUrl).then((depthTex) => {
-              this.depthTexture = depthTex;
-            }).catch(() => {
-              this.depthTexture = null;
-            });
-          }
-          this.depthTexture = null;
-        })
-        .then(() => {
-          const fallbackDepth = this.depthTexture || this.createFlatDepthTexture();
-
-          this.material = new THREE.ShaderMaterial({
-            uniforms: {
-              uTexture: { value: this.photoTexture },
-              uDepthMap: { value: fallbackDepth },
-              uOffset: { value: new THREE.Vector2(0, 0) },
-              uDepthScale: { value: 0.8 },
-              uZoom: { value: 1.06 },
-              uFocus: { value: new THREE.Vector2(0, 0) },
-              uRotation: { value: 0.0 },
-              uTiltX: { value: 0.0 },
-              uTiltY: { value: 0.0 },
-              uResolution: { value: new THREE.Vector2(this.width, this.height) },
-            },
-            vertexShader: PARALLAX_VERTEX,
-            fragmentShader: PARALLAX_FRAGMENT,
-          });
-
-          const geometry = new THREE.PlaneGeometry(2, 2);
-          this.mesh = new THREE.Mesh(geometry, this.material);
-          this.scene.add(this.mesh);
-
+      const img = new Image();
+      img.onload = () => {
+        if (!depthDataUrl) {
+          this.createSingleLayer(img);
           resolve();
-        })
-        .catch((err) => {
-          reject(err || new Error("Failed to load photo texture"));
-        });
+          return;
+        }
+
+        const depthImg = new Image();
+        depthImg.onload = () => {
+          try {
+            this.createMultiLayers(img, depthImg);
+            resolve();
+          } catch (e) {
+            this.createSingleLayer(img);
+            resolve();
+          }
+        };
+        depthImg.onerror = () => {
+          this.createSingleLayer(img);
+          resolve();
+        };
+        depthImg.src = depthDataUrl;
+      };
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = imageDataUrl;
     });
   }
 
-  private createFlatDepthTexture(): THREE.Texture {
+  private getWorkingSize(img: HTMLImageElement): { w: number; h: number } {
+    const maxDim = 1024;
+    let w = img.width;
+    let h = img.height;
+    if (w > maxDim || h > maxDim) {
+      const scale = maxDim / Math.max(w, h);
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+    }
+    return { w, h };
+  }
+
+  private createSingleLayer(img: HTMLImageElement) {
+    const { w, h } = this.getWorkingSize(img);
     const canvas = document.createElement("canvas");
-    canvas.width = 2;
-    canvas.height = 2;
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "rgb(128,128,128)";
-    ctx.fillRect(0, 0, 2, 2);
+    ctx.drawImage(img, 0, 0, w, h);
+
     const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
     tex.minFilter = THREE.LinearFilter;
     tex.magFilter = THREE.LinearFilter;
-    return tex;
+    this.layerTextures.push(tex);
+
+    const dist = CAM_Z;
+    const planeH = 2 * dist * Math.tan((FOV * Math.PI / 180) / 2);
+    const planeW = planeH * this.aspect;
+    const geom = new THREE.PlaneGeometry(planeW, planeH);
+    const mat = new THREE.MeshBasicMaterial({ map: tex });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.z = 0;
+    this.scene.add(mesh);
+    this.layerMeshes.push(mesh);
+  }
+
+  private createMultiLayers(img: HTMLImageElement, depthImg: HTMLImageElement) {
+    const { w, h } = this.getWorkingSize(img);
+
+    const imgCanvas = document.createElement("canvas");
+    imgCanvas.width = w;
+    imgCanvas.height = h;
+    const imgCtx = imgCanvas.getContext("2d")!;
+    imgCtx.drawImage(img, 0, 0, w, h);
+    const imgData = imgCtx.getImageData(0, 0, w, h);
+
+    const depthCanvas = document.createElement("canvas");
+    depthCanvas.width = w;
+    depthCanvas.height = h;
+    const depthCtx = depthCanvas.getContext("2d")!;
+    depthCtx.drawImage(depthImg, 0, 0, w, h);
+    const depthData = depthCtx.getImageData(0, 0, w, h);
+
+    const bgZ = -DEPTH_SPREAD / 2;
+    const bgDist = CAM_Z - bgZ;
+    const bgH = 2 * bgDist * Math.tan((FOV * Math.PI / 180) / 2);
+    const bgW = bgH * this.aspect;
+
+    const bgTex = new THREE.CanvasTexture(imgCanvas);
+    bgTex.colorSpace = THREE.SRGBColorSpace;
+    bgTex.minFilter = THREE.LinearFilter;
+    bgTex.magFilter = THREE.LinearFilter;
+    this.layerTextures.push(bgTex);
+
+    const bgGeom = new THREE.PlaneGeometry(bgW, bgH);
+    const bgMat = new THREE.MeshBasicMaterial({ map: bgTex });
+    const bgMesh = new THREE.Mesh(bgGeom, bgMat);
+    bgMesh.position.z = bgZ;
+    bgMesh.renderOrder = 0;
+    this.scene.add(bgMesh);
+    this.layerMeshes.push(bgMesh);
+
+    const fgLayers = NUM_LAYERS - 1;
+    for (let i = 1; i <= fgLayers; i++) {
+      const depthMin = i / NUM_LAYERS;
+      const depthMax = (i + 1) / NUM_LAYERS;
+      const overlap = 0.03;
+      const dMin = Math.max(0, depthMin - overlap);
+
+      const layerCanvas = document.createElement("canvas");
+      layerCanvas.width = w;
+      layerCanvas.height = h;
+      const layerCtx = layerCanvas.getContext("2d")!;
+      const layerImgData = layerCtx.createImageData(w, h);
+      const mask = new Uint8Array(w * h);
+
+      for (let p = 0; p < w * h; p++) {
+        const depth = depthData.data[p * 4] / 255;
+        if (depth >= dMin && depth <= depthMax) {
+          layerImgData.data[p * 4] = imgData.data[p * 4];
+          layerImgData.data[p * 4 + 1] = imgData.data[p * 4 + 1];
+          layerImgData.data[p * 4 + 2] = imgData.data[p * 4 + 2];
+          layerImgData.data[p * 4 + 3] = 255;
+          mask[p] = 1;
+        }
+      }
+
+      this.dilateEdges(layerImgData.data, mask, w, h, DILATION_RADIUS);
+
+      layerCtx.putImageData(layerImgData, 0, 0);
+
+      const tex = new THREE.CanvasTexture(layerCanvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      this.layerTextures.push(tex);
+
+      const zPos = bgZ + (i / fgLayers) * DEPTH_SPREAD;
+      const dist = CAM_Z - zPos;
+      const planeH = 2 * dist * Math.tan((FOV * Math.PI / 180) / 2);
+      const planeW = planeH * this.aspect;
+
+      const geom = new THREE.PlaneGeometry(planeW, planeH);
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        alphaTest: 0.5,
+        depthWrite: true,
+        depthTest: true,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.z = zPos;
+      mesh.renderOrder = i;
+      this.scene.add(mesh);
+      this.layerMeshes.push(mesh);
+    }
+  }
+
+  private dilateEdges(data: Uint8ClampedArray, mask: Uint8Array, w: number, h: number, radius: number) {
+    let currentMask = mask;
+
+    for (let iter = 0; iter < radius; iter++) {
+      const newMask = new Uint8Array(currentMask);
+
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const idx = y * w + x;
+          if (currentMask[idx]) continue;
+
+          let r = 0, g = 0, b = 0, count = 0;
+          if (x > 0 && currentMask[idx - 1]) {
+            const si = (idx - 1) * 4;
+            r += data[si]; g += data[si + 1]; b += data[si + 2]; count++;
+          }
+          if (x < w - 1 && currentMask[idx + 1]) {
+            const si = (idx + 1) * 4;
+            r += data[si]; g += data[si + 1]; b += data[si + 2]; count++;
+          }
+          if (y > 0 && currentMask[idx - w]) {
+            const si = (idx - w) * 4;
+            r += data[si]; g += data[si + 1]; b += data[si + 2]; count++;
+          }
+          if (y < h - 1 && currentMask[idx + w]) {
+            const si = (idx + w) * 4;
+            r += data[si]; g += data[si + 1]; b += data[si + 2]; count++;
+          }
+
+          if (count > 0) {
+            const pi = idx * 4;
+            data[pi] = Math.round(r / count);
+            data[pi + 1] = Math.round(g / count);
+            data[pi + 2] = Math.round(b / count);
+            data[pi + 3] = 255;
+            newMask[idx] = 1;
+          }
+        }
+      }
+
+      currentMask = newMask;
+    }
   }
 
   setCameraForMotion(motionType: string, progress: number, focusPoint?: { x: number; y: number }) {
-    if (!this.material) return;
-
     const ease = progress * progress * (3 - 2 * progress);
     const fp = focusPoint || { x: 50, y: 50 };
     const fpX = (fp.x - 50) / 100;
     const fpY = (50 - fp.y) / 100;
 
-    let offsetX = 0, offsetY = 0;
-    let zoom = 1.06;
-    let focusX = 0, focusY = 0;
-    let rotation = 0;
-    let tiltX = 0, tiltY = 0;
+    let camX = 0, camY = 0, camZ = CAM_Z;
+    let lookX = 0, lookY = 0;
 
     switch (motionType) {
       case "walk-forward":
-        zoom = 1.06 + ease * 0.18;
-        offsetX = fpX * ease * 0.06;
-        offsetY = fpY * ease * 0.06;
-        focusX = fpX * ease * 0.04;
-        focusY = -fpY * ease * 0.04;
-        tiltX = fpX * ease * 0.06;
-        tiltY = fpY * ease * 0.06;
+        camZ = CAM_Z - ease * 0.5;
+        camX = fpX * ease * 0.15;
+        camY = fpY * ease * 0.12;
+        lookX = fpX * ease * 0.08;
+        lookY = fpY * ease * 0.06;
         break;
 
       case "walk-right":
-        offsetX = ease * 0.08;
-        zoom = 1.06 + ease * 0.08;
-        focusX = ease * 0.03;
-        tiltX = ease * 0.08;
-        rotation = -ease * 0.006;
+        camX = ease * 0.3;
+        camZ = CAM_Z - ease * 0.12;
+        lookX = ease * 0.12;
         break;
 
       case "walk-left":
-        offsetX = -ease * 0.08;
-        zoom = 1.06 + ease * 0.08;
-        focusX = -ease * 0.03;
-        tiltX = -ease * 0.08;
-        rotation = ease * 0.006;
+        camX = -ease * 0.3;
+        camZ = CAM_Z - ease * 0.12;
+        lookX = -ease * 0.12;
         break;
 
       case "reveal":
-        zoom = 1.2 - ease * 0.12;
-        offsetX = fpX * (1 - ease) * 0.08;
-        offsetY = fpY * (1 - ease) * 0.06;
-        focusX = fpX * (1 - ease) * 0.04;
-        focusY = -fpY * (1 - ease) * 0.04;
-        tiltX = fpX * (1 - ease) * 0.06;
-        tiltY = fpY * (1 - ease) * 0.06;
+        camZ = CAM_Z - (1 - ease) * 0.35;
+        camX = fpX * (1 - ease) * 0.2;
+        camY = fpY * (1 - ease) * 0.15;
         break;
 
       case "drift-right":
-        offsetX = ease * 0.06;
-        offsetY = Math.sin(ease * Math.PI) * 0.02;
-        zoom = 1.08 + Math.sin(ease * Math.PI) * 0.04;
-        focusX = ease * 0.02;
-        tiltX = ease * 0.05;
+        camX = ease * 0.2;
+        camY = Math.sin(ease * Math.PI) * 0.06;
+        camZ = CAM_Z - Math.sin(ease * Math.PI) * 0.12;
         break;
 
       case "drift-left":
-        offsetX = -ease * 0.06;
-        offsetY = Math.sin(ease * Math.PI) * 0.02;
-        zoom = 1.08 + Math.sin(ease * Math.PI) * 0.04;
-        focusX = -ease * 0.02;
-        tiltX = -ease * 0.05;
+        camX = -ease * 0.2;
+        camY = Math.sin(ease * Math.PI) * 0.06;
+        camZ = CAM_Z - Math.sin(ease * Math.PI) * 0.12;
         break;
 
       case "push-in":
-        zoom = 1.06 + ease * 0.25;
-        offsetX = fpX * ease * 0.1;
-        offsetY = fpY * ease * 0.08;
-        focusX = fpX * ease * 0.06;
-        focusY = -fpY * ease * 0.06;
-        tiltX = fpX * ease * 0.08;
-        tiltY = fpY * ease * 0.08;
+        camZ = CAM_Z - ease * 0.6;
+        camX = fpX * ease * 0.2;
+        camY = fpY * ease * 0.15;
+        lookX = fpX * ease * 0.1;
+        lookY = fpY * ease * 0.08;
         break;
 
       case "pull-out":
-        zoom = 1.25 - ease * 0.16;
-        offsetX = -fpX * ease * 0.04;
-        offsetY = -fpY * ease * 0.03;
-        tiltY = -ease * 0.04;
+        camZ = CAM_Z + ease * 0.35;
         break;
 
       case "rise-up":
-        offsetY = ease * 0.06;
-        zoom = 1.06 + ease * 0.06;
-        focusY = -ease * 0.03;
-        tiltY = ease * 0.06;
+        camY = ease * 0.2;
+        camZ = CAM_Z - ease * 0.08;
+        lookY = ease * 0.08;
         break;
 
       case "pan-right":
-        offsetX = ease * 0.1;
-        focusX = ease * 0.04;
-        zoom = 1.08;
-        tiltX = ease * 0.06;
+        camX = ease * 0.25;
+        lookX = ease * 0.15;
         break;
 
       case "pan-left":
-        offsetX = -ease * 0.1;
-        focusX = -ease * 0.04;
-        zoom = 1.08;
-        tiltX = -ease * 0.06;
+        camX = -ease * 0.25;
+        lookX = -ease * 0.15;
         break;
 
       case "pan-up":
-        offsetY = ease * 0.08;
-        focusY = -ease * 0.03;
-        zoom = 1.08;
-        tiltY = ease * 0.06;
+        camY = ease * 0.2;
+        lookY = ease * 0.1;
         break;
 
       case "pan-down":
-        offsetY = -ease * 0.08;
-        focusY = ease * 0.03;
-        zoom = 1.08;
-        tiltY = -ease * 0.06;
+        camY = -ease * 0.2;
+        lookY = -ease * 0.1;
         break;
 
       case "zoom-in":
-        zoom = 1.06 + ease * 0.3;
-        offsetX = fpX * ease * 0.08;
-        offsetY = fpY * ease * 0.06;
-        focusX = fpX * ease * 0.05;
-        focusY = -fpY * ease * 0.05;
+        camZ = CAM_Z - ease * 0.7;
+        camX = fpX * ease * 0.15;
+        camY = fpY * ease * 0.12;
+        lookX = fpX * ease * 0.08;
+        lookY = fpY * ease * 0.06;
         break;
 
       case "zoom-out":
-        zoom = 1.3 - ease * 0.2;
+        camZ = CAM_Z + ease * 0.4;
         break;
 
       default:
-        offsetX = ease * 0.05;
-        zoom = 1.06 + ease * 0.1;
-        tiltX = ease * 0.04;
+        camX = ease * 0.12;
+        camZ = CAM_Z - ease * 0.2;
         break;
     }
 
-    this.material.uniforms.uOffset.value.set(offsetX, offsetY);
-    this.material.uniforms.uDepthScale.value = 0.8;
-    this.material.uniforms.uZoom.value = zoom;
-    this.material.uniforms.uFocus.value.set(focusX, focusY);
-    this.material.uniforms.uRotation.value = rotation;
-    this.material.uniforms.uTiltX.value = tiltX;
-    this.material.uniforms.uTiltY.value = tiltY;
+    this.camera.position.set(camX, camY, camZ);
+    this.camera.lookAt(lookX, lookY, 0);
   }
 
   render() {
@@ -347,10 +373,10 @@ export class ParallaxRenderer {
   resize(width: number, height: number) {
     this.width = width;
     this.height = height;
+    this.aspect = width / height;
     this.renderer.setSize(width, height);
-    if (this.material) {
-      this.material.uniforms.uResolution.value.set(width, height);
-    }
+    this.camera.aspect = this.aspect;
+    this.camera.updateProjectionMatrix();
   }
 
   getCanvas(): HTMLCanvasElement {
@@ -358,13 +384,7 @@ export class ParallaxRenderer {
   }
 
   dispose() {
-    if (this.photoTexture) this.photoTexture.dispose();
-    if (this.depthTexture) this.depthTexture.dispose();
-    if (this.material) this.material.dispose();
-    if (this.mesh) {
-      this.mesh.geometry.dispose();
-      this.scene.remove(this.mesh);
-    }
+    this.clearLayers();
     this.renderer.dispose();
   }
 }
