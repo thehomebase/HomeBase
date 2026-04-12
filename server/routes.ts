@@ -15755,7 +15755,7 @@ export function registerRoutes(app: Express): Server {
       }
 
       const clipDuration = Math.min(Math.max(duration || 4, 2), 8);
-      const numFrames = Math.round(clipDuration * 24);
+      const numFrames = Math.min(Math.round(clipDuration * 12), 49);
 
       const motionPrompts: Record<string, string> = {
         "walk-forward": "Slow cinematic camera push forward into the room, smooth steady movement, 3D parallax depth effect, static scene",

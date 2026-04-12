@@ -1225,7 +1225,7 @@ export default function ListingVideoPage() {
 
         try {
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 180000);
+          const timeout = setTimeout(() => controller.abort(), 480000);
           const res = await fetch("/api/listing-videos/generate-3d-clip", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1246,7 +1246,7 @@ export default function ListingVideoPage() {
           photo.videoClipUrl = data.videoUrl;
         } catch (err: any) {
           console.error(`3D clip generation failed for photo ${photo.id}:`, err);
-          const msg = err?.name === "AbortError" ? "Timed out (3 min limit)" : (err?.message || "Could not generate 3D clip");
+          const msg = err?.name === "AbortError" ? "Timed out (8 min limit)" : (err?.message || "Could not generate 3D clip");
           toast({
             title: `Photo ${i + 1} failed`,
             description: msg,
@@ -1471,7 +1471,7 @@ export default function ListingVideoPage() {
                             Generating 3D video for photo {gen3DProgress.current} of {gen3DProgress.total}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            ~15-30 sec per photo
+                            ~1-5 min per photo
                           </span>
                         </div>
                         <div className="w-full bg-muted rounded-full h-2">
