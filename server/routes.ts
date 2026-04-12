@@ -15631,7 +15631,7 @@ export function registerRoutes(app: Express): Server {
         mimeType: file.mimetype,
         dataUrl: `data:${file.mimetype};base64,${file.buffer.toString("base64")}`,
         order: index,
-        motionType: "pan-right",
+        motionType: "walk-forward",
         caption: "",
       }));
 
@@ -15726,21 +15726,34 @@ export function registerRoutes(app: Express): Server {
         },
       });
 
-      const analysisPrompt = `You are a professional real estate videographer AI. Analyze these property photos and provide:
+      const analysisPrompt = `You are a professional real estate videographer AI creating a cinematic virtual walkthrough. Analyze these property photos and provide:
 
 1. For each photo, determine:
    - roomType: what room/area this is (e.g., "living_room", "kitchen", "master_bedroom", "bathroom", "exterior_front", "backyard", "pool", "dining_room", "garage", "hallway", "office", etc.)
-   - motionType: the best cinematic camera motion to simulate a walkthrough feel. Choose from:
-     * "pan-left" - slow pan from right to left (good for wide rooms, revealing spaces)
-     * "pan-right" - slow pan from left to right (good for walkthrough feeling)
-     * "zoom-in" - slow zoom into a focal point (good for detail shots, features)
-     * "zoom-out" - slow zoom out to reveal full space (good for exteriors, large rooms)
-     * "pan-up" - slow upward pan (good for tall features, staircases)
-     * "pan-down" - slow downward pan (good for overhead views)
+   - motionType: the best cinematic camera motion to simulate physically walking through the property. IMPORTANT: Vary the motions across photos - don't repeat the same motion on consecutive photos. Choose from:
+     * "walk-forward" - simulates walking into/through the room with zoom + drift toward focal point (BEST for: entryways, hallways, first look at any room - use this most often)
+     * "walk-right" - simulates walking to the right through a space with combined pan+zoom (good for: touring long rooms, kitchens with counters)
+     * "walk-left" - simulates walking to the left through a space with combined pan+zoom (good for: touring rooms from opposite angle)
+     * "reveal" - starts zoomed in on a detail, then pulls back to reveal the full room (GREAT for: exterior shots, large living areas, pools, backyards)
+     * "drift-right" - gentle floating movement to the right with subtle zoom (good for: dining rooms, bedrooms, elegant spaces)
+     * "drift-left" - gentle floating movement to the left with subtle zoom (good for: alternate angle for flowing rooms)
+     * "push-in" - dramatic slow push toward a focal point like walking up to something (good for: fireplaces, kitchen islands, special features)
+     * "pull-out" - pulls back and slightly rises, revealing grandeur (good for: great rooms, open floor plans, master suites)
+     * "rise-up" - subtle upward float with zoom, like looking up as you enter (good for: tall ceilings, staircases, grand entries)
+     * "pan-right" - classic pan right (use sparingly, only when other motions don't fit)
+     * "pan-left" - classic pan left (use sparingly)
+     * "zoom-in" - direct zoom toward focal point (good for: detail shots, unique features)
    - caption: a short, elegant one-line description for this room (e.g., "Sun-drenched living room with vaulted ceilings")
-   - focusPoint: where the camera should focus/move toward as {x: 0-100, y: 0-100} percentage
+   - focusPoint: where the camera should focus/move toward as {x: 0-100, y: 0-100} percentage. Pick the most visually interesting element.
 
 2. Suggest the optimal photo ordering for a natural walkthrough flow (exterior first, then entry, main living areas, kitchen, bedrooms, bathrooms, backyard/pool last).
+
+GUIDELINES:
+- Prefer "walk-forward", "reveal", "drift-right/left", and "push-in" over basic pan motions
+- Use "reveal" for the first exterior shot to create a dramatic opening
+- Use "walk-forward" for entryways and first views of rooms
+- Alternate between different motion types to keep the video dynamic
+- Never use the same motion type on consecutive photos
 
 Return ONLY valid JSON in this exact format:
 {
@@ -15748,7 +15761,7 @@ Return ONLY valid JSON in this exact format:
     {
       "photoId": "<photo id>",
       "roomType": "living_room",
-      "motionType": "pan-right",
+      "motionType": "walk-forward",
       "caption": "Spacious living room with natural light",
       "focusPoint": {"x": 60, "y": 50}
     }
@@ -15777,6 +15790,18 @@ Return ONLY valid JSON in this exact format:
 
       const text = response.text || "";
       const analysis = JSON.parse(text);
+
+      const validMotions = new Set(["walk-forward","walk-right","walk-left","reveal","drift-right","drift-left","push-in","pull-out","rise-up","pan-right","pan-left","zoom-in","zoom-out","pan-up","pan-down"]);
+      if (analysis.analyses && Array.isArray(analysis.analyses)) {
+        for (const a of analysis.analyses) {
+          if (!validMotions.has(a.motionType)) a.motionType = "walk-forward";
+          if (a.focusPoint) {
+            a.focusPoint.x = Math.max(0, Math.min(100, Number(a.focusPoint.x) || 50));
+            a.focusPoint.y = Math.max(0, Math.min(100, Number(a.focusPoint.y) || 50));
+          }
+        }
+      }
+
       res.json(analysis);
     } catch (error) {
       console.error("Photo analysis error:", error);

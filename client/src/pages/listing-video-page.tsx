@@ -49,12 +49,18 @@ interface PropertyDetails {
 }
 
 const MOTION_TYPES = [
-  { value: "pan-left", label: "Pan Left", icon: ArrowLeft },
+  { value: "walk-forward", label: "Walk Forward", icon: ZoomIn },
+  { value: "walk-right", label: "Walk Right", icon: ArrowRight },
+  { value: "walk-left", label: "Walk Left", icon: ArrowLeft },
+  { value: "reveal", label: "Reveal Room", icon: ZoomOut },
+  { value: "drift-right", label: "Drift Right", icon: ArrowRight },
+  { value: "drift-left", label: "Drift Left", icon: ArrowLeft },
+  { value: "push-in", label: "Push In", icon: ZoomIn },
+  { value: "pull-out", label: "Pull Out", icon: ZoomOut },
+  { value: "rise-up", label: "Rise Up", icon: ArrowUp },
   { value: "pan-right", label: "Pan Right", icon: ArrowRight },
+  { value: "pan-left", label: "Pan Left", icon: ArrowLeft },
   { value: "zoom-in", label: "Zoom In", icon: ZoomIn },
-  { value: "zoom-out", label: "Zoom Out", icon: ZoomOut },
-  { value: "pan-up", label: "Pan Up", icon: ArrowUp },
-  { value: "pan-down", label: "Pan Down", icon: ArrowDown },
 ];
 
 const MUSIC_TRACKS = [
@@ -118,22 +124,42 @@ function VideoComposer({
   const getMotionTransform = (motionType: string, progress: number, focusPoint?: { x: number; y: number }) => {
     const fp = focusPoint || { x: 50, y: 50 };
     const ease = progress * progress * (3 - 2 * progress);
+    const fpX = fp.x / 100;
+    const fpY = fp.y / 100;
 
     switch (motionType) {
-      case "pan-left":
-        return { scale: 1.25, x: -ease * 0.2, y: 0, originX: 0.5, originY: fp.y / 100 };
+      case "walk-forward":
+        return { scale: 1.15 + ease * 0.45, x: (fpX - 0.5) * ease * 0.15, y: (fpY - 0.5) * ease * 0.1, originX: fpX, originY: fpY };
+      case "walk-right":
+        return { scale: 1.2 + ease * 0.25, x: ease * 0.18, y: ease * 0.02, originX: 0.3, originY: fpY };
+      case "walk-left":
+        return { scale: 1.2 + ease * 0.25, x: -ease * 0.18, y: ease * 0.02, originX: 0.7, originY: fpY };
+      case "reveal":
+        return { scale: 1.55 - ease * 0.35, x: (0.5 - fpX) * ease * 0.1, y: (0.5 - fpY) * ease * 0.08, originX: fpX, originY: fpY };
+      case "drift-right":
+        return { scale: 1.3 + ease * 0.12, x: ease * 0.12, y: Math.sin(ease * Math.PI) * 0.02, originX: 0.4, originY: fpY };
+      case "drift-left":
+        return { scale: 1.3 + ease * 0.12, x: -ease * 0.12, y: Math.sin(ease * Math.PI) * 0.02, originX: 0.6, originY: fpY };
+      case "push-in":
+        return { scale: 1.1 + ease * 0.55, x: (fpX - 0.5) * ease * 0.2, y: (fpY - 0.5) * ease * 0.15, originX: fpX, originY: fpY };
+      case "pull-out":
+        return { scale: 1.65 - ease * 0.4, x: 0, y: -ease * 0.03, originX: 0.5, originY: 0.45 };
+      case "rise-up":
+        return { scale: 1.25 + ease * 0.2, x: 0, y: -ease * 0.12, originX: 0.5, originY: 0.6 };
       case "pan-right":
-        return { scale: 1.25, x: ease * 0.2, y: 0, originX: 0.5, originY: fp.y / 100 };
+        return { scale: 1.3, x: ease * 0.22, y: 0, originX: 0.5, originY: fpY };
+      case "pan-left":
+        return { scale: 1.3, x: -ease * 0.22, y: 0, originX: 0.5, originY: fpY };
       case "zoom-in":
-        return { scale: 1.0 + ease * 0.35, x: (fp.x - 50) / 100 * ease * 0.1, y: (fp.y - 50) / 100 * ease * 0.1, originX: fp.x / 100, originY: fp.y / 100 };
+        return { scale: 1.0 + ease * 0.5, x: (fpX - 0.5) * ease * 0.12, y: (fpY - 0.5) * ease * 0.08, originX: fpX, originY: fpY };
       case "zoom-out":
-        return { scale: 1.35 - ease * 0.25, x: 0, y: 0, originX: fp.x / 100, originY: fp.y / 100 };
+        return { scale: 1.55 - ease * 0.3, x: 0, y: 0, originX: fpX, originY: fpY };
       case "pan-up":
-        return { scale: 1.25, x: 0, y: -ease * 0.15, originX: fp.x / 100, originY: 0.5 };
+        return { scale: 1.3, x: 0, y: -ease * 0.15, originX: 0.5, originY: 0.5 };
       case "pan-down":
-        return { scale: 1.25, x: 0, y: ease * 0.15, originX: fp.x / 100, originY: 0.5 };
+        return { scale: 1.3, x: 0, y: ease * 0.15, originX: 0.5, originY: 0.5 };
       default:
-        return { scale: 1.2, x: ease * 0.15, y: 0, originX: 0.5, originY: 0.5 };
+        return { scale: 1.15 + ease * 0.4, x: ease * 0.1, y: ease * 0.02, originX: 0.5, originY: 0.5 };
     }
   };
 
@@ -163,12 +189,19 @@ function VideoComposer({
       drawH = drawW / imgAspect;
     }
 
-    const baseX = (w - drawW) / 2;
-    const baseY = (h - drawH) / 2;
-    const offsetX = transform.x * w;
-    const offsetY = transform.y * h;
+    const pivotX = w * transform.originX;
+    const pivotY = h * transform.originY;
+    const imgPivotX = drawW * transform.originX;
+    const imgPivotY = drawH * transform.originY;
+    let drawX = pivotX - imgPivotX + transform.x * w;
+    let drawY = pivotY - imgPivotY + transform.y * h;
 
-    ctx.drawImage(img, baseX + offsetX, baseY + offsetY, drawW, drawH);
+    const maxOffsetX = drawW - w;
+    const maxOffsetY = drawH - h;
+    drawX = Math.min(0, Math.max(-maxOffsetX, drawX));
+    drawY = Math.min(0, Math.max(-maxOffsetY, drawY));
+
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
     ctx.restore();
   };
 
@@ -514,8 +547,8 @@ export default function ListingVideoPage() {
   const [settings, setSettings] = useState<VideoSettings>({
     aspectRatio: "16:9",
     musicTrack: "none",
-    transitionDuration: 1,
-    photoDuration: 4,
+    transitionDuration: 1.2,
+    photoDuration: 5,
     showCaptions: true,
     brandingPosition: "bottom-right",
   });
