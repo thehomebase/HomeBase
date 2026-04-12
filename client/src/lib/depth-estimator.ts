@@ -42,7 +42,7 @@ function dataUrlToCanvas(dataUrl: string): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const maxDim = 512;
+      const maxDim = 518;
       let w = img.width;
       let h = img.height;
       if (w > maxDim || h > maxDim) {
@@ -60,6 +60,49 @@ function dataUrlToCanvas(dataUrl: string): Promise<HTMLCanvasElement> {
     img.onerror = () => reject(new Error("Failed to load image for depth estimation"));
     img.src = dataUrl;
   });
+}
+
+function gaussianBlur(data: Uint8ClampedArray, w: number, h: number, radius: number): Uint8ClampedArray {
+  const result = new Uint8ClampedArray(data.length);
+  const kernel: number[] = [];
+  const sigma = radius / 2;
+  let sum = 0;
+  for (let i = -radius; i <= radius; i++) {
+    const val = Math.exp(-(i * i) / (2 * sigma * sigma));
+    kernel.push(val);
+    sum += val;
+  }
+  for (let i = 0; i < kernel.length; i++) kernel[i] /= sum;
+
+  const temp = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let val = 0;
+      for (let k = -radius; k <= radius; k++) {
+        const sx = Math.min(Math.max(x + k, 0), w - 1);
+        val += data[(y * w + sx) * 4] * kernel[k + radius];
+      }
+      temp[y * w + x] = val;
+    }
+  }
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let val = 0;
+      for (let k = -radius; k <= radius; k++) {
+        const sy = Math.min(Math.max(y + k, 0), h - 1);
+        val += temp[sy * w + x] * kernel[k + radius];
+      }
+      const idx = (y * w + x) * 4;
+      const clamped = Math.min(255, Math.max(0, Math.round(val)));
+      result[idx] = clamped;
+      result[idx + 1] = clamped;
+      result[idx + 2] = clamped;
+      result[idx + 3] = 255;
+    }
+  }
+
+  return result;
 }
 
 export async function estimateDepth(
@@ -92,7 +135,11 @@ export async function estimateDepth(
     imageData.data[i * 4 + 2] = val;
     imageData.data[i * 4 + 3] = 255;
   }
-  ctx.putImageData(imageData, 0, 0);
+
+  const blurRadius = Math.max(3, Math.round(Math.min(w, h) * 0.008));
+  const blurred = gaussianBlur(imageData.data, w, h, blurRadius);
+  const blurredImageData = new ImageData(blurred, w, h);
+  ctx.putImageData(blurredImageData, 0, 0);
 
   return { depthCanvas, width: w, height: h };
 }

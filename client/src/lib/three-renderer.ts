@@ -9,6 +9,7 @@ void main() {
 `;
 
 const PARALLAX_FRAGMENT = `
+precision highp float;
 uniform sampler2D uTexture;
 uniform sampler2D uDepthMap;
 uniform vec2 uOffset;
@@ -18,7 +19,22 @@ uniform vec2 uFocus;
 uniform float uRotation;
 uniform float uTiltX;
 uniform float uTiltY;
+uniform vec2 uResolution;
 varying vec2 vUv;
+
+float sampleDepthBlurred(vec2 uv) {
+  vec2 texel = 1.0 / uResolution;
+  float d = 0.0;
+  float total = 0.0;
+  for (float x = -2.0; x <= 2.0; x += 1.0) {
+    for (float y = -2.0; y <= 2.0; y += 1.0) {
+      float w = 1.0 / (1.0 + abs(x) + abs(y));
+      d += texture2D(uDepthMap, clamp(uv + vec2(x, y) * texel * 3.0, 0.0, 1.0)).r * w;
+      total += w;
+    }
+  }
+  return d / total;
+}
 
 void main() {
   vec2 centeredUv = vUv - 0.5;
@@ -30,23 +46,31 @@ void main() {
     centeredUv.x * sinR + centeredUv.y * cosR
   );
 
-  centeredUv.x += centeredUv.y * uTiltX * 0.3;
-  centeredUv.y += centeredUv.x * uTiltY * 0.3;
+  centeredUv.x += centeredUv.y * uTiltX * 0.15;
+  centeredUv.y += centeredUv.x * uTiltY * 0.15;
 
-  vec2 zoomedUv = centeredUv / uZoom + 0.5;
-  zoomedUv += uFocus;
+  vec2 baseUv = centeredUv / uZoom + 0.5 + uFocus;
 
-  float depth = texture2D(uDepthMap, clamp(zoomedUv, 0.0, 1.0)).r;
+  float depth = sampleDepthBlurred(baseUv);
 
-  float depthFactor = (depth - 0.5) * uDepthScale;
+  float nearFar = smoothstep(0.0, 1.0, depth);
+  float displacement = (nearFar - 0.5) * uDepthScale;
 
-  vec2 displaced = zoomedUv + uOffset * depthFactor;
+  vec2 displaced = baseUv + uOffset * displacement;
+
+  float depth2 = sampleDepthBlurred(displaced);
+  float displacement2 = (smoothstep(0.0, 1.0, depth2) - 0.5) * uDepthScale;
+  displaced = baseUv + uOffset * displacement2;
 
   vec2 edgeDist = abs(displaced - 0.5) * 2.0;
-  float edgeFade = 1.0 - smoothstep(0.92, 1.0, max(edgeDist.x, edgeDist.y));
+  float edgeFade = 1.0 - smoothstep(0.85, 1.0, max(edgeDist.x, edgeDist.y));
 
-  vec4 color = texture2D(uTexture, clamp(displaced, 0.001, 0.999));
-  color.rgb *= edgeFade;
+  float borderDist = min(min(displaced.x, 1.0 - displaced.x), min(displaced.y, 1.0 - displaced.y));
+  float borderFade = smoothstep(0.0, 0.03, borderDist);
+
+  vec4 color = texture2D(uTexture, clamp(displaced, 0.002, 0.998));
+
+  color.rgb *= edgeFade * borderFade;
 
   gl_FragColor = color;
 }
@@ -132,12 +156,13 @@ export class ParallaxRenderer {
               uTexture: { value: this.photoTexture },
               uDepthMap: { value: fallbackDepth },
               uOffset: { value: new THREE.Vector2(0, 0) },
-              uDepthScale: { value: 1.5 },
-              uZoom: { value: 1.05 },
+              uDepthScale: { value: 0.8 },
+              uZoom: { value: 1.06 },
               uFocus: { value: new THREE.Vector2(0, 0) },
               uRotation: { value: 0.0 },
               uTiltX: { value: 0.0 },
               uTiltY: { value: 0.0 },
+              uResolution: { value: new THREE.Vector2(this.width, this.height) },
             },
             vertexShader: PARALLAX_VERTEX,
             fragmentShader: PARALLAX_FRAGMENT,
@@ -177,144 +202,137 @@ export class ParallaxRenderer {
     const fpY = (50 - fp.y) / 100;
 
     let offsetX = 0, offsetY = 0;
-    let zoom = 1.05;
+    let zoom = 1.06;
     let focusX = 0, focusY = 0;
     let rotation = 0;
     let tiltX = 0, tiltY = 0;
-    const depthScale = 1.5;
 
     switch (motionType) {
       case "walk-forward":
-        zoom = 1.05 + ease * 0.25;
-        offsetX = fpX * ease * 0.12;
-        offsetY = fpY * ease * 0.12;
+        zoom = 1.06 + ease * 0.18;
+        offsetX = fpX * ease * 0.06;
+        offsetY = fpY * ease * 0.06;
+        focusX = fpX * ease * 0.04;
+        focusY = -fpY * ease * 0.04;
+        tiltX = fpX * ease * 0.06;
+        tiltY = fpY * ease * 0.06;
+        break;
+
+      case "walk-right":
+        offsetX = ease * 0.08;
+        zoom = 1.06 + ease * 0.08;
+        focusX = ease * 0.03;
+        tiltX = ease * 0.08;
+        rotation = -ease * 0.006;
+        break;
+
+      case "walk-left":
+        offsetX = -ease * 0.08;
+        zoom = 1.06 + ease * 0.08;
+        focusX = -ease * 0.03;
+        tiltX = -ease * 0.08;
+        rotation = ease * 0.006;
+        break;
+
+      case "reveal":
+        zoom = 1.2 - ease * 0.12;
+        offsetX = fpX * (1 - ease) * 0.08;
+        offsetY = fpY * (1 - ease) * 0.06;
+        focusX = fpX * (1 - ease) * 0.04;
+        focusY = -fpY * (1 - ease) * 0.04;
+        tiltX = fpX * (1 - ease) * 0.06;
+        tiltY = fpY * (1 - ease) * 0.06;
+        break;
+
+      case "drift-right":
+        offsetX = ease * 0.06;
+        offsetY = Math.sin(ease * Math.PI) * 0.02;
+        zoom = 1.08 + Math.sin(ease * Math.PI) * 0.04;
+        focusX = ease * 0.02;
+        tiltX = ease * 0.05;
+        break;
+
+      case "drift-left":
+        offsetX = -ease * 0.06;
+        offsetY = Math.sin(ease * Math.PI) * 0.02;
+        zoom = 1.08 + Math.sin(ease * Math.PI) * 0.04;
+        focusX = -ease * 0.02;
+        tiltX = -ease * 0.05;
+        break;
+
+      case "push-in":
+        zoom = 1.06 + ease * 0.25;
+        offsetX = fpX * ease * 0.1;
+        offsetY = fpY * ease * 0.08;
         focusX = fpX * ease * 0.06;
         focusY = -fpY * ease * 0.06;
         tiltX = fpX * ease * 0.08;
         tiltY = fpY * ease * 0.08;
         break;
 
-      case "walk-right":
-        offsetX = ease * 0.15;
-        offsetY = ease * 0.02;
-        zoom = 1.05 + ease * 0.12;
-        focusX = ease * 0.04;
-        tiltX = ease * 0.1;
-        rotation = -ease * 0.008;
-        break;
-
-      case "walk-left":
-        offsetX = -ease * 0.15;
-        offsetY = ease * 0.02;
-        zoom = 1.05 + ease * 0.12;
-        focusX = -ease * 0.04;
-        tiltX = -ease * 0.1;
-        rotation = ease * 0.008;
-        break;
-
-      case "reveal":
-        zoom = 1.25 - ease * 0.18;
-        offsetX = fpX * (1 - ease) * 0.15;
-        offsetY = fpY * (1 - ease) * 0.1;
-        focusX = fpX * (1 - ease) * 0.06;
-        focusY = -fpY * (1 - ease) * 0.06;
-        tiltX = fpX * (1 - ease) * 0.1;
-        tiltY = fpY * (1 - ease) * 0.1;
-        break;
-
-      case "drift-right":
-        offsetX = ease * 0.12;
-        offsetY = Math.sin(ease * Math.PI) * 0.04;
-        zoom = 1.08 + Math.sin(ease * Math.PI) * 0.06;
-        focusX = ease * 0.03;
-        rotation = -ease * 0.005;
-        tiltX = ease * 0.06;
-        break;
-
-      case "drift-left":
-        offsetX = -ease * 0.12;
-        offsetY = Math.sin(ease * Math.PI) * 0.04;
-        zoom = 1.08 + Math.sin(ease * Math.PI) * 0.06;
-        focusX = -ease * 0.03;
-        rotation = ease * 0.005;
-        tiltX = -ease * 0.06;
-        break;
-
-      case "push-in":
-        zoom = 1.05 + ease * 0.35;
-        offsetX = fpX * ease * 0.18;
-        offsetY = fpY * ease * 0.15;
-        focusX = fpX * ease * 0.1;
-        focusY = -fpY * ease * 0.1;
-        tiltX = fpX * ease * 0.12;
-        tiltY = fpY * ease * 0.12;
-        break;
-
       case "pull-out":
-        zoom = 1.3 - ease * 0.22;
-        offsetX = -fpX * ease * 0.08;
-        offsetY = -fpY * ease * 0.06;
-        focusX = -fpX * ease * 0.04;
-        focusY = fpY * ease * 0.04;
-        tiltY = -ease * 0.06;
+        zoom = 1.25 - ease * 0.16;
+        offsetX = -fpX * ease * 0.04;
+        offsetY = -fpY * ease * 0.03;
+        tiltY = -ease * 0.04;
         break;
 
       case "rise-up":
-        offsetY = ease * 0.12;
-        zoom = 1.05 + ease * 0.1;
-        focusY = -ease * 0.05;
-        tiltY = ease * 0.1;
+        offsetY = ease * 0.06;
+        zoom = 1.06 + ease * 0.06;
+        focusY = -ease * 0.03;
+        tiltY = ease * 0.06;
         break;
 
       case "pan-right":
-        offsetX = ease * 0.18;
-        focusX = ease * 0.06;
+        offsetX = ease * 0.1;
+        focusX = ease * 0.04;
         zoom = 1.08;
-        tiltX = ease * 0.08;
+        tiltX = ease * 0.06;
         break;
 
       case "pan-left":
-        offsetX = -ease * 0.18;
-        focusX = -ease * 0.06;
+        offsetX = -ease * 0.1;
+        focusX = -ease * 0.04;
         zoom = 1.08;
-        tiltX = -ease * 0.08;
+        tiltX = -ease * 0.06;
         break;
 
       case "pan-up":
-        offsetY = ease * 0.15;
-        focusY = -ease * 0.05;
+        offsetY = ease * 0.08;
+        focusY = -ease * 0.03;
         zoom = 1.08;
-        tiltY = ease * 0.08;
+        tiltY = ease * 0.06;
         break;
 
       case "pan-down":
-        offsetY = -ease * 0.15;
-        focusY = ease * 0.05;
+        offsetY = -ease * 0.08;
+        focusY = ease * 0.03;
         zoom = 1.08;
-        tiltY = -ease * 0.08;
+        tiltY = -ease * 0.06;
         break;
 
       case "zoom-in":
-        zoom = 1.05 + ease * 0.4;
-        offsetX = fpX * ease * 0.15;
-        offsetY = fpY * ease * 0.12;
-        focusX = fpX * ease * 0.08;
-        focusY = -fpY * ease * 0.08;
+        zoom = 1.06 + ease * 0.3;
+        offsetX = fpX * ease * 0.08;
+        offsetY = fpY * ease * 0.06;
+        focusX = fpX * ease * 0.05;
+        focusY = -fpY * ease * 0.05;
         break;
 
       case "zoom-out":
-        zoom = 1.35 - ease * 0.25;
+        zoom = 1.3 - ease * 0.2;
         break;
 
       default:
-        offsetX = ease * 0.1;
-        zoom = 1.05 + ease * 0.15;
-        tiltX = ease * 0.06;
+        offsetX = ease * 0.05;
+        zoom = 1.06 + ease * 0.1;
+        tiltX = ease * 0.04;
         break;
     }
 
     this.material.uniforms.uOffset.value.set(offsetX, offsetY);
-    this.material.uniforms.uDepthScale.value = depthScale;
+    this.material.uniforms.uDepthScale.value = 0.8;
     this.material.uniforms.uZoom.value = zoom;
     this.material.uniforms.uFocus.value.set(focusX, focusY);
     this.material.uniforms.uRotation.value = rotation;
@@ -330,6 +348,9 @@ export class ParallaxRenderer {
     this.width = width;
     this.height = height;
     this.renderer.setSize(width, height);
+    if (this.material) {
+      this.material.uniforms.uResolution.value.set(width, height);
+    }
   }
 
   getCanvas(): HTMLCanvasElement {
