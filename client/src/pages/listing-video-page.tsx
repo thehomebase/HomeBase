@@ -695,7 +695,6 @@ function VideoComposer({
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, w, h);
 
-    const currentPhoto = photos[photoIdx];
     const currentImg = loadedImagesRef.current.get(currentPhoto?.id);
 
     const transRatio = settings.transitionDuration / (settings.photoDuration + settings.transitionDuration);
