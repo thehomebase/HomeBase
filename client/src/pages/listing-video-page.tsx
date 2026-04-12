@@ -3,6 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { estimateDepth, depthCanvasToDataUrl, getDepthPipeline, isDepthModelLoaded } from "@/lib/depth-estimator";
+import { ParallaxRenderer } from "@/lib/three-renderer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Upload, Video, Sparkles, Play, Download, Trash2, GripVertical,
   ArrowLeft, ArrowRight, ArrowUp, ArrowDown, ZoomIn, ZoomOut,
-  Music, Type, Image, Settings, Plus, X, Loader2, Eye
+  Music, Type, Image, Settings, Plus, X, Loader2, Eye, Layers, Box
 } from "lucide-react";
 
 interface DepthZone {
@@ -37,6 +39,7 @@ interface PhotoItem {
   roomType?: string;
   focusPoint?: { x: number; y: number };
   depthZones?: DepthZone[];
+  depthMapUrl?: string;
 }
 
 interface VideoSettings {
@@ -105,16 +108,21 @@ function VideoComposer({
   onExportEnd?: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const threeRendererRef = useRef<ParallaxRenderer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const animationRef = useRef<number | null>(null);
   const loadedImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const currentThreePhotoRef = useRef<string | null>(null);
 
   const aspectRatio = ASPECT_RATIOS[settings.aspectRatio] || ASPECT_RATIOS["16:9"];
   const displayWidth = settings.aspectRatio === "9:16" ? 270 : settings.aspectRatio === "1:1" ? 400 : 480;
   const displayHeight = Math.round(displayWidth * (aspectRatio.height / aspectRatio.width));
+
+  const hasDepthMaps = photos.some(p => p.depthMapUrl);
+  const use3D = hasDepthMaps;
 
   useEffect(() => {
     photos.forEach(photo => {
@@ -476,11 +484,101 @@ function VideoComposer({
     ctx.restore();
   };
 
+  const threeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const ensureThreeCanvas = useCallback((w: number, h: number) => {
+    if (!threeCanvasRef.current) {
+      threeCanvasRef.current = document.createElement("canvas");
+    }
+    const tc = threeCanvasRef.current;
+    if (tc.width !== w || tc.height !== h) {
+      tc.width = w;
+      tc.height = h;
+    }
+    return tc;
+  }, []);
+
+  const threePhotoLoadingRef = useRef<Promise<void> | null>(null);
+
+  const loadThreePhoto = useCallback((photoId: string, dataUrl: string, depthMapUrl: string | null, w: number, h: number) => {
+    const threeCanvas = ensureThreeCanvas(w, h);
+    if (!threeRendererRef.current) {
+      threeRendererRef.current = new ParallaxRenderer(threeCanvas, w, h);
+    }
+    threePhotoLoadingRef.current = threeRendererRef.current.setPhoto(dataUrl, depthMapUrl).then(() => {
+      currentThreePhotoRef.current = photoId;
+    }).catch((err) => {
+      console.error("Three.js photo load failed:", err);
+    }).finally(() => {
+      threePhotoLoadingRef.current = null;
+    });
+    return threePhotoLoadingRef.current;
+  }, [ensureThreeCanvas]);
+
+  const drawFrame3D = useCallback((photoIdx: number, photoProgress: number, globalProgress: number = 0) => {
+    const canvas = canvasRef.current;
+    if (!canvas || photos.length === 0) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const currentPhoto = photos[photoIdx];
+    if (!currentPhoto?.dataUrl) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+
+    if (currentThreePhotoRef.current !== currentPhoto.id && !threePhotoLoadingRef.current) {
+      loadThreePhoto(currentPhoto.id, currentPhoto.dataUrl, currentPhoto.depthMapUrl || null, w, h);
+    }
+
+    if (threeRendererRef.current && currentThreePhotoRef.current === currentPhoto.id) {
+      threeRendererRef.current.setCameraForMotion(currentPhoto.motionType, photoProgress, currentPhoto.focusPoint);
+      threeRendererRef.current.render();
+
+      const threeCanvas = threeCanvasRef.current;
+      if (threeCanvas) {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(threeCanvas, 0, 0, w, h);
+      }
+    } else {
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, w, h);
+      const img = loadedImagesRef.current.get(currentPhoto.id);
+      if (img) {
+        const imgAspect = img.width / img.height;
+        const canvAspect = w / h;
+        let dw = w, dh = h, dx = 0, dy = 0;
+        if (imgAspect > canvAspect) {
+          dh = h;
+          dw = h * imgAspect;
+          dx = (w - dw) / 2;
+        } else {
+          dw = w;
+          dh = w / imgAspect;
+          dy = (h - dh) / 2;
+        }
+        ctx.drawImage(img, dx, dy, dw, dh);
+      }
+    }
+
+    if (currentPhoto.caption && settings.showCaptions) {
+      drawCaptionOverlay(ctx, w, h, currentPhoto.caption, photoProgress);
+    }
+    drawPropertyInfo(ctx, w, h, globalProgress);
+    drawBrandingOverlay(ctx, w, h);
+  }, [photos, settings, ensureThreeCanvas, loadThreePhoto]);
+
   const drawFrame = useCallback((photoIdx: number, photoProgress: number, globalProgress: number = 0) => {
     const canvas = canvasRef.current;
     if (!canvas || photos.length === 0) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    if (use3D) {
+      drawFrame3D(photoIdx, photoProgress, globalProgress);
+      return;
+    }
 
     const w = canvas.width;
     const h = canvas.height;
@@ -538,7 +636,7 @@ function VideoComposer({
     }
     drawPropertyInfo(ctx, w, h, globalProgress);
     drawBrandingOverlay(ctx, w, h);
-  }, [photos, settings, propertyAddress, propertyDetails, user]);
+  }, [photos, settings, propertyAddress, propertyDetails, user, use3D, drawFrame3D]);
 
   const playPreview = useCallback(() => {
     if (photos.length === 0) return;
@@ -614,6 +712,16 @@ function VideoComposer({
       const origW = canvasRef.current?.width;
       const origH = canvasRef.current?.height;
 
+      if (canvasRef.current) {
+        canvasRef.current.width = aspectRatio.width;
+        canvasRef.current.height = aspectRatio.height;
+      }
+      if (threeRendererRef.current) {
+        threeRendererRef.current.resize(aspectRatio.width, aspectRatio.height);
+        currentThreePhotoRef.current = null;
+      }
+
+      let lastExportPhotoIdx = -1;
       for (let frame = 0; frame < totalFrames; frame++) {
         const elapsed = frame / fps;
         const globalProgress = elapsed / totalDuration;
@@ -621,9 +729,12 @@ function VideoComposer({
         const photoIdx = Math.min(Math.floor(elapsed / segmentDuration), photos.length - 1);
         const photoProgress = (elapsed - photoIdx * segmentDuration) / segmentDuration;
 
-        if (canvasRef.current) {
-          canvasRef.current.width = aspectRatio.width;
-          canvasRef.current.height = aspectRatio.height;
+        if (use3D && photoIdx !== lastExportPhotoIdx) {
+          const photo = photos[photoIdx];
+          if (photo && currentThreePhotoRef.current !== photo.id) {
+            await loadThreePhoto(photo.id, photo.dataUrl, photo.depthMapUrl || null, aspectRatio.width, aspectRatio.height);
+          }
+          lastExportPhotoIdx = photoIdx;
         }
 
         drawFrame(photoIdx, Math.min(photoProgress, 1), globalProgress);
@@ -644,6 +755,10 @@ function VideoComposer({
       if (canvasRef.current) {
         canvasRef.current.width = origW || displayWidth;
         canvasRef.current.height = origH || displayHeight;
+      }
+      if (threeRendererRef.current) {
+        threeRendererRef.current.resize(origW || displayWidth, origH || displayHeight);
+        currentThreePhotoRef.current = null;
       }
 
       mediaRecorder.stop();
@@ -666,13 +781,23 @@ function VideoComposer({
       setProgress(0);
       onExportEnd?.();
     }
-  }, [photos, settings, drawFrame, aspectRatio, displayWidth, displayHeight]);
+  }, [photos, settings, drawFrame, aspectRatio, displayWidth, displayHeight, use3D, loadThreePhoto]);
 
   useEffect(() => {
     if (photos.length > 0 && !isPlaying) {
       drawFrame(0, 0, 0);
     }
   }, [photos, settings, drawFrame, isPlaying]);
+
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (threeRendererRef.current) {
+        threeRendererRef.current.dispose();
+        threeRendererRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -741,6 +866,8 @@ export default function ListingVideoPage() {
   });
   const [activeTab, setActiveTab] = useState("upload");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGeneratingDepth, setIsGeneratingDepth] = useState(false);
+  const [depthProgress, setDepthProgress] = useState({ current: 0, total: 0, modelLoading: false, modelPercent: 0 });
   const [selectedVideoId, setSelectedVideoId] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -875,6 +1002,49 @@ export default function ListingVideoPage() {
       toast({ title: "Analysis failed", description: "Please try again.", variant: "destructive" });
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const generateDepthMaps = async () => {
+    if (photos.length === 0) return;
+    setIsGeneratingDepth(true);
+    setDepthProgress({ current: 0, total: photos.length, modelLoading: true, modelPercent: 0 });
+
+    try {
+      await getDepthPipeline((pct: number) => {
+        setDepthProgress(prev => ({ ...prev, modelPercent: Math.round(pct) }));
+      });
+      setDepthProgress(prev => ({ ...prev, modelLoading: false }));
+
+      const updatedPhotos = [...photos];
+      for (let i = 0; i < updatedPhotos.length; i++) {
+        setDepthProgress(prev => ({ ...prev, current: i + 1 }));
+        const photo = updatedPhotos[i];
+        if (!photo.dataUrl) continue;
+
+        try {
+          const result = await estimateDepth(photo.dataUrl);
+          photo.depthMapUrl = depthCanvasToDataUrl(result.depthCanvas);
+        } catch (err) {
+          console.error(`Depth estimation failed for photo ${photo.id}:`, err);
+        }
+      }
+
+      setPhotos(updatedPhotos);
+      toast({
+        title: "3D Depth Maps Generated!",
+        description: `${updatedPhotos.filter(p => p.depthMapUrl).length} of ${updatedPhotos.length} photos processed. Preview now uses real 3D parallax.`,
+      });
+    } catch (error: any) {
+      console.error("Depth generation error:", error);
+      toast({
+        title: "Depth map generation failed",
+        description: error?.message || "Your browser may not support WebGPU. Falling back to standard motion.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingDepth(false);
+      setDepthProgress({ current: 0, total: 0, modelLoading: false, modelPercent: 0 });
     }
   };
 
@@ -1034,21 +1204,64 @@ export default function ListingVideoPage() {
 
               <TabsContent value="photos" className="space-y-4">
                 {photos.length > 0 && (
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">{photos.length} photos</p>
-                    <Button
-                      onClick={analyzePhotos}
-                      disabled={isAnalyzing}
-                      size="sm"
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                    >
-                      {isAnalyzing ? (
-                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-4 w-4 mr-1" />
-                      )}
-                      {isAnalyzing ? "Analyzing..." : "AI Analyze & Order"}
-                    </Button>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">{photos.length} photos{photos.some(p => p.depthMapUrl) ? ` • ${photos.filter(p => p.depthMapUrl).length} with 3D depth` : ""}</p>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={analyzePhotos}
+                          disabled={isAnalyzing || isGeneratingDepth}
+                          size="sm"
+                          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                        >
+                          {isAnalyzing ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-4 w-4 mr-1" />
+                          )}
+                          {isAnalyzing ? "Analyzing..." : "AI Analyze & Order"}
+                        </Button>
+                        <Button
+                          onClick={generateDepthMaps}
+                          disabled={isGeneratingDepth || isAnalyzing}
+                          size="sm"
+                          className="bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-700 hover:to-teal-700"
+                        >
+                          {isGeneratingDepth ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <Box className="h-4 w-4 mr-1" />
+                          )}
+                          {isGeneratingDepth ? "Generating..." : "3D Depth Maps"}
+                        </Button>
+                      </div>
+                    </div>
+                    {isGeneratingDepth && (
+                      <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            {depthProgress.modelLoading
+                              ? `Loading AI model... ${depthProgress.modelPercent}%`
+                              : `Processing photo ${depthProgress.current} of ${depthProgress.total}`
+                            }
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {depthProgress.modelLoading ? "First time may take a moment" : ""}
+                          </span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div
+                            className="bg-gradient-to-r from-cyan-500 to-teal-500 h-2 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${depthProgress.modelLoading
+                                ? depthProgress.modelPercent * 0.3
+                                : 30 + (depthProgress.current / Math.max(depthProgress.total, 1)) * 70
+                              }%`
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1084,6 +1297,11 @@ export default function ListingVideoPage() {
                               {photo.roomType && (
                                 <Badge variant="secondary" className="text-xs">
                                   {photo.roomType.replace(/_/g, " ")}
+                                </Badge>
+                              )}
+                              {photo.depthMapUrl && (
+                                <Badge variant="outline" className="text-xs bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-300 dark:border-cyan-800">
+                                  <Layers className="h-3 w-3 mr-0.5" />3D
                                 </Badge>
                               )}
                             </div>
@@ -1332,6 +1550,11 @@ export default function ListingVideoPage() {
                 <CardTitle className="text-base flex items-center gap-2">
                   <Eye className="h-4 w-4" />
                   Video Preview
+                  {photos.some(p => p.depthMapUrl) && (
+                    <Badge variant="outline" className="text-xs bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-300 dark:border-cyan-800">
+                      <Box className="h-3 w-3 mr-0.5" />3D Parallax
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex justify-center">
