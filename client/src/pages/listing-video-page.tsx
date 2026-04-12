@@ -138,37 +138,37 @@ function VideoComposer({
 
     switch (motionType) {
       case "walk-forward":
-        return { scale: 1.15 + ease * 0.45, x: (fpX - 0.5) * ease * 0.15, y: (fpY - 0.5) * ease * 0.1, originX: fpX, originY: fpY };
+        return { scale: 1.15 + ease * 0.45, x: (fpX - 0.5) * ease * 0.15, y: (fpY - 0.5) * ease * 0.1, originX: fpX, originY: fpY, rotY: ease * 1.5 * (fpX > 0.5 ? -1 : 1), rotX: ease * 0.8 };
       case "walk-right":
-        return { scale: 1.2 + ease * 0.25, x: ease * 0.18, y: ease * 0.02, originX: 0.3, originY: fpY };
+        return { scale: 1.2 + ease * 0.25, x: ease * 0.18, y: ease * 0.02, originX: 0.3, originY: fpY, rotY: -ease * 2.5, rotX: ease * 0.4 };
       case "walk-left":
-        return { scale: 1.2 + ease * 0.25, x: -ease * 0.18, y: ease * 0.02, originX: 0.7, originY: fpY };
+        return { scale: 1.2 + ease * 0.25, x: -ease * 0.18, y: ease * 0.02, originX: 0.7, originY: fpY, rotY: ease * 2.5, rotX: ease * 0.4 };
       case "reveal":
-        return { scale: 1.55 - ease * 0.35, x: (0.5 - fpX) * ease * 0.1, y: (0.5 - fpY) * ease * 0.08, originX: fpX, originY: fpY };
+        return { scale: 1.55 - ease * 0.35, x: (0.5 - fpX) * ease * 0.1, y: (0.5 - fpY) * ease * 0.08, originX: fpX, originY: fpY, rotY: ease * 1.2 * (fpX > 0.5 ? 1 : -1), rotX: -ease * 0.6 };
       case "drift-right":
-        return { scale: 1.3 + ease * 0.12, x: ease * 0.12, y: Math.sin(ease * Math.PI) * 0.02, originX: 0.4, originY: fpY };
+        return { scale: 1.3 + ease * 0.12, x: ease * 0.12, y: Math.sin(ease * Math.PI) * 0.02, originX: 0.4, originY: fpY, rotY: -ease * 1.8, rotX: Math.sin(ease * Math.PI) * 0.5 };
       case "drift-left":
-        return { scale: 1.3 + ease * 0.12, x: -ease * 0.12, y: Math.sin(ease * Math.PI) * 0.02, originX: 0.6, originY: fpY };
+        return { scale: 1.3 + ease * 0.12, x: -ease * 0.12, y: Math.sin(ease * Math.PI) * 0.02, originX: 0.6, originY: fpY, rotY: ease * 1.8, rotX: Math.sin(ease * Math.PI) * 0.5 };
       case "push-in":
-        return { scale: 1.1 + ease * 0.55, x: (fpX - 0.5) * ease * 0.2, y: (fpY - 0.5) * ease * 0.15, originX: fpX, originY: fpY };
+        return { scale: 1.1 + ease * 0.55, x: (fpX - 0.5) * ease * 0.2, y: (fpY - 0.5) * ease * 0.15, originX: fpX, originY: fpY, rotY: (fpX - 0.5) * ease * -3, rotX: (fpY - 0.5) * ease * 2 };
       case "pull-out":
-        return { scale: 1.65 - ease * 0.4, x: 0, y: -ease * 0.03, originX: 0.5, originY: 0.45 };
+        return { scale: 1.65 - ease * 0.4, x: 0, y: -ease * 0.03, originX: 0.5, originY: 0.45, rotY: 0, rotX: -ease * 1.2 };
       case "rise-up":
-        return { scale: 1.25 + ease * 0.2, x: 0, y: -ease * 0.12, originX: 0.5, originY: 0.6 };
+        return { scale: 1.25 + ease * 0.2, x: 0, y: -ease * 0.12, originX: 0.5, originY: 0.6, rotY: 0, rotX: ease * 2 };
       case "pan-right":
-        return { scale: 1.3, x: ease * 0.22, y: 0, originX: 0.5, originY: fpY };
+        return { scale: 1.3, x: ease * 0.22, y: 0, originX: 0.5, originY: fpY, rotY: -ease * 2, rotX: 0 };
       case "pan-left":
-        return { scale: 1.3, x: -ease * 0.22, y: 0, originX: 0.5, originY: fpY };
+        return { scale: 1.3, x: -ease * 0.22, y: 0, originX: 0.5, originY: fpY, rotY: ease * 2, rotX: 0 };
       case "zoom-in":
-        return { scale: 1.0 + ease * 0.5, x: (fpX - 0.5) * ease * 0.12, y: (fpY - 0.5) * ease * 0.08, originX: fpX, originY: fpY };
+        return { scale: 1.0 + ease * 0.5, x: (fpX - 0.5) * ease * 0.12, y: (fpY - 0.5) * ease * 0.08, originX: fpX, originY: fpY, rotY: (fpX - 0.5) * ease * -2, rotX: (fpY - 0.5) * ease * 1.5 };
       case "zoom-out":
-        return { scale: 1.55 - ease * 0.3, x: 0, y: 0, originX: fpX, originY: fpY };
+        return { scale: 1.55 - ease * 0.3, x: 0, y: 0, originX: fpX, originY: fpY, rotY: 0, rotX: 0 };
       case "pan-up":
-        return { scale: 1.3, x: 0, y: -ease * 0.15, originX: 0.5, originY: 0.5 };
+        return { scale: 1.3, x: 0, y: -ease * 0.15, originX: 0.5, originY: 0.5, rotY: 0, rotX: ease * 1.5 };
       case "pan-down":
-        return { scale: 1.3, x: 0, y: ease * 0.15, originX: 0.5, originY: 0.5 };
+        return { scale: 1.3, x: 0, y: ease * 0.15, originX: 0.5, originY: 0.5, rotY: 0, rotX: -ease * 1.5 };
       default:
-        return { scale: 1.15 + ease * 0.4, x: ease * 0.1, y: ease * 0.02, originX: 0.5, originY: 0.5 };
+        return { scale: 1.15 + ease * 0.4, x: ease * 0.1, y: ease * 0.02, originX: 0.5, originY: 0.5, rotY: -ease * 1.5, rotX: ease * 0.5 };
     }
   };
 
@@ -258,9 +258,28 @@ function VideoComposer({
     const hasMotion = Math.abs(transform.x) > 0.002 || Math.abs(transform.y) > 0.002 || transform.scale > 1.15;
     const hasParallax = depthZones.length > 0 && hasMotion;
 
+    const rotY = (transform as any).rotY || 0;
+    const rotX = (transform as any).rotX || 0;
+    const hasPerspective = Math.abs(rotY) > 0.1 || Math.abs(rotX) > 0.1;
+
+    const applyPerspective = (targetCtx: CanvasRenderingContext2D, cw: number, ch: number) => {
+      if (!hasPerspective) return;
+      const radY = (rotY * Math.PI) / 180;
+      const radX = (rotX * Math.PI) / 180;
+      const perspective = 800;
+      const skewX = Math.sin(radY) * (perspective / (perspective + cw * 0.5));
+      const skewY = Math.sin(radX) * (perspective / (perspective + ch * 0.5));
+      const scaleAdjX = Math.cos(radY);
+      const scaleAdjY = Math.cos(radX);
+      targetCtx.translate(cw / 2, ch / 2);
+      targetCtx.transform(scaleAdjX, skewY * 0.3, skewX * 0.3, scaleAdjY, 0, 0);
+      targetCtx.translate(-cw / 2, -ch / 2);
+    };
+
     if (!hasParallax) {
       ctx.save();
       ctx.globalAlpha = alpha;
+      applyPerspective(ctx, w, h);
       const clamped = clampDraw(baseDrawX, baseDrawY, drawW, drawH, w, h);
       ctx.drawImage(img, clamped.x, clamped.y, drawW, drawH);
       ctx.restore();
@@ -325,6 +344,7 @@ function VideoComposer({
 
     ctx.save();
     ctx.globalAlpha = alpha;
+    applyPerspective(ctx, w, h);
     ctx.drawImage(offscreen, 0, 0);
     ctx.restore();
     } catch {
@@ -569,9 +589,10 @@ function VideoComposer({
       const exportCtx = exportCanvas.getContext("2d");
       if (!exportCtx) throw new Error("Cannot get canvas context");
 
-      const stream = exportCanvas.captureStream(30);
+      const stream = exportCanvas.captureStream(0);
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm",
+        mimeType,
         videoBitsPerSecond: 8000000,
       });
 
@@ -582,11 +603,16 @@ function VideoComposer({
         mediaRecorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" }));
       });
 
-      mediaRecorder.start(100);
+      mediaRecorder.start();
 
       const totalDuration = photos.length * (settings.photoDuration + settings.transitionDuration);
       const fps = 30;
       const totalFrames = Math.ceil(totalDuration * fps);
+      const frameDurationMs = 1000 / fps;
+      const videoTrack = stream.getVideoTracks()[0];
+
+      const origW = canvasRef.current?.width;
+      const origH = canvasRef.current?.height;
 
       for (let frame = 0; frame < totalFrames; frame++) {
         const elapsed = frame / fps;
@@ -594,10 +620,6 @@ function VideoComposer({
         const segmentDuration = settings.photoDuration + settings.transitionDuration;
         const photoIdx = Math.min(Math.floor(elapsed / segmentDuration), photos.length - 1);
         const photoProgress = (elapsed - photoIdx * segmentDuration) / segmentDuration;
-
-        const origCanvas = canvasRef.current;
-        const origW = origCanvas?.width;
-        const origH = origCanvas?.height;
 
         if (canvasRef.current) {
           canvasRef.current.width = aspectRatio.width;
@@ -607,13 +629,21 @@ function VideoComposer({
         drawFrame(photoIdx, Math.min(photoProgress, 1), globalProgress);
 
         if (canvasRef.current) {
+          exportCtx.clearRect(0, 0, aspectRatio.width, aspectRatio.height);
           exportCtx.drawImage(canvasRef.current, 0, 0, aspectRatio.width, aspectRatio.height);
-          canvasRef.current.width = origW || displayWidth;
-          canvasRef.current.height = origH || displayHeight;
+        }
+
+        if ((videoTrack as any).requestFrame) {
+          (videoTrack as any).requestFrame();
         }
 
         setProgress(globalProgress);
-        if (frame % 10 === 0) await new Promise(r => setTimeout(r, 0));
+        await new Promise(r => setTimeout(r, frameDurationMs));
+      }
+
+      if (canvasRef.current) {
+        canvasRef.current.width = origW || displayWidth;
+        canvasRef.current.height = origH || displayHeight;
       }
 
       mediaRecorder.stop();
