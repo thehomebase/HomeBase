@@ -15787,10 +15787,21 @@ export function registerRoutes(app: Express): Server {
           num_frames: numFrames,
           negative_prompt: "blurry, distorted, morphing, changing objects, hallucination, artifacts, glitch, low quality, moving objects, people appearing",
         },
+        logs: true,
+        onQueueUpdate: (update: any) => {
+          if (update.status === "IN_PROGRESS") {
+            const pct = update.logs?.length ? `(${update.logs.length} log entries)` : "";
+            console.log(`[Fal.ai 3D clip] In progress... ${pct}`);
+          } else if (update.status === "IN_QUEUE") {
+            console.log(`[Fal.ai 3D clip] Queued, position: ${update.queue_position ?? "unknown"}`);
+          }
+        },
       });
 
-      const videoUrl = result?.data?.video?.url;
+      console.log(`[Fal.ai 3D clip] Raw result keys:`, Object.keys(result || {}));
+      const videoUrl = result?.data?.video?.url || result?.video?.url;
       if (!videoUrl) {
+        console.error(`[Fal.ai 3D clip] No video URL found in result:`, JSON.stringify(result).slice(0, 500));
         return res.status(500).json({ error: "No video returned from service" });
       }
 

@@ -1224,16 +1224,20 @@ export default function ListingVideoPage() {
         if (!photo.dataUrl) continue;
 
         try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 180000);
           const res = await fetch("/api/listing-videos/generate-3d-clip", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
+            signal: controller.signal,
             body: JSON.stringify({
               imageDataUrl: photo.dataUrl,
               motionType: photo.motionType || "walk-forward",
               duration: settings.photoDuration,
             }),
           });
+          clearTimeout(timeout);
           if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
             throw new Error(errData.error || "Generation failed");
