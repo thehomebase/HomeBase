@@ -71,12 +71,14 @@ import {
   Settings,
   Target,
   Moon,
-  Sun
+  Sun,
+  Video
 } from "lucide-react";
 import React, { useState, useEffect, createContext, useContext } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { OnboardingTutorial, useOnboardingTutorial, TutorialStartButton } from "@/components/onboarding-tutorial";
 import CalculatorsPage from "@/pages/calculators-page";
+import ListingVideoPage from "@/pages/listing-video-page";
 import ProfilePage from "@/pages/profile-page";
 import { SiteFooter } from "@/components/site-footer";
 import GlossaryPage from "./pages/glossary-page";
@@ -584,6 +586,16 @@ function Layout({ children }: { children: React.ReactNode }) {
                           </SidebarMenuButton>
                         </SidebarMenuItem>
                         )}
+                        {isAgentOrBroker && (
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Listing Videos">
+                            <Link href="/listing-videos" className="flex items-center gap-2">
+                              <Video className="h-4 w-4" />
+                              <span>Listing Videos</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        )}
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild tooltip="MyHome">
                             <Link href="/my-home" className="flex items-center gap-2">
@@ -867,6 +879,9 @@ function Router() {
       </Route>
       <Route path="/forms-library">
         <ProtectedRoute path="/forms-library" component={FormsLibraryPage} />
+      </Route>
+      <Route path="/listing-videos">
+        <ProtectedRoute path="/listing-videos" component={ListingVideoPage} />
       </Route>
       <Route path="/settings/biometric">
         <ProtectedRoute path="/settings/biometric" component={BiometricSettingsPage} />

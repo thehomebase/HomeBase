@@ -1959,3 +1959,20 @@ export const vendorPremiumListings = pgTable("vendor_premium_listings", {
 });
 
 export type VendorPremiumListing = typeof vendorPremiumListings.$inferSelect;
+
+export const listingVideos = pgTable("listing_videos", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  title: text("title").notNull(),
+  propertyAddress: text("property_address"),
+  propertyDetails: json("property_details"),
+  photos: json("photos").notNull(),
+  motionPaths: json("motion_paths"),
+  settings: json("settings"),
+  status: text("status").notNull().default("draft"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertListingVideoSchema = createInsertSchema(listingVideos).omit({ id: true, createdAt: true });
+export type InsertListingVideo = z.infer<typeof insertListingVideoSchema>;
+export type ListingVideo = typeof listingVideos.$inferSelect;

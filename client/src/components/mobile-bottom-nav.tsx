@@ -41,6 +41,7 @@ import {
   ShieldCheck,
   FolderOpen,
   ChevronRight,
+  Video,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -128,6 +129,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Star, label: "Find Agents", href: "/top-agents", id: "top-agents" },
       { icon: Calendar, label: "Calendar", href: "/calendar", id: "calendar" },
       { icon: FolderOpen, label: "Forms Library", href: "/forms-library", id: "forms-library" },
+      { icon: Video, label: "Listing Videos", href: "/listing-videos", id: "listing-videos" },
       { icon: Mail, label: "Mail", href: "/mail", id: "mail" },
       { icon: Gift, label: "Referrals", href: "/referrals", id: "referrals" },
       { icon: Bell, label: "Drip Campaigns", href: "/drip", id: "drip" },
@@ -175,6 +177,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
     { icon: Star, label: "Find Agents", href: "/top-agents", id: "top-agents" },
     { icon: Calendar, label: "Calendar", href: "/calendar", id: "calendar" },
     { icon: FolderOpen, label: "Forms Library", href: "/forms-library", id: "forms-library" },
+    { icon: Video, label: "Listing Videos", href: "/listing-videos", id: "listing-videos" },
     { icon: Mail, label: "Mail", href: "/mail", id: "mail" },
     { icon: Gift, label: "Referrals", href: "/referrals", id: "referrals" },
     { icon: Bell, label: "Drip Campaigns", href: "/drip", id: "drip" },
@@ -323,6 +326,7 @@ function getCategorizedItems(role: string | undefined): NavCategory[] {
       { label: "Tools", items: [
         { icon: Calendar, label: "Calendar", href: "/calendar", id: "calendar" },
         { icon: FolderOpen, label: "Forms Library", href: "/forms-library", id: "forms-library" },
+        { icon: Video, label: "Listing Videos", href: "/listing-videos", id: "listing-videos" },
         { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
         { icon: ScanLine, label: "Scanner", href: "/scanner", id: "scanner" },
       ]},
@@ -366,6 +370,7 @@ function getCategorizedItems(role: string | undefined): NavCategory[] {
     { label: "Tools", items: [
       { icon: Calendar, label: "Calendar", href: "/calendar", id: "calendar" },
       { icon: FolderOpen, label: "Forms Library", href: "/forms-library", id: "forms-library" },
+      { icon: Video, label: "Listing Videos", href: "/listing-videos", id: "listing-videos" },
       { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
       { icon: ScanLine, label: "Scanner", href: "/scanner", id: "scanner" },
     ]},

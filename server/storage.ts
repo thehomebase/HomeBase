@@ -75,7 +75,8 @@ import {
   lenderEstimateRatings, type LenderEstimateRating,
   brokerSeatPlans, type BrokerSeatPlan,
   brokerSeatAssignments, type BrokerSeatAssignment,
-  vendorPremiumListings, type VendorPremiumListing
+  vendorPremiumListings, type VendorPremiumListing,
+  listingVideos, type ListingVideo, type InsertListingVideo
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
@@ -7323,6 +7324,29 @@ export class DatabaseStorage implements IStorage {
 
   async incrementPremiumClicks(vendorUserId: number): Promise<void> {
     await db.execute(sql`UPDATE vendor_premium_listings SET clicks = clicks + 1 WHERE vendor_user_id = ${vendorUserId} AND status = 'active'`);
+  }
+
+  async createListingVideo(data: InsertListingVideo): Promise<ListingVideo> {
+    const [video] = await db.insert(listingVideos).values(data).returning();
+    return video;
+  }
+
+  async getListingVideosByUser(userId: number): Promise<ListingVideo[]> {
+    return db.select().from(listingVideos).where(eq(listingVideos.userId, userId)).orderBy(desc(listingVideos.createdAt));
+  }
+
+  async getListingVideo(id: number): Promise<ListingVideo | undefined> {
+    const [video] = await db.select().from(listingVideos).where(eq(listingVideos.id, id));
+    return video;
+  }
+
+  async updateListingVideo(id: number, data: Partial<ListingVideo>): Promise<ListingVideo> {
+    const [video] = await db.update(listingVideos).set(data).where(eq(listingVideos.id, id)).returning();
+    return video;
+  }
+
+  async deleteListingVideo(id: number): Promise<void> {
+    await db.delete(listingVideos).where(eq(listingVideos.id, id));
   }
 
 }

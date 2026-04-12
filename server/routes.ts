@@ -38,7 +38,7 @@ import { getCached, setCache, getCacheSize, getDbCacheSize, cleanExpiredCache, b
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024, files: 10 },
+  limits: { fileSize: 25 * 1024 * 1024, files: 15 },
 });
 
 const IMAGE_MAGIC_BYTES: { mime: string; bytes: number[] }[] = [
@@ -15570,6 +15570,208 @@ export function registerRoutes(app: Express): Server {
       res.json(stats);
     } catch (error) {
       res.status(500).json({ error: "Failed to update tier" });
+    }
+  });
+
+  app.get("/api/listing-videos", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const role = req.user!.role;
+    if (role !== "agent" && role !== "broker") return res.status(403).json({ error: "Agent or broker only" });
+    try {
+      const videos = await storage.getListingVideosByUser(req.user!.id);
+      const cleaned = videos.map(v => ({
+        ...v,
+        photos: Array.isArray(v.photos) ? (v.photos as any[]).map((p: any) => ({ ...p, dataUrl: undefined })) : []
+      }));
+      res.json(cleaned);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get videos" });
+    }
+  });
+
+  app.get("/api/listing-videos/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const role = req.user!.role;
+    if (role !== "agent" && role !== "broker") return res.status(403).json({ error: "Agent or broker only" });
+    try {
+      const video = await storage.getListingVideo(Number(req.params.id));
+      if (!video || video.userId !== req.user!.id) return res.status(404).json({ error: "Not found" });
+      res.json(video);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get video" });
+    }
+  });
+
+  app.post("/api/listing-videos", upload.array("photos", 15), async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const role = req.user!.role;
+    if (role !== "agent" && role !== "broker") return res.status(403).json({ error: "Agent or broker only" });
+    try {
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) return res.status(400).json({ error: "No photos uploaded" });
+
+      for (const file of files) {
+        if (!isValidImage(file.buffer, file.mimetype)) {
+          return res.status(400).json({ error: `Invalid image: ${file.originalname}` });
+        }
+      }
+
+      const photos = files.map((file, index) => ({
+        id: randomUUID(),
+        filename: file.originalname,
+        mimeType: file.mimetype,
+        dataUrl: `data:${file.mimetype};base64,${file.buffer.toString("base64")}`,
+        order: index,
+        motionType: "pan-right",
+        caption: "",
+      }));
+
+      const video = await storage.createListingVideo({
+        userId: req.user!.id,
+        title: req.body.title || "Untitled Video",
+        propertyAddress: req.body.propertyAddress || null,
+        propertyDetails: req.body.propertyDetails ? JSON.parse(req.body.propertyDetails) : null,
+        photos,
+        motionPaths: null,
+        settings: {
+          aspectRatio: "16:9",
+          musicTrack: "none",
+          transitionDuration: 1,
+          photoDuration: 4,
+          showCaptions: true,
+          brandingPosition: "bottom-right",
+        },
+        status: "draft",
+      });
+      res.json(video);
+    } catch (error) {
+      console.error("Create listing video error:", error);
+      res.status(500).json({ error: "Failed to create video" });
+    }
+  });
+
+  app.put("/api/listing-videos/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const role = req.user!.role;
+    if (role !== "agent" && role !== "broker") return res.status(403).json({ error: "Agent or broker only" });
+    try {
+      const video = await storage.getListingVideo(Number(req.params.id));
+      if (!video || video.userId !== req.user!.id) return res.status(404).json({ error: "Not found" });
+      const allowedFields = ["title", "propertyAddress", "propertyDetails", "photos", "motionPaths", "settings", "status"];
+      const updateData: any = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) updateData[field] = req.body[field];
+      }
+      if (updateData.title && typeof updateData.title === "string" && updateData.title.length > 200) {
+        return res.status(400).json({ error: "Title too long" });
+      }
+      if (updateData.photos && Array.isArray(updateData.photos) && updateData.photos.length > 15) {
+        return res.status(400).json({ error: "Maximum 15 photos allowed" });
+      }
+      const updated = await storage.updateListingVideo(video.id, updateData);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update video" });
+    }
+  });
+
+  app.delete("/api/listing-videos/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const role = req.user!.role;
+    if (role !== "agent" && role !== "broker") return res.status(403).json({ error: "Agent or broker only" });
+    try {
+      const video = await storage.getListingVideo(Number(req.params.id));
+      if (!video || video.userId !== req.user!.id) return res.status(404).json({ error: "Not found" });
+      await storage.deleteListingVideo(video.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete video" });
+    }
+  });
+
+  app.post("/api/listing-videos/analyze-photos", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const role = req.user!.role;
+    if (role !== "agent" && role !== "broker") return res.status(403).json({ error: "Agent or broker only" });
+    try {
+      const { photos } = req.body;
+      if (!photos || !Array.isArray(photos) || photos.length === 0) {
+        return res.status(400).json({ error: "No photos provided" });
+      }
+      if (photos.length > 15) {
+        return res.status(400).json({ error: "Maximum 15 photos allowed" });
+      }
+      for (const photo of photos) {
+        if (!photo.id || typeof photo.id !== "string") return res.status(400).json({ error: "Invalid photo data" });
+        if (!photo.dataUrl || typeof photo.dataUrl !== "string" || !photo.dataUrl.startsWith("data:image/")) {
+          return res.status(400).json({ error: "Invalid photo data URL" });
+        }
+      }
+
+      const { GoogleGenAI, createPartFromBase64 } = await import("@google/genai");
+      const ai = new GoogleGenAI({
+        apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+        httpOptions: {
+          apiVersion: "",
+          baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+        },
+      });
+
+      const analysisPrompt = `You are a professional real estate videographer AI. Analyze these property photos and provide:
+
+1. For each photo, determine:
+   - roomType: what room/area this is (e.g., "living_room", "kitchen", "master_bedroom", "bathroom", "exterior_front", "backyard", "pool", "dining_room", "garage", "hallway", "office", etc.)
+   - motionType: the best cinematic camera motion to simulate a walkthrough feel. Choose from:
+     * "pan-left" - slow pan from right to left (good for wide rooms, revealing spaces)
+     * "pan-right" - slow pan from left to right (good for walkthrough feeling)
+     * "zoom-in" - slow zoom into a focal point (good for detail shots, features)
+     * "zoom-out" - slow zoom out to reveal full space (good for exteriors, large rooms)
+     * "pan-up" - slow upward pan (good for tall features, staircases)
+     * "pan-down" - slow downward pan (good for overhead views)
+   - caption: a short, elegant one-line description for this room (e.g., "Sun-drenched living room with vaulted ceilings")
+   - focusPoint: where the camera should focus/move toward as {x: 0-100, y: 0-100} percentage
+
+2. Suggest the optimal photo ordering for a natural walkthrough flow (exterior first, then entry, main living areas, kitchen, bedrooms, bathrooms, backyard/pool last).
+
+Return ONLY valid JSON in this exact format:
+{
+  "analyses": [
+    {
+      "photoId": "<photo id>",
+      "roomType": "living_room",
+      "motionType": "pan-right",
+      "caption": "Spacious living room with natural light",
+      "focusPoint": {"x": 60, "y": 50}
+    }
+  ],
+  "suggestedOrder": ["<photo id 1>", "<photo id 2>", ...]
+}`;
+
+      const contents: any[] = [];
+      for (const photo of photos) {
+        if (photo.dataUrl) {
+          const base64Data = photo.dataUrl.split(",")[1];
+          const mimeType = photo.dataUrl.split(";")[0].split(":")[1] || "image/jpeg";
+          contents.push(createPartFromBase64(base64Data, mimeType));
+          contents.push({ text: `Photo ID: ${photo.id}` });
+        }
+      }
+      contents.push({ text: analysisPrompt });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents,
+        config: {
+          responseMimeType: "application/json",
+        },
+      });
+
+      const text = response.text || "";
+      const analysis = JSON.parse(text);
+      res.json(analysis);
+    } catch (error) {
+      console.error("Photo analysis error:", error);
+      res.status(500).json({ error: "Failed to analyze photos" });
     }
   });
 
