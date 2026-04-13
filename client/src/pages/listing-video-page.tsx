@@ -1210,6 +1210,7 @@ export default function ListingVideoPage() {
 
   const [isGenerating3D, setIsGenerating3D] = useState(false);
   const [gen3DProgress, setGen3DProgress] = useState({ current: 0, total: 0 });
+  const [videoQuality, setVideoQuality] = useState<"480p" | "720p">("480p");
 
   const generate3DVideoClips = async () => {
     if (photos.length === 0) return;
@@ -1235,6 +1236,7 @@ export default function ListingVideoPage() {
               imageDataUrl: photo.dataUrl,
               motionType: photo.motionType || "walk-forward",
               duration: settings.photoDuration,
+              quality: videoQuality,
             }),
           });
           clearTimeout(timeout);
@@ -1449,19 +1451,30 @@ export default function ListingVideoPage() {
                           )}
                           {isAnalyzing ? "Analyzing..." : "AI Analyze & Order"}
                         </Button>
-                        <Button
-                          onClick={generate3DVideoClips}
-                          disabled={isGenerating3D || isAnalyzing || isGeneratingDepth}
-                          size="sm"
-                          className="bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-700 hover:to-teal-700"
-                        >
-                          {isGenerating3D ? (
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          ) : (
-                            <Box className="h-4 w-4 mr-1" />
-                          )}
-                          {isGenerating3D ? "Generating..." : "AI 3D Video"}
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            onClick={generate3DVideoClips}
+                            disabled={isGenerating3D || isAnalyzing || isGeneratingDepth}
+                            size="sm"
+                            className="bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-700 hover:to-teal-700"
+                          >
+                            {isGenerating3D ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <Box className="h-4 w-4 mr-1" />
+                            )}
+                            {isGenerating3D ? "Generating..." : "AI 3D Video"}
+                          </Button>
+                          <Select value={videoQuality} onValueChange={(v: "480p" | "720p") => setVideoQuality(v)}>
+                            <SelectTrigger className="w-[72px] h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="480p">480p</SelectItem>
+                              <SelectItem value="720p">720p</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     </div>
                     {isGenerating3D && (

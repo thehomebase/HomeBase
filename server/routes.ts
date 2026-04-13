@@ -15756,21 +15756,24 @@ export function registerRoutes(app: Express): Server {
 
       const clipDuration = Math.min(Math.max(duration || 3, 2), 3);
       const numFrames = Math.min(Math.round(clipDuration * 8), 25);
+      const quality = req.body.quality || "480p";
+      const validQualities = ["480p", "720p"];
+      const selectedQuality = validQualities.includes(quality) ? quality : "480p";
 
       const motionPrompts: Record<string, string> = {
-        "walk-forward": "Very subtle gentle camera push forward, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
-        "walk-right": "Very subtle gentle camera drift slightly right, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
-        "walk-left": "Very subtle gentle camera drift slightly left, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
-        "reveal": "Very subtle gentle camera pull back slightly, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
-        "drift-right": "Very subtle gentle camera drift slightly right, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
-        "drift-left": "Very subtle gentle camera drift slightly left, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
-        "push-in": "Very subtle gentle camera push forward slightly, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
-        "pull-out": "Very subtle gentle camera pull back slightly, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
-        "rise-up": "Very subtle gentle camera rise upward slightly, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
-        "pan-right": "Very subtle gentle camera pan slightly right, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
-        "pan-left": "Very subtle gentle camera pan slightly left, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
-        "zoom-in": "Very subtle gentle camera zoom in slightly, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
-        "zoom-out": "Very subtle gentle camera zoom out slightly, barely noticeable slow movement, photograph stays exactly the same, no changes to the scene, static objects, no new elements",
+        "walk-forward": "Subtle slow camera dolly forward into the space, gentle depth parallax, everything in the photograph remains unchanged, static scene, no new objects",
+        "walk-right": "Subtle slow camera tracking right along the room, gentle lateral parallax shift, everything in the photograph remains unchanged, static scene, no new objects",
+        "walk-left": "Subtle slow camera tracking left along the room, gentle lateral parallax shift, everything in the photograph remains unchanged, static scene, no new objects",
+        "reveal": "Subtle slow camera pulling back to widen the view, gentle reveal, everything in the photograph remains unchanged, static scene, no new objects",
+        "drift-right": "Very gentle floating camera drift to the right, slight weightless movement, everything in the photograph remains unchanged, static scene, no new objects",
+        "drift-left": "Very gentle floating camera drift to the left, slight weightless movement, everything in the photograph remains unchanged, static scene, no new objects",
+        "push-in": "Subtle slow camera push toward the center of the frame, gentle zoom-like approach, everything in the photograph remains unchanged, static scene, no new objects",
+        "pull-out": "Subtle slow camera easing backward from the scene, gentle widening view, everything in the photograph remains unchanged, static scene, no new objects",
+        "rise-up": "Subtle slow camera rising gently upward, slight vertical crane movement, everything in the photograph remains unchanged, static scene, no new objects",
+        "pan-right": "Subtle slow camera rotating slightly to the right, gentle horizontal pan, everything in the photograph remains unchanged, static scene, no new objects",
+        "pan-left": "Subtle slow camera rotating slightly to the left, gentle horizontal pan, everything in the photograph remains unchanged, static scene, no new objects",
+        "zoom-in": "Subtle slow optical zoom toward the focal point of the image, gentle magnification, everything in the photograph remains unchanged, static scene, no new objects",
+        "zoom-out": "Subtle slow optical zoom pulling back from the image, gentle de-magnification, everything in the photograph remains unchanged, static scene, no new objects",
       };
 
       const prompt = motionPrompts[motionType] || motionPrompts["walk-forward"];
@@ -15792,9 +15795,10 @@ export function registerRoutes(app: Express): Server {
         console.log(`[Fal.ai 3D clip] Image uploaded: ${hostedImageUrl.slice(0, 80)}...`);
       }
 
-      console.log(`[Fal.ai 3D clip] Generating ${clipDuration}s clip (${numFrames} frames) for motion: ${motionType}`);
+      const modelEndpoint = `fal-ai/longcat-video/image-to-video/${selectedQuality}`;
+      console.log(`[Fal.ai 3D clip] Generating ${clipDuration}s clip (${numFrames} frames) at ${selectedQuality} for motion: ${motionType}`);
 
-      const result: any = await fal.subscribe("fal-ai/longcat-video/image-to-video/480p", {
+      const result: any = await fal.subscribe(modelEndpoint, {
         input: {
           image_url: hostedImageUrl,
           prompt,
