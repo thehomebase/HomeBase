@@ -15754,11 +15754,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid image data" });
       }
 
-      const clipDuration = Math.min(Math.max(duration || 3, 2), 3);
-      const numFrames = Math.min(Math.round(clipDuration * 8), 25);
-      const quality = req.body.quality || "480p";
-      const validQualities = ["480p", "720p"];
-      const selectedQuality = validQualities.includes(quality) ? quality : "480p";
+      const clipDuration = Math.min(Math.max(duration || 3, 2), 5);
 
       const motionPrompts: Record<string, string> = {
         "walk-forward": "Subtle slow camera dolly forward into the space, gentle depth parallax, everything in the photograph remains unchanged, static scene, no new objects",
@@ -15795,21 +15791,19 @@ export function registerRoutes(app: Express): Server {
         console.log(`[Fal.ai 3D clip] Image uploaded: ${hostedImageUrl.slice(0, 80)}...`);
       }
 
-      const modelEndpoint = `fal-ai/longcat-video/image-to-video/${selectedQuality}`;
-      console.log(`[Fal.ai 3D clip] Generating ${clipDuration}s clip (${numFrames} frames) at ${selectedQuality} for motion: ${motionType}`);
+      console.log(`[Fal.ai 3D clip] Generating ${clipDuration}s clip via Kling for motion: ${motionType}`);
 
-      const result: any = await fal.subscribe(modelEndpoint, {
+      const result: any = await fal.subscribe("fal-ai/kling-video/v1/standard/image-to-video", {
         input: {
           image_url: hostedImageUrl,
           prompt,
-          num_frames: numFrames,
+          duration: clipDuration <= 5 ? "5" : "10",
           negative_prompt: "new objects, added elements, fence, furniture changes, morphing, changing objects, hallucination, artifacts, glitch, distortion, people appearing, moving objects, new details, invented elements, extra objects, modifications to scene",
         },
         logs: true,
         onQueueUpdate: (update: any) => {
           if (update.status === "IN_PROGRESS") {
-            const pct = update.logs?.length ? `(${update.logs.length} log entries)` : "";
-            console.log(`[Fal.ai 3D clip] In progress... ${pct}`);
+            console.log(`[Fal.ai 3D clip] Kling in progress...`);
           } else if (update.status === "IN_QUEUE") {
             console.log(`[Fal.ai 3D clip] Queued, position: ${update.queue_position ?? "unknown"}`);
           }
