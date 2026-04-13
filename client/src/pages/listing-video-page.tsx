@@ -1450,17 +1450,30 @@ export default function ListingVideoPage() {
                           {isAnalyzing ? "Analyzing..." : "AI Analyze & Order"}
                         </Button>
                         <Button
-                          onClick={generate3DVideoClips}
-                          disabled={isGenerating3D || isAnalyzing || isGeneratingDepth}
+                          onClick={generateDepthMaps}
+                          disabled={isGeneratingDepth || isAnalyzing || isGenerating3D}
                           size="sm"
                           className="bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-700 hover:to-teal-700"
                         >
-                          {isGenerating3D ? (
+                          {isGeneratingDepth ? (
                             <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                           ) : (
                             <Box className="h-4 w-4 mr-1" />
                           )}
-                          {isGenerating3D ? "Generating..." : "AI 3D Video"}
+                          {isGeneratingDepth ? "Processing..." : "3D Parallax"}
+                        </Button>
+                        <Button
+                          onClick={generate3DVideoClips}
+                          disabled={isGenerating3D || isAnalyzing || isGeneratingDepth}
+                          size="sm"
+                          variant="outline"
+                        >
+                          {isGenerating3D ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-4 w-4 mr-1" />
+                          )}
+                          {isGenerating3D ? "Generating..." : "AI Video (Kling)"}
                         </Button>
                       </div>
                     </div>
