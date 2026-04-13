@@ -1,20 +1,116 @@
 import * as THREE from "three";
 
-const MESH_SEGMENTS = 200;
-const DEPTH_DISPLACEMENT = 0.8;
+const POM_LAYERS = 64;
+const DEPTH_STRENGTH = 0.04;
+const FOCUS_DEPTH = 0.5;
 const CAM_Z = 5;
 const FOV = 45;
+
+const vertexShader = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const fragmentShader = `
+precision highp float;
+
+varying vec2 vUv;
+
+uniform sampler2D uColorTex;
+uniform sampler2D uDepthMap;
+uniform vec2 uOffset;
+uniform float uStrength;
+uniform float uFocus;
+uniform float uZoom;
+uniform int uLayers;
+uniform float uDofAmount;
+uniform float uVignette;
+
+vec4 sampleColor(vec2 uv) {
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+    vec2 clamped = clamp(uv, vec2(0.001), vec2(0.999));
+    return texture2D(uColorTex, clamped);
+  }
+  return texture2D(uColorTex, uv);
+}
+
+void main() {
+  float centerX = 0.5 + uOffset.x * 0.5;
+  float centerY = 0.5 + uOffset.y * 0.5;
+  vec2 zoomedUv = (vUv - vec2(centerX, centerY)) / uZoom + vec2(centerX, centerY);
+
+  vec2 uv = zoomedUv;
+  vec2 direction = uOffset * uStrength;
+
+  float layerDepth = 1.0 / float(uLayers);
+  float currentLayerDepth = 0.0;
+  vec2 deltaUv = direction / float(uLayers);
+
+  vec2 currentUv = uv + direction * (1.0 - uFocus);
+  float currentDepth = 1.0 - texture2D(uDepthMap, currentUv).r;
+
+  for (int i = 0; i < 128; i++) {
+    if (i >= uLayers) break;
+    if (currentLayerDepth >= currentDepth) break;
+    currentUv -= deltaUv;
+    currentDepth = 1.0 - texture2D(uDepthMap, currentUv).r;
+    currentLayerDepth += layerDepth;
+  }
+
+  vec2 prevUv = currentUv + deltaUv;
+  float afterDepth = currentDepth - currentLayerDepth;
+  float beforeDepth = (1.0 - texture2D(uDepthMap, prevUv).r) - currentLayerDepth + layerDepth;
+  float weight = afterDepth / (afterDepth - beforeDepth);
+  vec2 finalUv = mix(currentUv, prevUv, weight);
+
+  vec4 color = sampleColor(finalUv);
+
+  if (uDofAmount > 0.0) {
+    float depth = texture2D(uDepthMap, finalUv).r;
+    float blur = abs(depth - uFocus) * uDofAmount * 3.0;
+    if (blur > 0.001) {
+      vec4 blurred = vec4(0.0);
+      float total = 0.0;
+      float radius = blur * 0.004;
+      for (int x = -2; x <= 2; x++) {
+        for (int y = -2; y <= 2; y++) {
+          vec2 sampleUv = finalUv + vec2(float(x), float(y)) * radius;
+          float w = 1.0 / (1.0 + float(x*x + y*y));
+          blurred += sampleColor(sampleUv) * w;
+          total += w;
+        }
+      }
+      color = mix(color, blurred / total, min(blur * 2.0, 0.8));
+    }
+  }
+
+  if (uVignette > 0.0) {
+    vec2 vig = vUv - 0.5;
+    float vigAmount = 1.0 - dot(vig, vig) * uVignette * 2.0;
+    color.rgb *= clamp(vigAmount, 0.0, 1.0);
+  }
+
+  color.rgb = pow(color.rgb, vec3(1.0 / 1.0));
+  gl_FragColor = color;
+}
+`;
 
 export class ParallaxRenderer {
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
+  private camera: THREE.OrthographicCamera;
   private mesh: THREE.Mesh | null = null;
-  private texture: THREE.Texture | null = null;
+  private material: THREE.ShaderMaterial | null = null;
+  private colorTexture: THREE.Texture | null = null;
+  private depthTexture: THREE.Texture | null = null;
   private canvas: HTMLCanvasElement;
   private width: number;
   private height: number;
   private aspect: number;
+  private hasDepth: boolean = false;
 
   constructor(canvas: HTMLCanvasElement, width: number, height: number) {
     this.canvas = canvas;
@@ -31,24 +127,32 @@ export class ParallaxRenderer {
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(1);
     this.renderer.setClearColor(0x000000);
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(FOV, this.aspect, 0.1, 100);
-    this.camera.position.set(0, 0, CAM_Z);
-    this.camera.lookAt(0, 0, 0);
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+    this.camera.position.z = 1;
   }
 
   private clearScene() {
     if (this.mesh) {
       this.mesh.geometry.dispose();
-      (this.mesh.material as THREE.Material).dispose();
       this.scene.remove(this.mesh);
       this.mesh = null;
     }
-    if (this.texture) {
-      this.texture.dispose();
-      this.texture = null;
+    if (this.material) {
+      this.material.dispose();
+      this.material = null;
     }
+    if (this.colorTexture) {
+      this.colorTexture.dispose();
+      this.colorTexture = null;
+    }
+    if (this.depthTexture) {
+      this.depthTexture.dispose();
+      this.depthTexture = null;
+    }
+    this.hasDepth = false;
   }
 
   setPhoto(imageDataUrl: string, depthDataUrl: string | null): Promise<void> {
@@ -57,26 +161,24 @@ export class ParallaxRenderer {
 
       const img = new Image();
       img.onload = () => {
+        const loadDepthAndCreate = (depthImg: HTMLImageElement | null) => {
+          try {
+            this.createParallaxPlane(img, depthImg);
+            resolve();
+          } catch (e) {
+            this.createParallaxPlane(img, null);
+            resolve();
+          }
+        };
+
         if (!depthDataUrl) {
-          this.createFlatPlane(img);
-          resolve();
+          loadDepthAndCreate(null);
           return;
         }
 
         const depthImg = new Image();
-        depthImg.onload = () => {
-          try {
-            this.createDisplacedMesh(img, depthImg);
-            resolve();
-          } catch (e) {
-            this.createFlatPlane(img);
-            resolve();
-          }
-        };
-        depthImg.onerror = () => {
-          this.createFlatPlane(img);
-          resolve();
-        };
+        depthImg.onload = () => loadDepthAndCreate(depthImg);
+        depthImg.onerror = () => loadDepthAndCreate(null);
         depthImg.src = depthDataUrl;
       };
       img.onerror = () => reject(new Error("Failed to load image"));
@@ -84,31 +186,8 @@ export class ParallaxRenderer {
     });
   }
 
-  private createFlatPlane(img: HTMLImageElement) {
-    const dist = CAM_Z;
-    const planeH = 2 * dist * Math.tan((FOV * Math.PI / 180) / 2);
-    const planeW = planeH * this.aspect;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(img, 0, 0);
-
-    this.texture = new THREE.CanvasTexture(canvas);
-    this.texture.colorSpace = THREE.SRGBColorSpace;
-    this.texture.minFilter = THREE.LinearFilter;
-    this.texture.magFilter = THREE.LinearFilter;
-
-    const geom = new THREE.PlaneGeometry(planeW, planeH);
-    const mat = new THREE.MeshBasicMaterial({ map: this.texture });
-    this.mesh = new THREE.Mesh(geom, mat);
-    this.mesh.position.z = 0;
-    this.scene.add(this.mesh);
-  }
-
-  private createDisplacedMesh(img: HTMLImageElement, depthImg: HTMLImageElement) {
-    const maxDim = 1024;
+  private createParallaxPlane(img: HTMLImageElement, depthImg: HTMLImageElement | null) {
+    const maxDim = 2048;
     let w = img.width;
     let h = img.height;
     if (w > maxDim || h > maxDim) {
@@ -123,161 +202,176 @@ export class ParallaxRenderer {
     const imgCtx = imgCanvas.getContext("2d")!;
     imgCtx.drawImage(img, 0, 0, w, h);
 
-    this.texture = new THREE.CanvasTexture(imgCanvas);
-    this.texture.colorSpace = THREE.SRGBColorSpace;
-    this.texture.minFilter = THREE.LinearFilter;
-    this.texture.magFilter = THREE.LinearFilter;
+    this.colorTexture = new THREE.CanvasTexture(imgCanvas);
+    this.colorTexture.colorSpace = THREE.SRGBColorSpace;
+    this.colorTexture.minFilter = THREE.LinearFilter;
+    this.colorTexture.magFilter = THREE.LinearFilter;
+    this.colorTexture.wrapS = THREE.ClampToEdgeWrapping;
+    this.colorTexture.wrapT = THREE.ClampToEdgeWrapping;
 
-    const depthCanvas = document.createElement("canvas");
-    depthCanvas.width = w;
-    depthCanvas.height = h;
-    const depthCtx = depthCanvas.getContext("2d")!;
-    depthCtx.drawImage(depthImg, 0, 0, w, h);
-    const depthData = depthCtx.getImageData(0, 0, w, h);
+    if (depthImg) {
+      const depthCanvas = document.createElement("canvas");
+      depthCanvas.width = w;
+      depthCanvas.height = h;
+      const depthCtx = depthCanvas.getContext("2d")!;
+      depthCtx.drawImage(depthImg, 0, 0, w, h);
 
-    const dist = CAM_Z;
-    const planeH = 2 * dist * Math.tan((FOV * Math.PI / 180) / 2);
-    const planeW = planeH * this.aspect;
-
-    const segX = Math.round(MESH_SEGMENTS * (w / Math.max(w, h)));
-    const segY = Math.round(MESH_SEGMENTS * (h / Math.max(w, h)));
-
-    const geom = new THREE.PlaneGeometry(planeW, planeH, segX, segY);
-    const positions = geom.attributes.position;
-    const uvs = geom.attributes.uv;
-
-    for (let i = 0; i < positions.count; i++) {
-      const u = uvs.getX(i);
-      const v = uvs.getY(i);
-
-      const px = Math.min(Math.floor(u * w), w - 1);
-      const py = Math.min(Math.floor((1 - v) * h), h - 1);
-      const depthIdx = (py * w + px) * 4;
-      const depthValue = depthData.data[depthIdx] / 255;
-
-      const displacement = depthValue * DEPTH_DISPLACEMENT;
-      positions.setZ(i, displacement);
+      this.depthTexture = new THREE.CanvasTexture(depthCanvas);
+      this.depthTexture.minFilter = THREE.LinearFilter;
+      this.depthTexture.magFilter = THREE.LinearFilter;
+      this.depthTexture.wrapS = THREE.ClampToEdgeWrapping;
+      this.depthTexture.wrapT = THREE.ClampToEdgeWrapping;
+      this.hasDepth = true;
+    } else {
+      const depthCanvas = document.createElement("canvas");
+      depthCanvas.width = 1;
+      depthCanvas.height = 1;
+      const depthCtx = depthCanvas.getContext("2d")!;
+      depthCtx.fillStyle = "#808080";
+      depthCtx.fillRect(0, 0, 1, 1);
+      this.depthTexture = new THREE.CanvasTexture(depthCanvas);
+      this.hasDepth = false;
     }
 
-    positions.needsUpdate = true;
-    geom.computeVertexNormals();
-
-    const mat = new THREE.MeshBasicMaterial({
-      map: this.texture,
-      side: THREE.DoubleSide,
+    this.material = new THREE.ShaderMaterial({
+      vertexShader,
+      fragmentShader,
+      uniforms: {
+        uColorTex: { value: this.colorTexture },
+        uDepthMap: { value: this.depthTexture },
+        uOffset: { value: new THREE.Vector2(0, 0) },
+        uStrength: { value: DEPTH_STRENGTH },
+        uFocus: { value: FOCUS_DEPTH },
+        uZoom: { value: 1.0 },
+        uLayers: { value: POM_LAYERS },
+        uDofAmount: { value: 0.0 },
+        uVignette: { value: 0.3 },
+      },
     });
 
-    this.mesh = new THREE.Mesh(geom, mat);
-    this.mesh.position.z = -DEPTH_DISPLACEMENT / 2;
+    const geom = new THREE.PlaneGeometry(2, 2);
+    this.mesh = new THREE.Mesh(geom, this.material);
     this.scene.add(this.mesh);
   }
 
   setCameraForMotion(motionType: string, progress: number, focusPoint?: { x: number; y: number }) {
+    if (!this.material) return;
+
     const ease = progress * progress * (3 - 2 * progress);
     const fp = focusPoint || { x: 50, y: 50 };
-    const fpX = (fp.x - 50) / 100;
-    const fpY = (50 - fp.y) / 100;
+    const fpX = (fp.x - 50) / 50;
+    const fpY = (50 - fp.y) / 50;
 
-    let camX = 0, camY = 0, camZ = CAM_Z;
-    let lookX = 0, lookY = 0;
+    let offsetX = 0, offsetY = 0;
+    let zoom = 1.0;
+    let strength = DEPTH_STRENGTH;
+    let dof = 0.0;
+
+    if (!this.hasDepth) {
+      strength = 0;
+    }
 
     switch (motionType) {
       case "walk-forward":
-        camZ = CAM_Z - ease * 0.5;
-        camX = fpX * ease * 0.15;
-        camY = fpY * ease * 0.12;
-        lookX = fpX * ease * 0.08;
-        lookY = fpY * ease * 0.06;
+        zoom = 1.0 + ease * 0.08;
+        offsetX = fpX * ease * 0.15;
+        offsetY = fpY * ease * 0.12;
+        strength = DEPTH_STRENGTH * (1.0 + ease * 0.5);
+        dof = ease * 0.15;
         break;
 
       case "walk-right":
-        camX = ease * 0.3;
-        camZ = CAM_Z - ease * 0.12;
-        lookX = ease * 0.12;
+        offsetX = ease * 0.6;
+        offsetY = ease * 0.05;
+        zoom = 1.0 + ease * 0.03;
         break;
 
       case "walk-left":
-        camX = -ease * 0.3;
-        camZ = CAM_Z - ease * 0.12;
-        lookX = -ease * 0.12;
+        offsetX = -ease * 0.6;
+        offsetY = ease * 0.05;
+        zoom = 1.0 + ease * 0.03;
         break;
 
       case "reveal":
-        camZ = CAM_Z - (1 - ease) * 0.35;
-        camX = fpX * (1 - ease) * 0.2;
-        camY = fpY * (1 - ease) * 0.15;
+        zoom = 1.0 + (1 - ease) * 0.06;
+        offsetX = fpX * (1 - ease) * 0.4;
+        offsetY = fpY * (1 - ease) * 0.3;
         break;
 
       case "drift-right":
-        camX = ease * 0.2;
-        camY = Math.sin(ease * Math.PI) * 0.06;
-        camZ = CAM_Z - Math.sin(ease * Math.PI) * 0.12;
+        offsetX = ease * 0.4;
+        offsetY = Math.sin(ease * Math.PI) * 0.1;
+        zoom = 1.0 + Math.sin(ease * Math.PI) * 0.03;
         break;
 
       case "drift-left":
-        camX = -ease * 0.2;
-        camY = Math.sin(ease * Math.PI) * 0.06;
-        camZ = CAM_Z - Math.sin(ease * Math.PI) * 0.12;
+        offsetX = -ease * 0.4;
+        offsetY = Math.sin(ease * Math.PI) * 0.1;
+        zoom = 1.0 + Math.sin(ease * Math.PI) * 0.03;
         break;
 
       case "push-in":
-        camZ = CAM_Z - ease * 0.6;
-        camX = fpX * ease * 0.2;
-        camY = fpY * ease * 0.15;
-        lookX = fpX * ease * 0.1;
-        lookY = fpY * ease * 0.08;
+        zoom = 1.0 + ease * 0.12;
+        offsetX = fpX * ease * 0.3;
+        offsetY = fpY * ease * 0.25;
+        dof = ease * 0.2;
+        strength = DEPTH_STRENGTH * (1.0 + ease * 0.8);
         break;
 
       case "pull-out":
-        camZ = CAM_Z + ease * 0.35;
+        zoom = 1.0 + (1 - ease) * 0.1;
+        offsetX = fpX * (1 - ease) * 0.1;
+        offsetY = fpY * (1 - ease) * 0.08;
         break;
 
       case "rise-up":
-        camY = ease * 0.2;
-        camZ = CAM_Z - ease * 0.08;
-        lookY = ease * 0.08;
+        offsetY = ease * 0.5;
+        offsetX = ease * 0.05;
+        zoom = 1.0 + ease * 0.03;
         break;
 
       case "pan-right":
-        camX = ease * 0.25;
-        lookX = ease * 0.15;
+        offsetX = ease * 0.5;
+        zoom = 1.0 + Math.sin(ease * Math.PI) * 0.02;
         break;
 
       case "pan-left":
-        camX = -ease * 0.25;
-        lookX = -ease * 0.15;
+        offsetX = -ease * 0.5;
+        zoom = 1.0 + Math.sin(ease * Math.PI) * 0.02;
         break;
 
       case "pan-up":
-        camY = ease * 0.2;
-        lookY = ease * 0.1;
+        offsetY = ease * 0.4;
+        zoom = 1.0 + Math.sin(ease * Math.PI) * 0.02;
         break;
 
       case "pan-down":
-        camY = -ease * 0.2;
-        lookY = -ease * 0.1;
+        offsetY = -ease * 0.4;
+        zoom = 1.0 + Math.sin(ease * Math.PI) * 0.02;
         break;
 
       case "zoom-in":
-        camZ = CAM_Z - ease * 0.7;
-        camX = fpX * ease * 0.15;
-        camY = fpY * ease * 0.12;
-        lookX = fpX * ease * 0.08;
-        lookY = fpY * ease * 0.06;
+        zoom = 1.0 + ease * 0.15;
+        offsetX = fpX * ease * 0.2;
+        offsetY = fpY * ease * 0.15;
+        dof = ease * 0.25;
+        strength = DEPTH_STRENGTH * (1.0 + ease);
         break;
 
       case "zoom-out":
-        camZ = CAM_Z + ease * 0.4;
+        zoom = 1.0 + (1 - ease) * 0.12;
         break;
 
       default:
-        camX = ease * 0.12;
-        camZ = CAM_Z - ease * 0.2;
+        offsetX = ease * 0.2;
+        zoom = 1.0 + ease * 0.04;
         break;
     }
 
-    this.camera.position.set(camX, camY, camZ);
-    this.camera.lookAt(lookX, lookY, 0);
+    this.material.uniforms.uOffset.value.set(offsetX, offsetY);
+    this.material.uniforms.uZoom.value = zoom;
+    this.material.uniforms.uStrength.value = strength;
+    this.material.uniforms.uDofAmount.value = dof;
   }
 
   render() {
@@ -289,8 +383,6 @@ export class ParallaxRenderer {
     this.height = height;
     this.aspect = width / height;
     this.renderer.setSize(width, height);
-    this.camera.aspect = this.aspect;
-    this.camera.updateProjectionMatrix();
   }
 
   getCanvas(): HTMLCanvasElement {
