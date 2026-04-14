@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { createMusicPlayer, createMusicForExport } from "@/lib/music-synthesizer";
+import type { MusicPlayer } from "@/lib/music-synthesizer";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -53,6 +55,19 @@ interface PropertyDetails {
   baths?: string;
   sqft?: string;
   description?: string;
+}
+
+interface AgentBranding {
+  showName: boolean;
+  showEmail: boolean;
+  showPhone: boolean;
+  showBrokerage: boolean;
+  showClosingSlide: boolean;
+  name: string;
+  email: string;
+  phone: string;
+  brokerageName: string;
+  roleText: string;
 }
 
 const MOTION_TYPES = [
@@ -151,6 +166,7 @@ function VideoComposer({
   propertyDetails,
   propertyAddress,
   user,
+  agentBranding,
   onExportStart,
   onExportEnd,
 }: {
@@ -159,6 +175,7 @@ function VideoComposer({
   propertyDetails: PropertyDetails;
   propertyAddress: string;
   user: any;
+  agentBranding: AgentBranding;
   onExportStart?: () => void;
   onExportEnd?: () => void;
 }) {
@@ -170,6 +187,7 @@ function VideoComposer({
   const animationRef = useRef<number | null>(null);
   const loadedImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const videoElementsRef = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const musicPlayerRef = useRef<MusicPlayer | null>(null);
 
   const aspectRatio = ASPECT_RATIOS[settings.aspectRatio] || ASPECT_RATIOS["16:9"];
   const displayWidth = settings.aspectRatio === "9:16" ? 270 : settings.aspectRatio === "1:1" ? 400 : 480;
@@ -421,24 +439,32 @@ function VideoComposer({
   };
 
   const drawBrandingOverlay = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    if (!user || settings.textTemplate === "none") return;
+    if (settings.textTemplate === "none") return;
+    const lines: string[] = [];
+    if (agentBranding.showName && agentBranding.name) lines.push(agentBranding.name);
+    if (agentBranding.showPhone && agentBranding.phone) lines.push(agentBranding.phone);
+    if (agentBranding.showEmail && agentBranding.email) lines.push(agentBranding.email);
+    if (agentBranding.showBrokerage && agentBranding.brokerageName) lines.push(agentBranding.brokerageName);
+    if (lines.length === 0) return;
+
     ctx.save();
     ctx.globalAlpha = 0.85;
-    const name = `${user.firstName || ""} ${user.lastName || ""}`.trim();
-    const phone = user.profilePhone || "";
-    if (!name) { ctx.restore(); return; }
     const tmpl = settings.textTemplate || "classic";
     const isSerif = tmpl === "elegant";
     const fontFamily = isSerif ? '"Georgia", "Times New Roman", serif' : '"Inter", system-ui, sans-serif';
     const fontSize = Math.max(11, w * 0.025);
-    ctx.font = `600 ${fontSize}px ${fontFamily}`;
-    const nameW = ctx.measureText(name).width;
-    ctx.font = `400 ${fontSize * 0.8}px ${fontFamily}`;
-    const phoneW = phone ? ctx.measureText(phone).width : 0;
-    const maxTextW = Math.max(nameW, phoneW);
+    const smallFont = fontSize * 0.78;
     const padding = fontSize * 0.6;
-    const boxW = maxTextW + padding * 2;
-    const boxH = phone ? fontSize * 3 : fontSize * 2;
+    const lineH = fontSize * 1.15;
+
+    let maxW = 0;
+    lines.forEach((line, i) => {
+      ctx.font = i === 0 ? `600 ${fontSize}px ${fontFamily}` : `400 ${smallFont}px ${fontFamily}`;
+      maxW = Math.max(maxW, ctx.measureText(line).width);
+    });
+
+    const boxW = maxW + padding * 2;
+    const boxH = padding * 2 + lineH * lines.length;
     const margin = w * 0.03;
     let boxX: number, boxY: number;
     switch (settings.brandingPosition) {
@@ -453,12 +479,76 @@ function VideoComposer({
     ctx.fill();
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "left";
-    ctx.font = `600 ${fontSize}px ${fontFamily}`;
-    ctx.fillText(name, boxX + padding, boxY + padding + fontSize * 0.4);
-    if (phone) {
-      ctx.font = `400 ${fontSize * 0.8}px ${fontFamily}`;
-      ctx.fillText(phone, boxX + padding, boxY + padding + fontSize * 1.4);
+    lines.forEach((line, i) => {
+      ctx.font = i === 0 ? `600 ${fontSize}px ${fontFamily}` : `400 ${smallFont}px ${fontFamily}`;
+      ctx.fillText(line, boxX + padding, boxY + padding + i * lineH + fontSize * 0.4);
+    });
+    ctx.restore();
+  };
+
+  const drawClosingSlide = (ctx: CanvasRenderingContext2D, w: number, h: number, slideProgress: number) => {
+    if (!agentBranding.showClosingSlide) return;
+    const tmpl = settings.textTemplate || "classic";
+    const isSerif = tmpl === "elegant";
+    const fontFamily = isSerif ? '"Georgia", "Times New Roman", serif' : '"Inter", system-ui, sans-serif';
+
+    ctx.save();
+    ctx.fillStyle = "#111111";
+    ctx.fillRect(0, 0, w, h);
+
+    const fadeIn = easeOut(Math.min(1, slideProgress * 3));
+    ctx.globalAlpha = fadeIn;
+
+    const centerX = w / 2;
+    let yPos = h * 0.3;
+
+    if (agentBranding.showName && agentBranding.name) {
+      const nameSize = Math.max(22, w * 0.055);
+      ctx.font = `700 ${nameSize}px ${fontFamily}`;
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(agentBranding.name, centerX, yPos);
+      yPos += nameSize * 1.6;
     }
+
+    if (agentBranding.roleText) {
+      const roleSize = Math.max(13, w * 0.028);
+      ctx.font = `400 ${roleSize}px ${fontFamily}`;
+      ctx.fillStyle = "rgba(255,255,255,0.65)";
+      ctx.fillText(agentBranding.roleText.toUpperCase(), centerX, yPos);
+      yPos += roleSize * 2;
+    }
+
+    const lineW = w * 0.12;
+    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(centerX - lineW / 2, yPos);
+    ctx.lineTo(centerX + lineW / 2, yPos);
+    ctx.stroke();
+    yPos += Math.max(14, w * 0.03) * 1.5;
+
+    const contactLines: string[] = [];
+    if (agentBranding.showPhone && agentBranding.phone) contactLines.push(agentBranding.phone);
+    if (agentBranding.showEmail && agentBranding.email) contactLines.push(agentBranding.email);
+
+    contactLines.forEach((line) => {
+      const contactSize = Math.max(13, w * 0.028);
+      ctx.font = `400 ${contactSize}px ${fontFamily}`;
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.fillText(line, centerX, yPos);
+      yPos += contactSize * 1.6;
+    });
+
+    if (agentBranding.showBrokerage && agentBranding.brokerageName) {
+      yPos += Math.max(8, w * 0.015);
+      const brokSize = Math.max(12, w * 0.024);
+      ctx.font = `500 ${brokSize}px ${fontFamily}`;
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.fillText(agentBranding.brokerageName, centerX, yPos);
+    }
+
     ctx.restore();
   };
 
@@ -740,13 +830,25 @@ function VideoComposer({
     }
     drawPropertyInfo(ctx, w, h, globalProgress);
     drawBrandingOverlay(ctx, w, h);
-  }, [photos, settings, propertyAddress, propertyDetails, user]);
+  }, [photos, settings, propertyAddress, propertyDetails, agentBranding]);
+
+  const closingSlideDuration = agentBranding.showClosingSlide ? 4 : 0;
 
   const drawFrame = useCallback((photoIdx: number, photoProgress: number, globalProgress: number = 0) => {
     const canvas = canvasRef.current;
     if (!canvas || photos.length === 0) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    const photosDuration = photos.length * (settings.photoDuration + settings.transitionDuration);
+    const totalDuration = photosDuration + closingSlideDuration;
+    const elapsed = globalProgress * totalDuration;
+
+    if (elapsed >= photosDuration && closingSlideDuration > 0) {
+      const slideProgress = (elapsed - photosDuration) / closingSlideDuration;
+      drawClosingSlide(ctx, canvas.width, canvas.height, slideProgress);
+      return;
+    }
 
     const currentPhoto = photos[photoIdx];
     const hasClip = currentPhoto?.videoClipUrl && videoElementsRef.current.has(currentPhoto.id);
@@ -789,13 +891,24 @@ function VideoComposer({
     }
     drawPropertyInfo(ctx, w, h, globalProgress);
     drawBrandingOverlay(ctx, w, h);
-  }, [photos, settings, propertyAddress, propertyDetails, user, drawFrameVideoClip]);
+  }, [photos, settings, propertyAddress, propertyDetails, agentBranding, drawFrameVideoClip, closingSlideDuration]);
 
   const playPreview = useCallback(() => {
     if (photos.length === 0) return;
     setIsPlaying(true);
-    const totalDuration = photos.length * (settings.photoDuration + settings.transitionDuration);
+    const photosDuration = photos.length * (settings.photoDuration + settings.transitionDuration);
+    const totalDuration = photosDuration + closingSlideDuration;
     const startTime = performance.now();
+
+    if (musicPlayerRef.current) {
+      musicPlayerRef.current.stop();
+      musicPlayerRef.current = null;
+    }
+    if (settings.musicTrack && settings.musicTrack !== "none") {
+      const player = createMusicPlayer(settings.musicTrack, totalDuration);
+      player.start();
+      musicPlayerRef.current = player;
+    }
 
     const animate = (time: number) => {
       const elapsed = (time - startTime) / 1000;
@@ -805,6 +918,10 @@ function VideoComposer({
         setCurrentPhotoIndex(0);
         setProgress(0);
         drawFrame(0, 0, 0);
+        if (musicPlayerRef.current) {
+          musicPlayerRef.current.stop();
+          musicPlayerRef.current = null;
+        }
         return;
       }
       setProgress(globalProgress);
@@ -816,10 +933,14 @@ function VideoComposer({
       animationRef.current = requestAnimationFrame(animate);
     };
     animationRef.current = requestAnimationFrame(animate);
-  }, [photos, settings, drawFrame]);
+  }, [photos, settings, drawFrame, closingSlideDuration]);
 
   const stopPreview = useCallback(() => {
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    if (musicPlayerRef.current) {
+      musicPlayerRef.current.stop();
+      musicPlayerRef.current = null;
+    }
     setIsPlaying(false);
   }, []);
 
@@ -835,9 +956,25 @@ function VideoComposer({
       const exportCtx = exportCanvas.getContext("2d");
       if (!exportCtx) throw new Error("Cannot get canvas context");
 
-      const stream = exportCanvas.captureStream(0);
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
-      const mediaRecorder = new MediaRecorder(stream, {
+      const videoStream = exportCanvas.captureStream(0);
+      let musicExport: { stream: MediaStream; stop: () => void } | null = null;
+      let combinedStream: MediaStream;
+
+      if (settings.musicTrack && settings.musicTrack !== "none") {
+        const photosDur = photos.length * (settings.photoDuration + settings.transitionDuration);
+        const totalDur = photosDur + closingSlideDuration;
+        musicExport = createMusicForExport(settings.musicTrack, totalDur);
+        combinedStream = new MediaStream([
+          ...videoStream.getVideoTracks(),
+          ...musicExport.stream.getAudioTracks(),
+        ]);
+      } else {
+        combinedStream = videoStream;
+      }
+
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus") ? "video/webm;codecs=vp9,opus"
+        : MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+      const mediaRecorder = new MediaRecorder(combinedStream, {
         mimeType,
         videoBitsPerSecond: 20000000,
       });
@@ -849,11 +986,12 @@ function VideoComposer({
       });
       mediaRecorder.start();
 
-      const totalDuration = photos.length * (settings.photoDuration + settings.transitionDuration);
+      const photosDuration = photos.length * (settings.photoDuration + settings.transitionDuration);
+      const totalDuration = photosDuration + closingSlideDuration;
       const fps = 30;
       const totalFrames = Math.ceil(totalDuration * fps);
       const frameDurationMs = 1000 / fps;
-      const videoTrack = stream.getVideoTracks()[0];
+      const videoTrack = videoStream.getVideoTracks()[0];
 
       const origW = canvasRef.current?.width;
       const origH = canvasRef.current?.height;
@@ -910,6 +1048,7 @@ function VideoComposer({
       }
 
       mediaRecorder.stop();
+      if (musicExport) musicExport.stop();
       const blob = await exportPromise;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -927,7 +1066,7 @@ function VideoComposer({
       setProgress(0);
       onExportEnd?.();
     }
-  }, [photos, settings, drawFrame, aspectRatio, displayWidth, displayHeight]);
+  }, [photos, settings, drawFrame, aspectRatio, displayWidth, displayHeight, closingSlideDuration]);
 
   useEffect(() => {
     if (photos.length > 0 && !isPlaying) {
@@ -938,6 +1077,10 @@ function VideoComposer({
   useEffect(() => {
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (musicPlayerRef.current) {
+        musicPlayerRef.current.stop();
+        musicPlayerRef.current = null;
+      }
     };
   }, []);
 
@@ -1007,6 +1150,31 @@ export default function ListingVideoPage() {
     transitionStyle: "cinematic",
     textTemplate: "bold",
   });
+  const [agentBranding, setAgentBranding] = useState<AgentBranding>({
+    showName: true,
+    showEmail: false,
+    showPhone: true,
+    showBrokerage: false,
+    showClosingSlide: true,
+    name: `${user?.firstName || ""} ${user?.lastName || ""}`.trim(),
+    email: user?.email || "",
+    phone: user?.profilePhone || "",
+    brokerageName: "",
+    roleText: "Licensed Real Estate Agent",
+  });
+  const brandingInitializedRef = useRef(false);
+  useEffect(() => {
+    if (user && !brandingInitializedRef.current) {
+      brandingInitializedRef.current = true;
+      const name = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+      setAgentBranding(prev => ({
+        ...prev,
+        name: prev.name || name,
+        email: prev.email || user.email || "",
+        phone: prev.phone || user.profilePhone || "",
+      }));
+    }
+  }, [user]);
   const [activeTab, setActiveTab] = useState("upload");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [selectedVideoId, setSelectedVideoId] = useState<number | null>(null);
@@ -1667,6 +1835,101 @@ export default function ListingVideoPage() {
                     </div>
                   </CardContent>
                 </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Agent Info</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-sm">Name</Label>
+                      </div>
+                      <Switch
+                        checked={agentBranding.showName}
+                        onCheckedChange={(v) => setAgentBranding(b => ({ ...b, showName: v }))}
+                      />
+                    </div>
+                    {agentBranding.showName && (
+                      <Input
+                        value={agentBranding.name}
+                        onChange={(e) => setAgentBranding(b => ({ ...b, name: e.target.value }))}
+                        placeholder="Your name"
+                      />
+                    )}
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Phone</Label>
+                      <Switch
+                        checked={agentBranding.showPhone}
+                        onCheckedChange={(v) => setAgentBranding(b => ({ ...b, showPhone: v }))}
+                      />
+                    </div>
+                    {agentBranding.showPhone && (
+                      <Input
+                        value={agentBranding.phone}
+                        onChange={(e) => setAgentBranding(b => ({ ...b, phone: e.target.value }))}
+                        placeholder="(555) 123-4567"
+                      />
+                    )}
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Email</Label>
+                      <Switch
+                        checked={agentBranding.showEmail}
+                        onCheckedChange={(v) => setAgentBranding(b => ({ ...b, showEmail: v }))}
+                      />
+                    </div>
+                    {agentBranding.showEmail && (
+                      <Input
+                        value={agentBranding.email}
+                        onChange={(e) => setAgentBranding(b => ({ ...b, email: e.target.value }))}
+                        placeholder="agent@email.com"
+                      />
+                    )}
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Brokerage</Label>
+                      <Switch
+                        checked={agentBranding.showBrokerage}
+                        onCheckedChange={(v) => setAgentBranding(b => ({ ...b, showBrokerage: v }))}
+                      />
+                    </div>
+                    {agentBranding.showBrokerage && (
+                      <Input
+                        value={agentBranding.brokerageName}
+                        onChange={(e) => setAgentBranding(b => ({ ...b, brokerageName: e.target.value }))}
+                        placeholder="XYZ Realty Group"
+                      />
+                    )}
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-sm">Closing Slide</Label>
+                        <p className="text-xs text-muted-foreground">Agent card at end of video</p>
+                      </div>
+                      <Switch
+                        checked={agentBranding.showClosingSlide}
+                        onCheckedChange={(v) => setAgentBranding(b => ({ ...b, showClosingSlide: v }))}
+                      />
+                    </div>
+                    {agentBranding.showClosingSlide && (
+                      <Input
+                        value={agentBranding.roleText}
+                        onChange={(e) => setAgentBranding(b => ({ ...b, roleText: e.target.value }))}
+                        placeholder="Licensed Real Estate Agent"
+                      />
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="settings" className="space-y-4">
@@ -1832,7 +2095,7 @@ export default function ListingVideoPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-muted-foreground mt-1">Music playback during preview (audio not included in export)</p>
+                      <p className="text-xs text-muted-foreground mt-1">Music plays during preview and is included in exported video</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -1855,6 +2118,7 @@ export default function ListingVideoPage() {
                   propertyDetails={propertyDetails}
                   propertyAddress={propertyAddress}
                   user={user}
+                  agentBranding={agentBranding}
                 />
               </CardContent>
             </Card>
@@ -1864,7 +2128,7 @@ export default function ListingVideoPage() {
                 <CardContent className="pt-6">
                   <div className="text-center space-y-2">
                     <p className="text-sm text-muted-foreground">
-                      Total duration: ~{Math.round(photos.length * (settings.photoDuration + settings.transitionDuration))}s
+                      Total duration: ~{Math.round(photos.length * (settings.photoDuration + settings.transitionDuration) + (agentBranding.showClosingSlide ? 4 : 0))}s
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {photos.length} photos • {ASPECT_RATIOS[settings.aspectRatio]?.label}
