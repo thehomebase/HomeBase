@@ -142,7 +142,7 @@ function ClipPreviewModal({
           {photo.videoClipUrl ? (
             <video
               ref={videoRef}
-              src={photo.videoClipUrl}
+              src={photo.videoClipUrl.startsWith("/") ? window.location.origin + photo.videoClipUrl : photo.videoClipUrl}
               controls
               autoPlay
               loop
@@ -193,6 +193,7 @@ function VideoComposer({
   const loadedImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const videoElementsRef = useRef<Map<string, HTMLVideoElement>>(new Map());
   const musicPlayerRef = useRef<MusicPlayer | null>(null);
+  const [videosReady, setVideosReady] = useState(0);
 
   const aspectRatio = ASPECT_RATIOS[settings.aspectRatio] || ASPECT_RATIOS["16:9"];
   const displayWidth = settings.aspectRatio === "9:16" ? 270 : settings.aspectRatio === "1:1" ? 400 : 480;
@@ -211,13 +212,23 @@ function VideoComposer({
       }
       if (photo.videoClipUrl) {
         const existing = videoElementsRef.current.get(photo.id);
-        if (!existing || existing.src !== photo.videoClipUrl) {
+        const fullUrl = photo.videoClipUrl.startsWith("/") ? window.location.origin + photo.videoClipUrl : photo.videoClipUrl;
+        if (!existing || existing.getAttribute("data-clip-url") !== photo.videoClipUrl) {
           const video = document.createElement("video");
           video.crossOrigin = "anonymous";
-          video.src = photo.videoClipUrl;
+          video.src = fullUrl;
           video.muted = true;
           video.playsInline = true;
           video.preload = "auto";
+          video.setAttribute("data-clip-url", photo.videoClipUrl);
+          video.addEventListener("loadeddata", () => {
+            console.log(`[VideoClip] Loaded: ${photo.id}, readyState=${video.readyState}, duration=${video.duration}`);
+            setVideosReady(prev => prev + 1);
+            if (!isPlaying) drawFrame(0, 0);
+          });
+          video.addEventListener("error", (e) => {
+            console.error(`[VideoClip] Error loading ${photo.id}:`, e);
+          });
           video.load();
           videoElementsRef.current.set(photo.id, video);
         }
@@ -1102,7 +1113,7 @@ function VideoComposer({
       drawCaptionOverlay(ctx, w, h, currentPhoto.caption, photoProgress);
     }
     drawPropertyInfo(ctx, w, h, globalProgress);
-  }, [photos, settings, propertyAddress, propertyDetails, agentBranding]);
+  }, [photos, settings, propertyAddress, propertyDetails, agentBranding, videosReady]);
 
   const closingSlideDuration = agentBranding.showClosingSlide ? 4 : 0;
 
@@ -1626,7 +1637,7 @@ export default function ListingVideoPage() {
         let timeout: ReturnType<typeof setTimeout> | null = null;
         try {
           const controller = new AbortController();
-          timeout = setTimeout(() => controller.abort(), 300000);
+          timeout = setTimeout(() => controller.abort(), 840000);
           const res = await fetch("/api/listing-videos/generate-3d-clip", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1646,7 +1657,7 @@ export default function ListingVideoPage() {
           photo.videoClipUrl = data.videoUrl;
         } catch (err: any) {
           console.error(`Video failed for photo ${photo.id}:`, err);
-          const msg = err?.name === "AbortError" ? "Timed out (5 min limit)" : (err?.message || "Could not generate clip");
+          const msg = err?.name === "AbortError" ? "Timed out (14 min limit)" : (err?.message || "Could not generate clip");
           toast({ title: `Photo ${index + 1} failed`, description: msg, variant: "destructive" });
         } finally {
           if (timeout) clearTimeout(timeout);
@@ -1697,7 +1708,7 @@ export default function ListingVideoPage() {
     let timeout: ReturnType<typeof setTimeout> | null = null;
     try {
       const controller = new AbortController();
-      timeout = setTimeout(() => controller.abort(), 300000);
+      timeout = setTimeout(() => controller.abort(), 840000);
       const res = await fetch("/api/listing-videos/generate-3d-clip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1976,8 +1987,11 @@ export default function ListingVideoPage() {
                             )}
                             {photo.videoClipUrl && (
                               <button
-                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                                onClick={() => setPreviewingClip(photo)}
+                                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10"
+                                draggable={false}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onDragStart={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                                onClick={(e) => { e.stopPropagation(); e.preventDefault(); setPreviewingClip(photo); }}
                               >
                                 <Play className="h-5 w-5 text-white" />
                               </button>

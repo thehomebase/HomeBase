@@ -15811,22 +15811,43 @@ export function registerRoutes(app: Express): Server {
 
       console.log(`[Hailuo] Generating 6s clip via Hailuo 2.3 Fast for motion: ${safeMotion} ${cameraDirective}`);
 
-      const result: any = await fal.subscribe("fal-ai/minimax/hailuo-2.3-fast/standard/image-to-video", {
-        input: {
-          image_url: hostedImageUrl,
-          prompt,
-          prompt_optimizer: false,
-          duration: "6",
-        },
-        logs: true,
-        onQueueUpdate: (update: any) => {
-          if (update.status === "IN_PROGRESS") {
-            console.log(`[Hailuo] Generation in progress...`);
-          } else if (update.status === "IN_QUEUE") {
-            console.log(`[Hailuo] Queued, position: ${update.queue_position ?? "unknown"}`);
-          }
-        },
-      });
+      const MAX_RETRIES = 2;
+      const SUBSCRIBE_TIMEOUT = 240000;
+      let result: any = null;
+
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        if (attempt > 0) {
+          console.log(`[Hailuo] Retry attempt ${attempt}/${MAX_RETRIES}...`);
+        }
+        try {
+          result = await Promise.race([
+            fal.subscribe("fal-ai/minimax/hailuo-2.3-fast/standard/image-to-video", {
+              input: {
+                image_url: hostedImageUrl,
+                prompt,
+                prompt_optimizer: false,
+                duration: "6",
+              },
+              logs: true,
+              onQueueUpdate: (update: any) => {
+                if (update.status === "IN_PROGRESS") {
+                  console.log(`[Hailuo] Generation in progress... (attempt ${attempt + 1})`);
+                } else if (update.status === "IN_QUEUE") {
+                  console.log(`[Hailuo] Queued, position: ${update.queue_position ?? "unknown"} (attempt ${attempt + 1})`);
+                }
+              },
+            }),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("fal.ai generation timed out after 4 minutes")), SUBSCRIBE_TIMEOUT)
+            ),
+          ]);
+          break;
+        } catch (retryErr: any) {
+          console.warn(`[Hailuo] Attempt ${attempt + 1} failed: ${retryErr?.message}`);
+          if (attempt === MAX_RETRIES) throw retryErr;
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
 
       console.log(`[Hailuo] Raw result keys:`, Object.keys(result || {}));
       const videoUrl = result?.data?.video?.url || result?.video?.url;
