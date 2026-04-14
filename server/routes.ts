@@ -16060,6 +16060,99 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/listing-videos/render-remotion", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { photos, settings, propertyDetails, propertyAddress, agentBranding } = req.body;
+      if (!photos || !Array.isArray(photos) || photos.length === 0) {
+        return res.status(400).json({ error: "No photos provided" });
+      }
+
+      const jobId = `remotion-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const outputPath = `/tmp/${jobId}.mp4`;
+      const statusKey = `mp4-jobs/status_${jobId}.json`;
+
+      const { Client: ObjClient } = await import("@replit/object-storage");
+      const objClient = new ObjClient();
+      const userId = req.user!.id;
+      await objClient.uploadFromText(statusKey, JSON.stringify({ status: "processing", progress: 0, userId }));
+      console.log(`[Remotion] Job ${jobId}: Starting render for user ${userId}`);
+      res.json({ jobId });
+
+      (async () => {
+        try {
+          const { renderListingVideo } = await import("./remotion-render");
+          await renderListingVideo(
+            { photos, settings, propertyDetails, propertyAddress, agentBranding },
+            outputPath,
+            async (progress) => {
+              try {
+                await objClient.uploadFromText(statusKey, JSON.stringify({ status: "processing", progress: Math.round(progress * 100), userId }));
+              } catch {}
+            }
+          );
+          const stats = (await import("fs")).statSync(outputPath);
+          console.log(`[Remotion] Job ${jobId}: Render complete (${Math.round(stats.size / 1024 / 1024)}MB)`);
+          await objClient.uploadFromText(statusKey, JSON.stringify({ status: "complete", userId }));
+        } catch (err: any) {
+          console.error(`[Remotion] Job ${jobId}: Render failed:`, err?.message);
+          await objClient.uploadFromText(statusKey, JSON.stringify({ status: "failed", error: err?.message || "Unknown error", userId }));
+          try { (await import("fs")).unlinkSync(outputPath); } catch {}
+        }
+      })();
+    } catch (err: any) {
+      console.error("[Remotion] Render request error:", err?.message);
+      res.status(500).json({ error: "Render failed to start" });
+    }
+  });
+
+  app.get("/api/listing-videos/render-status/:jobId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { Client: ObjClient } = await import("@replit/object-storage");
+      const objClient = new ObjClient();
+      const statusKey = `mp4-jobs/status_${req.params.jobId}.json`;
+      const result = await objClient.downloadAsText(statusKey);
+      if (!result.ok) return res.status(404).json({ error: "Job not found" });
+      const parsed = JSON.parse(result.value);
+      if (parsed.userId && parsed.userId !== req.user!.id) return res.status(403).json({ error: "Forbidden" });
+      const { userId: _u, ...safeStatus } = parsed;
+      res.json(safeStatus);
+    } catch {
+      res.status(500).json({ error: "Status check failed" });
+    }
+  });
+
+  app.get("/api/listing-videos/render-download/:jobId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { Client: ObjClient } = await import("@replit/object-storage");
+      const objClient = new ObjClient();
+      const statusKey = `mp4-jobs/status_${req.params.jobId}.json`;
+      const result = await objClient.downloadAsText(statusKey);
+      if (result.ok) {
+        const parsed = JSON.parse(result.value);
+        if (parsed.userId && parsed.userId !== req.user!.id) return res.status(403).json({ error: "Forbidden" });
+      }
+    } catch {}
+    const outputPath = `/tmp/${req.params.jobId}.mp4`;
+    try {
+      const fs = await import("fs");
+      if (!fs.existsSync(outputPath)) return res.status(404).json({ error: "File not found" });
+      const stats = fs.statSync(outputPath);
+      res.setHeader("Content-Type", "video/mp4");
+      res.setHeader("Content-Length", stats.size);
+      res.setHeader("Content-Disposition", `attachment; filename="listing-video-${Date.now()}.mp4"`);
+      const stream = fs.createReadStream(outputPath);
+      stream.pipe(res);
+      stream.on("end", () => {
+        setTimeout(() => { try { fs.unlinkSync(outputPath); } catch {} }, 60000);
+      });
+    } catch {
+      res.status(500).json({ error: "Download failed" });
+    }
+  });
+
   app.post("/api/listing-videos/convert-to-mp4", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const multer = (await import("multer")).default;
