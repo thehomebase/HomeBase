@@ -15987,6 +15987,61 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  app.post("/api/listing-videos/convert-to-mp4", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const multer = (await import("multer")).default;
+    const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+    upload.single("video")(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: "Upload failed: " + err.message });
+      if (!req.file) return res.status(400).json({ error: "No video file provided" });
+      const { execFile } = await import("child_process");
+      const fs = await import("fs");
+      const os = await import("os");
+      const path = await import("path");
+      const tmpDir = os.tmpdir();
+      const inputPath = path.join(tmpDir, `input_${req.user!.id}_${Date.now()}.webm`);
+      const outputPath = path.join(tmpDir, `output_${req.user!.id}_${Date.now()}.mp4`);
+      try {
+        fs.writeFileSync(inputPath, req.file.buffer);
+        await new Promise<void>((resolve, reject) => {
+          execFile("ffmpeg", [
+            "-i", inputPath,
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "18",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-movflags", "+faststart",
+            "-y",
+            outputPath,
+          ], { timeout: 120000 }, (error, _stdout, stderr) => {
+            if (error) {
+              console.error("[FFmpeg] Conversion error:", stderr);
+              reject(new Error("Video conversion failed"));
+            } else {
+              resolve();
+            }
+          });
+        });
+        const stat = fs.statSync(outputPath);
+        res.set("Content-Type", "video/mp4");
+        res.set("Content-Length", String(stat.size));
+        res.set("Content-Disposition", `attachment; filename="listing-video-${Date.now()}.mp4"`);
+        const readStream = fs.createReadStream(outputPath);
+        readStream.pipe(res);
+        readStream.on("end", () => {
+          try { fs.unlinkSync(inputPath); } catch {}
+          try { fs.unlinkSync(outputPath); } catch {}
+        });
+      } catch (convErr: any) {
+        try { fs.unlinkSync(inputPath); } catch {}
+        try { fs.unlinkSync(outputPath); } catch {}
+        console.error("[FFmpeg] Error:", convErr?.message);
+        res.status(500).json({ error: "Video conversion failed" });
+      }
+    });
+  });
+
   app.post("/api/listing-videos/analyze-photos", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const role = req.user!.role;

@@ -1372,14 +1372,48 @@ function VideoComposer({
       mediaRecorder.stop();
       if (musicExport) musicExport.stop();
       const blob = await exportPromise;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `listing-video-${Date.now()}.webm`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+
+      setProgress(0.95);
+      try {
+        const formData = new FormData();
+        formData.append("video", blob, "listing-video.webm");
+        const convResp = await fetch("/api/listing-videos/convert-to-mp4", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (convResp.ok) {
+          const mp4Blob = await convResp.blob();
+          const url = URL.createObjectURL(mp4Blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `listing-video-${Date.now()}.mp4`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } else {
+          console.warn("MP4 conversion failed, falling back to WebM");
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `listing-video-${Date.now()}.webm`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      } catch {
+        console.warn("MP4 conversion unavailable, falling back to WebM");
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `listing-video-${Date.now()}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
       drawFrame(0, 0, 0);
     } catch (error) {
       console.error("Export error:", error);
@@ -1431,7 +1465,7 @@ function VideoComposer({
             <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress * 100}%` }} />
           </div>
           <p className="text-xs text-muted-foreground text-center mt-1">
-            {isExporting ? `Exporting... ${Math.round(progress * 100)}%` : `Photo ${currentPhotoIndex + 1} of ${photos.length}`}
+            {isExporting ? (progress >= 0.95 ? "Converting to MP4..." : `Rendering... ${Math.round(progress * 100)}%`) : `Photo ${currentPhotoIndex + 1} of ${photos.length}`}
           </p>
         </div>
       )}
@@ -1448,7 +1482,7 @@ function VideoComposer({
         )}
         <Button onClick={exportVideo} disabled={photos.length === 0 || isPlaying || isExporting} variant="outline" size="sm">
           {isExporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
-          {isExporting ? "Exporting..." : "Export Video"}
+          {isExporting ? "Exporting..." : "Export MP4"}
         </Button>
       </div>
     </div>
