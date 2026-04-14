@@ -42,6 +42,7 @@ import {
   FolderOpen,
   ChevronRight,
   Video,
+  Lightbulb,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -71,6 +72,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Users, label: "Users", href: "/admin", id: "admin-users" },
       { icon: Megaphone, label: "Ads", href: "/sponsored-ads", id: "sponsored-ads" },
       { icon: Settings, label: "Settings", href: "/settings", id: "settings" },
+      { icon: Lightbulb, label: "Feedback", href: "/feedback-board", id: "feedback-board" },
     ];
   }
 
@@ -89,6 +91,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Calendar, label: "Calendar", href: "/calendar", id: "calendar" },
       { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
       { icon: Settings, label: "Settings", href: "/settings", id: "settings" },
+      { icon: Lightbulb, label: "Feedback", href: "/feedback-board", id: "feedback-board" },
     ];
   }
 
@@ -107,6 +110,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Calendar, label: "Calendar", href: "/calendar", id: "calendar" },
       { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
       { icon: Settings, label: "Settings", href: "/settings", id: "settings" },
+      { icon: Lightbulb, label: "Feedback", href: "/feedback-board", id: "feedback-board" },
     ];
   }
 
@@ -139,6 +143,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: ScanLine, label: "Scanner", href: "/scanner", id: "scanner" },
       { icon: Phone, label: "Phone & SMS", href: "/phone", id: "phone" },
       { icon: Settings, label: "Settings", href: "/settings", id: "settings" },
+      { icon: Lightbulb, label: "Feedback", href: "/feedback-board", id: "feedback-board" },
     ];
   }
 
@@ -157,6 +162,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
       { icon: Calculator, label: "Calculators", href: "/calculators", id: "calculators" },
       { icon: Book, label: "Glossary", href: "/glossary", id: "glossary" },
       { icon: Settings, label: "Settings", href: "/settings", id: "settings" },
+      { icon: Lightbulb, label: "Feedback", href: "/feedback-board", id: "feedback-board" },
     ];
   }
 
@@ -187,6 +193,7 @@ function getAllNavItems(role: string | undefined): NavItem[] {
     { icon: ScanLine, label: "Scanner", href: "/scanner", id: "scanner" },
     { icon: Phone, label: "Phone & SMS", href: "/phone", id: "phone" },
     { icon: Settings, label: "Settings", href: "/settings", id: "settings" },
+    { icon: Lightbulb, label: "Feedback", href: "/feedback-board", id: "feedback-board" },
   ];
 }
 

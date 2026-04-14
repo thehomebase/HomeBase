@@ -42,6 +42,7 @@ Preferred communication style: Simple, everyday language.
 - **Lead Metrics Dashboard**: Analytics for lead performance, conversion, and source breakdown.
 - **Listing & Price Alerts**: Saved search alerts with multi-channel notifications based on RentCast API data.
 - **Specialized Portals**: Lender Portal (loan pipelines, checklist sync), Broker Portal (agent oversight, sales competitions, lead routing).
+- **Feedback Board**: Feature request and bug report system with upvoting, roadmap view (Planned/In Progress/Complete), screenshot paste/upload on bug reports, admin status management and notes. Tables: `feedback_posts`, `feedback_votes`.
 - **Zapier Integration**: API key authentication, webhook triggers, public REST API.
 - **Financial Calculators**: Mortgage, Affordability, Refinance, Rent vs Buy, Financing Guide, Lender Comparison.
 - **Lender Rate Quote Comparison**: Buyers request non-binding rate quotes from lenders in service areas; system provides weighted ranking comparison.

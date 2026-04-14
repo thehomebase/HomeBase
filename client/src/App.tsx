@@ -72,7 +72,9 @@ import {
   Target,
   Moon,
   Sun,
-  Video
+  Video,
+  Lightbulb,
+  Bug,
 } from "lucide-react";
 import React, { useState, useEffect, createContext, useContext } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -119,6 +121,7 @@ import BiometricSettingsPage from "@/pages/biometric-settings-page";
 import SettingsPage from "@/pages/settings-page";
 import LandingPage from "@/pages/landing-page";
 import FeedbackPage from "@/pages/feedback-page";
+import FeedbackBoardPage from "@/pages/feedback-board-page";
 import VerifyEmailPage from "@/pages/verify-email-page";
 import ZapierPage from "@/pages/zapier-page";
 import ApiKeysPage from "@/pages/api-keys-page";
@@ -648,6 +651,14 @@ function Layout({ children }: { children: React.ReactNode }) {
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Feedback Board">
+                            <Link href="/feedback-board" className="flex items-center gap-2">
+                              <Lightbulb className="h-4 w-4" />
+                              <span>Feedback Board</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
                       </SidebarMenu>
                     </CollapsibleContent>
                   </SidebarGroup>
@@ -888,6 +899,9 @@ function Router() {
       </Route>
       <Route path="/settings">
         <ProtectedRoute path="/settings" component={SettingsPage} />
+      </Route>
+      <Route path="/feedback-board">
+        <ProtectedRoute path="/feedback-board" component={FeedbackBoardPage} />
       </Route>
       <Route path="/tasks">
         <ProtectedRoute path="/tasks" component={TasksPage} />

@@ -15973,5 +15973,136 @@ Return ONLY valid JSON in this exact format:
     }
   });
 
+  app.get("/api/feedback-board", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
+      const type = req.query.type as string | undefined;
+      const posts = await storage.getFeedbackPosts(type);
+      const userVotes = await storage.getUserFeedbackVotes((req.user as any).id);
+      const userMap: Record<number, { firstName: string; lastName: string }> = {};
+      for (const p of posts) {
+        if (!userMap[p.userId]) {
+          const u = await storage.getUser(p.userId);
+          if (u) userMap[p.userId] = { firstName: u.firstName, lastName: u.lastName };
+        }
+      }
+      const result = posts.map(p => ({
+        ...p,
+        authorName: userMap[p.userId] ? `${userMap[p.userId].firstName} ${userMap[p.userId].lastName[0]}.` : "User",
+        voted: userVotes.includes(p.id),
+      }));
+      res.json(result);
+    } catch (error) {
+      console.error("Feedback board fetch error:", error);
+      res.status(500).json({ error: "Failed to load feedback" });
+    }
+  });
+
+  app.post("/api/feedback-board", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
+      const userId = (req.user as any).id;
+      const { type, title, description, screenshotUrls } = req.body;
+      if (!type || !title || !description) return res.status(400).json({ error: "Missing required fields" });
+      if (!["feature_request", "bug_report"].includes(type)) return res.status(400).json({ error: "Invalid type" });
+      const post = await storage.createFeedbackPost({
+        userId,
+        type,
+        title: String(title).slice(0, 200),
+        description: String(description).slice(0, 5000),
+        status: "under_review",
+        adminNote: null,
+        screenshotUrls: Array.isArray(screenshotUrls) ? screenshotUrls.slice(0, 5) : null,
+      });
+      res.json(post);
+    } catch (error) {
+      console.error("Feedback board create error:", error);
+      res.status(500).json({ error: "Failed to create feedback" });
+    }
+  });
+
+  app.post("/api/feedback-board/:id/vote", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
+      const userId = (req.user as any).id;
+      const postId = parseInt(req.params.id);
+      const success = await storage.voteFeedbackPost(postId, userId);
+      if (!success) return res.status(400).json({ error: "Already voted" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Feedback vote error:", error);
+      res.status(500).json({ error: "Failed to vote" });
+    }
+  });
+
+  app.delete("/api/feedback-board/:id/vote", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
+      const userId = (req.user as any).id;
+      const postId = parseInt(req.params.id);
+      await storage.unvoteFeedbackPost(postId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Feedback unvote error:", error);
+      res.status(500).json({ error: "Failed to remove vote" });
+    }
+  });
+
+  app.patch("/api/feedback-board/:id", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
+      const user = req.user as any;
+      const postId = parseInt(req.params.id);
+      const post = await storage.getFeedbackPost(postId);
+      if (!post) return res.status(404).json({ error: "Not found" });
+      if (user.role !== "admin" && post.userId !== user.id) return res.status(403).json({ error: "Forbidden" });
+      const updates: Partial<any> = {};
+      if (user.role === "admin") {
+        if (req.body.status) updates.status = req.body.status;
+        if (req.body.adminNote !== undefined) updates.adminNote = req.body.adminNote;
+      }
+      if (post.userId === user.id) {
+        if (req.body.title) updates.title = String(req.body.title).slice(0, 200);
+        if (req.body.description) updates.description = String(req.body.description).slice(0, 5000);
+      }
+      const updated = await storage.updateFeedbackPost(postId, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Feedback update error:", error);
+      res.status(500).json({ error: "Failed to update feedback" });
+    }
+  });
+
+  app.delete("/api/feedback-board/:id", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
+      const user = req.user as any;
+      const postId = parseInt(req.params.id);
+      const post = await storage.getFeedbackPost(postId);
+      if (!post) return res.status(404).json({ error: "Not found" });
+      if (user.role !== "admin" && post.userId !== user.id) return res.status(403).json({ error: "Forbidden" });
+      await storage.deleteFeedbackPost(postId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Feedback delete error:", error);
+      res.status(500).json({ error: "Failed to delete feedback" });
+    }
+  });
+
+  const feedbackUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+  app.post("/api/feedback-board/upload-screenshot", feedbackUpload.single("screenshot"), async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
+      if (!req.file) return res.status(400).json({ error: "No file" });
+      if (!isValidImage(req.file.buffer, req.file.mimetype)) return res.status(400).json({ error: "File must be a valid image (PNG, JPEG, GIF, or WebP)" });
+      const processed = await sharp(req.file.buffer).resize(1200, 1200, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 80 }).toBuffer();
+      const base64 = `data:image/jpeg;base64,${processed.toString("base64")}`;
+      res.json({ url: base64 });
+    } catch (error) {
+      console.error("Screenshot upload error:", error);
+      res.status(500).json({ error: "Failed to process screenshot" });
+    }
+  });
+
   return createServer(app);
 }

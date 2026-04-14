@@ -76,7 +76,9 @@ import {
   brokerSeatPlans, type BrokerSeatPlan,
   brokerSeatAssignments, type BrokerSeatAssignment,
   vendorPremiumListings, type VendorPremiumListing,
-  listingVideos, type ListingVideo, type InsertListingVideo
+  listingVideos, type ListingVideo, type InsertListingVideo,
+  feedbackPosts, type FeedbackPost, type InsertFeedbackPost,
+  feedbackVotes, type FeedbackVote
 } from "@shared/schema";
 import { db } from "./db";
 import { sql } from 'drizzle-orm/sql';
@@ -543,6 +545,15 @@ export interface IStorage {
   rankLendersForZip(zipCode: string, excludeLenderIds?: number[]): Promise<{ lenderUserId: number; score: number }[]>;
   rateLenderEstimate(data: { estimateId: number; requestId: number; ratedByUserId: number; lenderUserId: number; rating: number; review?: string }): Promise<LenderEstimateRating>;
   updateEstimateRequestStatus(id: number, status: string): Promise<void>;
+
+  createFeedbackPost(data: InsertFeedbackPost): Promise<FeedbackPost>;
+  getFeedbackPosts(type?: string): Promise<FeedbackPost[]>;
+  getFeedbackPost(id: number): Promise<FeedbackPost | undefined>;
+  updateFeedbackPost(id: number, data: Partial<FeedbackPost>): Promise<FeedbackPost>;
+  deleteFeedbackPost(id: number): Promise<void>;
+  voteFeedbackPost(postId: number, userId: number): Promise<boolean>;
+  unvoteFeedbackPost(postId: number, userId: number): Promise<boolean>;
+  getUserFeedbackVotes(userId: number): Promise<number[]>;
 }
 
 const PgStore = connectPgSimple(session);
@@ -7347,6 +7358,57 @@ export class DatabaseStorage implements IStorage {
 
   async deleteListingVideo(id: number): Promise<void> {
     await db.delete(listingVideos).where(eq(listingVideos.id, id));
+  }
+
+  async createFeedbackPost(data: InsertFeedbackPost): Promise<FeedbackPost> {
+    const [post] = await db.insert(feedbackPosts).values(data).returning();
+    return post;
+  }
+
+  async getFeedbackPosts(type?: string): Promise<FeedbackPost[]> {
+    if (type) {
+      return db.select().from(feedbackPosts).where(eq(feedbackPosts.type, type)).orderBy(desc(feedbackPosts.voteCount));
+    }
+    return db.select().from(feedbackPosts).orderBy(desc(feedbackPosts.voteCount));
+  }
+
+  async getFeedbackPost(id: number): Promise<FeedbackPost | undefined> {
+    const [post] = await db.select().from(feedbackPosts).where(eq(feedbackPosts.id, id));
+    return post;
+  }
+
+  async updateFeedbackPost(id: number, data: Partial<FeedbackPost>): Promise<FeedbackPost> {
+    const [post] = await db.update(feedbackPosts).set(data).where(eq(feedbackPosts.id, id)).returning();
+    return post;
+  }
+
+  async deleteFeedbackPost(id: number): Promise<void> {
+    await db.delete(feedbackVotes).where(eq(feedbackVotes.postId, id));
+    await db.delete(feedbackPosts).where(eq(feedbackPosts.id, id));
+  }
+
+  async voteFeedbackPost(postId: number, userId: number): Promise<boolean> {
+    try {
+      await db.insert(feedbackVotes).values({ postId, userId });
+      await db.execute(sql`UPDATE feedback_posts SET vote_count = vote_count + 1 WHERE id = ${postId}`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async unvoteFeedbackPost(postId: number, userId: number): Promise<boolean> {
+    const result = await db.delete(feedbackVotes).where(and(eq(feedbackVotes.postId, postId), eq(feedbackVotes.userId, userId))).returning();
+    if (result.length > 0) {
+      await db.execute(sql`UPDATE feedback_posts SET vote_count = GREATEST(vote_count - 1, 0) WHERE id = ${postId}`);
+      return true;
+    }
+    return false;
+  }
+
+  async getUserFeedbackVotes(userId: number): Promise<number[]> {
+    const votes = await db.select({ postId: feedbackVotes.postId }).from(feedbackVotes).where(eq(feedbackVotes.userId, userId));
+    return votes.map(v => v.postId);
   }
 
 }

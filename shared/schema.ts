@@ -1960,6 +1960,34 @@ export const vendorPremiumListings = pgTable("vendor_premium_listings", {
 
 export type VendorPremiumListing = typeof vendorPremiumListings.$inferSelect;
 
+export const feedbackPosts = pgTable("feedback_posts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  status: text("status").notNull().default("under_review"),
+  adminNote: text("admin_note"),
+  screenshotUrls: json("screenshot_urls"),
+  voteCount: integer("vote_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFeedbackPostSchema = createInsertSchema(feedbackPosts).omit({ id: true, createdAt: true, voteCount: true });
+export type InsertFeedbackPost = z.infer<typeof insertFeedbackPostSchema>;
+export type FeedbackPost = typeof feedbackPosts.$inferSelect;
+
+export const feedbackVotes = pgTable("feedback_votes", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull(),
+  userId: integer("user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFeedbackVoteSchema = createInsertSchema(feedbackVotes).omit({ id: true, createdAt: true });
+export type InsertFeedbackVote = z.infer<typeof insertFeedbackVoteSchema>;
+export type FeedbackVote = typeof feedbackVotes.$inferSelect;
+
 export const listingVideos = pgTable("listing_videos", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
