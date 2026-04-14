@@ -576,7 +576,7 @@ function VideoComposer({
       const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType,
-        videoBitsPerSecond: 12000000,
+        videoBitsPerSecond: 20000000,
       });
 
       const chunks: Blob[] = [];
