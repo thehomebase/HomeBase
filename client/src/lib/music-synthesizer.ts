@@ -214,6 +214,13 @@ export const BUNDLED_TRACKS: BundledTrack[] = [
     artist: "lNPLUSMUSIC",
     source: "Pixabay",
   },
+  {
+    id: "pixabay-fun-travel",
+    label: "Fun Exciting Travel",
+    file: "/music/fun-exciting-travel-background-music-350761.mp3",
+    artist: "MFCC",
+    source: "Pixabay",
+  },
 ];
 
 export function isBundledTrack(trackId: string): boolean {
