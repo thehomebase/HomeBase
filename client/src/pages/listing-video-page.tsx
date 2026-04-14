@@ -1491,16 +1491,27 @@ function VideoComposer({
             const maxWait = 300000;
             const pollInterval = 3000;
             const start = Date.now();
+            let consecutiveErrors = 0;
             while (Date.now() - start < maxWait) {
               await new Promise(r => setTimeout(r, pollInterval));
               try {
                 const statusResp = await fetch(`/api/listing-videos/convert-status/${jobId}`, { credentials: "include" });
-                if (!statusResp.ok) return false;
+                if (!statusResp.ok) {
+                  console.warn(`[Export] Status poll returned ${statusResp.status}`);
+                  consecutiveErrors++;
+                  if (consecutiveErrors >= 5) { console.warn("[Export] Too many poll errors"); return false; }
+                  continue;
+                }
+                consecutiveErrors = 0;
                 const { status, error } = await statusResp.json();
+                console.log(`[Export] Poll: status=${status} (${Math.round((Date.now() - start) / 1000)}s)`);
                 if (status === "complete") return true;
                 if (status === "failed") { console.warn(`[Export] MP4 conversion failed: ${error}`); return false; }
-                console.log(`[Export] MP4 converting... (${Math.round((Date.now() - start) / 1000)}s)`);
-              } catch { return false; }
+              } catch (pollErr: any) {
+                console.warn(`[Export] Poll error: ${pollErr?.message}`);
+                consecutiveErrors++;
+                if (consecutiveErrors >= 5) { console.warn("[Export] Too many poll errors"); return false; }
+              }
             }
             console.warn("[Export] MP4 conversion timed out (5min)");
             return false;
