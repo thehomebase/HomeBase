@@ -15858,27 +15858,48 @@ export function registerRoutes(app: Express): Server {
 
       console.log(`[Hailuo] Generated successfully: ${videoUrl}`);
 
-      res.json({ videoUrl });
-
-      const fs = await import("fs");
-      const path = await import("path");
-      const clipFilename = `clip_${req.user!.id}_${Date.now()}.mp4`;
-      const clipDir = path.default.join(process.cwd(), "public", "clips");
-      if (!fs.existsSync(clipDir)) fs.mkdirSync(clipDir, { recursive: true });
-      const clipPath = path.default.join(clipDir, clipFilename);
+      const clipFilename = `clips/clip_${req.user!.id}_${Date.now()}.mp4`;
       try {
+        const { Client: ObjStorageClient } = await import("@replit/object-storage");
+        const objClient = new ObjStorageClient();
         const clipResp = await fetch(videoUrl);
         if (clipResp.ok) {
           const arrayBuffer = await clipResp.arrayBuffer();
-          fs.writeFileSync(clipPath, Buffer.from(arrayBuffer));
-          console.log(`[Hailuo] Clip cached locally: /clips/${clipFilename} (${Math.round(arrayBuffer.byteLength / 1024)}KB)`);
+          const buffer = Buffer.from(arrayBuffer);
+          await objClient.uploadFromBytes(clipFilename, buffer);
+          const persistentUrl = `/api/listing-videos/serve-clip/${clipFilename}`;
+          console.log(`[Hailuo] Clip saved to Object Storage: ${persistentUrl} (${Math.round(buffer.byteLength / 1024)}KB)`);
+          res.json({ videoUrl: persistentUrl });
+        } else {
+          console.warn(`[Hailuo] Could not download clip for storage, using CDN URL`);
+          res.json({ videoUrl });
         }
-      } catch (dlErr: any) {
-        console.warn(`[Hailuo] Local cache failed: ${dlErr.message}`);
+      } catch (storageErr: any) {
+        console.warn(`[Hailuo] Object Storage save failed: ${storageErr.message}, using CDN URL`);
+        res.json({ videoUrl });
       }
     } catch (error: any) {
       console.error("[Hailuo] Error:", error?.message || error);
       res.status(500).json({ error: error?.message || "AI video clip generation failed" });
+    }
+  });
+
+  app.get("/api/listing-videos/serve-clip/clips/:filename", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const key = `clips/${req.params.filename}`;
+    try {
+      const { Client: ObjStorageClient } = await import("@replit/object-storage");
+      const objClient = new ObjStorageClient();
+      const result = await objClient.downloadAsBytes(key);
+      if (!result.ok) {
+        return res.status(404).json({ error: "Clip not found" });
+      }
+      res.set("Content-Type", "video/mp4");
+      res.set("Cache-Control", "public, max-age=604800");
+      res.send(Buffer.from(result.value));
+    } catch (err: any) {
+      console.error("[ServeClip] Error:", err?.message);
+      res.status(500).json({ error: "Failed to serve clip" });
     }
   });
 
