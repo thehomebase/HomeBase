@@ -16,6 +16,13 @@ process.on('uncaughtException', (err) => {
     console.error('[DB] Neon WebSocket connection error (non-fatal):', err.message);
     return;
   }
+  const errMsg = (err as any)?.message || '';
+  const errCode = (err as any)?.code || '';
+  const causeMsg = (err as any)?.cause?.message || '';
+  if (errCode === 'UND_ERR_SOCKET' || causeMsg.includes('other side closed') || errMsg.includes('fetch failed') && causeMsg.includes('SocketError')) {
+    console.error('[ObjectStorage] Socket connection error (non-fatal):', errMsg);
+    return;
+  }
   console.error('Uncaught exception:', err);
   process.exit(1);
 });

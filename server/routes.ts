@@ -15871,22 +15871,26 @@ export function registerRoutes(app: Express): Server {
         const job = clipJobs.get(jobId);
         if (job) { job.status = "complete"; job.videoUrl = videoUrl; }
 
-        try {
-          const clipFilename = `clips/clip_${req.user!.id}_${Date.now()}.mp4`;
-          const { Client: ObjStorageClient } = await import("@replit/object-storage");
-          const objClient = new ObjStorageClient();
-          const clipResp = await fetch(videoUrl);
-          if (clipResp.ok) {
+        setImmediate(async () => {
+          try {
+            const clipFilename = `clips/clip_${req.user!.id}_${Date.now()}.mp4`;
+            const clipResp = await fetch(videoUrl);
+            if (!clipResp.ok) {
+              console.warn(`[Hailuo] Job ${jobId}: Failed to download clip from CDN`);
+              return;
+            }
             const arrayBuffer = await clipResp.arrayBuffer();
             const clipBuffer = Buffer.from(arrayBuffer);
+            const { Client: ObjStorageClient } = await import("@replit/object-storage");
+            const objClient = new ObjStorageClient();
             await objClient.uploadFromBytes(clipFilename, clipBuffer);
             const persistentUrl = `/api/listing-videos/serve-clip/${clipFilename}`;
             console.log(`[Hailuo] Job ${jobId}: Persisted to Object Storage: ${persistentUrl} (${Math.round(clipBuffer.byteLength / 1024)}KB)`);
             if (job) job.persistedUrl = persistentUrl;
+          } catch (storageErr: any) {
+            console.warn(`[Hailuo] Job ${jobId}: Object Storage save failed (non-fatal): ${storageErr.message}`);
           }
-        } catch (storageErr: any) {
-          console.warn(`[Hailuo] Job ${jobId}: Object Storage save failed: ${storageErr.message}`);
-        }
+        });
       } catch (error: any) {
         console.error(`[Hailuo] Job ${jobId}: Error:`, error?.message || error);
         const job = clipJobs.get(jobId);
