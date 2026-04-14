@@ -15785,12 +15785,20 @@ export function registerRoutes(app: Express): Server {
       const base64Match = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
       let hostedImageUrl = imageDataUrl;
       if (base64Match) {
-        const mimeType = base64Match[1];
         const base64Data = base64Match[2];
-        const buffer = Buffer.from(base64Data, "base64");
-        const blob = new Blob([buffer], { type: mimeType });
-        const ext = mimeType.split("/")[1] || "jpg";
-        const file = new File([blob], `photo.${ext}`, { type: mimeType });
+        let buffer = Buffer.from(base64Data, "base64");
+        const sharp = (await import("sharp")).default;
+        const metadata = await sharp(buffer).metadata();
+        const MAX_DIM = 1920;
+        if ((metadata.width && metadata.width > MAX_DIM) || (metadata.height && metadata.height > MAX_DIM)) {
+          console.log(`[Luma] Resizing image from ${metadata.width}x${metadata.height} to fit ${MAX_DIM}x${MAX_DIM}`);
+          buffer = await sharp(buffer)
+            .resize(MAX_DIM, MAX_DIM, { fit: "inside", withoutEnlargement: true })
+            .jpeg({ quality: 90 })
+            .toBuffer();
+        }
+        const blob = new Blob([buffer], { type: "image/jpeg" });
+        const file = new File([blob], `photo.jpg`, { type: "image/jpeg" });
         hostedImageUrl = await fal.storage.upload(file);
         console.log(`[Luma] Image uploaded: ${hostedImageUrl.slice(0, 80)}...`);
       }
