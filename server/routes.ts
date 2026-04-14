@@ -15756,8 +15756,8 @@ export function registerRoutes(app: Express): Server {
 
       const validMotions = ["walk-forward","walk-right","walk-left","reveal","drift-right","drift-left","push-in","pull-out","rise-up","pan-right","pan-left","pan-up","pan-down","zoom-in","zoom-out"];
       const safeMotion = validMotions.includes(motionType) ? motionType : "walk-forward";
-      const numDuration = typeof duration === "number" ? duration : parseInt(duration) || 3;
-      const clipDuration = Math.min(Math.max(numDuration, 2), 6).toString();
+      const numDuration = typeof duration === "number" ? duration : parseInt(duration) || 5;
+      const clipDuration = numDuration >= 6 ? "7" : "5";
 
       const motionToCamera: Record<string, string> = {
         "walk-forward": "[Push in]",
