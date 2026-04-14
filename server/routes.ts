@@ -16078,7 +16078,6 @@ export function registerRoutes(app: Express): Server {
       const inputPath = path.join(tmpDir, `input_${jobId}.webm`);
       const outputPath = path.join(tmpDir, `output_${jobId}.mp4`);
       const statusKey = `mp4-jobs/status_${jobId}.json`;
-      const mp4Key = `mp4-jobs/output_${jobId}.mp4`;
       fs.writeFileSync(inputPath, req.file.buffer);
       const fileSizeKB = Math.round(req.file.buffer.length / 1024);
       console.log(`[FFmpeg] Job ${jobId}: Starting conversion (${fileSizeKB}KB)`);
@@ -16095,16 +16094,13 @@ export function registerRoutes(app: Express): Server {
           try { fs.unlinkSync(outputPath); } catch {}
         } else {
           try {
-            const mp4Buffer = fs.readFileSync(outputPath);
-            console.log(`[FFmpeg] Job ${jobId}: Conversion complete (${Math.round(mp4Buffer.length / 1024)}KB), uploading to object storage...`);
-            await objClient.uploadFromBytes(mp4Key, mp4Buffer);
+            const stat = fs.statSync(outputPath);
+            console.log(`[FFmpeg] Job ${jobId}: Conversion complete (${Math.round(stat.size / 1024)}KB MP4 on disk)`);
             await objClient.uploadFromText(statusKey, JSON.stringify({ status: "complete" }));
-            console.log(`[FFmpeg] Job ${jobId}: MP4 uploaded to object storage`);
+            console.log(`[FFmpeg] Job ${jobId}: Status updated to complete`);
           } catch (uploadErr: any) {
-            console.error(`[FFmpeg] Job ${jobId}: Failed to upload MP4:`, uploadErr?.message);
-            try { await objClient.uploadFromText(statusKey, JSON.stringify({ status: "failed", error: "Upload to storage failed" })); } catch {}
+            console.error(`[FFmpeg] Job ${jobId}: Failed to update status:`, uploadErr?.message);
           }
-          try { fs.unlinkSync(outputPath); } catch {}
         }
       });
       proc.stderr?.on("data", (data: string) => {
@@ -16141,22 +16137,27 @@ export function registerRoutes(app: Express): Server {
     const jobId = req.params.jobId;
     console.log(`[FFmpeg] Download request for job: ${jobId}`);
     try {
-      const { Client: ObjStorageClient } = await import("@replit/object-storage");
-      const objClient = new ObjStorageClient({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID });
-      const mp4Key = `mp4-jobs/output_${jobId}.mp4`;
-      const statusKey = `mp4-jobs/status_${jobId}.json`;
-      const result = await objClient.downloadAsBytes(mp4Key);
-      if (!result.ok) {
-        console.log(`[FFmpeg] MP4 not found in storage for job: ${jobId}`);
+      const fs = await import("fs");
+      const os = await import("os");
+      const path = await import("path");
+      const outputPath = path.join(os.tmpdir(), `output_${jobId}.mp4`);
+      if (!fs.existsSync(outputPath)) {
+        console.log(`[FFmpeg] MP4 file not found on disk: ${outputPath}`);
         return res.status(404).json({ error: "MP4 file not found" });
       }
-      const buf = Buffer.from(result.value);
-      console.log(`[FFmpeg] Serving MP4 for job ${jobId}: ${Math.round(buf.length / 1024)}KB`);
+      const stat = fs.statSync(outputPath);
+      console.log(`[FFmpeg] Serving MP4 for job ${jobId}: ${Math.round(stat.size / 1024)}KB from disk`);
       res.set("Content-Type", "video/mp4");
-      res.set("Content-Length", String(buf.length));
+      res.set("Content-Length", String(stat.size));
       res.set("Content-Disposition", `attachment; filename="listing-video-${Date.now()}.mp4"`);
-      res.send(buf);
-      try { await objClient.delete(mp4Key); } catch {}
+      const readStream = fs.createReadStream(outputPath);
+      readStream.pipe(res);
+      readStream.on("end", () => {
+        try { fs.unlinkSync(outputPath); } catch {}
+      });
+      const { Client: ObjStorageClient } = await import("@replit/object-storage");
+      const objClient = new ObjStorageClient({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID });
+      const statusKey = `mp4-jobs/status_${jobId}.json`;
       try { await objClient.delete(statusKey); } catch {}
     } catch (e: any) {
       console.error(`[FFmpeg] Download error for job ${jobId}:`, e?.message);
