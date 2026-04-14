@@ -1214,18 +1214,19 @@ export default function ListingVideoPage() {
   const generate3DVideoClips = async () => {
     if (photos.length === 0) return;
     setIsGenerating3D(true);
-    setGen3DProgress({ current: 0, total: photos.length });
+    const total = photos.filter(p => p.dataUrl).length;
+    setGen3DProgress({ current: 0, total });
 
     try {
       const updatedPhotos = [...photos];
-      for (let i = 0; i < updatedPhotos.length; i++) {
-        setGen3DProgress({ current: i + 1, total: updatedPhotos.length });
-        const photo = updatedPhotos[i];
-        if (!photo.dataUrl) continue;
+      let completed = 0;
 
+      const generateOne = async (photo: typeof updatedPhotos[0], index: number) => {
+        if (!photo.dataUrl) return;
+        let timeout: ReturnType<typeof setTimeout> | null = null;
         try {
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 480000);
+          timeout = setTimeout(() => controller.abort(), 300000);
           const res = await fetch("/api/listing-videos/generate-3d-clip", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1237,7 +1238,6 @@ export default function ListingVideoPage() {
               duration: settings.photoDuration,
             }),
           });
-          clearTimeout(timeout);
           if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
             throw new Error(errData.error || "Generation failed");
@@ -1245,22 +1245,33 @@ export default function ListingVideoPage() {
           const data = await res.json();
           photo.videoClipUrl = data.videoUrl;
         } catch (err: any) {
-          console.error(`3D clip generation failed for photo ${photo.id}:`, err);
-          const msg = err?.name === "AbortError" ? "Timed out (8 min limit)" : (err?.message || "Could not generate 3D clip");
+          console.error(`AI video failed for photo ${photo.id}:`, err);
+          const msg = err?.name === "AbortError" ? "Timed out (5 min limit)" : (err?.message || "Could not generate clip");
           toast({
-            title: `Photo ${i + 1} failed`,
+            title: `Photo ${index + 1} failed`,
             description: msg,
             variant: "destructive",
           });
+        } finally {
+          if (timeout) clearTimeout(timeout);
+          completed++;
+          setGen3DProgress({ current: completed, total });
         }
+      };
+
+      const CONCURRENCY = 4;
+      const photosToProcess = updatedPhotos.filter(p => p.dataUrl);
+      for (let i = 0; i < photosToProcess.length; i += CONCURRENCY) {
+        const batch = photosToProcess.slice(i, i + CONCURRENCY);
+        await Promise.all(batch.map((photo) => generateOne(photo, updatedPhotos.indexOf(photo))));
       }
 
       setPhotos(updatedPhotos);
       const successCount = updatedPhotos.filter(p => p.videoClipUrl).length;
       if (successCount > 0) {
         toast({
-          title: "3D Video Clips Generated!",
-          description: `${successCount} of ${updatedPhotos.length} photos converted to 3D video. Preview now uses AI-generated parallax.`,
+          title: "AI Video Clips Generated!",
+          description: `${successCount} of ${total} clips ready (~$0.19 each). Preview now uses AI-generated video.`,
         });
       }
     } catch (error: any) {
@@ -1473,7 +1484,7 @@ export default function ListingVideoPage() {
                           ) : (
                             <Sparkles className="h-4 w-4 mr-1" />
                           )}
-                          {isGenerating3D ? "Generating..." : "AI Video (Kling)"}
+                          {isGenerating3D ? "Generating..." : "AI Video (~$0.19/clip)"}
                         </Button>
                       </div>
                     </div>
@@ -1481,10 +1492,10 @@ export default function ListingVideoPage() {
                       <div className="bg-muted/50 rounded-lg p-3 space-y-2">
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">
-                            Generating 3D video for photo {gen3DProgress.current} of {gen3DProgress.total}
+                            AI video: {gen3DProgress.current} of {gen3DProgress.total} complete
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            ~1-5 min per photo
+                            All clips generating in parallel (~1 min)
                           </span>
                         </div>
                         <div className="w-full bg-muted rounded-full h-2">

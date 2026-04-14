@@ -15754,30 +15754,36 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid image data" });
       }
 
-      const clipDuration = Math.min(Math.max(duration || 3, 2), 5);
+      const validMotions = ["walk-forward","walk-right","walk-left","reveal","drift-right","drift-left","push-in","pull-out","rise-up","pan-right","pan-left","pan-up","pan-down","zoom-in","zoom-out"];
+      const safeMotion = validMotions.includes(motionType) ? motionType : "walk-forward";
+      const numDuration = typeof duration === "number" ? duration : parseInt(duration) || 3;
+      const clipDuration = Math.min(Math.max(numDuration, 2), 6).toString();
 
-      const motionPrompts: Record<string, string> = {
-        "walk-forward": "Subtle slow camera dolly forward into the space, gentle depth parallax, everything in the photograph remains unchanged, static scene, no new objects",
-        "walk-right": "Subtle slow camera tracking right along the room, gentle lateral parallax shift, everything in the photograph remains unchanged, static scene, no new objects",
-        "walk-left": "Subtle slow camera tracking left along the room, gentle lateral parallax shift, everything in the photograph remains unchanged, static scene, no new objects",
-        "reveal": "Subtle slow camera pulling back to widen the view, gentle reveal, everything in the photograph remains unchanged, static scene, no new objects",
-        "drift-right": "Very gentle floating camera drift to the right, slight weightless movement, everything in the photograph remains unchanged, static scene, no new objects",
-        "drift-left": "Very gentle floating camera drift to the left, slight weightless movement, everything in the photograph remains unchanged, static scene, no new objects",
-        "push-in": "Subtle slow camera push toward the center of the frame, gentle zoom-like approach, everything in the photograph remains unchanged, static scene, no new objects",
-        "pull-out": "Subtle slow camera easing backward from the scene, gentle widening view, everything in the photograph remains unchanged, static scene, no new objects",
-        "rise-up": "Subtle slow camera rising gently upward, slight vertical crane movement, everything in the photograph remains unchanged, static scene, no new objects",
-        "pan-right": "Subtle slow camera rotating slightly to the right, gentle horizontal pan, everything in the photograph remains unchanged, static scene, no new objects",
-        "pan-left": "Subtle slow camera rotating slightly to the left, gentle horizontal pan, everything in the photograph remains unchanged, static scene, no new objects",
-        "zoom-in": "Subtle slow optical zoom toward the focal point of the image, gentle magnification, everything in the photograph remains unchanged, static scene, no new objects",
-        "zoom-out": "Subtle slow optical zoom pulling back from the image, gentle de-magnification, everything in the photograph remains unchanged, static scene, no new objects",
+      const motionToCamera: Record<string, string> = {
+        "walk-forward": "[Push in]",
+        "walk-right": "[Truck right]",
+        "walk-left": "[Truck left]",
+        "reveal": "[Pull out]",
+        "drift-right": "[Truck right, Tilt up]",
+        "drift-left": "[Truck left, Tilt up]",
+        "push-in": "[Push in, Zoom in]",
+        "pull-out": "[Pull out]",
+        "rise-up": "[Pedestal up]",
+        "pan-right": "[Pan right]",
+        "pan-left": "[Pan left]",
+        "pan-up": "[Tilt up]",
+        "pan-down": "[Tilt down]",
+        "zoom-in": "[Zoom in]",
+        "zoom-out": "[Zoom out]",
       };
 
-      const prompt = motionPrompts[motionType] || motionPrompts["walk-forward"];
+      const cameraDirective = motionToCamera[safeMotion] || "[Push in]";
+      const prompt = `Cinematic real estate interior, static scene, smooth slow camera movement, no objects move or change, everything remains perfectly still ${cameraDirective}`;
 
       const { fal } = await import("@fal-ai/client");
       fal.config({ credentials: falKey });
 
-      console.log(`[Fal.ai 3D clip] Uploading image to fal.ai storage...`);
+      console.log(`[Hailuo] Uploading image to fal.ai storage...`);
       const base64Match = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
       let hostedImageUrl = imageDataUrl;
       if (base64Match) {
@@ -15788,40 +15794,40 @@ export function registerRoutes(app: Express): Server {
         const ext = mimeType.split("/")[1] || "jpg";
         const file = new File([blob], `photo.${ext}`, { type: mimeType });
         hostedImageUrl = await fal.storage.upload(file);
-        console.log(`[Fal.ai 3D clip] Image uploaded: ${hostedImageUrl.slice(0, 80)}...`);
+        console.log(`[Hailuo] Image uploaded: ${hostedImageUrl.slice(0, 80)}...`);
       }
 
-      console.log(`[Fal.ai 3D clip] Generating ${clipDuration}s clip via Kling for motion: ${motionType}`);
+      console.log(`[Hailuo] Generating ${clipDuration}s clip via Hailuo 2.3 Fast for motion: ${motionType} ${cameraDirective}`);
 
-      const result: any = await fal.subscribe("fal-ai/kling-video/v1/standard/image-to-video", {
+      const result: any = await fal.subscribe("fal-ai/minimax/hailuo-2.3-fast/standard/image-to-video", {
         input: {
           image_url: hostedImageUrl,
           prompt,
-          duration: clipDuration <= 5 ? "5" : "10",
-          negative_prompt: "new objects, added elements, fence, furniture changes, morphing, changing objects, hallucination, artifacts, glitch, distortion, people appearing, moving objects, new details, invented elements, extra objects, modifications to scene",
+          prompt_optimizer: false,
+          duration: clipDuration,
         },
         logs: true,
         onQueueUpdate: (update: any) => {
           if (update.status === "IN_PROGRESS") {
-            console.log(`[Fal.ai 3D clip] Kling in progress...`);
+            console.log(`[Hailuo] Generation in progress...`);
           } else if (update.status === "IN_QUEUE") {
-            console.log(`[Fal.ai 3D clip] Queued, position: ${update.queue_position ?? "unknown"}`);
+            console.log(`[Hailuo] Queued, position: ${update.queue_position ?? "unknown"}`);
           }
         },
       });
 
-      console.log(`[Fal.ai 3D clip] Raw result keys:`, Object.keys(result || {}));
+      console.log(`[Hailuo] Raw result keys:`, Object.keys(result || {}));
       const videoUrl = result?.data?.video?.url || result?.video?.url;
       if (!videoUrl) {
-        console.error(`[Fal.ai 3D clip] No video URL found in result:`, JSON.stringify(result).slice(0, 500));
+        console.error(`[Hailuo] No video URL found in result:`, JSON.stringify(result).slice(0, 500));
         return res.status(500).json({ error: "No video returned from service" });
       }
 
-      console.log(`[Fal.ai 3D clip] Generated successfully: ${videoUrl}`);
+      console.log(`[Hailuo] Generated successfully: ${videoUrl}`);
       res.json({ videoUrl });
     } catch (error: any) {
-      console.error("[Fal.ai 3D clip] Error:", error?.message || error);
-      res.status(500).json({ error: error?.message || "3D video clip generation failed" });
+      console.error("[Hailuo] Error:", error?.message || error);
+      res.status(500).json({ error: error?.message || "AI video clip generation failed" });
     }
   });
 
