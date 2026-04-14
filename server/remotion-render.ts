@@ -2,6 +2,7 @@ import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition, ensureBrowser } from "@remotion/renderer";
 import path from "path";
 import fs from "fs";
+import { execSync } from "child_process";
 
 let bundleLocation: string | null = null;
 let bundlePromise: Promise<string> | null = null;
@@ -92,12 +93,41 @@ export interface RenderOptions {
   };
 }
 
+function findSystemChromium(): string | null {
+  const candidates = [
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome",
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  try {
+    const result = execSync("which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome 2>/dev/null", { encoding: "utf-8" }).trim();
+    if (result) return result;
+  } catch {}
+  try {
+    const nixResult = execSync("ls /nix/store/*/bin/chromium 2>/dev/null | head -1", { encoding: "utf-8" }).trim();
+    if (nixResult) return nixResult;
+  } catch {}
+  return null;
+}
+
 export async function renderListingVideo(
   options: RenderOptions,
   outputPath: string,
   onProgress?: (progress: number) => void
 ): Promise<void> {
-  await ensureBrowser();
+  const systemChromium = findSystemChromium();
+  if (systemChromium) {
+    console.log(`[Remotion] Using system Chromium: ${systemChromium}`);
+  } else {
+    console.log("[Remotion] No system Chromium found, using Remotion's bundled browser");
+  }
+
+  const browserExecutable = systemChromium || undefined;
+
+  await ensureBrowser({ browserExecutable });
   const bundlePath = await getBundle();
 
   const inputProps = {
@@ -112,6 +142,7 @@ export async function renderListingVideo(
     serveUrl: bundlePath,
     id: "ListingVideo",
     inputProps,
+    browserExecutable,
   });
 
   console.log(`[Remotion] Rendering ${composition.durationInFrames} frames (${composition.width}x${composition.height}) at ${composition.fps}fps`);
@@ -123,6 +154,7 @@ export async function renderListingVideo(
     outputLocation: outputPath,
     inputProps,
     videoBitrate: "4M",
+    browserExecutable,
     onProgress: ({ progress }) => {
       onProgress?.(progress);
     },
