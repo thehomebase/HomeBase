@@ -10,21 +10,34 @@ export async function getFFmpeg(): Promise<FFmpeg | null> {
   if (loadPromise) return loadPromise.then(ok => ok ? ffmpegInstance : null);
 
   loadPromise = (async () => {
-    try {
-      const ffmpeg = new FFmpeg();
-      await ffmpeg.load({
-        coreURL: "/ffmpeg/ffmpeg-core.js",
-        wasmURL: "/ffmpeg/ffmpeg-core.wasm",
-      });
+    const ffmpeg = new FFmpeg();
+
+    const tryLoad = async (coreURL: string, wasmURL: string, label: string): Promise<boolean> => {
+      try {
+        await ffmpeg.load({ coreURL, wasmURL });
+        console.log(`[ClientFFmpeg] Loaded successfully (${label})`);
+        return true;
+      } catch (err: any) {
+        console.warn(`[ClientFFmpeg] Failed to load from ${label}:`, err?.message);
+        return false;
+      }
+    };
+
+    const ok =
+      await tryLoad("/ffmpeg/ffmpeg-core.js", "/ffmpeg/ffmpeg-core.wasm", "self-hosted") ||
+      await tryLoad(
+        "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js",
+        "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm",
+        "unpkg CDN"
+      );
+
+    if (ok) {
       ffmpegInstance = ffmpeg;
-      console.log("[ClientFFmpeg] Loaded successfully");
       return true;
-    } catch (err: any) {
-      console.warn("[ClientFFmpeg] Failed to load:", err?.message);
-      ffmpegInstance = null;
-      loadPromise = null;
-      return false;
     }
+
+    loadPromise = null;
+    return false;
   })();
 
   return loadPromise.then(ok => ok ? ffmpegInstance : null);

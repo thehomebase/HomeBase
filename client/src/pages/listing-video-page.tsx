@@ -1490,7 +1490,7 @@ function VideoComposer({
         }
       };
 
-      const convertServerSide = async (): Promise<Blob | null> => {
+      const convertServerSide = async (): Promise<boolean> => {
         try {
           console.log(`[Export] Falling back to server-side conversion (${Math.round(blob.size / 1024)}KB)...`);
           const formData = new FormData();
@@ -1502,7 +1502,7 @@ function VideoComposer({
           });
           if (!startResp.ok) {
             console.warn(`[Export] Server upload failed (${startResp.status})`);
-            return null;
+            return false;
           }
           const { jobId } = await startResp.json();
           console.log(`[Export] Server conversion started, job: ${jobId}`);
@@ -1517,45 +1517,44 @@ function VideoComposer({
               const statusResp = await fetch(`/api/listing-videos/convert-status/${jobId}`, { credentials: "include" });
               if (!statusResp.ok) {
                 consecutiveErrors++;
-                if (consecutiveErrors >= 5) return null;
+                if (consecutiveErrors >= 5) return false;
                 continue;
               }
               consecutiveErrors = 0;
               const { status, error } = await statusResp.json();
               console.log(`[Export] Server poll: status=${status} (${Math.round((Date.now() - start) / 1000)}s)`);
               if (status === "complete") {
-                const dlResp = await fetch(`/api/listing-videos/download-mp4/${jobId}`, { credentials: "include" });
-                if (dlResp.ok) {
-                  const mp4Blob = await dlResp.blob();
-                  if (mp4Blob.size > 1000) {
-                    console.log(`[Export] Server MP4 downloaded: ${Math.round(mp4Blob.size / 1024)}KB`);
-                    return mp4Blob;
-                  }
-                }
-                return null;
+                console.log("[Export] Server conversion complete, triggering direct download...");
+                const a = document.createElement("a");
+                a.href = `/api/listing-videos/download-mp4/${jobId}`;
+                a.download = `listing-video-${Date.now()}.mp4`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                return true;
               }
-              if (status === "failed") { console.warn(`[Export] Server conversion failed: ${error}`); return null; }
+              if (status === "failed") { console.warn(`[Export] Server conversion failed: ${error}`); return false; }
             } catch {
               consecutiveErrors++;
-              if (consecutiveErrors >= 5) return null;
+              if (consecutiveErrors >= 5) return false;
             }
           }
-          return null;
+          return false;
         } catch (err: any) {
           console.warn("[Export] Server conversion error:", err?.message);
-          return null;
+          return false;
         }
       };
 
       let mp4Result = await convertClientSide();
-      if (!mp4Result) {
-        mp4Result = await convertServerSide();
-      }
       if (mp4Result) {
         downloadBlob(mp4Result, "mp4");
       } else {
-        console.warn("[Export] All MP4 conversion methods failed, downloading WebM");
-        downloadBlob(blob, "webm");
+        const serverOk = await convertServerSide();
+        if (!serverOk) {
+          console.warn("[Export] All MP4 conversion methods failed, downloading WebM");
+          downloadBlob(blob, "webm");
+        }
       }
       drawFrame(0, 0, 0);
     } catch (error) {
