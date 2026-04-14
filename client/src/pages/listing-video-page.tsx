@@ -1665,6 +1665,20 @@ export default function ListingVideoPage() {
           }
           const data = await res.json();
           photo.videoClipUrl = data.videoUrl;
+          if (data.needsPersist && data.videoUrl?.startsWith("https://")) {
+            fetch("/api/listing-videos/persist-clip", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ cdnUrl: data.videoUrl }),
+            }).then(async (pRes) => {
+              if (pRes.ok) {
+                const pData = await pRes.json();
+                photo.videoClipUrl = pData.videoUrl;
+                console.log(`[Persist] Clip ${photo.id} saved permanently: ${pData.videoUrl}`);
+              }
+            }).catch((e) => console.warn(`[Persist] Background save failed for ${photo.id}:`, e));
+          }
         } catch (err: any) {
           console.error(`Video failed for photo ${photo.id}:`, err);
           const msg = err?.name === "AbortError" ? "Timed out (14 min limit)" : (err?.message || "Could not generate clip");
@@ -1735,8 +1749,26 @@ export default function ListingVideoPage() {
         throw new Error(errData.error || "Re-animation failed");
       }
       const data = await res.json();
+      let clipUrl = data.videoUrl;
+      if (data.needsPersist && clipUrl?.startsWith("https://")) {
+        try {
+          const pRes = await fetch("/api/listing-videos/persist-clip", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ cdnUrl: clipUrl }),
+          });
+          if (pRes.ok) {
+            const pData = await pRes.json();
+            clipUrl = pData.videoUrl;
+            console.log(`[Persist] Reanimate clip saved permanently: ${clipUrl}`);
+          }
+        } catch (e) {
+          console.warn(`[Persist] Reanimate persist failed, using CDN URL`, e);
+        }
+      }
       const updatedPhotos = [...photos];
-      updatedPhotos[photoIndex] = { ...updatedPhotos[photoIndex], videoClipUrl: data.videoUrl };
+      updatedPhotos[photoIndex] = { ...updatedPhotos[photoIndex], videoClipUrl: clipUrl };
       setPhotos(updatedPhotos);
       toast({ title: "Clip re-animated!", description: `Photo ${photoIndex + 1} has a new animation.` });
       if (selectedVideoId) {

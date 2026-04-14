@@ -15858,29 +15858,60 @@ export function registerRoutes(app: Express): Server {
 
       console.log(`[Hailuo] Generated successfully: ${videoUrl}`);
 
-      const clipFilename = `clips/clip_${req.user!.id}_${Date.now()}.mp4`;
-      try {
-        const { Client: ObjStorageClient } = await import("@replit/object-storage");
-        const objClient = new ObjStorageClient();
-        const clipResp = await fetch(videoUrl);
-        if (clipResp.ok) {
-          const arrayBuffer = await clipResp.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
-          await objClient.uploadFromBytes(clipFilename, buffer);
-          const persistentUrl = `/api/listing-videos/serve-clip/${clipFilename}`;
-          console.log(`[Hailuo] Clip saved to Object Storage: ${persistentUrl} (${Math.round(buffer.byteLength / 1024)}KB)`);
-          res.json({ videoUrl: persistentUrl });
-        } else {
-          console.warn(`[Hailuo] Could not download clip for storage, using CDN URL`);
-          res.json({ videoUrl });
+      res.json({ videoUrl, needsPersist: true });
+
+      setImmediate(async () => {
+        const clipFilename = `clips/clip_${req.user!.id}_${Date.now()}.mp4`;
+        try {
+          const { Client: ObjStorageClient } = await import("@replit/object-storage");
+          const objClient = new ObjStorageClient();
+          const clipResp = await fetch(videoUrl);
+          if (clipResp.ok) {
+            const arrayBuffer = await clipResp.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            await objClient.uploadFromBytes(clipFilename, buffer);
+            console.log(`[Hailuo] Clip persisted to Object Storage: ${clipFilename} (${Math.round(buffer.byteLength / 1024)}KB)`);
+          }
+        } catch (storageErr: any) {
+          console.warn(`[Hailuo] Background Object Storage save failed: ${storageErr.message}`);
         }
-      } catch (storageErr: any) {
-        console.warn(`[Hailuo] Object Storage save failed: ${storageErr.message}, using CDN URL`);
-        res.json({ videoUrl });
-      }
+      });
     } catch (error: any) {
       console.error("[Hailuo] Error:", error?.message || error);
       res.status(500).json({ error: error?.message || "AI video clip generation failed" });
+    }
+  });
+
+  app.post("/api/listing-videos/persist-clip", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const { cdnUrl } = req.body;
+    if (!cdnUrl || typeof cdnUrl !== "string" || !cdnUrl.startsWith("https://")) {
+      return res.status(400).json({ error: "Invalid CDN URL" });
+    }
+    const allowedHosts = ["fal.media", "v3.fal.media", "v3b.fal.media", "storage.googleapis.com", "fal-cdn.batuhan.co"];
+    try {
+      const parsedUrl = new URL(cdnUrl);
+      if (!allowedHosts.some(h => parsedUrl.hostname === h || parsedUrl.hostname.endsWith("." + h))) {
+        return res.status(403).json({ error: "URL domain not allowed" });
+      }
+    } catch {
+      return res.status(400).json({ error: "Invalid URL format" });
+    }
+    const clipFilename = `clips/clip_${req.user!.id}_${Date.now()}.mp4`;
+    try {
+      const { Client: ObjStorageClient } = await import("@replit/object-storage");
+      const objClient = new ObjStorageClient();
+      const clipResp = await fetch(cdnUrl);
+      if (!clipResp.ok) return res.status(502).json({ error: "Failed to download clip from CDN" });
+      const arrayBuffer = await clipResp.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      await objClient.uploadFromBytes(clipFilename, buffer);
+      const persistentUrl = `/api/listing-videos/serve-clip/${clipFilename}`;
+      console.log(`[Hailuo] Clip persisted via explicit request: ${persistentUrl} (${Math.round(buffer.byteLength / 1024)}KB)`);
+      res.json({ videoUrl: persistentUrl });
+    } catch (err: any) {
+      console.error("[PersistClip] Error:", err?.message);
+      res.status(500).json({ error: "Failed to persist clip" });
     }
   });
 
@@ -15908,7 +15939,7 @@ export function registerRoutes(app: Express): Server {
     const url = req.query.url as string;
     if (!url || typeof url !== "string") return res.status(400).json({ error: "Missing url" });
     if (!url.startsWith("https://")) return res.status(400).json({ error: "Invalid URL" });
-    const allowedHosts = ["fal.media", "v3.fal.media", "storage.googleapis.com", "fal-cdn.batuhan.co"];
+    const allowedHosts = ["fal.media", "v3.fal.media", "v3b.fal.media", "storage.googleapis.com", "fal-cdn.batuhan.co"];
     try {
       const parsedUrl = new URL(url);
       if (!allowedHosts.some(h => parsedUrl.hostname === h || parsedUrl.hostname.endsWith("." + h))) {
