@@ -1471,70 +1471,90 @@ function VideoComposer({
         URL.revokeObjectURL(url);
       };
 
-      try {
-        console.log(`[Export] Uploading ${Math.round(blob.size / 1024)}KB WebM for MP4 conversion...`);
-        const formData = new FormData();
-        formData.append("video", blob, "listing-video.webm");
-        const startResp = await fetch("/api/listing-videos/convert-to-mp4", {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        });
-        if (!startResp.ok) {
-          console.warn(`[Export] MP4 upload failed (${startResp.status}), falling back to WebM`);
-          downloadBlob(blob, "webm");
-        } else {
-          const { jobId } = await startResp.json();
-          console.log(`[Export] MP4 conversion started, job: ${jobId}`);
-
-          const pollForCompletion = async (): Promise<boolean> => {
-            const maxWait = 300000;
-            const pollInterval = 3000;
-            const start = Date.now();
-            let consecutiveErrors = 0;
-            while (Date.now() - start < maxWait) {
-              await new Promise(r => setTimeout(r, pollInterval));
-              try {
-                const statusResp = await fetch(`/api/listing-videos/convert-status/${jobId}`, { credentials: "include" });
-                if (!statusResp.ok) {
-                  console.warn(`[Export] Status poll returned ${statusResp.status}`);
-                  consecutiveErrors++;
-                  if (consecutiveErrors >= 5) { console.warn("[Export] Too many poll errors"); return false; }
-                  continue;
-                }
-                consecutiveErrors = 0;
-                const { status, error } = await statusResp.json();
-                console.log(`[Export] Poll: status=${status} (${Math.round((Date.now() - start) / 1000)}s)`);
-                if (status === "complete") return true;
-                if (status === "failed") { console.warn(`[Export] MP4 conversion failed: ${error}`); return false; }
-              } catch (pollErr: any) {
-                console.warn(`[Export] Poll error: ${pollErr?.message}`);
-                consecutiveErrors++;
-                if (consecutiveErrors >= 5) { console.warn("[Export] Too many poll errors"); return false; }
-              }
-            }
-            console.warn("[Export] MP4 conversion timed out (5min)");
-            return false;
-          };
-
-          const success = await pollForCompletion();
-          if (success) {
-            console.log("[Export] Downloading MP4...");
-            const dlResp = await fetch(`/api/listing-videos/download-mp4/${jobId}`, { credentials: "include" });
-            if (dlResp.ok) {
-              const mp4Blob = await dlResp.blob();
-              console.log(`[Export] MP4 downloaded: ${Math.round(mp4Blob.size / 1024)}KB`);
-              downloadBlob(mp4Blob, "mp4");
-            } else {
-              console.warn("[Export] MP4 download failed, falling back to WebM");
-              downloadBlob(blob, "webm");
-            }
-          } else {
-            downloadBlob(blob, "webm");
+      const convertClientSide = async (): Promise<Blob | null> => {
+        try {
+          console.log("[Export] Attempting client-side MP4 conversion...");
+          const { convertWebmToMp4 } = await import("@/lib/client-ffmpeg");
+          const mp4 = await convertWebmToMp4(blob, (ratio) => {
+            setProgress(0.95 + ratio * 0.04);
+          });
+          if (mp4 && mp4.size > 1000) {
+            console.log(`[Export] Client-side conversion succeeded: ${Math.round(mp4.size / 1024)}KB`);
+            return mp4;
           }
+          console.warn("[Export] Client-side conversion returned empty/small result");
+          return null;
+        } catch (err: any) {
+          console.warn("[Export] Client-side conversion failed:", err?.message);
+          return null;
         }
-      } catch (convErr: any) {
-        console.warn("[Export] MP4 conversion error:", convErr?.message || convErr);
+      };
+
+      const convertServerSide = async (): Promise<Blob | null> => {
+        try {
+          console.log(`[Export] Falling back to server-side conversion (${Math.round(blob.size / 1024)}KB)...`);
+          const formData = new FormData();
+          formData.append("video", blob, "listing-video.webm");
+          const startResp = await fetch("/api/listing-videos/convert-to-mp4", {
+            method: "POST",
+            body: formData,
+            credentials: "include",
+          });
+          if (!startResp.ok) {
+            console.warn(`[Export] Server upload failed (${startResp.status})`);
+            return null;
+          }
+          const { jobId } = await startResp.json();
+          console.log(`[Export] Server conversion started, job: ${jobId}`);
+
+          const maxWait = 300000;
+          const pollInterval = 3000;
+          const start = Date.now();
+          let consecutiveErrors = 0;
+          while (Date.now() - start < maxWait) {
+            await new Promise(r => setTimeout(r, pollInterval));
+            try {
+              const statusResp = await fetch(`/api/listing-videos/convert-status/${jobId}`, { credentials: "include" });
+              if (!statusResp.ok) {
+                consecutiveErrors++;
+                if (consecutiveErrors >= 5) return null;
+                continue;
+              }
+              consecutiveErrors = 0;
+              const { status, error } = await statusResp.json();
+              console.log(`[Export] Server poll: status=${status} (${Math.round((Date.now() - start) / 1000)}s)`);
+              if (status === "complete") {
+                const dlResp = await fetch(`/api/listing-videos/download-mp4/${jobId}`, { credentials: "include" });
+                if (dlResp.ok) {
+                  const mp4Blob = await dlResp.blob();
+                  if (mp4Blob.size > 1000) {
+                    console.log(`[Export] Server MP4 downloaded: ${Math.round(mp4Blob.size / 1024)}KB`);
+                    return mp4Blob;
+                  }
+                }
+                return null;
+              }
+              if (status === "failed") { console.warn(`[Export] Server conversion failed: ${error}`); return null; }
+            } catch {
+              consecutiveErrors++;
+              if (consecutiveErrors >= 5) return null;
+            }
+          }
+          return null;
+        } catch (err: any) {
+          console.warn("[Export] Server conversion error:", err?.message);
+          return null;
+        }
+      };
+
+      let mp4Result = await convertClientSide();
+      if (!mp4Result) {
+        mp4Result = await convertServerSide();
+      }
+      if (mp4Result) {
+        downloadBlob(mp4Result, "mp4");
+      } else {
+        console.warn("[Export] All MP4 conversion methods failed, downloading WebM");
         downloadBlob(blob, "webm");
       }
       drawFrame(0, 0, 0);
