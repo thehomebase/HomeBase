@@ -409,28 +409,39 @@ function VideoComposer({
       ctx.restore();
       return;
     } else if (tmpl === "elegant") {
-      const fontSize = Math.max(12, w * 0.026);
-      ctx.font = `300 ${fontSize}px "Georgia", "Times New Roman", serif`;
+      const fontSize = Math.max(13, w * 0.028);
+      ctx.font = `italic 400 ${fontSize}px "Playfair Display", Georgia, serif`;
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.shadowColor = "rgba(0,0,0,0.5)";
-      ctx.shadowBlur = 6;
-      ctx.fillText(caption, w / 2, h * 0.93);
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 2;
+      ctx.fillText(caption, w / 2, h * 0.92);
     } else {
-      const fontSize = Math.max(14, w * 0.032);
-      ctx.font = `500 ${fontSize}px "Inter", system-ui, sans-serif`;
+      const fontSize = Math.max(14, w * 0.03);
+      ctx.font = `500 ${fontSize}px "Montserrat", system-ui, sans-serif`;
       const metrics = ctx.measureText(caption);
       const textW = metrics.width;
-      const padding = fontSize * 0.8;
-      const boxW = textW + padding * 2;
-      const boxH = fontSize * 2.2;
+      const padX = fontSize * 1.2;
+      const padY = fontSize * 0.7;
+      const boxW = textW + padX * 2;
+      const boxH = fontSize + padY * 2;
       const boxX = (w - boxW) / 2;
-      const boxY = h - boxH - h * 0.08;
-      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+      const boxY = h - boxH - h * 0.06;
+      const grad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY);
+      grad.addColorStop(0, "rgba(0,0,0,0.7)");
+      grad.addColorStop(0.5, "rgba(0,0,0,0.55)");
+      grad.addColorStop(1, "rgba(0,0,0,0.7)");
+      ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.roundRect(boxX, boxY, boxW, boxH, boxH / 2);
       ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, boxH / 2);
+      ctx.stroke();
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -449,23 +460,28 @@ function VideoComposer({
     if (lines.length === 0) return;
 
     ctx.save();
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = 0.92;
     const tmpl = settings.textTemplate || "classic";
-    const isSerif = tmpl === "elegant";
-    const fontFamily = isSerif ? '"Georgia", "Times New Roman", serif' : '"Inter", system-ui, sans-serif';
-    const fontSize = Math.max(11, w * 0.025);
-    const smallFont = fontSize * 0.78;
-    const padding = fontSize * 0.6;
-    const lineH = fontSize * 1.15;
+    const headFont = tmpl === "elegant"
+      ? '"Playfair Display", Georgia, serif'
+      : '"Montserrat", system-ui, sans-serif';
+    const bodyFont = tmpl === "elegant"
+      ? '"Playfair Display", Georgia, serif'
+      : '"Montserrat", system-ui, sans-serif';
+    const nameSize = Math.max(12, w * 0.026);
+    const detailSize = nameSize * 0.78;
+    const padding = nameSize * 0.8;
+    const lineH = nameSize * 1.2;
 
     let maxW = 0;
     lines.forEach((line, i) => {
-      ctx.font = i === 0 ? `600 ${fontSize}px ${fontFamily}` : `400 ${smallFont}px ${fontFamily}`;
+      ctx.font = i === 0 ? `700 ${nameSize}px ${headFont}` : `400 ${detailSize}px ${bodyFont}`;
       maxW = Math.max(maxW, ctx.measureText(line).width);
     });
 
-    const boxW = maxW + padding * 2;
-    const boxH = padding * 2 + lineH * lines.length;
+    const accentW = 3;
+    const boxW = maxW + padding * 2 + accentW + padding * 0.4;
+    const boxH = padding * 1.6 + lineH * lines.length;
     const margin = w * 0.03;
     let boxX: number, boxY: number;
     switch (settings.brandingPosition) {
@@ -474,15 +490,29 @@ function VideoComposer({
       case "bottom-left": boxX = margin; boxY = h - boxH - margin; break;
       default: boxX = w - boxW - margin; boxY = h - boxH - margin;
     }
-    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+
+    const bgGrad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
+    bgGrad.addColorStop(0, "rgba(0,0,0,0.65)");
+    bgGrad.addColorStop(1, "rgba(0,0,0,0.45)");
+    ctx.fillStyle = bgGrad;
     ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+    ctx.roundRect(boxX, boxY, boxW, boxH, 8);
     ctx.fill();
+
     ctx.fillStyle = "#ffffff";
+    ctx.fillRect(boxX + padding * 0.5, boxY + padding * 0.6, accentW, boxH - padding * 1.2);
+
+    const textX = boxX + padding * 0.5 + accentW + padding * 0.5;
     ctx.textAlign = "left";
     lines.forEach((line, i) => {
-      ctx.font = i === 0 ? `600 ${fontSize}px ${fontFamily}` : `400 ${smallFont}px ${fontFamily}`;
-      ctx.fillText(line, boxX + padding, boxY + padding + i * lineH + fontSize * 0.4);
+      if (i === 0) {
+        ctx.font = `700 ${nameSize}px ${headFont}`;
+        ctx.fillStyle = "#ffffff";
+      } else {
+        ctx.font = `400 ${detailSize}px ${bodyFont}`;
+        ctx.fillStyle = "rgba(255,255,255,0.8)";
+      }
+      ctx.fillText(line, textX, boxY + padding * 0.8 + i * lineH + nameSize * 0.35);
     });
     ctx.restore();
   };
@@ -490,45 +520,74 @@ function VideoComposer({
   const drawClosingSlide = (ctx: CanvasRenderingContext2D, w: number, h: number, slideProgress: number) => {
     if (!agentBranding.showClosingSlide) return;
     const tmpl = settings.textTemplate || "classic";
-    const isSerif = tmpl === "elegant";
-    const fontFamily = isSerif ? '"Georgia", "Times New Roman", serif' : '"Inter", system-ui, sans-serif';
+    const headFont = tmpl === "elegant"
+      ? '"Playfair Display", Georgia, serif'
+      : '"Montserrat", system-ui, sans-serif';
+    const bodyFont = tmpl === "elegant"
+      ? '"Playfair Display", Georgia, serif'
+      : '"Montserrat", system-ui, sans-serif';
 
     ctx.save();
-    ctx.fillStyle = "#111111";
+
+    const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w * 0.7);
+    bgGrad.addColorStop(0, "#1a1a2e");
+    bgGrad.addColorStop(1, "#0a0a0f");
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
 
     const fadeIn = easeOut(Math.min(1, slideProgress * 3));
+    const scaleIn = 0.95 + 0.05 * fadeIn;
     ctx.globalAlpha = fadeIn;
 
+    ctx.translate(w / 2, h / 2);
+    ctx.scale(scaleIn, scaleIn);
+    ctx.translate(-w / 2, -h / 2);
+
     const centerX = w / 2;
-    let yPos = h * 0.3;
+    let yPos = h * 0.28;
 
     if (agentBranding.showName && agentBranding.name) {
-      const nameSize = Math.max(22, w * 0.055);
-      ctx.font = `700 ${nameSize}px ${fontFamily}`;
+      const nameSize = Math.max(24, w * 0.06);
+      ctx.font = `700 ${nameSize}px ${headFont}`;
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(255,255,255,0.1)";
+      ctx.shadowBlur = 20;
       ctx.fillText(agentBranding.name, centerX, yPos);
-      yPos += nameSize * 1.6;
+      ctx.shadowBlur = 0;
+      yPos += nameSize * 1.5;
     }
 
     if (agentBranding.roleText) {
-      const roleSize = Math.max(13, w * 0.028);
-      ctx.font = `400 ${roleSize}px ${fontFamily}`;
-      ctx.fillStyle = "rgba(255,255,255,0.65)";
-      ctx.fillText(agentBranding.roleText.toUpperCase(), centerX, yPos);
-      yPos += roleSize * 2;
-    }
+      const roleSize = Math.max(12, w * 0.024);
+      ctx.font = `600 ${roleSize}px ${bodyFont}`;
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      const roleText = agentBranding.roleText.toUpperCase();
+      ctx.fillText(roleText, centerX, yPos);
 
-    const lineW = w * 0.12;
-    ctx.strokeStyle = "rgba(255,255,255,0.3)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(centerX - lineW / 2, yPos);
-    ctx.lineTo(centerX + lineW / 2, yPos);
-    ctx.stroke();
-    yPos += Math.max(14, w * 0.03) * 1.5;
+      const roleW = ctx.measureText(roleText).width;
+      const dashLen = w * 0.04;
+      const gap = roleSize * 0.8;
+      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(centerX - roleW / 2 - gap - dashLen, yPos);
+      ctx.lineTo(centerX - roleW / 2 - gap, yPos);
+      ctx.moveTo(centerX + roleW / 2 + gap, yPos);
+      ctx.lineTo(centerX + roleW / 2 + gap + dashLen, yPos);
+      ctx.stroke();
+      yPos += roleSize * 2.5;
+    } else {
+      const lineW = w * 0.08;
+      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(centerX - lineW / 2, yPos);
+      ctx.lineTo(centerX + lineW / 2, yPos);
+      ctx.stroke();
+      yPos += Math.max(14, w * 0.03) * 1.8;
+    }
 
     const contactLines: string[] = [];
     if (agentBranding.showPhone && agentBranding.phone) contactLines.push(agentBranding.phone);
@@ -536,17 +595,17 @@ function VideoComposer({
 
     contactLines.forEach((line) => {
       const contactSize = Math.max(13, w * 0.028);
-      ctx.font = `400 ${contactSize}px ${fontFamily}`;
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = `400 ${contactSize}px ${bodyFont}`;
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
       ctx.fillText(line, centerX, yPos);
-      yPos += contactSize * 1.6;
+      yPos += contactSize * 1.8;
     });
 
     if (agentBranding.showBrokerage && agentBranding.brokerageName) {
-      yPos += Math.max(8, w * 0.015);
-      const brokSize = Math.max(12, w * 0.024);
-      ctx.font = `500 ${brokSize}px ${fontFamily}`;
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      yPos += Math.max(6, w * 0.01);
+      const brokSize = Math.max(11, w * 0.022);
+      ctx.font = `500 ${brokSize}px ${bodyFont}`;
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
       ctx.fillText(agentBranding.brokerageName, centerX, yPos);
     }
 
@@ -575,74 +634,130 @@ function VideoComposer({
       };
       const staggerSlide = (delay: number) => {
         const t = Math.max(0, globalProgress - delay);
-        return easeOut(Math.min(1, t * 12)) * 20;
+        return easeOut(Math.min(1, t * 12)) * 30;
       };
 
       ctx.save();
-      const sansFont = '"Inter", system-ui, sans-serif';
 
-      const headerSize = Math.max(28, w * 0.08);
+      const vignette = ctx.createRadialGradient(w / 2, h * 0.35, w * 0.1, w / 2, h * 0.35, w * 0.8);
+      vignette.addColorStop(0, "rgba(0,0,0,0.45)");
+      vignette.addColorStop(0.6, "rgba(0,0,0,0.2)");
+      vignette.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = vignette;
+      ctx.globalAlpha = staggerAlpha(headerDelay);
+      ctx.fillRect(0, 0, w, h);
+
+      const headerSize = Math.max(32, w * 0.09);
       let yPos = h * 0.22;
       ctx.globalAlpha = staggerAlpha(headerDelay);
-      ctx.font = `900 ${headerSize}px ${sansFont}`;
+      ctx.font = `900 italic ${headerSize}px "Bebas Neue", "Oswald", system-ui, sans-serif`;
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.shadowColor = "rgba(0,0,0,0.8)";
-      ctx.shadowBlur = 12;
-      ctx.shadowOffsetY = 3;
+      ctx.shadowColor = "rgba(0,0,0,0.9)";
+      ctx.shadowBlur = 16;
+      ctx.shadowOffsetY = 4;
       const slideY1 = staggerSlide(headerDelay);
-      ctx.fillText("JUST LISTED", w / 2, yPos + (20 - slideY1));
+      ctx.fillText("JUST LISTED", w / 2, yPos + (30 - slideY1));
+
+      const underlineAlpha = staggerAlpha(headerDelay);
+      if (underlineAlpha > 0) {
+        ctx.globalAlpha = underlineAlpha * 0.6;
+        const lineW = w * 0.15;
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(w / 2 - lineW / 2, yPos + headerSize * 0.55 + (30 - slideY1), lineW, 2);
+      }
 
       if (propertyDetails.price) {
-        yPos += headerSize * 1.2;
+        yPos += headerSize * 1.3;
         ctx.globalAlpha = staggerAlpha(priceDelay);
-        const priceSize = Math.max(22, w * 0.055);
-        ctx.font = `700 ${priceSize}px ${sansFont}`;
+        const priceSize = Math.max(24, w * 0.06);
+        ctx.font = `700 ${priceSize}px "Montserrat", system-ui, sans-serif`;
+        ctx.shadowColor = "rgba(0,0,0,0.8)";
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 3;
+        ctx.fillStyle = "#ffffff";
         const slideY2 = staggerSlide(priceDelay);
-        ctx.fillText(propertyDetails.price, w / 2, yPos + (20 - slideY2));
+        ctx.fillText(propertyDetails.price, w / 2, yPos + (30 - slideY2));
       }
 
       if (propertyAddress) {
-        yPos += (propertyDetails.price ? Math.max(22, w * 0.055) : headerSize) * 1.4;
+        yPos += (propertyDetails.price ? Math.max(24, w * 0.06) : headerSize) * 1.5;
         ctx.globalAlpha = staggerAlpha(addrDelay);
-        const addrSize = Math.max(14, w * 0.03);
-        ctx.font = `600 ${addrSize}px ${sansFont}`;
+        const addrSize = Math.max(13, w * 0.028);
+        ctx.font = `500 ${addrSize}px "Montserrat", system-ui, sans-serif`;
         ctx.shadowBlur = 6;
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
         const slideY3 = staggerSlide(addrDelay);
-        ctx.fillText(propertyAddress.toUpperCase(), w / 2, yPos + (20 - slideY3));
+        ctx.fillText(propertyAddress.toUpperCase(), w / 2, yPos + (30 - slideY3));
       }
 
-      const detailItems: { icon: string; text: string }[] = [];
-      if (propertyDetails.beds) detailItems.push({ icon: "🛏", text: `${propertyDetails.beds} BEDS` });
-      if (propertyDetails.baths) detailItems.push({ icon: "🚿", text: `${propertyDetails.baths} BATHS` });
-      if (propertyDetails.sqft) detailItems.push({ icon: "📐", text: `${propertyDetails.sqft} SQ FT` });
+      const detailItems: string[] = [];
+      if (propertyDetails.beds) detailItems.push(`${propertyDetails.beds} BEDS`);
+      if (propertyDetails.baths) detailItems.push(`${propertyDetails.baths} BATHS`);
+      if (propertyDetails.sqft) detailItems.push(`${propertyDetails.sqft} SQ FT`);
 
       if (detailItems.length > 0) {
         ctx.globalAlpha = staggerAlpha(detailDelay);
-        const barH = Math.max(36, h * 0.06);
+        const barH = Math.max(42, h * 0.07);
         const barY = h - barH;
         const slideY4 = staggerSlide(detailDelay);
-        const barAlphaOffset = (20 - slideY4) / 20;
+        const yOff = 30 - slideY4;
 
         ctx.shadowColor = "transparent";
         ctx.shadowBlur = 0;
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.92 * barAlphaOffset})`;
-        ctx.fillRect(0, barY + (20 - slideY4), w, barH);
+        ctx.shadowOffsetY = 0;
+
+        const barGrad = ctx.createLinearGradient(0, barY + yOff, 0, barY + barH + yOff);
+        barGrad.addColorStop(0, "rgba(255,255,255,0.95)");
+        barGrad.addColorStop(1, "rgba(240,240,240,0.95)");
+        ctx.fillStyle = barGrad;
+        ctx.fillRect(0, barY + yOff, w, barH);
+
+        ctx.strokeStyle = "rgba(0,0,0,0.08)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, barY + yOff);
+        ctx.lineTo(w, barY + yOff);
+        ctx.stroke();
 
         const segW = w / detailItems.length;
-        const detailSize = Math.max(12, w * 0.024);
-        ctx.font = `700 ${detailSize}px ${sansFont}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = "#1a1a1a";
+        const detailSize = Math.max(12, w * 0.022);
+        const iconSize = detailSize * 1.1;
+
         detailItems.forEach((item, i) => {
           const cx = segW * i + segW / 2;
-          ctx.fillText(item.text, cx, barY + barH / 2 + (20 - slideY4));
+          const cy = barY + barH / 2 + yOff;
+
+          let iconChar = "■";
+          if (item.includes("BED")) iconChar = "⌂";
+          else if (item.includes("BATH")) iconChar = "◈";
+          else if (item.includes("SQ")) iconChar = "▣";
+
+          ctx.font = `400 ${iconSize}px system-ui`;
+          ctx.fillStyle = "rgba(0,0,0,0.3)";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          const iconW = ctx.measureText(iconChar).width;
+          const textFont = `700 ${detailSize}px "Montserrat", system-ui, sans-serif`;
+          ctx.font = textFont;
+          const textW = ctx.measureText(item).width;
+          const totalW = iconW + 6 + textW;
+          const startX = cx - totalW / 2;
+
+          ctx.font = `400 ${iconSize}px system-ui`;
+          ctx.fillStyle = "rgba(0,0,0,0.35)";
+          ctx.fillText(iconChar, startX + iconW / 2, cy);
+
+          ctx.font = textFont;
+          ctx.fillStyle = "#1a1a1a";
+          ctx.fillText(item, startX + iconW + 6 + textW / 2, cy);
+
           if (i < detailItems.length - 1) {
-            ctx.fillStyle = "rgba(0,0,0,0.15)";
-            ctx.fillRect(segW * (i + 1) - 0.5, barY + barH * 0.2 + (20 - slideY4), 1, barH * 0.6);
-            ctx.fillStyle = "#1a1a1a";
+            ctx.fillStyle = "rgba(0,0,0,0.12)";
+            ctx.fillRect(segW * (i + 1) - 0.5, barY + barH * 0.2 + yOff, 1, barH * 0.6);
           }
         });
       }
@@ -651,109 +766,173 @@ function VideoComposer({
       const alpha = globalProgress < 0.02 ? globalProgress / 0.02 : globalProgress > 0.12 ? (0.15 - globalProgress) / 0.03 : 1;
       ctx.save();
       ctx.globalAlpha = alpha;
-      const margin = w * 0.05;
-      const sansFont = '"Inter", system-ui, sans-serif';
+      const margin = w * 0.06;
       const slideIn = easeOut(Math.min(1, globalProgress * 10));
-      const offsetX = (1 - slideIn) * -30;
+      const offsetX = (1 - slideIn) * -40;
 
-      let yPos = h * 0.35;
+      const panelW = w * 0.45;
+      const panelH = h * 0.35;
+      const panelY = h * 0.3;
+      const panelGrad = ctx.createLinearGradient(0, panelY, panelW * 0.6, panelY);
+      panelGrad.addColorStop(0, "rgba(0,0,0,0.5)");
+      panelGrad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = panelGrad;
+      ctx.fillRect(0, panelY, panelW, panelH);
+
+      const accentX = margin + offsetX - 6;
+      const accentGrad = ctx.createLinearGradient(accentX, panelY + panelH * 0.1, accentX, panelY + panelH * 0.9);
+      accentGrad.addColorStop(0, "rgba(255,255,255,0.9)");
+      accentGrad.addColorStop(1, "rgba(255,255,255,0.3)");
+      ctx.fillStyle = accentGrad;
+      ctx.fillRect(accentX, panelY + panelH * 0.1, 3, panelH * 0.8);
+
+      let yPos = h * 0.36;
       if (propertyDetails.price) {
-        const priceSize = Math.max(20, w * 0.055);
-        ctx.font = `800 ${priceSize}px ${sansFont}`;
+        const priceSize = Math.max(22, w * 0.058);
+        ctx.font = `800 ${priceSize}px "Montserrat", system-ui, sans-serif`;
         ctx.fillStyle = "#ffffff";
         ctx.textAlign = "left";
-        ctx.shadowColor = "rgba(0,0,0,0.7)";
-        ctx.shadowBlur = 8;
-        ctx.fillText(propertyDetails.price, margin + offsetX, yPos);
-        yPos += priceSize * 1.3;
+        ctx.shadowColor = "rgba(0,0,0,0.6)";
+        ctx.shadowBlur = 10;
+        ctx.fillText(propertyDetails.price, margin + offsetX + 6, yPos);
+        yPos += priceSize * 1.4;
       }
       if (propertyAddress) {
-        const addrSize = Math.max(12, w * 0.028);
-        ctx.font = `500 ${addrSize}px ${sansFont}`;
-        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        const addrSize = Math.max(12, w * 0.026);
+        ctx.font = `500 ${addrSize}px "Montserrat", system-ui, sans-serif`;
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
         ctx.shadowBlur = 4;
-        ctx.fillText(propertyAddress, margin + offsetX, yPos);
-        yPos += addrSize * 1.6;
+        ctx.fillText(propertyAddress.toUpperCase(), margin + offsetX + 6, yPos);
+        yPos += addrSize * 2;
       }
       const details: string[] = [];
       if (propertyDetails.beds) details.push(`${propertyDetails.beds} Bed`);
       if (propertyDetails.baths) details.push(`${propertyDetails.baths} Bath`);
       if (propertyDetails.sqft) details.push(`${propertyDetails.sqft} Sq Ft`);
       if (details.length > 0) {
-        const detSize = Math.max(11, w * 0.024);
-        ctx.font = `400 ${detSize}px ${sansFont}`;
-        ctx.fillStyle = "rgba(255,255,255,0.75)";
-        ctx.fillText(details.join("  •  "), margin + offsetX, yPos);
+        const detSize = Math.max(11, w * 0.022);
+        ctx.font = `400 ${detSize}px "Montserrat", system-ui, sans-serif`;
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
+        ctx.shadowBlur = 0;
+        ctx.fillText(details.join("  ·  "), margin + offsetX + 6, yPos);
       }
-
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(margin + offsetX - 10, h * 0.35 - Math.max(20, w * 0.055) * 0.7, 3, yPos - (h * 0.35 - Math.max(20, w * 0.055) * 0.7) + 5);
       ctx.restore();
     } else if (tmpl === "elegant") {
       const alpha = globalProgress < 0.02 ? globalProgress / 0.02 : globalProgress > 0.12 ? (0.15 - globalProgress) / 0.03 : 1;
       ctx.save();
       ctx.globalAlpha = alpha;
-      const serifFont = '"Georgia", "Times New Roman", serif';
+      const serifFont = '"Playfair Display", Georgia, serif';
 
-      const grad = ctx.createLinearGradient(0, h * 0.55, 0, h);
+      const grad = ctx.createLinearGradient(0, h * 0.5, 0, h);
       grad.addColorStop(0, "rgba(0,0,0,0)");
-      grad.addColorStop(1, "rgba(0,0,0,0.6)");
+      grad.addColorStop(0.4, "rgba(0,0,0,0.3)");
+      grad.addColorStop(1, "rgba(0,0,0,0.7)");
       ctx.fillStyle = grad;
-      ctx.fillRect(0, h * 0.55, w, h * 0.45);
+      ctx.fillRect(0, h * 0.5, w, h * 0.5);
 
-      let yPos = h * 0.68;
+      let yPos = h * 0.66;
+      ctx.textAlign = "center";
+
       if (propertyDetails.price) {
-        const priceSize = Math.max(22, w * 0.06);
-        ctx.font = `400 ${priceSize}px ${serifFont}`;
+        const priceSize = Math.max(24, w * 0.065);
+        ctx.font = `italic 400 ${priceSize}px ${serifFont}`;
         ctx.fillStyle = "#ffffff";
-        ctx.textAlign = "center";
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 10;
         ctx.fillText(propertyDetails.price, w / 2, yPos);
-        yPos += priceSize * 1.4;
+        yPos += priceSize * 1.5;
       }
+
+      const ornW = w * 0.06;
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(w / 2 - ornW, yPos);
+      ctx.lineTo(w / 2 + ornW, yPos);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.beginPath();
+      ctx.arc(w / 2, yPos, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      yPos += Math.max(16, w * 0.035);
+
       if (propertyAddress) {
-        const addrSize = Math.max(12, w * 0.028);
+        const addrSize = Math.max(12, w * 0.026);
         ctx.font = `400 ${addrSize}px ${serifFont}`;
         ctx.fillStyle = "rgba(255,255,255,0.85)";
-        const letterSpaced = propertyAddress.toUpperCase().split("").join(" ");
-        ctx.fillText(letterSpaced, w / 2, yPos);
-        yPos += addrSize * 1.8;
+        ctx.shadowBlur = 4;
+        const spaced = propertyAddress.toUpperCase().split("").join("\u200A");
+        ctx.fillText(spaced, w / 2, yPos);
+        yPos += addrSize * 2;
       }
       const details: string[] = [];
       if (propertyDetails.beds) details.push(`${propertyDetails.beds} Beds`);
       if (propertyDetails.baths) details.push(`${propertyDetails.baths} Baths`);
       if (propertyDetails.sqft) details.push(`${propertyDetails.sqft} Sq Ft`);
       if (details.length > 0) {
-        const detSize = Math.max(11, w * 0.024);
+        const detSize = Math.max(11, w * 0.023);
         ctx.font = `300 ${detSize}px ${serifFont}`;
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        ctx.fillText(details.join("   ·   "), w / 2, yPos);
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
+        ctx.shadowBlur = 0;
+        ctx.fillText(details.join("     ·     "), w / 2, yPos);
       }
       ctx.restore();
     } else {
       const alpha = globalProgress < 0.02 ? globalProgress / 0.02 : globalProgress > 0.12 ? (0.15 - globalProgress) / 0.03 : 1;
       ctx.save();
       ctx.globalAlpha = alpha;
-      const fontSize = Math.max(16, w * 0.04);
-      const padding = fontSize;
-      const lineHeight = fontSize * 1.5;
-      let lines: string[] = [];
-      if (propertyAddress) lines.push(propertyAddress);
+
+      const contentLines: { text: string; isTitle: boolean }[] = [];
+      if (propertyAddress) contentLines.push({ text: propertyAddress, isTitle: true });
       const details: string[] = [];
       if (propertyDetails.price) details.push(propertyDetails.price);
       if (propertyDetails.beds) details.push(`${propertyDetails.beds} Bed`);
       if (propertyDetails.baths) details.push(`${propertyDetails.baths} Bath`);
       if (propertyDetails.sqft) details.push(`${propertyDetails.sqft} Sq Ft`);
-      if (details.length > 0) lines.push(details.join(" • "));
-      const boxH = padding * 2 + lines.length * lineHeight;
+      if (details.length > 0) contentLines.push({ text: details.join("  •  "), isTitle: false });
+
+      const titleSize = Math.max(16, w * 0.038);
+      const detailFontSize = titleSize * 0.72;
+      const lineH = titleSize * 1.7;
+      const padX = titleSize * 1.5;
+      const padY = titleSize * 1;
+
+      let maxW = 0;
+      contentLines.forEach(({ text, isTitle }) => {
+        ctx.font = isTitle
+          ? `700 ${titleSize}px "Montserrat", system-ui, sans-serif`
+          : `400 ${detailFontSize}px "Montserrat", system-ui, sans-serif`;
+        maxW = Math.max(maxW, ctx.measureText(text).width);
+      });
+
+      const boxW = maxW + padX * 2;
+      const boxH = padY * 2 + contentLines.length * lineH;
+      const boxX = (w - boxW) / 2;
       const boxY = (h - boxH) / 2;
-      ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-      ctx.fillRect(0, boxY, w, boxH);
+
+      const bgGrad = ctx.createLinearGradient(boxX, boxY, boxX, boxY + boxH);
+      bgGrad.addColorStop(0, "rgba(0,0,0,0.7)");
+      bgGrad.addColorStop(1, "rgba(0,0,0,0.55)");
+      ctx.fillStyle = bgGrad;
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 12);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255,255,255,0.1)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 12);
+      ctx.stroke();
+
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      lines.forEach((line, i) => {
-        ctx.font = i === 0 ? `700 ${fontSize}px "Inter", system-ui, sans-serif` : `400 ${fontSize * 0.75}px "Inter", system-ui, sans-serif`;
-        ctx.fillText(line, w / 2, boxY + padding + i * lineHeight + lineHeight / 2);
+      contentLines.forEach(({ text, isTitle }, i) => {
+        ctx.font = isTitle
+          ? `700 ${titleSize}px "Montserrat", system-ui, sans-serif`
+          : `400 ${detailFontSize}px "Montserrat", system-ui, sans-serif`;
+        ctx.fillStyle = isTitle ? "#ffffff" : "rgba(255,255,255,0.8)";
+        ctx.fillText(text, w / 2, boxY + padY + i * lineH + lineH / 2);
       });
       ctx.restore();
     }
