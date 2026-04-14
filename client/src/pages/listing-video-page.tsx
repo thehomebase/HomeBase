@@ -56,19 +56,17 @@ interface PropertyDetails {
 }
 
 const MOTION_TYPES = [
-  { value: "walk-forward", label: "Walk Forward", icon: ZoomIn },
-  { value: "walk-right", label: "Walk Right", icon: ArrowRight },
-  { value: "walk-left", label: "Walk Left", icon: ArrowLeft },
-  { value: "reveal", label: "Reveal Room", icon: ZoomOut },
-  { value: "drift-right", label: "Drift Right", icon: ArrowRight },
-  { value: "drift-left", label: "Drift Left", icon: ArrowLeft },
   { value: "push-in", label: "Push In", icon: ZoomIn },
   { value: "pull-out", label: "Pull Out", icon: ZoomOut },
-  { value: "rise-up", label: "Rise Up", icon: ArrowUp },
+  { value: "truck-right", label: "Truck Right", icon: ArrowRight },
+  { value: "truck-left", label: "Truck Left", icon: ArrowLeft },
+  { value: "drift-right", label: "Drift Right", icon: ArrowRight },
+  { value: "drift-left", label: "Drift Left", icon: ArrowLeft },
   { value: "pan-right", label: "Pan Right", icon: ArrowRight },
   { value: "pan-left", label: "Pan Left", icon: ArrowLeft },
-  { value: "pan-up", label: "Pan Up", icon: ArrowUp },
-  { value: "pan-down", label: "Pan Down", icon: ArrowDown },
+  { value: "tilt-up", label: "Tilt Up", icon: ArrowUp },
+  { value: "tilt-down", label: "Tilt Down", icon: ArrowDown },
+  { value: "pedestal-up", label: "Pedestal Up", icon: ArrowUp },
   { value: "zoom-in", label: "Zoom In", icon: ZoomIn },
   { value: "zoom-out", label: "Zoom Out", icon: ZoomOut },
 ];
@@ -211,36 +209,39 @@ function VideoComposer({
     const fpY = fp.y / 100;
 
     switch (motionType) {
+      case "push-in":
       case "walk-forward":
-        return { scale: 1.15 + ease * 0.45, x: (fpX - 0.5) * ease * 0.15, y: (fpY - 0.5) * ease * 0.1 };
+        return { scale: 1.1 + ease * 0.55, x: (fpX - 0.5) * ease * 0.2, y: (fpY - 0.5) * ease * 0.15 };
+      case "pull-out":
+      case "reveal":
+        return { scale: 1.65 - ease * 0.4, x: 0, y: -ease * 0.03 };
+      case "truck-right":
       case "walk-right":
         return { scale: 1.2 + ease * 0.25, x: ease * 0.18, y: ease * 0.02 };
+      case "truck-left":
       case "walk-left":
         return { scale: 1.2 + ease * 0.25, x: -ease * 0.18, y: ease * 0.02 };
-      case "reveal":
-        return { scale: 1.55 - ease * 0.35, x: (0.5 - fpX) * ease * 0.1, y: (0.5 - fpY) * ease * 0.08 };
       case "drift-right":
         return { scale: 1.3 + ease * 0.12, x: ease * 0.12, y: Math.sin(ease * Math.PI) * 0.02 };
       case "drift-left":
         return { scale: 1.3 + ease * 0.12, x: -ease * 0.12, y: Math.sin(ease * Math.PI) * 0.02 };
-      case "push-in":
-        return { scale: 1.1 + ease * 0.55, x: (fpX - 0.5) * ease * 0.2, y: (fpY - 0.5) * ease * 0.15 };
-      case "pull-out":
-        return { scale: 1.65 - ease * 0.4, x: 0, y: -ease * 0.03 };
-      case "rise-up":
-        return { scale: 1.25 + ease * 0.2, x: 0, y: -ease * 0.12 };
       case "pan-right":
         return { scale: 1.3, x: ease * 0.22, y: 0 };
       case "pan-left":
         return { scale: 1.3, x: -ease * 0.22, y: 0 };
+      case "tilt-up":
+      case "pan-up":
+        return { scale: 1.3, x: 0, y: -ease * 0.15 };
+      case "tilt-down":
+      case "pan-down":
+        return { scale: 1.3, x: 0, y: ease * 0.15 };
+      case "pedestal-up":
+      case "rise-up":
+        return { scale: 1.25 + ease * 0.2, x: 0, y: -ease * 0.12 };
       case "zoom-in":
         return { scale: 1.0 + ease * 0.5, x: (fpX - 0.5) * ease * 0.12, y: (fpY - 0.5) * ease * 0.08 };
       case "zoom-out":
         return { scale: 1.55 - ease * 0.3, x: 0, y: 0 };
-      case "pan-up":
-        return { scale: 1.3, x: 0, y: -ease * 0.15 };
-      case "pan-down":
-        return { scale: 1.3, x: 0, y: ease * 0.15 };
       default:
         return { scale: 1.15 + ease * 0.4, x: ease * 0.1, y: ease * 0.02 };
     }
@@ -1166,7 +1167,7 @@ export default function ListingVideoPage() {
             signal: controller.signal,
             body: JSON.stringify({
               imageDataUrl: photo.dataUrl,
-              motionType: photo.motionType || "walk-forward",
+              motionType: photo.motionType || "push-in",
               duration: settings.photoDuration,
             }),
           });
@@ -1226,7 +1227,7 @@ export default function ListingVideoPage() {
         signal: controller.signal,
         body: JSON.stringify({
           imageDataUrl: photo.dataUrl,
-          motionType: photo.motionType || "walk-forward",
+          motionType: photo.motionType || "push-in",
           duration: settings.photoDuration,
         }),
       });

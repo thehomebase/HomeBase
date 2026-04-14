@@ -15631,7 +15631,7 @@ export function registerRoutes(app: Express): Server {
         mimeType: file.mimetype,
         dataUrl: `data:${file.mimetype};base64,${file.buffer.toString("base64")}`,
         order: index,
-        motionType: "walk-forward",
+        motionType: "push-in",
         caption: "",
       }));
 
@@ -15754,25 +15754,31 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid image data" });
       }
 
-      const validMotions = ["walk-forward","walk-right","walk-left","reveal","drift-right","drift-left","push-in","pull-out","rise-up","pan-right","pan-left","pan-up","pan-down","zoom-in","zoom-out"];
-      const safeMotion = validMotions.includes(motionType) ? motionType : "walk-forward";
+      const validMotions = ["push-in","pull-out","truck-right","truck-left","drift-right","drift-left","pan-right","pan-left","tilt-up","tilt-down","pedestal-up","zoom-in","zoom-out",
+        "walk-forward","walk-right","walk-left","reveal","rise-up","pan-up","pan-down"];
+      const safeMotion = validMotions.includes(motionType) ? motionType : "push-in";
 
       const motionToCamera: Record<string, string> = {
+        "push-in": "[Push in]",
+        "pull-out": "[Pull out]",
+        "truck-right": "[Truck right]",
+        "truck-left": "[Truck left]",
+        "drift-right": "[Truck right, Tilt up]",
+        "drift-left": "[Truck left, Tilt up]",
+        "pan-right": "[Pan right]",
+        "pan-left": "[Pan left]",
+        "tilt-up": "[Tilt up]",
+        "tilt-down": "[Tilt down]",
+        "pedestal-up": "[Pedestal up]",
+        "zoom-in": "[Zoom in]",
+        "zoom-out": "[Zoom out]",
         "walk-forward": "[Push in]",
         "walk-right": "[Truck right]",
         "walk-left": "[Truck left]",
         "reveal": "[Pull out]",
-        "drift-right": "[Truck right, Tilt up]",
-        "drift-left": "[Truck left, Tilt up]",
-        "push-in": "[Push in, Zoom in]",
-        "pull-out": "[Pull out]",
         "rise-up": "[Pedestal up]",
-        "pan-right": "[Pan right]",
-        "pan-left": "[Pan left]",
         "pan-up": "[Tilt up]",
         "pan-down": "[Tilt down]",
-        "zoom-in": "[Zoom in]",
-        "zoom-out": "[Zoom out]",
       };
 
       const cameraDirective = motionToCamera[safeMotion] || "[Push in]";
@@ -15869,22 +15875,20 @@ export function registerRoutes(app: Express): Server {
 
 1. For each photo, determine:
    - roomType: what room/area this is (e.g., "living_room", "kitchen", "master_bedroom", "bathroom", "exterior_front", "backyard", "pool", "dining_room", "garage", "hallway", "office", etc.)
-   - motionType: the best cinematic camera motion to simulate physically walking through the property. IMPORTANT: Vary the motions across photos - don't repeat the same motion on consecutive photos. Choose from:
-     * "walk-forward" - simulates walking into/through the room with zoom + drift toward focal point (BEST for: entryways, hallways, first look at any room - use this most often)
-     * "walk-right" - simulates walking to the right through a space with combined pan+zoom (good for: touring long rooms, kitchens with counters)
-     * "walk-left" - simulates walking to the left through a space with combined pan+zoom (good for: touring rooms from opposite angle)
-     * "reveal" - starts zoomed in on a detail, then pulls back to reveal the full room (GREAT for: exterior shots, large living areas, pools, backyards)
-     * "drift-right" - gentle floating movement to the right with subtle zoom (good for: dining rooms, bedrooms, elegant spaces)
-     * "drift-left" - gentle floating movement to the left with subtle zoom (good for: alternate angle for flowing rooms)
-     * "push-in" - dramatic slow push toward a focal point like walking up to something (good for: fireplaces, kitchen islands, special features)
-     * "pull-out" - pulls back and slightly rises, revealing grandeur (good for: great rooms, open floor plans, master suites)
-     * "rise-up" - subtle upward float with zoom, like looking up as you enter (good for: tall ceilings, staircases, grand entries)
-     * "pan-right" - classic pan right (use sparingly, only when other motions don't fit)
-     * "pan-left" - classic pan left (use sparingly)
-     * "pan-up" - tilts camera upward (good for: tall ceilings, chandeliers, two-story foyers)
-     * "pan-down" - tilts camera downward (good for: looking down at pools, patios, floor details)
-     * "zoom-in" - direct zoom toward focal point (good for: detail shots, unique features)
-     * "zoom-out" - pulls lens back to show wider view (good for: revealing full room scope, panoramic views)
+   - motionType: the best cinematic camera motion for this photo. IMPORTANT: Vary the motions across photos - don't repeat the same motion on consecutive photos. Choose from:
+     * "push-in" - camera moves forward toward subject (BEST for: entryways, hallways, first look at any room - use this most often)
+     * "pull-out" - camera moves backward, revealing the full scene (GREAT for: exterior shots, large living areas, open floor plans, pools)
+     * "truck-right" - camera slides right on a dolly track (good for: touring long rooms, kitchens with counters)
+     * "truck-left" - camera slides left on a dolly track (good for: touring rooms from opposite angle)
+     * "drift-right" - gentle floating movement to the right with subtle upward tilt (good for: dining rooms, bedrooms, elegant spaces)
+     * "drift-left" - gentle floating movement to the left with subtle upward tilt (good for: alternate angle for flowing rooms)
+     * "pan-right" - camera rotates right while staying in place (use sparingly, only when other motions don't fit)
+     * "pan-left" - camera rotates left while staying in place (use sparingly)
+     * "tilt-up" - camera tilts upward (good for: tall ceilings, chandeliers, two-story foyers, grand entries)
+     * "tilt-down" - camera tilts downward (good for: looking down at pools, patios, floor details)
+     * "pedestal-up" - camera physically rises upward (good for: tall ceilings, staircases, grand entries)
+     * "zoom-in" - lens zooms toward focal point (good for: detail shots, unique features, fireplaces)
+     * "zoom-out" - lens pulls back to show wider view (good for: revealing full room scope, panoramic views)
    - caption: a short, elegant one-line description for this room (e.g., "Sun-drenched living room with vaulted ceilings")
    - focusPoint: where the camera should focus/move toward as {x: 0-100, y: 0-100} percentage. Pick the most visually interesting element.
    - depthZones: analyze where foreground, midground, and background regions are in the image for parallax depth effect. Return 3 zones as an array. Each zone has:
@@ -15897,9 +15901,9 @@ export function registerRoutes(app: Express): Server {
 2. Suggest the optimal photo ordering for a natural walkthrough flow (exterior first, then entry, main living areas, kitchen, bedrooms, bathrooms, backyard/pool last).
 
 GUIDELINES:
-- Prefer "walk-forward", "reveal", "drift-right/left", and "push-in" over basic pan motions
-- Use "reveal" for the first exterior shot to create a dramatic opening
-- Use "walk-forward" for entryways and first views of rooms
+- Prefer "push-in", "pull-out", "drift-right/left", and "truck-right/left" over basic pan motions
+- Use "pull-out" for the first exterior shot to create a dramatic reveal
+- Use "push-in" for entryways and first views of rooms
 - Alternate between different motion types to keep the video dynamic
 - Never use the same motion type on consecutive photos
 - For depthZones: look at actual image content. Floors, counters, furniture in lower portion = foreground (depthFactor 1.3-1.8). Walls, windows, fixtures = midground (0.6-0.8). Ceilings, sky, distant walls = background (0.2-0.4). Zones should overlap by ~10-15% for smooth blending.
