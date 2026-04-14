@@ -15883,7 +15883,7 @@ export function registerRoutes(app: Express): Server {
 
           const clipFilename = `clips/clip_${req.user!.id}_${Date.now()}.mp4`;
           const { Client: ObjStorageClient } = await import("@replit/object-storage");
-          const objClient = new ObjStorageClient();
+          const objClient = new ObjStorageClient({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID });
           await objClient.uploadFromBytes(clipFilename, clipBuffer);
           const persistentUrl = `/api/listing-videos/serve-clip/${clipFilename}`;
           console.log(`[Hailuo] Job ${jobId}: Persisted to Object Storage: ${persistentUrl}`);
@@ -15937,7 +15937,7 @@ export function registerRoutes(app: Express): Server {
     const clipFilename = `clips/clip_${req.user!.id}_${Date.now()}.mp4`;
     try {
       const { Client: ObjStorageClient } = await import("@replit/object-storage");
-      const objClient = new ObjStorageClient();
+      const objClient = new ObjStorageClient({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID });
       const clipResp = await fetch(cdnUrl);
       if (!clipResp.ok) return res.status(502).json({ error: "Failed to download clip from CDN" });
       const arrayBuffer = await clipResp.arrayBuffer();
@@ -16000,7 +16000,7 @@ export function registerRoutes(app: Express): Server {
 
       const key = `clips/${filename}`;
       const { Client: ObjStorageClient } = await import("@replit/object-storage");
-      const objClient = new ObjStorageClient();
+      const objClient = new ObjStorageClient({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID });
       const result = await objClient.downloadAsBytes(key);
       if (!result.ok) {
         return res.status(404).json({ error: "Clip not found" });
