@@ -16071,27 +16071,40 @@ export function registerRoutes(app: Express): Server {
       const fs = await import("fs");
       const os = await import("os");
       const path = await import("path");
+      const { Client: ObjStorageClient } = await import("@replit/object-storage");
+      const objClient = new ObjStorageClient({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID });
       const tmpDir = os.tmpdir();
       const jobId = `mp4_${req.user!.id}_${Date.now()}`;
       const inputPath = path.join(tmpDir, `input_${jobId}.webm`);
       const outputPath = path.join(tmpDir, `output_${jobId}.mp4`);
-      const statusPath = path.join(tmpDir, `status_${jobId}.json`);
+      const statusKey = `mp4-jobs/status_${jobId}.json`;
+      const mp4Key = `mp4-jobs/output_${jobId}.mp4`;
       fs.writeFileSync(inputPath, req.file.buffer);
       const fileSizeKB = Math.round(req.file.buffer.length / 1024);
       console.log(`[FFmpeg] Job ${jobId}: Starting conversion (${fileSizeKB}KB)`);
-      fs.writeFileSync(statusPath, JSON.stringify({ status: "processing" }));
+      await objClient.uploadFromText(statusKey, JSON.stringify({ status: "processing" }));
+      console.log(`[FFmpeg] Job ${jobId}: Status written to object storage`);
       res.json({ jobId });
 
       const cmd = `ffmpeg -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 128k -movflags +faststart -threads 0 -y "${outputPath}"`;
-      const proc = exec(cmd, { timeout: 300000, maxBuffer: 10 * 1024 * 1024 }, (error, _stdout, stderr) => {
+      const proc = exec(cmd, { timeout: 300000, maxBuffer: 10 * 1024 * 1024 }, async (error, _stdout, stderr) => {
         try { fs.unlinkSync(inputPath); } catch {}
         if (error) {
           console.error(`[FFmpeg] Job ${jobId}: Conversion error:`, (stderr || "").slice(-500));
-          fs.writeFileSync(statusPath, JSON.stringify({ status: "failed", error: "Conversion failed" }));
+          try { await objClient.uploadFromText(statusKey, JSON.stringify({ status: "failed", error: "Conversion failed" })); } catch (e) { console.error(`[FFmpeg] Job ${jobId}: Failed to write error status`, e); }
           try { fs.unlinkSync(outputPath); } catch {}
         } else {
-          console.log(`[FFmpeg] Job ${jobId}: Conversion complete`);
-          fs.writeFileSync(statusPath, JSON.stringify({ status: "complete" }));
+          try {
+            const mp4Buffer = fs.readFileSync(outputPath);
+            console.log(`[FFmpeg] Job ${jobId}: Conversion complete (${Math.round(mp4Buffer.length / 1024)}KB), uploading to object storage...`);
+            await objClient.uploadFromBytes(mp4Key, mp4Buffer);
+            await objClient.uploadFromText(statusKey, JSON.stringify({ status: "complete" }));
+            console.log(`[FFmpeg] Job ${jobId}: MP4 uploaded to object storage`);
+          } catch (uploadErr: any) {
+            console.error(`[FFmpeg] Job ${jobId}: Failed to upload MP4:`, uploadErr?.message);
+            try { await objClient.uploadFromText(statusKey, JSON.stringify({ status: "failed", error: "Upload to storage failed" })); } catch {}
+          }
+          try { fs.unlinkSync(outputPath); } catch {}
         }
       });
       proc.stderr?.on("data", (data: string) => {
@@ -16103,38 +16116,51 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/listing-videos/convert-status/:jobId", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const fs = await import("fs");
-    const os = await import("os");
-    const path = await import("path");
-    const statusPath = path.join(os.tmpdir(), `status_${req.params.jobId}.json`);
+    const jobId = req.params.jobId;
+    console.log(`[FFmpeg] Status check for job: ${jobId}`);
     try {
-      const data = JSON.parse(fs.readFileSync(statusPath, "utf-8"));
+      const { Client: ObjStorageClient } = await import("@replit/object-storage");
+      const objClient = new ObjStorageClient({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID });
+      const statusKey = `mp4-jobs/status_${jobId}.json`;
+      const result = await objClient.downloadAsText(statusKey);
+      if (!result.ok) {
+        console.log(`[FFmpeg] Status not found for job: ${jobId}`);
+        return res.status(404).json({ error: "Job not found" });
+      }
+      const data = JSON.parse(result.value);
+      console.log(`[FFmpeg] Status for job ${jobId}: ${data.status}`);
       res.json(data);
-    } catch {
-      res.status(404).json({ error: "Job not found" });
+    } catch (e: any) {
+      console.error(`[FFmpeg] Status check error for job ${jobId}:`, e?.message);
+      res.status(500).json({ error: "Failed to check status" });
     }
   });
 
   app.get("/api/listing-videos/download-mp4/:jobId", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const fs = await import("fs");
-    const os = await import("os");
-    const path = await import("path");
-    const outputPath = path.join(os.tmpdir(), `output_${req.params.jobId}.mp4`);
-    const statusPath = path.join(os.tmpdir(), `status_${req.params.jobId}.json`);
+    const jobId = req.params.jobId;
+    console.log(`[FFmpeg] Download request for job: ${jobId}`);
     try {
-      const stat = fs.statSync(outputPath);
+      const { Client: ObjStorageClient } = await import("@replit/object-storage");
+      const objClient = new ObjStorageClient({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID });
+      const mp4Key = `mp4-jobs/output_${jobId}.mp4`;
+      const statusKey = `mp4-jobs/status_${jobId}.json`;
+      const result = await objClient.downloadAsBytes(mp4Key);
+      if (!result.ok) {
+        console.log(`[FFmpeg] MP4 not found in storage for job: ${jobId}`);
+        return res.status(404).json({ error: "MP4 file not found" });
+      }
+      const buf = Buffer.from(result.value);
+      console.log(`[FFmpeg] Serving MP4 for job ${jobId}: ${Math.round(buf.length / 1024)}KB`);
       res.set("Content-Type", "video/mp4");
-      res.set("Content-Length", String(stat.size));
+      res.set("Content-Length", String(buf.length));
       res.set("Content-Disposition", `attachment; filename="listing-video-${Date.now()}.mp4"`);
-      const readStream = fs.createReadStream(outputPath);
-      readStream.pipe(res);
-      readStream.on("end", () => {
-        try { fs.unlinkSync(outputPath); } catch {}
-        try { fs.unlinkSync(statusPath); } catch {}
-      });
-    } catch {
-      res.status(404).json({ error: "MP4 file not found" });
+      res.send(buf);
+      try { await objClient.delete(mp4Key); } catch {}
+      try { await objClient.delete(statusKey); } catch {}
+    } catch (e: any) {
+      console.error(`[FFmpeg] Download error for job ${jobId}:`, e?.message);
+      res.status(500).json({ error: "Failed to download MP4" });
     }
   });
 
