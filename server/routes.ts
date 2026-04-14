@@ -15740,6 +15740,15 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  const clipJobs = new Map<string, { status: "pending" | "complete" | "failed"; videoUrl?: string; error?: string; persistedUrl?: string; createdAt: number }>();
+
+  setInterval(() => {
+    const now = Date.now();
+    for (const [id, job] of clipJobs) {
+      if (now - job.createdAt > 30 * 60 * 1000) clipJobs.delete(id);
+    }
+  }, 5 * 60 * 1000);
+
   app.post("/api/listing-videos/generate-3d-clip", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const role = req.user!.role;
@@ -15748,140 +15757,151 @@ export function registerRoutes(app: Express): Server {
     const falKey = process.env.FAL_KEY;
     if (!falKey) return res.status(500).json({ error: "3D video service not configured" });
 
-    try {
-      const { imageDataUrl, motionType, duration } = req.body;
-      if (!imageDataUrl || typeof imageDataUrl !== "string" || !imageDataUrl.startsWith("data:image/")) {
-        return res.status(400).json({ error: "Invalid image data" });
-      }
+    const { imageDataUrl, motionType, duration } = req.body;
+    if (!imageDataUrl || typeof imageDataUrl !== "string" || !imageDataUrl.startsWith("data:image/")) {
+      return res.status(400).json({ error: "Invalid image data" });
+    }
 
-      const validMotions = ["push-in","pull-out","truck-right","truck-left","drift-right","drift-left","pan-right","pan-left","tilt-up","tilt-down","pedestal-up","orbit-right","orbit-left","zoom-in","zoom-out",
-        "walk-forward","walk-right","walk-left","reveal","rise-up","pan-up","pan-down"];
-      const safeMotion = validMotions.includes(motionType) ? motionType : "push-in";
+    const validMotions = ["push-in","pull-out","truck-right","truck-left","drift-right","drift-left","pan-right","pan-left","tilt-up","tilt-down","pedestal-up","orbit-right","orbit-left","zoom-in","zoom-out",
+      "walk-forward","walk-right","walk-left","reveal","rise-up","pan-up","pan-down"];
+    const safeMotion = validMotions.includes(motionType) ? motionType : "push-in";
 
-      const motionToCamera: Record<string, string> = {
-        "push-in": "[Push in]",
-        "pull-out": "[Pull out]",
-        "truck-right": "[Truck right]",
-        "truck-left": "[Truck left]",
-        "drift-right": "[Truck right, Tilt up]",
-        "drift-left": "[Truck left, Tilt up]",
-        "pan-right": "[Pan right]",
-        "pan-left": "[Pan left]",
-        "tilt-up": "[Tilt up]",
-        "tilt-down": "[Tilt down]",
-        "pedestal-up": "[Pedestal up]",
-        "orbit-right": "[Truck right, Pan left]",
-        "orbit-left": "[Truck left, Pan right]",
-        "zoom-in": "[Zoom in]",
-        "zoom-out": "[Zoom out]",
-        "walk-forward": "[Push in]",
-        "walk-right": "[Truck right]",
-        "walk-left": "[Truck left]",
-        "reveal": "[Pull out]",
-        "rise-up": "[Pedestal up]",
-        "pan-up": "[Tilt up]",
-        "pan-down": "[Tilt down]",
-      };
+    const motionToCamera: Record<string, string> = {
+      "push-in": "[Push in]",
+      "pull-out": "[Pull out]",
+      "truck-right": "[Truck right]",
+      "truck-left": "[Truck left]",
+      "drift-right": "[Truck right, Tilt up]",
+      "drift-left": "[Truck left, Tilt up]",
+      "pan-right": "[Pan right]",
+      "pan-left": "[Pan left]",
+      "tilt-up": "[Tilt up]",
+      "tilt-down": "[Tilt down]",
+      "pedestal-up": "[Pedestal up]",
+      "orbit-right": "[Truck right, Pan left]",
+      "orbit-left": "[Truck left, Pan right]",
+      "zoom-in": "[Zoom in]",
+      "zoom-out": "[Zoom out]",
+      "walk-forward": "[Push in]",
+      "walk-right": "[Truck right]",
+      "walk-left": "[Truck left]",
+      "reveal": "[Pull out]",
+      "rise-up": "[Pedestal up]",
+      "pan-up": "[Tilt up]",
+      "pan-down": "[Tilt down]",
+    };
 
-      const cameraDirective = motionToCamera[safeMotion] || "[Push in]";
-      const prompt = `Cinematic real estate interior, static scene, smooth slow camera movement, no objects move or change, everything remains perfectly still ${cameraDirective}`;
+    const cameraDirective = motionToCamera[safeMotion] || "[Push in]";
+    const prompt = `Cinematic real estate interior, static scene, smooth slow camera movement, no objects move or change, everything remains perfectly still ${cameraDirective}`;
 
-      const { fal } = await import("@fal-ai/client");
-      fal.config({ credentials: falKey });
+    const jobId = `clip_${req.user!.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    clipJobs.set(jobId, { status: "pending", createdAt: Date.now() });
 
-      console.log(`[Hailuo] Uploading image to fal.ai storage...`);
-      const base64Match = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
-      let hostedImageUrl = imageDataUrl;
-      if (base64Match) {
-        const base64Data = base64Match[2];
-        let buffer = Buffer.from(base64Data, "base64");
-        const sharp = (await import("sharp")).default;
-        const metadata = await sharp(buffer).metadata();
-        const MAX_DIM = 1920;
-        if ((metadata.width && metadata.width > MAX_DIM) || (metadata.height && metadata.height > MAX_DIM)) {
-          console.log(`[Hailuo] Resizing image from ${metadata.width}x${metadata.height} to fit ${MAX_DIM}x${MAX_DIM}`);
-          buffer = await sharp(buffer)
-            .resize(MAX_DIM, MAX_DIM, { fit: "inside", withoutEnlargement: true })
-            .jpeg({ quality: 90 })
-            .toBuffer();
+    res.json({ jobId });
+
+    (async () => {
+      try {
+        const { fal } = await import("@fal-ai/client");
+        fal.config({ credentials: falKey });
+
+        console.log(`[Hailuo] Job ${jobId}: Uploading image to fal.ai storage...`);
+        const base64Match = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+        let hostedImageUrl = imageDataUrl;
+        if (base64Match) {
+          const base64Data = base64Match[2];
+          let buffer = Buffer.from(base64Data, "base64");
+          const sharp = (await import("sharp")).default;
+          const metadata = await sharp(buffer).metadata();
+          const MAX_DIM = 1920;
+          if ((metadata.width && metadata.width > MAX_DIM) || (metadata.height && metadata.height > MAX_DIM)) {
+            console.log(`[Hailuo] Job ${jobId}: Resizing image from ${metadata.width}x${metadata.height}`);
+            buffer = await sharp(buffer)
+              .resize(MAX_DIM, MAX_DIM, { fit: "inside", withoutEnlargement: true })
+              .jpeg({ quality: 90 })
+              .toBuffer();
+          }
+          const blob = new Blob([buffer], { type: "image/jpeg" });
+          const file = new File([blob], `photo.jpg`, { type: "image/jpeg" });
+          hostedImageUrl = await fal.storage.upload(file);
+          console.log(`[Hailuo] Job ${jobId}: Image uploaded: ${hostedImageUrl.slice(0, 80)}...`);
         }
-        const blob = new Blob([buffer], { type: "image/jpeg" });
-        const file = new File([blob], `photo.jpg`, { type: "image/jpeg" });
-        hostedImageUrl = await fal.storage.upload(file);
-        console.log(`[Hailuo] Image uploaded: ${hostedImageUrl.slice(0, 80)}...`);
-      }
 
-      console.log(`[Hailuo] Generating 6s clip via Hailuo 2.3 Fast for motion: ${safeMotion} ${cameraDirective}`);
+        console.log(`[Hailuo] Job ${jobId}: Generating 6s clip via Hailuo 2.3 Fast for motion: ${safeMotion} ${cameraDirective}`);
 
-      const MAX_RETRIES = 2;
-      const SUBSCRIBE_TIMEOUT = 240000;
-      let result: any = null;
+        const MAX_RETRIES = 2;
+        const SUBSCRIBE_TIMEOUT = 240000;
+        let result: any = null;
 
-      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        if (attempt > 0) {
-          console.log(`[Hailuo] Retry attempt ${attempt}/${MAX_RETRIES}...`);
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          if (attempt > 0) console.log(`[Hailuo] Job ${jobId}: Retry ${attempt}/${MAX_RETRIES}...`);
+          try {
+            result = await Promise.race([
+              fal.subscribe("fal-ai/minimax/hailuo-2.3-fast/standard/image-to-video", {
+                input: { image_url: hostedImageUrl, prompt, prompt_optimizer: false, duration: "6" },
+                logs: true,
+                onQueueUpdate: (update: any) => {
+                  if (update.status === "IN_PROGRESS") {
+                    console.log(`[Hailuo] Job ${jobId}: Generation in progress... (attempt ${attempt + 1})`);
+                  } else if (update.status === "IN_QUEUE") {
+                    console.log(`[Hailuo] Job ${jobId}: Queued, position: ${update.queue_position ?? "unknown"}`);
+                  }
+                },
+              }),
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("fal.ai generation timed out after 4 minutes")), SUBSCRIBE_TIMEOUT)
+              ),
+            ]);
+            break;
+          } catch (retryErr: any) {
+            console.warn(`[Hailuo] Job ${jobId}: Attempt ${attempt + 1} failed: ${retryErr?.message}`);
+            if (attempt === MAX_RETRIES) throw retryErr;
+            await new Promise(r => setTimeout(r, 2000));
+          }
         }
+
+        const videoUrl = result?.data?.video?.url || result?.video?.url;
+        if (!videoUrl) {
+          console.error(`[Hailuo] Job ${jobId}: No video URL in result:`, JSON.stringify(result).slice(0, 500));
+          const job = clipJobs.get(jobId);
+          if (job) { job.status = "failed"; job.error = "No video returned from service"; }
+          return;
+        }
+
+        console.log(`[Hailuo] Job ${jobId}: Generated successfully: ${videoUrl}`);
+        const job = clipJobs.get(jobId);
+        if (job) { job.status = "complete"; job.videoUrl = videoUrl; }
+
         try {
-          result = await Promise.race([
-            fal.subscribe("fal-ai/minimax/hailuo-2.3-fast/standard/image-to-video", {
-              input: {
-                image_url: hostedImageUrl,
-                prompt,
-                prompt_optimizer: false,
-                duration: "6",
-              },
-              logs: true,
-              onQueueUpdate: (update: any) => {
-                if (update.status === "IN_PROGRESS") {
-                  console.log(`[Hailuo] Generation in progress... (attempt ${attempt + 1})`);
-                } else if (update.status === "IN_QUEUE") {
-                  console.log(`[Hailuo] Queued, position: ${update.queue_position ?? "unknown"} (attempt ${attempt + 1})`);
-                }
-              },
-            }),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error("fal.ai generation timed out after 4 minutes")), SUBSCRIBE_TIMEOUT)
-            ),
-          ]);
-          break;
-        } catch (retryErr: any) {
-          console.warn(`[Hailuo] Attempt ${attempt + 1} failed: ${retryErr?.message}`);
-          if (attempt === MAX_RETRIES) throw retryErr;
-          await new Promise(r => setTimeout(r, 2000));
-        }
-      }
-
-      console.log(`[Hailuo] Raw result keys:`, Object.keys(result || {}));
-      const videoUrl = result?.data?.video?.url || result?.video?.url;
-      if (!videoUrl) {
-        console.error(`[Hailuo] No video URL found in result:`, JSON.stringify(result).slice(0, 500));
-        return res.status(500).json({ error: "No video returned from service" });
-      }
-
-      console.log(`[Hailuo] Generated successfully: ${videoUrl}`);
-
-      res.json({ videoUrl, needsPersist: true });
-
-      setImmediate(async () => {
-        const clipFilename = `clips/clip_${req.user!.id}_${Date.now()}.mp4`;
-        try {
+          const clipFilename = `clips/clip_${req.user!.id}_${Date.now()}.mp4`;
           const { Client: ObjStorageClient } = await import("@replit/object-storage");
           const objClient = new ObjStorageClient();
           const clipResp = await fetch(videoUrl);
           if (clipResp.ok) {
             const arrayBuffer = await clipResp.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            await objClient.uploadFromBytes(clipFilename, buffer);
-            console.log(`[Hailuo] Clip persisted to Object Storage: ${clipFilename} (${Math.round(buffer.byteLength / 1024)}KB)`);
+            const clipBuffer = Buffer.from(arrayBuffer);
+            await objClient.uploadFromBytes(clipFilename, clipBuffer);
+            const persistentUrl = `/api/listing-videos/serve-clip/${clipFilename}`;
+            console.log(`[Hailuo] Job ${jobId}: Persisted to Object Storage: ${persistentUrl} (${Math.round(clipBuffer.byteLength / 1024)}KB)`);
+            if (job) job.persistedUrl = persistentUrl;
           }
         } catch (storageErr: any) {
-          console.warn(`[Hailuo] Background Object Storage save failed: ${storageErr.message}`);
+          console.warn(`[Hailuo] Job ${jobId}: Object Storage save failed: ${storageErr.message}`);
         }
-      });
-    } catch (error: any) {
-      console.error("[Hailuo] Error:", error?.message || error);
-      res.status(500).json({ error: error?.message || "AI video clip generation failed" });
-    }
+      } catch (error: any) {
+        console.error(`[Hailuo] Job ${jobId}: Error:`, error?.message || error);
+        const job = clipJobs.get(jobId);
+        if (job) { job.status = "failed"; job.error = error?.message || "AI video clip generation failed"; }
+      }
+    })();
+  });
+
+  app.get("/api/listing-videos/clip-status/:jobId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const job = clipJobs.get(req.params.jobId);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    if (job.status === "pending") return res.json({ status: "pending" });
+    if (job.status === "failed") return res.json({ status: "failed", error: job.error });
+    res.json({ status: "complete", videoUrl: job.persistedUrl || job.videoUrl, needsPersist: !job.persistedUrl });
   });
 
   app.post("/api/listing-videos/persist-clip", async (req, res) => {

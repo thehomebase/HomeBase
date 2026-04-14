@@ -1650,15 +1650,11 @@ export default function ListingVideoPage() {
 
       const generateOne = async (photo: typeof updatedPhotos[0], index: number) => {
         if (!photo.dataUrl) return;
-        let timeout: ReturnType<typeof setTimeout> | null = null;
         try {
-          const controller = new AbortController();
-          timeout = setTimeout(() => controller.abort(), 840000);
           const res = await fetch("/api/listing-videos/generate-3d-clip", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            signal: controller.signal,
             body: JSON.stringify({
               imageDataUrl: photo.dataUrl,
               motionType: photo.motionType || "push-in",
@@ -1670,31 +1666,37 @@ export default function ListingVideoPage() {
             throw new Error(errData.error || "Generation failed");
           }
           const data = await res.json();
-          let clipUrl = data.videoUrl;
-          if (data.needsPersist && clipUrl?.startsWith("https://")) {
-            try {
-              const pRes = await fetch("/api/listing-videos/persist-clip", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ cdnUrl: clipUrl }),
-              });
-              if (pRes.ok) {
-                const pData = await pRes.json();
-                clipUrl = pData.videoUrl;
-                console.log(`[Persist] Clip ${photo.id} saved permanently: ${clipUrl}`);
+          if (data.jobId) {
+            const result = await pollForClipResult(data.jobId);
+            if (result) {
+              let clipUrl = result.videoUrl;
+              if (result.needsPersist && clipUrl?.startsWith("https://")) {
+                try {
+                  const pRes = await fetch("/api/listing-videos/persist-clip", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ cdnUrl: clipUrl }),
+                  });
+                  if (pRes.ok) {
+                    const pData = await pRes.json();
+                    clipUrl = pData.videoUrl;
+                    console.log(`[Persist] Clip ${photo.id} saved permanently: ${clipUrl}`);
+                  }
+                } catch (e) {
+                  console.warn(`[Persist] Save failed for ${photo.id}, using CDN URL`, e);
+                }
               }
-            } catch (e) {
-              console.warn(`[Persist] Save failed for ${photo.id}, using CDN URL`, e);
+              photo.videoClipUrl = clipUrl;
             }
+          } else if (data.videoUrl) {
+            photo.videoClipUrl = data.videoUrl;
           }
-          photo.videoClipUrl = clipUrl;
         } catch (err: any) {
           console.error(`Video failed for photo ${photo.id}:`, err);
-          const msg = err?.name === "AbortError" ? "Timed out (14 min limit)" : (err?.message || "Could not generate clip");
+          const msg = err?.message || "Could not generate clip";
           toast({ title: `Photo ${index + 1} failed`, description: msg, variant: "destructive" });
         } finally {
-          if (timeout) clearTimeout(timeout);
           completed++;
           setGen3DProgress({ current: completed, total });
         }
@@ -1735,19 +1737,33 @@ export default function ListingVideoPage() {
     }
   };
 
+  const pollForClipResult = async (jobId: string, maxWaitMs = 600000): Promise<{ videoUrl: string; needsPersist: boolean } | null> => {
+    const start = Date.now();
+    const POLL_INTERVAL = 4000;
+    while (Date.now() - start < maxWaitMs) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL));
+      try {
+        const statusRes = await fetch(`/api/listing-videos/clip-status/${jobId}`, { credentials: "include" });
+        if (!statusRes.ok) continue;
+        const statusData = await statusRes.json();
+        if (statusData.status === "complete") return { videoUrl: statusData.videoUrl, needsPersist: statusData.needsPersist };
+        if (statusData.status === "failed") throw new Error(statusData.error || "Generation failed");
+      } catch (e: any) {
+        if (e?.message && e.message !== "Failed to fetch") throw e;
+      }
+    }
+    throw new Error("Timed out waiting for clip (10 min limit)");
+  };
+
   const reanimatePhoto = async (photoIndex: number) => {
     const photo = photos[photoIndex];
     if (!photo?.dataUrl) return;
     setReanimatingPhotoId(photo.id);
-    let timeout: ReturnType<typeof setTimeout> | null = null;
     try {
-      const controller = new AbortController();
-      timeout = setTimeout(() => controller.abort(), 840000);
       const res = await fetch("/api/listing-videos/generate-3d-clip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        signal: controller.signal,
         body: JSON.stringify({
           imageDataUrl: photo.dataUrl,
           motionType: photo.motionType || "push-in",
@@ -1760,21 +1776,27 @@ export default function ListingVideoPage() {
       }
       const data = await res.json();
       let clipUrl = data.videoUrl;
-      if (data.needsPersist && clipUrl?.startsWith("https://")) {
-        try {
-          const pRes = await fetch("/api/listing-videos/persist-clip", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ cdnUrl: clipUrl }),
-          });
-          if (pRes.ok) {
-            const pData = await pRes.json();
-            clipUrl = pData.videoUrl;
-            console.log(`[Persist] Reanimate clip saved permanently: ${clipUrl}`);
+      if (data.jobId) {
+        const result = await pollForClipResult(data.jobId);
+        if (result) {
+          clipUrl = result.videoUrl;
+          if (result.needsPersist && clipUrl?.startsWith("https://")) {
+            try {
+              const pRes = await fetch("/api/listing-videos/persist-clip", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ cdnUrl: clipUrl }),
+              });
+              if (pRes.ok) {
+                const pData = await pRes.json();
+                clipUrl = pData.videoUrl;
+                console.log(`[Persist] Reanimate clip saved permanently: ${clipUrl}`);
+              }
+            } catch (e) {
+              console.warn(`[Persist] Reanimate persist failed, using CDN URL`, e);
+            }
           }
-        } catch (e) {
-          console.warn(`[Persist] Reanimate persist failed, using CDN URL`, e);
         }
       }
       const updatedPhotos = [...photos];
@@ -1793,7 +1815,6 @@ export default function ListingVideoPage() {
       const msg = err?.name === "AbortError" ? "Timed out" : (err?.message || "Failed");
       toast({ title: "Re-animate failed", description: msg, variant: "destructive" });
     } finally {
-      if (timeout) clearTimeout(timeout);
       setReanimatingPhotoId(null);
     }
   };
