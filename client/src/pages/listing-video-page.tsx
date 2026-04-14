@@ -236,10 +236,19 @@ function VideoComposer({
             setVideosReady(prev => prev + 1);
             if (!isPlaying) drawFrame(0, 0);
           });
+          let retryCount = 0;
           video.addEventListener("error", () => {
-            console.warn(`[VideoClip] Failed to load clip for ${photo.id}, clearing broken URL`);
-            videoElementsRef.current.delete(photo.id);
-            onClipError?.(photo.id);
+            if (retryCount < 3) {
+              retryCount++;
+              console.warn(`[VideoClip] Retrying clip for ${photo.id} (attempt ${retryCount}/3)`);
+              setTimeout(() => {
+                video.src = resolvedUrl + (resolvedUrl.includes("?") ? "&" : "?") + `_retry=${retryCount}`;
+                video.load();
+              }, 2000 * retryCount);
+            } else {
+              console.warn(`[VideoClip] Failed to load clip for ${photo.id} after retries`);
+              videoElementsRef.current.delete(photo.id);
+            }
           });
           video.load();
           videoElementsRef.current.set(photo.id, video);
@@ -1168,12 +1177,33 @@ function VideoComposer({
     const transProgress = isTransitioning ? (photoProgress - (1 - transRatio)) / transRatio : 0;
     const transEase = transProgress * transProgress * (3 - 2 * transProgress);
 
-    if (currentImg) {
+    if (currentPhoto?.videoClipUrl) {
+      if (currentImg) {
+        const alpha = isTransitioning ? 1 - transEase : 1;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        const srcAspect = currentImg.width / currentImg.height;
+        const canvAspect = w / h;
+        let dw = w, dh = h, dx = 0, dy = 0;
+        if (srcAspect > canvAspect) { dh = h; dw = h * srcAspect; dx = (w - dw) / 2; }
+        else { dw = w; dh = w / srcAspect; dy = (h - dh) / 2; }
+        ctx.drawImage(currentImg, dx, dy, dw, dh);
+        ctx.restore();
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,0.4)";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 14px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Loading AI clip...", w / 2, h / 2);
+        ctx.restore();
+      }
+    } else if (currentImg) {
       const alpha = isTransitioning ? 1 - transEase : 1;
       drawImageWithMotion(ctx, currentImg, w, h, currentPhoto.motionType, photoProgress, alpha);
     }
 
-    if (isTransitioning) {
+    if (isTransitioning && !currentPhoto?.videoClipUrl) {
       const nextIdx = (photoIdx + 1) % photos.length;
       const nextPhoto = photos[nextIdx];
       const nextImg = loadedImagesRef.current.get(nextPhoto?.id);
@@ -2627,9 +2657,7 @@ export default function ListingVideoPage() {
                   propertyAddress={propertyAddress}
                   user={user}
                   agentBranding={agentBranding}
-                  onClipError={(photoId) => {
-                    setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, videoClipUrl: undefined } : p));
-                  }}
+                  onClipError={() => {}}
                 />
               </CardContent>
             </Card>

@@ -15974,16 +15974,25 @@ export function registerRoutes(app: Express): Server {
     } catch {
       return res.status(400).json({ error: "Invalid URL format" });
     }
-    try {
-      const clipResp = await fetch(url);
-      if (!clipResp.ok) return res.status(502).json({ error: "Failed to fetch clip" });
-      res.set("Content-Type", clipResp.headers.get("content-type") || "video/mp4");
-      res.set("Cache-Control", "public, max-age=86400");
-      const arrayBuffer = await clipResp.arrayBuffer();
-      res.send(Buffer.from(arrayBuffer));
-    } catch (err: any) {
-      console.error("[ClipProxy] Error:", err?.message);
-      res.status(502).json({ error: "Proxy failed" });
+    const MAX_PROXY_RETRIES = 2;
+    for (let attempt = 0; attempt <= MAX_PROXY_RETRIES; attempt++) {
+      try {
+        const clipResp = await fetch(url);
+        if (!clipResp.ok) {
+          if (attempt < MAX_PROXY_RETRIES) { await new Promise(r => setTimeout(r, 1000)); continue; }
+          return res.status(502).json({ error: "Failed to fetch clip" });
+        }
+        res.set("Content-Type", clipResp.headers.get("content-type") || "video/mp4");
+        res.set("Cache-Control", "public, max-age=86400");
+        res.set("Access-Control-Allow-Origin", "*");
+        const arrayBuffer = await clipResp.arrayBuffer();
+        res.send(Buffer.from(arrayBuffer));
+        return;
+      } catch (err: any) {
+        console.error(`[ClipProxy] Attempt ${attempt + 1} error:`, err?.message);
+        if (attempt < MAX_PROXY_RETRIES) { await new Promise(r => setTimeout(r, 1000)); continue; }
+        res.status(502).json({ error: "Proxy failed" });
+      }
     }
   });
 
