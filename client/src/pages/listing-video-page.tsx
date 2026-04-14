@@ -63,11 +63,15 @@ interface AgentBranding {
   showPhone: boolean;
   showBrokerage: boolean;
   showClosingSlide: boolean;
+  showAgentPhoto: boolean;
+  showBrokerageLogo: boolean;
   name: string;
   email: string;
   phone: string;
   brokerageName: string;
   roleText: string;
+  agentPhotoUrl: string;
+  brokerageLogoUrl: string;
 }
 
 const MOTION_TYPES = [
@@ -539,6 +543,31 @@ function VideoComposer({
     ctx.restore();
   };
 
+  const agentPhotoRef = useRef<HTMLImageElement | null>(null);
+  const brokerageLogoRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    if (agentBranding.agentPhotoUrl) {
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => { agentPhotoRef.current = img; };
+      img.src = agentBranding.agentPhotoUrl;
+    } else {
+      agentPhotoRef.current = null;
+    }
+  }, [agentBranding.agentPhotoUrl]);
+
+  useEffect(() => {
+    if (agentBranding.brokerageLogoUrl) {
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => { brokerageLogoRef.current = img; };
+      img.src = agentBranding.brokerageLogoUrl;
+    } else {
+      brokerageLogoRef.current = null;
+    }
+  }, [agentBranding.brokerageLogoUrl]);
+
   const drawClosingSlide = (ctx: CanvasRenderingContext2D, w: number, h: number, slideProgress: number) => {
     if (!agentBranding.showClosingSlide) return;
     if (settings.textTemplate === "none") return;
@@ -567,9 +596,31 @@ function VideoComposer({
     ctx.translate(-w / 2, -h / 2);
 
     const centerX = w / 2;
-    let yPos = h * 0.28;
+    const hasPhoto = agentBranding.showAgentPhoto && agentPhotoRef.current;
+    const hasLogo = agentBranding.showBrokerageLogo && brokerageLogoRef.current;
 
-    if (agentBranding.showName && agentBranding.name) {
+    let yPos = hasPhoto ? h * 0.22 : h * 0.28;
+
+    if (hasPhoto && agentPhotoRef.current) {
+      const photoSize = Math.max(60, w * 0.12);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(centerX, yPos, photoSize / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(agentPhotoRef.current, centerX - photoSize / 2, yPos - photoSize / 2, photoSize, photoSize);
+      ctx.restore();
+
+      ctx.strokeStyle = "rgba(255,255,255,0.3)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(centerX, yPos, photoSize / 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      yPos += photoSize / 2 + Math.max(16, w * 0.025);
+    }
+
+    if (agentBranding.name) {
       const nameSize = Math.max(24, w * 0.06);
       ctx.font = `700 ${nameSize}px ${headFont}`;
       ctx.fillStyle = "#ffffff";
@@ -613,8 +664,8 @@ function VideoComposer({
     }
 
     const contactLines: string[] = [];
-    if (agentBranding.showPhone && agentBranding.phone) contactLines.push(agentBranding.phone);
-    if (agentBranding.showEmail && agentBranding.email) contactLines.push(agentBranding.email);
+    if (agentBranding.phone) contactLines.push(agentBranding.phone);
+    if (agentBranding.email) contactLines.push(agentBranding.email);
 
     contactLines.forEach((line) => {
       const contactSize = Math.max(13, w * 0.028);
@@ -624,12 +675,30 @@ function VideoComposer({
       yPos += contactSize * 1.8;
     });
 
-    if (agentBranding.showBrokerage && agentBranding.brokerageName) {
+    if (agentBranding.brokerageName) {
       yPos += Math.max(6, w * 0.01);
+
+      if (hasLogo && brokerageLogoRef.current) {
+        const logoH = Math.max(30, w * 0.05);
+        const logoAspect = brokerageLogoRef.current.width / brokerageLogoRef.current.height;
+        const logoW = logoH * logoAspect;
+        ctx.globalAlpha = fadeIn * 0.7;
+        ctx.drawImage(brokerageLogoRef.current, centerX - logoW / 2, yPos - logoH / 2, logoW, logoH);
+        ctx.globalAlpha = fadeIn;
+        yPos += logoH + Math.max(6, w * 0.01);
+      }
+
       const brokSize = Math.max(11, w * 0.022);
       ctx.font = `500 ${brokSize}px ${bodyFont}`;
       ctx.fillStyle = "rgba(255,255,255,0.4)";
       ctx.fillText(agentBranding.brokerageName, centerX, yPos);
+    } else if (hasLogo && brokerageLogoRef.current) {
+      yPos += Math.max(10, w * 0.015);
+      const logoH = Math.max(30, w * 0.05);
+      const logoAspect = brokerageLogoRef.current.width / brokerageLogoRef.current.height;
+      const logoW = logoH * logoAspect;
+      ctx.globalAlpha = fadeIn * 0.7;
+      ctx.drawImage(brokerageLogoRef.current, centerX - logoW / 2, yPos - logoH / 2, logoW, logoH);
     }
 
     ctx.restore();
@@ -673,7 +742,7 @@ function VideoComposer({
       const headerSize = Math.max(32, w * 0.09);
       let yPos = h * 0.22;
       ctx.globalAlpha = staggerAlpha(headerDelay);
-      ctx.font = `900 italic ${headerSize}px "Bebas Neue", "Oswald", system-ui, sans-serif`;
+      ctx.font = `900 ${headerSize}px "Bebas Neue", "Oswald", system-ui, sans-serif`;
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -1025,14 +1094,14 @@ function VideoComposer({
       }
     }
 
-    if (currentPhoto.keyword) {
+    const propertyInfoVisible = globalProgress <= 0.15 && (!!propertyAddress || !!propertyDetails.price);
+    if (currentPhoto.keyword && !propertyInfoVisible) {
       drawKeywordOverlay(ctx, w, h, currentPhoto.keyword, photoProgress);
     }
-    if (currentPhoto.caption && settings.showCaptions) {
+    if (currentPhoto.caption && settings.showCaptions && !propertyInfoVisible) {
       drawCaptionOverlay(ctx, w, h, currentPhoto.caption, photoProgress);
     }
     drawPropertyInfo(ctx, w, h, globalProgress);
-    drawBrandingOverlay(ctx, w, h);
   }, [photos, settings, propertyAddress, propertyDetails, agentBranding]);
 
   const closingSlideDuration = agentBranding.showClosingSlide ? 4 : 0;
@@ -1086,14 +1155,14 @@ function VideoComposer({
       }
     }
 
-    if (currentPhoto?.keyword) {
+    const propertyInfoVisible = globalProgress <= 0.15 && (!!propertyAddress || !!propertyDetails.price);
+    if (currentPhoto?.keyword && !propertyInfoVisible) {
       drawKeywordOverlay(ctx, w, h, currentPhoto.keyword, photoProgress);
     }
-    if (currentPhoto) {
+    if (currentPhoto && !propertyInfoVisible) {
       drawCaptionOverlay(ctx, w, h, currentPhoto.caption, photoProgress);
     }
     drawPropertyInfo(ctx, w, h, globalProgress);
-    drawBrandingOverlay(ctx, w, h);
   }, [photos, settings, propertyAddress, propertyDetails, agentBranding, drawFrameVideoClip, closingSlideDuration]);
 
   const ensureFontsLoaded = async () => {
@@ -1378,15 +1447,19 @@ export default function ListingVideoPage() {
   });
   const [agentBranding, setAgentBranding] = useState<AgentBranding>({
     showName: true,
-    showEmail: false,
+    showEmail: true,
     showPhone: true,
     showBrokerage: false,
     showClosingSlide: true,
+    showAgentPhoto: false,
+    showBrokerageLogo: false,
     name: `${user?.firstName || ""} ${user?.lastName || ""}`.trim(),
     email: user?.email || "",
     phone: user?.profilePhone || "",
     brokerageName: "",
     roleText: "Licensed Real Estate Agent",
+    agentPhotoUrl: "",
+    brokerageLogoUrl: "",
   });
   const brandingInitializedRef = useRef(false);
   useEffect(() => {
@@ -2086,73 +2159,127 @@ export default function ListingVideoPage() {
                     <CardTitle className="text-base">Agent Info</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="text-sm">Name</Label>
-                      </div>
-                      <Switch
-                        checked={agentBranding.showName}
-                        onCheckedChange={(v) => setAgentBranding(b => ({ ...b, showName: v }))}
-                      />
-                    </div>
-                    {agentBranding.showName && (
+                    <div className="flex items-center justify-between gap-3">
+                      <Label className="text-sm shrink-0">Name</Label>
                       <Input
                         value={agentBranding.name}
                         onChange={(e) => setAgentBranding(b => ({ ...b, name: e.target.value }))}
                         placeholder="Your name"
+                        className="max-w-[220px]"
                       />
-                    )}
+                    </div>
 
                     <Separator />
 
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Phone</Label>
-                      <Switch
-                        checked={agentBranding.showPhone}
-                        onCheckedChange={(v) => setAgentBranding(b => ({ ...b, showPhone: v }))}
-                      />
-                    </div>
-                    {agentBranding.showPhone && (
-                      <Input
-                        value={agentBranding.phone}
-                        onChange={(e) => setAgentBranding(b => ({ ...b, phone: e.target.value }))}
-                        placeholder="(555) 123-4567"
-                      />
-                    )}
-
-                    <Separator />
-
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Email</Label>
-                      <Switch
-                        checked={agentBranding.showEmail}
-                        onCheckedChange={(v) => setAgentBranding(b => ({ ...b, showEmail: v }))}
-                      />
-                    </div>
-                    {agentBranding.showEmail && (
+                    <div className="flex items-center justify-between gap-3">
+                      <Label className="text-sm shrink-0">Email</Label>
                       <Input
                         value={agentBranding.email}
                         onChange={(e) => setAgentBranding(b => ({ ...b, email: e.target.value }))}
                         placeholder="agent@email.com"
+                        className="max-w-[220px]"
                       />
-                    )}
+                    </div>
 
                     <Separator />
 
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Brokerage</Label>
-                      <Switch
-                        checked={agentBranding.showBrokerage}
-                        onCheckedChange={(v) => setAgentBranding(b => ({ ...b, showBrokerage: v }))}
+                    <div className="flex items-center justify-between gap-3">
+                      <Label className="text-sm shrink-0">Phone</Label>
+                      <Input
+                        value={agentBranding.phone}
+                        onChange={(e) => setAgentBranding(b => ({ ...b, phone: e.target.value }))}
+                        placeholder="(555) 123-4567"
+                        className="max-w-[220px]"
                       />
                     </div>
-                    {agentBranding.showBrokerage && (
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between gap-3">
+                      <Label className="text-sm shrink-0">Brokerage</Label>
                       <Input
                         value={agentBranding.brokerageName}
                         onChange={(e) => setAgentBranding(b => ({ ...b, brokerageName: e.target.value }))}
                         placeholder="XYZ Realty Group"
+                        className="max-w-[220px]"
                       />
-                    )}
+                    </div>
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Label className="text-sm shrink-0">Agent Photo</Label>
+                        {agentBranding.agentPhotoUrl && (
+                          <img src={agentBranding.agentPhotoUrl} alt="Agent" className="w-10 h-10 rounded-full object-cover border" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-7"
+                          onClick={() => {
+                            const input = document.createElement("input");
+                            input.type = "file";
+                            input.accept = "image/*";
+                            input.onchange = (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = () => setAgentBranding(b => ({ ...b, agentPhotoUrl: reader.result as string, showAgentPhoto: true }));
+                              reader.readAsDataURL(file);
+                            };
+                            input.click();
+                          }}
+                        >
+                          {agentBranding.agentPhotoUrl ? "Change" : "Upload"}
+                        </Button>
+                        <Switch
+                          checked={agentBranding.showAgentPhoto}
+                          onCheckedChange={(v) => setAgentBranding(b => ({ ...b, showAgentPhoto: v }))}
+                          disabled={!agentBranding.agentPhotoUrl}
+                        />
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Label className="text-sm shrink-0">Brokerage Logo</Label>
+                        {agentBranding.brokerageLogoUrl && (
+                          <img src={agentBranding.brokerageLogoUrl} alt="Logo" className="h-8 max-w-[80px] object-contain" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-7"
+                          onClick={() => {
+                            const input = document.createElement("input");
+                            input.type = "file";
+                            input.accept = "image/*";
+                            input.onchange = (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = () => setAgentBranding(b => ({ ...b, brokerageLogoUrl: reader.result as string, showBrokerageLogo: true }));
+                              reader.readAsDataURL(file);
+                            };
+                            input.click();
+                          }}
+                        >
+                          {agentBranding.brokerageLogoUrl ? "Change" : "Upload"}
+                        </Button>
+                        <Switch
+                          checked={agentBranding.showBrokerageLogo}
+                          onCheckedChange={(v) => setAgentBranding(b => ({ ...b, showBrokerageLogo: v }))}
+                          disabled={!agentBranding.brokerageLogoUrl}
+                        />
+                      </div>
+                    </div>
 
                     <Separator />
 
