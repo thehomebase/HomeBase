@@ -1,4 +1,4 @@
-import { Composition } from "remotion";
+import { Composition, registerRoot } from "remotion";
 import { ListingVideo } from "./ListingVideo";
 import type { ListingVideoProps } from "./types";
 import { ASPECT_RATIOS } from "./types";
@@ -52,3 +52,5 @@ export function RemotionRoot() {
     </>
   );
 }
+
+registerRoot(RemotionRoot);
