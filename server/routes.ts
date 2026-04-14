@@ -15858,32 +15858,54 @@ export function registerRoutes(app: Express): Server {
 
       console.log(`[Hailuo] Generated successfully: ${videoUrl}`);
 
+      res.json({ videoUrl });
+
       const fs = await import("fs");
       const path = await import("path");
       const clipFilename = `clip_${req.user!.id}_${Date.now()}.mp4`;
       const clipDir = path.default.join(process.cwd(), "public", "clips");
       if (!fs.existsSync(clipDir)) fs.mkdirSync(clipDir, { recursive: true });
       const clipPath = path.default.join(clipDir, clipFilename);
-
       try {
         const clipResp = await fetch(videoUrl);
         if (clipResp.ok) {
           const arrayBuffer = await clipResp.arrayBuffer();
           fs.writeFileSync(clipPath, Buffer.from(arrayBuffer));
-          const localUrl = `/clips/${clipFilename}`;
-          console.log(`[Hailuo] Clip saved locally: ${localUrl} (${Math.round(arrayBuffer.byteLength / 1024)}KB)`);
-          res.json({ videoUrl: localUrl });
-        } else {
-          console.warn(`[Hailuo] Could not download clip for local storage, using CDN URL`);
-          res.json({ videoUrl });
+          console.log(`[Hailuo] Clip cached locally: /clips/${clipFilename} (${Math.round(arrayBuffer.byteLength / 1024)}KB)`);
         }
       } catch (dlErr: any) {
-        console.warn(`[Hailuo] Download to local failed: ${dlErr.message}, using CDN URL`);
-        res.json({ videoUrl });
+        console.warn(`[Hailuo] Local cache failed: ${dlErr.message}`);
       }
     } catch (error: any) {
       console.error("[Hailuo] Error:", error?.message || error);
       res.status(500).json({ error: error?.message || "AI video clip generation failed" });
+    }
+  });
+
+  app.get("/api/listing-videos/proxy-clip", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const url = req.query.url as string;
+    if (!url || typeof url !== "string") return res.status(400).json({ error: "Missing url" });
+    if (!url.startsWith("https://")) return res.status(400).json({ error: "Invalid URL" });
+    const allowedHosts = ["fal.media", "v3.fal.media", "storage.googleapis.com", "fal-cdn.batuhan.co"];
+    try {
+      const parsedUrl = new URL(url);
+      if (!allowedHosts.some(h => parsedUrl.hostname === h || parsedUrl.hostname.endsWith("." + h))) {
+        return res.status(403).json({ error: "URL domain not allowed" });
+      }
+    } catch {
+      return res.status(400).json({ error: "Invalid URL format" });
+    }
+    try {
+      const clipResp = await fetch(url);
+      if (!clipResp.ok) return res.status(502).json({ error: "Failed to fetch clip" });
+      res.set("Content-Type", clipResp.headers.get("content-type") || "video/mp4");
+      res.set("Cache-Control", "public, max-age=86400");
+      const arrayBuffer = await clipResp.arrayBuffer();
+      res.send(Buffer.from(arrayBuffer));
+    } catch (err: any) {
+      console.error("[ClipProxy] Error:", err?.message);
+      res.status(502).json({ error: "Proxy failed" });
     }
   });
 

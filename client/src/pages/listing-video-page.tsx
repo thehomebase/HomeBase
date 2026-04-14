@@ -142,7 +142,7 @@ function ClipPreviewModal({
           {photo.videoClipUrl ? (
             <video
               ref={videoRef}
-              src={photo.videoClipUrl.startsWith("/") ? window.location.origin + photo.videoClipUrl : photo.videoClipUrl}
+              src={photo.videoClipUrl.startsWith("https://") ? `/api/listing-videos/proxy-clip?url=${encodeURIComponent(photo.videoClipUrl)}` : photo.videoClipUrl}
               controls
               autoPlay
               loop
@@ -174,6 +174,7 @@ function VideoComposer({
   agentBranding,
   onExportStart,
   onExportEnd,
+  onClipError,
 }: {
   photos: PhotoItem[];
   settings: VideoSettings;
@@ -183,6 +184,7 @@ function VideoComposer({
   agentBranding: AgentBranding;
   onExportStart?: () => void;
   onExportEnd?: () => void;
+  onClipError?: (photoId: string) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -212,11 +214,17 @@ function VideoComposer({
       }
       if (photo.videoClipUrl) {
         const existing = videoElementsRef.current.get(photo.id);
-        const fullUrl = photo.videoClipUrl.startsWith("/") ? window.location.origin + photo.videoClipUrl : photo.videoClipUrl;
+        const resolveClipUrl = (url: string) => {
+          if (url.startsWith("https://")) {
+            return `/api/listing-videos/proxy-clip?url=${encodeURIComponent(url)}`;
+          }
+          return url.startsWith("/") ? url : `/${url}`;
+        };
+        const resolvedUrl = resolveClipUrl(photo.videoClipUrl);
         if (!existing || existing.getAttribute("data-clip-url") !== photo.videoClipUrl) {
           const video = document.createElement("video");
           video.crossOrigin = "anonymous";
-          video.src = fullUrl;
+          video.src = resolvedUrl;
           video.muted = true;
           video.playsInline = true;
           video.preload = "auto";
@@ -226,8 +234,10 @@ function VideoComposer({
             setVideosReady(prev => prev + 1);
             if (!isPlaying) drawFrame(0, 0);
           });
-          video.addEventListener("error", (e) => {
-            console.error(`[VideoClip] Error loading ${photo.id}:`, e);
+          video.addEventListener("error", () => {
+            console.warn(`[VideoClip] Failed to load clip for ${photo.id}, clearing broken URL`);
+            videoElementsRef.current.delete(photo.id);
+            onClipError?.(photo.id);
           });
           video.load();
           videoElementsRef.current.set(photo.id, video);
@@ -2518,6 +2528,9 @@ export default function ListingVideoPage() {
                   propertyAddress={propertyAddress}
                   user={user}
                   agentBranding={agentBranding}
+                  onClipError={(photoId) => {
+                    setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, videoClipUrl: undefined } : p));
+                  }}
                 />
               </CardContent>
             </Card>
