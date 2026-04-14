@@ -198,6 +198,7 @@ function VideoComposer({
   const videoElementsRef = useRef<Map<string, HTMLVideoElement>>(new Map());
   const musicPlayerRef = useRef<MusicPlayer | null>(null);
   const [videosReady, setVideosReady] = useState(0);
+  const isPlayingRef = useRef(false);
 
   const aspectRatio = ASPECT_RATIOS[settings.aspectRatio] || ASPECT_RATIOS["16:9"];
   const displayWidth = settings.aspectRatio === "9:16" ? 270 : settings.aspectRatio === "1:1" ? 400 : 480;
@@ -1107,10 +1108,12 @@ function VideoComposer({
     };
 
     if (video && video.readyState >= 2 && video.duration > 0) {
-      const motionProgress = Math.min(photoProgress / (1 - transRatio), 1);
-      const targetTime = motionProgress * video.duration;
-      if (Math.abs(video.currentTime - targetTime) > 0.05) {
-        video.currentTime = targetTime;
+      if (!isPlayingRef.current) {
+        const motionProgress = Math.min(photoProgress / (1 - transRatio), 1);
+        const targetTime = motionProgress * video.duration;
+        if (Math.abs(video.currentTime - targetTime) > 0.05) {
+          video.currentTime = targetTime;
+        }
       }
       drawVideoOrImage(video, isTransitioning ? 1 - transEase : 1);
     } else if (fallbackImg) {
@@ -1123,7 +1126,9 @@ function VideoComposer({
       const nextVideo = videoElementsRef.current.get(nextPhoto?.id);
       const nextImg = loadedImagesRef.current.get(nextPhoto?.id);
       if (nextVideo && nextVideo.readyState >= 2 && nextVideo.duration > 0) {
-        nextVideo.currentTime = transEase * 0.08 * nextVideo.duration;
+        if (!isPlayingRef.current) {
+          nextVideo.currentTime = transEase * 0.08 * nextVideo.duration;
+        }
         drawVideoOrImage(nextVideo, transEase);
       } else if (nextImg) {
         drawVideoOrImage(nextImg, transEase);
@@ -1237,9 +1242,11 @@ function VideoComposer({
     if (photos.length === 0) return;
     ensureFontsLoaded();
     setIsPlaying(true);
+    isPlayingRef.current = true;
     const photosDuration = photos.length * (settings.photoDuration + settings.transitionDuration);
     const totalDuration = photosDuration + closingSlideDuration;
     const startTime = performance.now();
+    const segmentDuration = settings.photoDuration + settings.transitionDuration;
 
     if (musicPlayerRef.current) {
       musicPlayerRef.current.stop();
@@ -1253,13 +1260,38 @@ function VideoComposer({
       musicPlayerRef.current = player;
     }
 
+    let lastActiveIdx = -1;
+
+    const startVideoForPhoto = (idx: number) => {
+      const photo = photos[idx];
+      if (!photo) return;
+      const video = videoElementsRef.current.get(photo.id);
+      if (video && video.readyState >= 2 && video.duration > 0) {
+        const transRatio = settings.transitionDuration / segmentDuration;
+        const clipPlayDur = segmentDuration * (1 - transRatio);
+        video.currentTime = 0;
+        video.playbackRate = Math.min(Math.max(video.duration / clipPlayDur, 0.25), 4);
+        video.muted = true;
+        video.play().catch(() => {});
+      }
+    };
+
+    const pauseVideoForPhoto = (idx: number) => {
+      const photo = photos[idx];
+      if (!photo) return;
+      const video = videoElementsRef.current.get(photo.id);
+      if (video) video.pause();
+    };
+
     const animate = (time: number) => {
       const elapsed = (time - startTime) / 1000;
       const globalProgress = elapsed / totalDuration;
       if (globalProgress >= 1) {
+        isPlayingRef.current = false;
         setIsPlaying(false);
         setCurrentPhotoIndex(0);
         setProgress(0);
+        videoElementsRef.current.forEach(v => v.pause());
         drawFrame(0, 0, 0);
         if (musicPlayerRef.current) {
           musicPlayerRef.current.stop();
@@ -1268,9 +1300,27 @@ function VideoComposer({
         return;
       }
       setProgress(globalProgress);
-      const segmentDuration = settings.photoDuration + settings.transitionDuration;
       const photoIdx = Math.min(Math.floor(elapsed / segmentDuration), photos.length - 1);
       const photoProgress = (elapsed - photoIdx * segmentDuration) / segmentDuration;
+
+      if (photoIdx !== lastActiveIdx) {
+        if (lastActiveIdx >= 0) pauseVideoForPhoto(lastActiveIdx);
+        startVideoForPhoto(photoIdx);
+        lastActiveIdx = photoIdx;
+      }
+
+      const transRatio = settings.transitionDuration / segmentDuration;
+      if (photoProgress > (1 - transRatio)) {
+        const nextIdx = (photoIdx + 1) % photos.length;
+        const nextVideo = videoElementsRef.current.get(photos[nextIdx]?.id);
+        if (nextVideo && nextVideo.paused && nextVideo.readyState >= 2) {
+          nextVideo.currentTime = 0;
+          nextVideo.playbackRate = Math.min(Math.max(nextVideo.duration / (segmentDuration * (1 - transRatio)), 0.25), 4);
+          nextVideo.muted = true;
+          nextVideo.play().catch(() => {});
+        }
+      }
+
       setCurrentPhotoIndex(photoIdx);
       drawFrame(photoIdx, Math.min(photoProgress, 1), globalProgress);
       animationRef.current = requestAnimationFrame(animate);
@@ -1284,12 +1334,16 @@ function VideoComposer({
       musicPlayerRef.current.stop();
       musicPlayerRef.current = null;
     }
+    isPlayingRef.current = false;
+    videoElementsRef.current.forEach(v => v.pause());
     setIsPlaying(false);
   }, []);
 
   const exportVideo = useCallback(async () => {
     if (photos.length === 0) return;
     await ensureFontsLoaded();
+    isPlayingRef.current = false;
+    videoElementsRef.current.forEach(v => v.pause());
     setIsExporting(true);
     onExportStart?.();
 
@@ -1355,10 +1409,12 @@ function VideoComposer({
       const seekVideo = (video: HTMLVideoElement, time: number): Promise<void> => {
         return new Promise((resolve) => {
           if (Math.abs(video.currentTime - time) < 0.02) { resolve(); return; }
-          const onSeeked = () => { video.removeEventListener("seeked", onSeeked); resolve(); };
+          let resolved = false;
+          const done = () => { if (!resolved) { resolved = true; resolve(); } };
+          const onSeeked = () => { video.removeEventListener("seeked", onSeeked); done(); };
           video.addEventListener("seeked", onSeeked);
           video.currentTime = time;
-          setTimeout(resolve, 200);
+          setTimeout(done, 500);
         });
       };
 
@@ -1391,7 +1447,8 @@ function VideoComposer({
         }
 
         setProgress(globalProgress);
-        await new Promise(r => setTimeout(r, frameDurationMs));
+        const hasVideoSeek = exportPhoto?.videoClipUrl && videoElementsRef.current.has(exportPhoto.id);
+        await new Promise(r => setTimeout(r, hasVideoSeek ? frameDurationMs : 8));
       }
 
       if (canvasRef.current) {
