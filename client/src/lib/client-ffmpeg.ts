@@ -68,7 +68,7 @@ export async function convertWebmToMp4(
     await ffmpeg.exec([
       "-i", "input.webm",
       "-c:v", "libx264",
-      "-preset", "medium",
+      "-preset", "veryfast",
       "-crf", "26",
       "-maxrate", "4M",
       "-bufsize", "8M",
