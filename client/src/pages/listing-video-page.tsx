@@ -317,70 +317,92 @@ function VideoComposer({
     if (tmpl === "bold") {
       const slideIn = easeOut(Math.min(1, photoProgress * 3));
       ctx.globalAlpha = alpha;
-      const fontSize = Math.max(22, w * 0.055);
-      const fontFamily = '"Inter", system-ui, sans-serif';
-      ctx.font = `900 ${fontSize}px ${fontFamily}`;
+      const fontSize = Math.max(22, w * 0.05);
+      ctx.font = `800 ${fontSize}px "Oswald", "Montserrat", system-ui, sans-serif`;
       const barW = 4;
       const margin = w * 0.05;
       const textX = margin + barW + fontSize * 0.5;
       const textY = h - h * 0.1;
       const offsetX = (1 - slideIn) * -40;
+
+      const bgGrad = ctx.createLinearGradient(0, textY - fontSize, w * 0.5, textY - fontSize);
+      bgGrad.addColorStop(0, "rgba(0,0,0,0.5)");
+      bgGrad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, textY - fontSize * 1.2, w * 0.5, fontSize * 2.4);
+
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(margin + offsetX, textY - fontSize * 0.8, barW, fontSize * 1.2);
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.shadowColor = "rgba(0,0,0,0.7)";
-      ctx.shadowBlur = 8;
+      ctx.shadowColor = "rgba(0,0,0,0.8)";
+      ctx.shadowBlur = 10;
       ctx.shadowOffsetX = 2;
       ctx.shadowOffsetY = 2;
       ctx.fillText(keyword.toUpperCase(), textX + offsetX, textY);
     } else if (tmpl === "minimal") {
       const slideUp = easeOut(Math.min(1, photoProgress * 3));
-      const fontSize = Math.max(16, w * 0.04);
-      const fontFamily = '"Inter", system-ui, sans-serif';
-      ctx.font = `600 ${fontSize}px ${fontFamily}`;
-      const margin = w * 0.05;
+      const fontSize = Math.max(16, w * 0.038);
+      ctx.font = `600 ${fontSize}px "Montserrat", system-ui, sans-serif`;
+      const margin = w * 0.06;
       const baseY = h - h * 0.08;
       const offsetY = (1 - slideUp) * 20;
-      ctx.fillStyle = "#ffffff";
+      const accentGrad = ctx.createLinearGradient(margin, baseY - fontSize * 0.6, margin, baseY + fontSize * 0.3);
+      accentGrad.addColorStop(0, "rgba(255,255,255,0.9)");
+      accentGrad.addColorStop(1, "rgba(255,255,255,0.3)");
+      ctx.fillStyle = accentGrad;
       ctx.fillRect(margin, baseY - fontSize * 0.6 + offsetY, 3, fontSize * 0.9);
+      ctx.fillStyle = "#ffffff";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.shadowColor = "rgba(0,0,0,0.5)";
-      ctx.shadowBlur = 6;
-      ctx.fillText(keyword.toUpperCase(), margin + 12, baseY + offsetY);
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = 8;
+      ctx.fillText(keyword.toUpperCase(), margin + 14, baseY + offsetY);
     } else if (tmpl === "elegant") {
-      const fontSize = Math.max(18, w * 0.045);
-      const fontFamily = '"Georgia", "Times New Roman", serif';
-      ctx.font = `italic 400 ${fontSize}px ${fontFamily}`;
+      const fontSize = Math.max(18, w * 0.042);
+      ctx.font = `italic 400 ${fontSize}px "Playfair Display", Georgia, serif`;
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.shadowColor = "rgba(0,0,0,0.6)";
-      ctx.shadowBlur = 10;
-      const letterSpaced = keyword.toUpperCase().split("").join(" ");
-      ctx.fillText(letterSpaced, w / 2, h * 0.88);
-      const lineW = Math.min(ctx.measureText(letterSpaced).width * 0.6, w * 0.3);
-      ctx.strokeStyle = "rgba(255,255,255,0.5)";
-      ctx.lineWidth = 1;
+      ctx.shadowBlur = 12;
+      const spaced = keyword.toUpperCase().split("").join("\u200A");
+      ctx.fillText(spaced, w / 2, h * 0.88);
+      const lineW = Math.min(ctx.measureText(spaced).width * 0.5, w * 0.25);
+      ctx.strokeStyle = "rgba(255,255,255,0.4)";
+      ctx.lineWidth = 0.8;
       ctx.beginPath();
       ctx.moveTo(w / 2 - lineW / 2, h * 0.88 + fontSize * 0.8);
       ctx.lineTo(w / 2 + lineW / 2, h * 0.88 + fontSize * 0.8);
       ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.beginPath();
+      ctx.arc(w / 2, h * 0.88 + fontSize * 0.8, 2, 0, Math.PI * 2);
+      ctx.fill();
     } else {
-      const fontSize = Math.max(18, w * 0.045);
-      ctx.font = `700 ${fontSize}px "Inter", system-ui, sans-serif`;
+      const fontSize = Math.max(18, w * 0.042);
+      ctx.font = `700 ${fontSize}px "Montserrat", system-ui, sans-serif`;
       const metrics = ctx.measureText(keyword.toUpperCase());
       const textW = metrics.width;
-      const padding = fontSize * 0.7;
-      const boxW = textW + padding * 2;
-      const boxH = fontSize * 2;
+      const padX = fontSize * 1;
+      const padY = fontSize * 0.6;
+      const boxW = textW + padX * 2;
+      const boxH = fontSize + padY * 2;
       const boxX = (w - boxW) / 2;
       const boxY = h * 0.12;
-      ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+      const bgGrad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY);
+      bgGrad.addColorStop(0, "rgba(0,0,0,0.7)");
+      bgGrad.addColorStop(0.5, "rgba(0,0,0,0.55)");
+      bgGrad.addColorStop(1, "rgba(0,0,0,0.7)");
+      ctx.fillStyle = bgGrad;
       ctx.beginPath();
-      ctx.roundRect(boxX, boxY, boxW, boxH, 8);
+      ctx.roundRect(boxX, boxY, boxW, boxH, 10);
       ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 10);
+      ctx.stroke();
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -519,6 +541,7 @@ function VideoComposer({
 
   const drawClosingSlide = (ctx: CanvasRenderingContext2D, w: number, h: number, slideProgress: number) => {
     if (!agentBranding.showClosingSlide) return;
+    if (settings.textTemplate === "none") return;
     const tmpl = settings.textTemplate || "classic";
     const headFont = tmpl === "elegant"
       ? '"Playfair Display", Georgia, serif'
@@ -871,7 +894,7 @@ function VideoComposer({
       if (propertyDetails.sqft) details.push(`${propertyDetails.sqft} Sq Ft`);
       if (details.length > 0) {
         const detSize = Math.max(11, w * 0.023);
-        ctx.font = `300 ${detSize}px ${serifFont}`;
+        ctx.font = `400 ${detSize}px ${serifFont}`;
         ctx.fillStyle = "rgba(255,255,255,0.6)";
         ctx.shadowBlur = 0;
         ctx.fillText(details.join("     ·     "), w / 2, yPos);
@@ -1073,8 +1096,20 @@ function VideoComposer({
     drawBrandingOverlay(ctx, w, h);
   }, [photos, settings, propertyAddress, propertyDetails, agentBranding, drawFrameVideoClip, closingSlideDuration]);
 
+  const ensureFontsLoaded = async () => {
+    try {
+      await Promise.all([
+        document.fonts.load('900 48px "Bebas Neue"'),
+        document.fonts.load('italic 400 48px "Playfair Display"'),
+        document.fonts.load('700 48px "Montserrat"'),
+        document.fonts.load('700 48px "Oswald"'),
+      ]);
+    } catch {}
+  };
+
   const playPreview = useCallback(() => {
     if (photos.length === 0) return;
+    ensureFontsLoaded();
     setIsPlaying(true);
     const photosDuration = photos.length * (settings.photoDuration + settings.transitionDuration);
     const totalDuration = photosDuration + closingSlideDuration;
@@ -1128,6 +1163,7 @@ function VideoComposer({
 
   const exportVideo = useCallback(async () => {
     if (photos.length === 0) return;
+    await ensureFontsLoaded();
     setIsExporting(true);
     onExportStart?.();
 
