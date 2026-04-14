@@ -1380,7 +1380,7 @@ function VideoComposer({
         : MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
       const mediaRecorder = new MediaRecorder(combinedStream, {
         mimeType,
-        videoBitsPerSecond: 8000000,
+        videoBitsPerSecond: 4000000,
       });
 
       const chunks: Blob[] = [];

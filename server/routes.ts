@@ -16085,7 +16085,7 @@ export function registerRoutes(app: Express): Server {
       console.log(`[FFmpeg] Job ${jobId}: Status written to object storage`);
       res.json({ jobId });
 
-      const cmd = `ffmpeg -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 128k -movflags +faststart -threads 0 -y "${outputPath}"`;
+      const cmd = `ffmpeg -i "${inputPath}" -c:v libx264 -preset medium -crf 26 -maxrate 4M -bufsize 8M -c:a aac -b:a 128k -movflags +faststart -threads 0 -y "${outputPath}"`;
       const proc = exec(cmd, { timeout: 300000, maxBuffer: 10 * 1024 * 1024 }, async (error, _stdout, stderr) => {
         try { fs.unlinkSync(inputPath); } catch {}
         if (error) {
