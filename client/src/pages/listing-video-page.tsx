@@ -1267,10 +1267,8 @@ function VideoComposer({
       if (!photo) return;
       const video = videoElementsRef.current.get(photo.id);
       if (video && video.readyState >= 2 && video.duration > 0) {
-        const transRatio = settings.transitionDuration / segmentDuration;
-        const clipPlayDur = segmentDuration * (1 - transRatio);
         video.currentTime = 0;
-        video.playbackRate = Math.min(Math.max(video.duration / clipPlayDur, 0.25), 4);
+        video.playbackRate = Math.min(Math.max(video.duration / segmentDuration, 0.25), 4);
         video.muted = true;
         video.play().catch(() => {});
       }
@@ -1315,7 +1313,7 @@ function VideoComposer({
         const nextVideo = videoElementsRef.current.get(photos[nextIdx]?.id);
         if (nextVideo && nextVideo.paused && nextVideo.readyState >= 2) {
           nextVideo.currentTime = 0;
-          nextVideo.playbackRate = Math.min(Math.max(nextVideo.duration / (segmentDuration * (1 - transRatio)), 0.25), 4);
+          nextVideo.playbackRate = Math.min(Math.max(nextVideo.duration / segmentDuration, 0.25), 4);
           nextVideo.muted = true;
           nextVideo.play().catch(() => {});
         }
@@ -1474,8 +1472,9 @@ function VideoComposer({
       };
 
       try {
+        console.log(`[Export] Uploading ${Math.round(blob.size / 1024)}KB WebM for MP4 conversion...`);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000);
+        const timeoutId = setTimeout(() => controller.abort(), 300000);
         const formData = new FormData();
         formData.append("video", blob, "listing-video.webm");
         const convResp = await fetch("/api/listing-videos/convert-to-mp4", {
@@ -1486,17 +1485,20 @@ function VideoComposer({
         });
         clearTimeout(timeoutId);
         if (convResp.ok) {
+          console.log("[Export] MP4 conversion succeeded, downloading...");
           const mp4Blob = await convResp.blob();
+          console.log(`[Export] MP4 downloaded: ${Math.round(mp4Blob.size / 1024)}KB`);
           downloadBlob(mp4Blob, "mp4");
         } else {
-          console.warn("MP4 conversion failed, falling back to WebM");
+          const errText = await convResp.text().catch(() => "");
+          console.warn(`[Export] MP4 conversion failed (${convResp.status}): ${errText}, falling back to WebM`);
           downloadBlob(blob, "webm");
         }
       } catch (convErr: any) {
         if (convErr?.name === "AbortError") {
-          console.warn("MP4 conversion timed out, falling back to WebM");
+          console.warn("[Export] MP4 conversion timed out (5min), falling back to WebM");
         } else {
-          console.warn("MP4 conversion unavailable, falling back to WebM");
+          console.warn("[Export] MP4 conversion error:", convErr?.message || convErr);
         }
         downloadBlob(blob, "webm");
       }
