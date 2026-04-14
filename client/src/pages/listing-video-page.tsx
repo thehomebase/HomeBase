@@ -1120,8 +1120,8 @@ function VideoComposer({
       drawVideoOrImage(fallbackImg, isTransitioning ? 1 - transEase : 1);
     }
 
-    if (isTransitioning) {
-      const nextIdx = (photoIdx + 1) % photos.length;
+    if (isTransitioning && photoIdx < photos.length - 1) {
+      const nextIdx = photoIdx + 1;
       const nextPhoto = photos[nextIdx];
       const nextVideo = videoElementsRef.current.get(nextPhoto?.id);
       const nextImg = loadedImagesRef.current.get(nextPhoto?.id);
@@ -1208,8 +1208,8 @@ function VideoComposer({
       drawImageWithMotion(ctx, currentImg, w, h, currentPhoto.motionType, photoProgress, alpha);
     }
 
-    if (isTransitioning && !currentPhoto?.videoClipUrl) {
-      const nextIdx = (photoIdx + 1) % photos.length;
+    if (isTransitioning && !currentPhoto?.videoClipUrl && photoIdx < photos.length - 1) {
+      const nextIdx = photoIdx + 1;
       const nextPhoto = photos[nextIdx];
       const nextImg = loadedImagesRef.current.get(nextPhoto?.id);
       if (nextImg) {
@@ -1308,8 +1308,8 @@ function VideoComposer({
       }
 
       const transRatio = settings.transitionDuration / segmentDuration;
-      if (photoProgress > (1 - transRatio)) {
-        const nextIdx = (photoIdx + 1) % photos.length;
+      if (photoProgress > (1 - transRatio) && photoIdx < photos.length - 1) {
+        const nextIdx = photoIdx + 1;
         const nextVideo = videoElementsRef.current.get(photos[nextIdx]?.id);
         if (nextVideo && nextVideo.paused && nextVideo.readyState >= 2) {
           nextVideo.currentTime = 0;
@@ -1473,33 +1473,57 @@ function VideoComposer({
 
       try {
         console.log(`[Export] Uploading ${Math.round(blob.size / 1024)}KB WebM for MP4 conversion...`);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000);
         const formData = new FormData();
         formData.append("video", blob, "listing-video.webm");
-        const convResp = await fetch("/api/listing-videos/convert-to-mp4", {
+        const startResp = await fetch("/api/listing-videos/convert-to-mp4", {
           method: "POST",
           body: formData,
           credentials: "include",
-          signal: controller.signal,
         });
-        clearTimeout(timeoutId);
-        if (convResp.ok) {
-          console.log("[Export] MP4 conversion succeeded, downloading...");
-          const mp4Blob = await convResp.blob();
-          console.log(`[Export] MP4 downloaded: ${Math.round(mp4Blob.size / 1024)}KB`);
-          downloadBlob(mp4Blob, "mp4");
-        } else {
-          const errText = await convResp.text().catch(() => "");
-          console.warn(`[Export] MP4 conversion failed (${convResp.status}): ${errText}, falling back to WebM`);
+        if (!startResp.ok) {
+          console.warn(`[Export] MP4 upload failed (${startResp.status}), falling back to WebM`);
           downloadBlob(blob, "webm");
+        } else {
+          const { jobId } = await startResp.json();
+          console.log(`[Export] MP4 conversion started, job: ${jobId}`);
+
+          const pollForCompletion = async (): Promise<boolean> => {
+            const maxWait = 300000;
+            const pollInterval = 3000;
+            const start = Date.now();
+            while (Date.now() - start < maxWait) {
+              await new Promise(r => setTimeout(r, pollInterval));
+              try {
+                const statusResp = await fetch(`/api/listing-videos/convert-status/${jobId}`, { credentials: "include" });
+                if (!statusResp.ok) return false;
+                const { status, error } = await statusResp.json();
+                if (status === "complete") return true;
+                if (status === "failed") { console.warn(`[Export] MP4 conversion failed: ${error}`); return false; }
+                console.log(`[Export] MP4 converting... (${Math.round((Date.now() - start) / 1000)}s)`);
+              } catch { return false; }
+            }
+            console.warn("[Export] MP4 conversion timed out (5min)");
+            return false;
+          };
+
+          const success = await pollForCompletion();
+          if (success) {
+            console.log("[Export] Downloading MP4...");
+            const dlResp = await fetch(`/api/listing-videos/download-mp4/${jobId}`, { credentials: "include" });
+            if (dlResp.ok) {
+              const mp4Blob = await dlResp.blob();
+              console.log(`[Export] MP4 downloaded: ${Math.round(mp4Blob.size / 1024)}KB`);
+              downloadBlob(mp4Blob, "mp4");
+            } else {
+              console.warn("[Export] MP4 download failed, falling back to WebM");
+              downloadBlob(blob, "webm");
+            }
+          } else {
+            downloadBlob(blob, "webm");
+          }
         }
       } catch (convErr: any) {
-        if (convErr?.name === "AbortError") {
-          console.warn("[Export] MP4 conversion timed out (5min), falling back to WebM");
-        } else {
-          console.warn("[Export] MP4 conversion error:", convErr?.message || convErr);
-        }
+        console.warn("[Export] MP4 conversion error:", convErr?.message || convErr);
         downloadBlob(blob, "webm");
       }
       drawFrame(0, 0, 0);

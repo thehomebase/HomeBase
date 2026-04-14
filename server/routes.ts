@@ -16060,6 +16060,17 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  const mp4ConversionJobs = new Map<string, { status: "processing" | "complete" | "failed"; outputPath?: string; error?: string; createdAt: number }>();
+  setInterval(() => {
+    const now = Date.now();
+    mp4ConversionJobs.forEach((job, id) => {
+      if (now - job.createdAt > 30 * 60 * 1000) {
+        if (job.outputPath) { try { require("fs").unlinkSync(job.outputPath); } catch {} }
+        mp4ConversionJobs.delete(id);
+      }
+    });
+  }, 5 * 60 * 1000);
+
   app.post("/api/listing-videos/convert-to-mp4", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const multer = (await import("multer")).default;
@@ -16072,45 +16083,63 @@ export function registerRoutes(app: Express): Server {
       const os = await import("os");
       const path = await import("path");
       const tmpDir = os.tmpdir();
-      const inputPath = path.join(tmpDir, `input_${req.user!.id}_${Date.now()}.webm`);
-      const outputPath = path.join(tmpDir, `output_${req.user!.id}_${Date.now()}.mp4`);
-      try {
-        fs.writeFileSync(inputPath, req.file.buffer);
-        const fileSizeKB = Math.round(req.file.buffer.length / 1024);
-        console.log(`[FFmpeg] Starting conversion: ${inputPath} (${fileSizeKB}KB)`);
-        await new Promise<void>((resolve, reject) => {
-          const cmd = `ffmpeg -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 128k -movflags +faststart -threads 0 -y "${outputPath}"`;
-          const proc = exec(cmd, { timeout: 300000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
-            if (error) {
-              console.error("[FFmpeg] Conversion error:", (stderr || stdout || "")?.slice(-500));
-              reject(new Error("Video conversion failed"));
-            } else {
-              console.log("[FFmpeg] Conversion complete");
-              resolve();
-            }
-          });
-          proc.stderr?.on("data", (data: string) => {
-            const match = data.match(/time=(\d+:\d+:\d+\.\d+)/);
-            if (match) console.log(`[FFmpeg] Progress: ${match[1]}`);
-          });
-        });
-        const stat = fs.statSync(outputPath);
-        res.set("Content-Type", "video/mp4");
-        res.set("Content-Length", String(stat.size));
-        res.set("Content-Disposition", `attachment; filename="listing-video-${Date.now()}.mp4"`);
-        const readStream = fs.createReadStream(outputPath);
-        readStream.pipe(res);
-        readStream.on("end", () => {
-          try { fs.unlinkSync(inputPath); } catch {}
-          try { fs.unlinkSync(outputPath); } catch {}
-        });
-      } catch (convErr: any) {
+      const jobId = `mp4_${req.user!.id}_${Date.now()}`;
+      const inputPath = path.join(tmpDir, `input_${jobId}.webm`);
+      const outputPath = path.join(tmpDir, `output_${jobId}.mp4`);
+      fs.writeFileSync(inputPath, req.file.buffer);
+      const fileSizeKB = Math.round(req.file.buffer.length / 1024);
+      console.log(`[FFmpeg] Job ${jobId}: Starting conversion (${fileSizeKB}KB)`);
+      mp4ConversionJobs.set(jobId, { status: "processing", outputPath, createdAt: Date.now() });
+      res.json({ jobId });
+
+      const cmd = `ffmpeg -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 128k -movflags +faststart -threads 0 -y "${outputPath}"`;
+      const proc = exec(cmd, { timeout: 300000, maxBuffer: 10 * 1024 * 1024 }, (error, _stdout, stderr) => {
         try { fs.unlinkSync(inputPath); } catch {}
-        try { fs.unlinkSync(outputPath); } catch {}
-        console.error("[FFmpeg] Error:", convErr?.message);
-        res.status(500).json({ error: "Video conversion failed" });
-      }
+        if (error) {
+          console.error(`[FFmpeg] Job ${jobId}: Conversion error:`, (stderr || "").slice(-500));
+          mp4ConversionJobs.set(jobId, { status: "failed", error: "Conversion failed", createdAt: Date.now() });
+          try { fs.unlinkSync(outputPath); } catch {}
+        } else {
+          console.log(`[FFmpeg] Job ${jobId}: Conversion complete`);
+          mp4ConversionJobs.set(jobId, { status: "complete", outputPath, createdAt: Date.now() });
+        }
+      });
+      proc.stderr?.on("data", (data: string) => {
+        const match = data.match(/time=(\d+:\d+:\d+\.\d+)/);
+        if (match) console.log(`[FFmpeg] Job ${jobId}: Progress ${match[1]}`);
+      });
     });
+  });
+
+  app.get("/api/listing-videos/convert-status/:jobId", (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const job = mp4ConversionJobs.get(req.params.jobId);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    res.json({ status: job.status, error: job.error });
+  });
+
+  app.get("/api/listing-videos/download-mp4/:jobId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const job = mp4ConversionJobs.get(req.params.jobId);
+    if (!job || job.status !== "complete" || !job.outputPath) {
+      return res.status(404).json({ error: "MP4 not ready" });
+    }
+    const fs = await import("fs");
+    try {
+      const stat = fs.statSync(job.outputPath);
+      res.set("Content-Type", "video/mp4");
+      res.set("Content-Length", String(stat.size));
+      res.set("Content-Disposition", `attachment; filename="listing-video-${Date.now()}.mp4"`);
+      const readStream = fs.createReadStream(job.outputPath);
+      readStream.pipe(res);
+      readStream.on("end", () => {
+        try { fs.unlinkSync(job.outputPath!); } catch {}
+        mp4ConversionJobs.delete(req.params.jobId);
+      });
+    } catch {
+      res.status(500).json({ error: "File not found" });
+      mp4ConversionJobs.delete(req.params.jobId);
+    }
   });
 
   app.post("/api/listing-videos/analyze-photos", async (req, res) => {
