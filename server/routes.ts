@@ -16140,12 +16140,41 @@ export function registerRoutes(app: Express): Server {
           const fs = await import("fs");
           const pathMod = await import("path");
           const os = await import("os");
+          const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
+          const s3Region = process.env.REMOTION_AWS_REGION || "us-east-1";
+          const s3 = new S3Client({ region: s3Region });
+          const bucketMatch = (process.env.REMOTION_SERVE_URL || "").match(/\/\/(remotionlambda-[^.]+)\./);
+          const bucketName = bucketMatch?.[1] || "remotionlambda-useast1-dkoz0smins";
 
           const resolvedPhotos = await Promise.all(photos.map(async (photo: any) => {
-            if (!photo.videoClipUrl) return photo;
+            const resolved = { ...photo };
+
+            if (resolved.dataUrl && resolved.dataUrl.startsWith("data:")) {
+              try {
+                const match = resolved.dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+                if (match) {
+                  const contentType = match[1];
+                  const ext = contentType.split("/")[1] || "jpeg";
+                  const imageBuffer = Buffer.from(match[2], "base64");
+                  const imageKey = `render-assets/${jobId}/${photo.id}.${ext}`;
+                  await s3.send(new PutObjectCommand({
+                    Bucket: bucketName,
+                    Key: imageKey,
+                    Body: imageBuffer,
+                    ContentType: contentType,
+                  }));
+                  resolved.dataUrl = `https://${bucketName}.s3.${s3Region}.amazonaws.com/${imageKey}`;
+                  console.log(`[Remotion Lambda] Uploaded image for photo ${photo.id} to S3`);
+                }
+              } catch (err: any) {
+                console.warn(`[Remotion Lambda] Job ${jobId}: Image upload failed for photo ${photo.id}: ${err.message}`);
+              }
+            }
+
+            if (!resolved.videoClipUrl) return resolved;
             try {
               let clipBuffer: Buffer | null = null;
-              const clipUrl = photo.videoClipUrl as string;
+              const clipUrl = resolved.videoClipUrl as string;
 
               if (clipUrl.startsWith("/api/listing-videos/serve-clip/clips/")) {
                 const filename = clipUrl.split("/").pop()!;
@@ -16159,36 +16188,47 @@ export function registerRoutes(app: Express): Server {
                   if (result.ok) clipBuffer = Buffer.from(result.value);
                 }
               } else if (clipUrl.startsWith("https://")) {
-                return photo;
+                return resolved;
               }
 
               if (clipBuffer) {
-                const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
-                const s3 = new S3Client({ region: process.env.REMOTION_AWS_REGION || "us-east-1" });
                 const clipKey = `render-clips/${jobId}/${photo.id}.mp4`;
-                const bucketMatch = (process.env.REMOTION_SERVE_URL || "").match(/\/\/(remotionlambda-[^.]+)\./);
-                const bucketName = bucketMatch?.[1] || "remotionlambda-useast1-dkoz0smins";
                 await s3.send(new PutObjectCommand({
                   Bucket: bucketName,
                   Key: clipKey,
                   Body: clipBuffer,
                   ContentType: "video/mp4",
                 }));
-                const publicUrl = `https://${bucketName}.s3.${process.env.REMOTION_AWS_REGION || "us-east-1"}.amazonaws.com/${clipKey}`;
+                const publicUrl = `https://${bucketName}.s3.${s3Region}.amazonaws.com/${clipKey}`;
                 console.log(`[Remotion Lambda] Uploaded clip for photo ${photo.id} to S3: ${publicUrl}`);
-                return { ...photo, videoClipUrl: publicUrl };
+                return { ...resolved, videoClipUrl: publicUrl };
               }
               console.warn(`[Remotion Lambda] Job ${jobId}: Could not resolve clip for photo ${photo.id}, using Ken Burns fallback`);
-              return { ...photo, videoClipUrl: undefined };
+              return { ...resolved, videoClipUrl: undefined };
             } catch (err: any) {
               console.warn(`[Remotion Lambda] Job ${jobId}: Clip resolution failed for photo ${photo.id}: ${err.message}`);
-              return { ...photo, videoClipUrl: undefined };
+              return { ...resolved, videoClipUrl: undefined };
             }
           }));
 
+          const resolvedBranding = { ...agentBranding };
+          const uploadBase64ToS3 = async (dataUrl: string, key: string): Promise<string> => {
+            const m = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+            if (!m) return dataUrl;
+            const buf = Buffer.from(m[2], "base64");
+            await s3.send(new PutObjectCommand({ Bucket: bucketName, Key: key, Body: buf, ContentType: m[1] }));
+            return `https://${bucketName}.s3.${s3Region}.amazonaws.com/${key}`;
+          };
+          if (resolvedBranding.agentPhotoUrl?.startsWith("data:")) {
+            resolvedBranding.agentPhotoUrl = await uploadBase64ToS3(resolvedBranding.agentPhotoUrl, `render-assets/${jobId}/agent-photo.png`);
+          }
+          if (resolvedBranding.brokerageLogoUrl?.startsWith("data:")) {
+            resolvedBranding.brokerageLogoUrl = await uploadBase64ToS3(resolvedBranding.brokerageLogoUrl, `render-assets/${jobId}/brokerage-logo.png`);
+          }
+
           const { renderListingVideoOnLambda } = await import("./remotion-render");
           const result = await renderListingVideoOnLambda(
-            { photos: resolvedPhotos, settings, propertyDetails, propertyAddress, agentBranding },
+            { photos: resolvedPhotos, settings, propertyDetails, propertyAddress, agentBranding: resolvedBranding },
             (progress) => {
               remotionRenderJobs.set(jobId, { status: "processing", progress: Math.round(progress * 100), userId, updatedAt: Date.now() });
             }

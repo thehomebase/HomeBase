@@ -90,33 +90,53 @@ export async function renderListingVideoOnLambda(
 
   console.log(`[Remotion Lambda] Render started: renderId=${renderId}, bucket=${bucketName}`);
 
+  const MAX_RENDER_TIME_MS = 5 * 60 * 1000;
+  let lastProgressUpdate = Date.now();
+
   while (true) {
-    const progress = await getRenderProgress({
-      renderId,
-      bucketName,
-      functionName,
-      region,
-    });
+    if (Date.now() - renderStart > MAX_RENDER_TIME_MS) {
+      throw new Error("Lambda render timed out after 5 minutes");
+    }
 
-    if (progress.done) {
-      const elapsed = Math.round((Date.now() - renderStart) / 1000);
-      console.log(`[Remotion Lambda] Render complete in ${elapsed}s: ${progress.outputFile}`);
-      onProgress?.(1);
-      return {
-        outputUrl: progress.outputFile!,
-        bucketName,
+    try {
+      const progress = await getRenderProgress({
         renderId,
-      };
+        bucketName,
+        functionName,
+        region,
+      });
+
+      if (progress.done) {
+        const elapsed = Math.round((Date.now() - renderStart) / 1000);
+        console.log(`[Remotion Lambda] Render complete in ${elapsed}s: ${progress.outputFile}`);
+        onProgress?.(1);
+        return {
+          outputUrl: progress.outputFile!,
+          bucketName,
+          renderId,
+        };
+      }
+
+      if (progress.fatalErrorEncountered) {
+        const errMsg = progress.errors?.map((e: any) => e.message || e).join("; ") || "Unknown error";
+        console.error(`[Remotion Lambda] Fatal error: ${errMsg}`);
+        throw new Error(`Lambda render failed: ${errMsg}`);
+      }
+
+      if (progress.overallProgress !== null && progress.overallProgress !== undefined) {
+        onProgress?.(progress.overallProgress);
+        lastProgressUpdate = Date.now();
+      }
+
+      if (Date.now() - lastProgressUpdate > 90000) {
+        console.warn(`[Remotion Lambda] No progress update for 90s, render may have stalled`);
+        throw new Error("Lambda render stalled — no progress for 90 seconds");
+      }
+    } catch (pollErr: any) {
+      if (pollErr.message.includes("Lambda render")) throw pollErr;
+      console.warn(`[Remotion Lambda] Progress poll error: ${pollErr.message}`);
     }
 
-    if (progress.fatalErrorEncountered) {
-      throw new Error(`Lambda render failed: ${progress.errors?.[0]?.message || "Unknown error"}`);
-    }
-
-    if (progress.overallProgress !== null) {
-      onProgress?.(progress.overallProgress);
-    }
-
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 3000));
   }
 }
