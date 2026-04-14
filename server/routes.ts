@@ -15873,49 +15873,35 @@ export function registerRoutes(app: Express): Server {
         const fs = await import("fs");
         const path = await import("path");
         const os = await import("os");
-        const clipsDir = path.join(os.tmpdir(), "listing-clips");
-        if (!fs.existsSync(clipsDir)) fs.mkdirSync(clipsDir, { recursive: true });
-        const localFilename = `clip_${req.user!.id}_${Date.now()}.mp4`;
-        const localPath = path.join(clipsDir, localFilename);
 
         try {
           const clipResp = await fetch(videoUrl);
-          if (clipResp.ok) {
-            const arrayBuffer = await clipResp.arrayBuffer();
-            fs.writeFileSync(localPath, Buffer.from(arrayBuffer));
-            const localUrl = `/api/listing-videos/local-clip/${localFilename}`;
-            console.log(`[Hailuo] Job ${jobId}: Saved locally: ${localUrl} (${Math.round(arrayBuffer.byteLength / 1024)}KB)`);
-            if (job) { job.status = "complete"; job.videoUrl = localUrl; job.persistedUrl = localUrl; }
-          } else {
-            console.warn(`[Hailuo] Job ${jobId}: CDN download failed (${clipResp.status}), using CDN URL directly`);
-            if (job) { job.status = "complete"; job.videoUrl = videoUrl; }
-          }
-        } catch (dlErr: any) {
-          console.warn(`[Hailuo] Job ${jobId}: Download failed: ${dlErr.message}, using CDN URL directly`);
+          if (!clipResp.ok) throw new Error(`CDN download failed: ${clipResp.status}`);
+          const arrayBuffer = await clipResp.arrayBuffer();
+          const clipBuffer = Buffer.from(arrayBuffer);
+          console.log(`[Hailuo] Job ${jobId}: Downloaded clip (${Math.round(clipBuffer.byteLength / 1024)}KB), saving to Object Storage...`);
+
+          const clipFilename = `clips/clip_${req.user!.id}_${Date.now()}.mp4`;
+          const { Client: ObjStorageClient } = await import("@replit/object-storage");
+          const objClient = new ObjStorageClient();
+          await objClient.uploadFromBytes(clipFilename, clipBuffer);
+          const persistentUrl = `/api/listing-videos/serve-clip/${clipFilename}`;
+          console.log(`[Hailuo] Job ${jobId}: Persisted to Object Storage: ${persistentUrl}`);
+          if (job) { job.status = "complete"; job.videoUrl = persistentUrl; job.persistedUrl = persistentUrl; }
+
+          setImmediate(() => {
+            try {
+              const clipsDir = path.join(os.tmpdir(), "listing-clips");
+              if (!fs.existsSync(clipsDir)) fs.mkdirSync(clipsDir, { recursive: true });
+              const localPath = path.join(clipsDir, path.basename(clipFilename));
+              fs.writeFileSync(localPath, clipBuffer);
+              console.log(`[Hailuo] Job ${jobId}: Also cached locally for fast serving`);
+            } catch {}
+          });
+        } catch (storageErr: any) {
+          console.warn(`[Hailuo] Job ${jobId}: Object Storage save failed: ${storageErr.message}, falling back to CDN URL`);
           if (job) { job.status = "complete"; job.videoUrl = videoUrl; }
         }
-
-        setImmediate(async () => {
-          try {
-            const clipFilename = `clips/clip_${req.user!.id}_${Date.now()}.mp4`;
-            let clipBuffer: Buffer;
-            if (fs.existsSync(localPath)) {
-              clipBuffer = fs.readFileSync(localPath);
-            } else {
-              const clipResp = await fetch(videoUrl);
-              if (!clipResp.ok) return;
-              clipBuffer = Buffer.from(await clipResp.arrayBuffer());
-            }
-            const { Client: ObjStorageClient } = await import("@replit/object-storage");
-            const objClient = new ObjStorageClient();
-            await objClient.uploadFromBytes(clipFilename, clipBuffer);
-            const persistentUrl = `/api/listing-videos/serve-clip/${clipFilename}`;
-            console.log(`[Hailuo] Job ${jobId}: Also persisted to Object Storage: ${persistentUrl}`);
-            if (job) job.persistedUrl = persistentUrl;
-          } catch (storageErr: any) {
-            console.warn(`[Hailuo] Job ${jobId}: Object Storage save failed (non-fatal): ${storageErr.message}`);
-          }
-        });
       } catch (error: any) {
         console.error(`[Hailuo] Job ${jobId}: Error:`, error?.message || error);
         const job = clipJobs.get(jobId);
@@ -15994,17 +15980,44 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/listing-videos/serve-clip/clips/:filename", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const key = `clips/${req.params.filename}`;
+    const filename = req.params.filename;
+    if (!filename || filename.includes("..") || filename.includes("/")) {
+      return res.status(400).json({ error: "Invalid filename" });
+    }
     try {
+      const fs = await import("fs");
+      const pathMod = await import("path");
+      const os = await import("os");
+      const localPath = pathMod.join(os.tmpdir(), "listing-clips", filename);
+      if (fs.existsSync(localPath)) {
+        const stat = fs.statSync(localPath);
+        res.set("Content-Type", "video/mp4");
+        res.set("Content-Length", String(stat.size));
+        res.set("Cache-Control", "public, max-age=604800");
+        fs.createReadStream(localPath).pipe(res);
+        return;
+      }
+
+      const key = `clips/${filename}`;
       const { Client: ObjStorageClient } = await import("@replit/object-storage");
       const objClient = new ObjStorageClient();
       const result = await objClient.downloadAsBytes(key);
       if (!result.ok) {
         return res.status(404).json({ error: "Clip not found" });
       }
+      const buf = Buffer.from(result.value);
       res.set("Content-Type", "video/mp4");
+      res.set("Content-Length", String(buf.byteLength));
       res.set("Cache-Control", "public, max-age=604800");
-      res.send(Buffer.from(result.value));
+      res.send(buf);
+
+      setImmediate(() => {
+        try {
+          const clipsDir = pathMod.join(os.tmpdir(), "listing-clips");
+          if (!fs.existsSync(clipsDir)) fs.mkdirSync(clipsDir, { recursive: true });
+          fs.writeFileSync(localPath, buf);
+        } catch {}
+      });
     } catch (err: any) {
       console.error("[ServeClip] Error:", err?.message);
       res.status(500).json({ error: "Failed to serve clip" });
