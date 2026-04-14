@@ -16063,17 +16063,22 @@ export function registerRoutes(app: Express): Server {
       const outputPath = path.join(tmpDir, `output_${req.user!.id}_${Date.now()}.mp4`);
       try {
         fs.writeFileSync(inputPath, req.file.buffer);
-        console.log(`[FFmpeg] Starting conversion: ${inputPath} (${Math.round(req.file.buffer.length / 1024)}KB)`);
+        const fileSizeKB = Math.round(req.file.buffer.length / 1024);
+        console.log(`[FFmpeg] Starting conversion: ${inputPath} (${fileSizeKB}KB)`);
         await new Promise<void>((resolve, reject) => {
-          const cmd = `ffmpeg -i "${inputPath}" -c:v libx264 -preset fast -crf 18 -c:a aac -b:a 192k -movflags +faststart -y "${outputPath}" 2>&1`;
-          exec(cmd, { timeout: 180000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout) => {
+          const cmd = `ffmpeg -i "${inputPath}" -c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 128k -movflags +faststart -threads 0 -y "${outputPath}"`;
+          const proc = exec(cmd, { timeout: 300000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
             if (error) {
-              console.error("[FFmpeg] Conversion error:", stdout?.slice(-500));
+              console.error("[FFmpeg] Conversion error:", (stderr || stdout || "")?.slice(-500));
               reject(new Error("Video conversion failed"));
             } else {
               console.log("[FFmpeg] Conversion complete");
               resolve();
             }
+          });
+          proc.stderr?.on("data", (data: string) => {
+            const match = data.match(/time=(\d+:\d+:\d+\.\d+)/);
+            if (match) console.log(`[FFmpeg] Progress: ${match[1]}`);
           });
         });
         const stat = fs.statSync(outputPath);

@@ -1330,7 +1330,7 @@ function VideoComposer({
         : MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
       const mediaRecorder = new MediaRecorder(combinedStream, {
         mimeType,
-        videoBitsPerSecond: 20000000,
+        videoBitsPerSecond: 8000000,
       });
 
       const chunks: Blob[] = [];
@@ -1406,45 +1406,44 @@ function VideoComposer({
       const blob = await exportPromise;
 
       setProgress(0.95);
+
+      const downloadBlob = (b: Blob, ext: string) => {
+        const url = URL.createObjectURL(b);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `listing-video-${Date.now()}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000);
         const formData = new FormData();
         formData.append("video", blob, "listing-video.webm");
         const convResp = await fetch("/api/listing-videos/convert-to-mp4", {
           method: "POST",
           body: formData,
           credentials: "include",
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
         if (convResp.ok) {
           const mp4Blob = await convResp.blob();
-          const url = URL.createObjectURL(mp4Blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `listing-video-${Date.now()}.mp4`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
+          downloadBlob(mp4Blob, "mp4");
         } else {
           console.warn("MP4 conversion failed, falling back to WebM");
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `listing-video-${Date.now()}.webm`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
+          downloadBlob(blob, "webm");
         }
-      } catch {
-        console.warn("MP4 conversion unavailable, falling back to WebM");
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `listing-video-${Date.now()}.webm`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+      } catch (convErr: any) {
+        if (convErr?.name === "AbortError") {
+          console.warn("MP4 conversion timed out, falling back to WebM");
+        } else {
+          console.warn("MP4 conversion unavailable, falling back to WebM");
+        }
+        downloadBlob(blob, "webm");
       }
       drawFrame(0, 0, 0);
     } catch (error) {
