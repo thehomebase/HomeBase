@@ -15756,34 +15756,32 @@ export function registerRoutes(app: Express): Server {
 
       const validMotions = ["walk-forward","walk-right","walk-left","reveal","drift-right","drift-left","push-in","pull-out","rise-up","pan-right","pan-left","pan-up","pan-down","zoom-in","zoom-out"];
       const safeMotion = validMotions.includes(motionType) ? motionType : "walk-forward";
-      const numDuration = typeof duration === "number" ? duration : parseInt(duration) || 5;
-      const clipDuration = numDuration >= 8 ? "10" : "6";
 
-      const motionToCamera: Record<string, string> = {
-        "walk-forward": "[Push in]",
-        "walk-right": "[Truck right]",
-        "walk-left": "[Truck left]",
-        "reveal": "[Pull out]",
-        "drift-right": "[Truck right, Tilt up]",
-        "drift-left": "[Truck left, Tilt up]",
-        "push-in": "[Push in, Zoom in]",
-        "pull-out": "[Pull out]",
-        "rise-up": "[Pedestal up]",
-        "pan-right": "[Pan right]",
-        "pan-left": "[Pan left]",
-        "pan-up": "[Tilt up]",
-        "pan-down": "[Tilt down]",
-        "zoom-in": "[Zoom in]",
-        "zoom-out": "[Zoom out]",
+      const motionToPrompt: Record<string, string> = {
+        "walk-forward": "camera slowly pushes forward into the room",
+        "walk-right": "camera slowly trucks right through the space",
+        "walk-left": "camera slowly trucks left through the space",
+        "reveal": "camera slowly pulls back to reveal the full room",
+        "drift-right": "camera gently drifts right and tilts upward",
+        "drift-left": "camera gently drifts left and tilts upward",
+        "push-in": "camera pushes in closer with a subtle zoom",
+        "pull-out": "camera slowly pulls back away from the scene",
+        "rise-up": "camera slowly rises upward to reveal the space",
+        "pan-right": "camera smoothly pans right across the room",
+        "pan-left": "camera smoothly pans left across the room",
+        "pan-up": "camera slowly tilts upward",
+        "pan-down": "camera slowly tilts downward",
+        "zoom-in": "camera slowly zooms in on the scene",
+        "zoom-out": "camera slowly zooms out to show more of the space",
       };
 
-      const cameraDirective = motionToCamera[safeMotion] || "[Push in]";
-      const prompt = `Cinematic real estate interior, static scene, smooth slow camera movement, no objects move or change, everything remains perfectly still ${cameraDirective}`;
+      const cameraMotion = motionToPrompt[safeMotion] || "camera slowly pushes forward into the room";
+      const prompt = `Cinematic real estate photo, ${cameraMotion}, static scene with no moving objects, everything remains perfectly still, professional property showcase, smooth steady motion`;
 
       const { fal } = await import("@fal-ai/client");
       fal.config({ credentials: falKey });
 
-      console.log(`[Hailuo] Uploading image to fal.ai storage...`);
+      console.log(`[Luma] Uploading image to fal.ai storage...`);
       const base64Match = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
       let hostedImageUrl = imageDataUrl;
       if (base64Match) {
@@ -15794,39 +15792,38 @@ export function registerRoutes(app: Express): Server {
         const ext = mimeType.split("/")[1] || "jpg";
         const file = new File([blob], `photo.${ext}`, { type: mimeType });
         hostedImageUrl = await fal.storage.upload(file);
-        console.log(`[Hailuo] Image uploaded: ${hostedImageUrl.slice(0, 80)}...`);
+        console.log(`[Luma] Image uploaded: ${hostedImageUrl.slice(0, 80)}...`);
       }
 
-      console.log(`[Hailuo] Generating ${clipDuration}s clip via Hailuo 2.3 Fast for motion: ${motionType} ${cameraDirective}`);
+      console.log(`[Luma] Generating 5s clip via Luma Ray 2 for motion: ${safeMotion}`);
 
-      const result: any = await fal.subscribe("fal-ai/minimax/hailuo-2.3-fast/standard/image-to-video", {
+      const result: any = await fal.subscribe("fal-ai/luma-dream-machine/ray-2/image-to-video", {
         input: {
           image_url: hostedImageUrl,
           prompt,
-          prompt_optimizer: false,
-          duration: clipDuration,
+          aspect_ratio: "16:9",
         },
         logs: true,
         onQueueUpdate: (update: any) => {
           if (update.status === "IN_PROGRESS") {
-            console.log(`[Hailuo] Generation in progress...`);
+            console.log(`[Luma] Generation in progress...`);
           } else if (update.status === "IN_QUEUE") {
-            console.log(`[Hailuo] Queued, position: ${update.queue_position ?? "unknown"}`);
+            console.log(`[Luma] Queued, position: ${update.queue_position ?? "unknown"}`);
           }
         },
       });
 
-      console.log(`[Hailuo] Raw result keys:`, Object.keys(result || {}));
+      console.log(`[Luma] Raw result keys:`, Object.keys(result || {}));
       const videoUrl = result?.data?.video?.url || result?.video?.url;
       if (!videoUrl) {
-        console.error(`[Hailuo] No video URL found in result:`, JSON.stringify(result).slice(0, 500));
+        console.error(`[Luma] No video URL found in result:`, JSON.stringify(result).slice(0, 500));
         return res.status(500).json({ error: "No video returned from service" });
       }
 
-      console.log(`[Hailuo] Generated successfully: ${videoUrl}`);
+      console.log(`[Luma] Generated successfully: ${videoUrl}`);
       res.json({ videoUrl });
     } catch (error: any) {
-      console.error("[Hailuo] Error:", error?.message || error);
+      console.error("[Luma] Error:", error?.message || error);
       res.status(500).json({ error: error?.message || "AI video clip generation failed" });
     }
   });
