@@ -204,6 +204,14 @@ function VideoComposer({
   const displayHeight = Math.round(displayWidth * (aspectRatio.height / aspectRatio.width));
 
   useEffect(() => {
+    let container = document.getElementById("__video-clip-container");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "__video-clip-container";
+      container.style.cssText = "position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;opacity:0";
+      document.body.appendChild(container);
+    }
+
     photos.forEach(photo => {
       if (!loadedImagesRef.current.has(photo.id) && photo.dataUrl) {
         const img = new window.Image();
@@ -224,6 +232,9 @@ function VideoComposer({
         };
         const resolvedUrl = resolveClipUrl(photo.videoClipUrl);
         if (!existing || existing.getAttribute("data-clip-url") !== photo.videoClipUrl) {
+          if (existing && existing.parentNode) {
+            existing.parentNode.removeChild(existing);
+          }
           const video = document.createElement("video");
           if (resolvedUrl.includes("proxy-clip")) {
             video.crossOrigin = "anonymous";
@@ -233,13 +244,21 @@ function VideoComposer({
           video.playsInline = true;
           video.preload = "auto";
           video.setAttribute("data-clip-url", photo.videoClipUrl);
+          video.style.cssText = "width:1px;height:1px";
           video.addEventListener("loadeddata", () => {
-            console.log(`[VideoClip] Loaded: ${photo.id}, readyState=${video.readyState}, duration=${video.duration}`);
+            console.log(`[VideoClip] Loaded: ${photo.id}, readyState=${video.readyState}, duration=${video.duration}, videoWidth=${video.videoWidth}`);
             setVideosReady(prev => prev + 1);
+            if (!isPlaying) drawFrame(0, 0);
+          });
+          video.addEventListener("canplaythrough", () => {
+            console.log(`[VideoClip] CanPlayThrough: ${photo.id}, readyState=${video.readyState}`);
             if (!isPlaying) drawFrame(0, 0);
           });
           let retryCount = 0;
           video.addEventListener("error", () => {
+            const errCode = video.error?.code;
+            const errMsg = video.error?.message;
+            console.warn(`[VideoClip] Error for ${photo.id}: code=${errCode}, msg=${errMsg}, src=${video.src}`);
             if (retryCount < 3) {
               retryCount++;
               console.warn(`[VideoClip] Retrying clip for ${photo.id} (attempt ${retryCount}/3)`);
@@ -250,13 +269,25 @@ function VideoComposer({
             } else {
               console.warn(`[VideoClip] Failed to load clip for ${photo.id} after retries`);
               videoElementsRef.current.delete(photo.id);
+              if (video.parentNode) video.parentNode.removeChild(video);
             }
           });
+          container.appendChild(video);
           video.load();
           videoElementsRef.current.set(photo.id, video);
         }
       }
     });
+
+    return () => {
+      const currentPhotoIds = new Set(photos.map(p => p.id));
+      videoElementsRef.current.forEach((video, id) => {
+        if (!currentPhotoIds.has(id)) {
+          if (video.parentNode) video.parentNode.removeChild(video);
+          videoElementsRef.current.delete(id);
+        }
+      });
+    };
   }, [photos]);
 
   const getMotionTransform = (motionType: string, progress: number, focusPoint?: { x: number; y: number }) => {
@@ -1468,6 +1499,14 @@ function VideoComposer({
         musicPlayerRef.current.stop();
         musicPlayerRef.current = null;
       }
+      videoElementsRef.current.forEach((video) => {
+        video.pause();
+        video.src = "";
+        if (video.parentNode) video.parentNode.removeChild(video);
+      });
+      videoElementsRef.current.clear();
+      const container = document.getElementById("__video-clip-container");
+      if (container) container.remove();
     };
   }, []);
 
