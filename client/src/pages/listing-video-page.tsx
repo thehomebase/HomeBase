@@ -1670,21 +1670,25 @@ export default function ListingVideoPage() {
             throw new Error(errData.error || "Generation failed");
           }
           const data = await res.json();
-          photo.videoClipUrl = data.videoUrl;
-          if (data.needsPersist && data.videoUrl?.startsWith("https://")) {
-            fetch("/api/listing-videos/persist-clip", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({ cdnUrl: data.videoUrl }),
-            }).then(async (pRes) => {
+          let clipUrl = data.videoUrl;
+          if (data.needsPersist && clipUrl?.startsWith("https://")) {
+            try {
+              const pRes = await fetch("/api/listing-videos/persist-clip", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ cdnUrl: clipUrl }),
+              });
               if (pRes.ok) {
                 const pData = await pRes.json();
-                photo.videoClipUrl = pData.videoUrl;
-                console.log(`[Persist] Clip ${photo.id} saved permanently: ${pData.videoUrl}`);
+                clipUrl = pData.videoUrl;
+                console.log(`[Persist] Clip ${photo.id} saved permanently: ${clipUrl}`);
               }
-            }).catch((e) => console.warn(`[Persist] Background save failed for ${photo.id}:`, e));
+            } catch (e) {
+              console.warn(`[Persist] Save failed for ${photo.id}, using CDN URL`, e);
+            }
           }
+          photo.videoClipUrl = clipUrl;
         } catch (err: any) {
           console.error(`Video failed for photo ${photo.id}:`, err);
           const msg = err?.name === "AbortError" ? "Timed out (14 min limit)" : (err?.message || "Could not generate clip");
@@ -1926,7 +1930,9 @@ export default function ListingVideoPage() {
                             <div>
                               <p className="text-sm font-medium">{video.title}</p>
                               <p className="text-xs text-muted-foreground">
-                                {video.photos?.length || 0} photos • {new Date(video.createdAt).toLocaleDateString()}
+                                {video.photos?.length || 0} photos
+                                {video.photos?.filter((p: any) => p.videoClipUrl)?.length > 0 && ` • ${video.photos.filter((p: any) => p.videoClipUrl).length} clips`}
+                                {" • "}{new Date(video.createdAt).toLocaleDateString()}
                               </p>
                             </div>
                           </div>
