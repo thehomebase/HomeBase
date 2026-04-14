@@ -113,6 +113,21 @@ function findSystemChromium(): string | null {
   return null;
 }
 
+const CHROME_LOW_MEM_FLAGS = [
+  "--disable-gpu",
+  "--disable-dev-shm-usage",
+  "--disable-software-rasterizer",
+  "--no-sandbox",
+  "--disable-extensions",
+  "--disable-background-networking",
+  "--disable-default-apps",
+  "--disable-sync",
+  "--disable-translate",
+  "--metrics-recording-only",
+  "--no-first-run",
+  "--js-flags=--max-old-space-size=256",
+];
+
 export async function renderListingVideo(
   options: RenderOptions,
   outputPath: string,
@@ -143,6 +158,9 @@ export async function renderListingVideo(
     id: "ListingVideo",
     inputProps,
     browserExecutable,
+    chromiumOptions: {
+      args: CHROME_LOW_MEM_FLAGS,
+    },
   });
 
   console.log(`[Remotion] Rendering ${composition.durationInFrames} frames (${composition.width}x${composition.height}) at ${composition.fps}fps`);
@@ -155,6 +173,10 @@ export async function renderListingVideo(
     inputProps,
     videoBitrate: "4M",
     browserExecutable,
+    concurrency: 1,
+    chromiumOptions: {
+      args: CHROME_LOW_MEM_FLAGS,
+    },
     onProgress: ({ progress }) => {
       onProgress?.(progress);
     },
