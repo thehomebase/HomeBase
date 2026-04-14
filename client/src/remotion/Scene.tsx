@@ -1,5 +1,6 @@
-import { AbsoluteFill, Img, interpolate, useCurrentFrame, useVideoConfig, spring, Video } from "remotion";
-import type { PhotoItem, VideoSettings } from "./types";
+import { useState, useEffect } from "react";
+import { AbsoluteFill, Img, interpolate, useCurrentFrame, useVideoConfig, Video, continueRender, delayRender } from "remotion";
+import type { PhotoItem } from "./types";
 
 function getMotionStyle(motionType: string, progress: number, focusPoint?: { x: number; y: number }) {
   const fp = focusPoint || { x: 50, y: 50 };
@@ -56,6 +57,56 @@ function getMotionStyle(motionType: string, progress: number, focusPoint?: { x: 
   };
 }
 
+function resolveClipUrl(url: string): string {
+  if (url.startsWith("https://")) {
+    return url;
+  }
+  return url.startsWith("/") ? url : `/${url}`;
+}
+
+function VideoClipWithFallback({
+  photo,
+  motionProgress,
+  style,
+}: {
+  photo: PhotoItem;
+  motionProgress: number;
+  style?: React.CSSProperties;
+}) {
+  const [videoFailed, setVideoFailed] = useState(false);
+  const clipUrl = photo.videoClipUrl ? resolveClipUrl(photo.videoClipUrl) : null;
+
+  if (!clipUrl || videoFailed) {
+    return (
+      <AbsoluteFill style={{ overflow: "hidden", ...style }}>
+        <Img
+          src={photo.dataUrl}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            ...getMotionStyle(photo.motionType, motionProgress, photo.focusPoint),
+            transformOrigin: "center center",
+          }}
+        />
+      </AbsoluteFill>
+    );
+  }
+
+  return (
+    <AbsoluteFill style={style}>
+      <Video
+        src={clipUrl}
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        onError={() => {
+          console.warn(`[Scene] Video clip failed to load, falling back to image: ${photo.id}`);
+          setVideoFailed(true);
+        }}
+      />
+    </AbsoluteFill>
+  );
+}
+
 export function Scene({
   photo,
   nextPhoto,
@@ -68,13 +119,12 @@ export function Scene({
   photoDuration: number;
 }) {
   const frame = useCurrentFrame();
-  const { fps, width, height } = useVideoConfig();
+  const { fps } = useVideoConfig();
 
   const segmentFrames = (photoDuration + transitionDuration) * fps;
   const transitionFrames = transitionDuration * fps;
   const photoFrames = segmentFrames - transitionFrames;
 
-  const progress = frame / segmentFrames;
   const motionProgress = Math.min(frame / photoFrames, 1);
 
   const isTransitioning = frame >= photoFrames;
@@ -84,19 +134,15 @@ export function Scene({
   const nextOpacity = isTransitioning ? interpolate(transProgress, [0, 1], [0, 1]) : 0;
 
   const hasVideoClip = !!photo.videoClipUrl;
-  const nextHasVideoClip = !!nextPhoto?.videoClipUrl;
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       {hasVideoClip ? (
-        <AbsoluteFill style={{ opacity: currentOpacity }}>
-          <Video
-            src={photo.videoClipUrl!.startsWith("https://")
-              ? `/api/listing-videos/proxy-clip?url=${encodeURIComponent(photo.videoClipUrl!)}`
-              : photo.videoClipUrl!}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        </AbsoluteFill>
+        <VideoClipWithFallback
+          photo={photo}
+          motionProgress={motionProgress}
+          style={{ opacity: currentOpacity }}
+        />
       ) : (
         <AbsoluteFill style={{ opacity: currentOpacity, overflow: "hidden" }}>
           <Img
@@ -113,16 +159,12 @@ export function Scene({
       )}
 
       {isTransitioning && nextPhoto && (
-        nextHasVideoClip ? (
-          <AbsoluteFill style={{ opacity: nextOpacity }}>
-            <Video
-              src={nextPhoto.videoClipUrl!.startsWith("https://")
-                ? `/api/listing-videos/proxy-clip?url=${encodeURIComponent(nextPhoto.videoClipUrl!)}`
-                : nextPhoto.videoClipUrl!}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              startFrom={0}
-            />
-          </AbsoluteFill>
+        nextPhoto.videoClipUrl ? (
+          <VideoClipWithFallback
+            photo={nextPhoto}
+            motionProgress={transProgress * 0.1}
+            style={{ opacity: nextOpacity }}
+          />
         ) : (
           <AbsoluteFill style={{ opacity: nextOpacity, overflow: "hidden" }}>
             <Img
