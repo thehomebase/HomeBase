@@ -221,6 +221,13 @@ export const BUNDLED_TRACKS: BundledTrack[] = [
     artist: "MFCC",
     source: "Pixabay",
   },
+  {
+    id: "pixabay-luxury-electronic",
+    label: "Luxury Electronic",
+    file: "/music/luxury-luxury-music-490006.mp3",
+    artist: "The_Mountain",
+    source: "Pixabay",
+  },
 ];
 
 export function isBundledTrack(trackId: string): boolean {
