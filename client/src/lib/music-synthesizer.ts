@@ -198,6 +198,28 @@ function generateAcoustic(ctx: AudioContext, dest: AudioNode, duration: number) 
   }
 }
 
+export interface BundledTrack {
+  id: string;
+  label: string;
+  file: string;
+  artist: string;
+  source: string;
+}
+
+export const BUNDLED_TRACKS: BundledTrack[] = [
+  {
+    id: "pixabay-fashion-luxury",
+    label: "Fashion & Luxury",
+    file: "/music/fashion-beauty-luxury-music-331431.mp3",
+    artist: "lNPLUSMUSIC",
+    source: "Pixabay",
+  },
+];
+
+export function isBundledTrack(trackId: string): boolean {
+  return BUNDLED_TRACKS.some(t => t.id === trackId);
+}
+
 export interface MusicPlayer {
   start: () => void;
   stop: () => void;
@@ -276,5 +298,84 @@ export function createMusicForExport(track: string, duration: number): { stream:
   return {
     stream: streamDest.stream,
     stop() { ctx.close(); },
+  };
+}
+
+export function createBundledMusicPlayer(trackId: string, duration: number): MusicPlayer {
+  const track = BUNDLED_TRACKS.find(t => t.id === trackId);
+  let audio: HTMLAudioElement | null = null;
+  let ctx: AudioContext | null = null;
+  let streamDest: MediaStreamAudioDestinationNode | null = null;
+  let active = false;
+
+  return {
+    start() {
+      if (active) return;
+      audio = new Audio(track?.file || "");
+      audio.loop = true;
+      audio.volume = 0.6;
+      ctx = new AudioContext();
+      streamDest = ctx.createMediaStreamDestination();
+      const source = ctx.createMediaElementSource(audio);
+      const gainNode = ctx.createGain();
+      gainNode.gain.setValueAtTime(0.6, ctx.currentTime);
+      source.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      gainNode.connect(streamDest);
+      audio.play().catch(() => {});
+      active = true;
+    },
+    stop() {
+      if (audio) {
+        audio.pause();
+        audio.src = "";
+        audio = null;
+      }
+      if (ctx) {
+        ctx.close();
+        ctx = null;
+        streamDest = null;
+      }
+      active = false;
+    },
+    getDestination() {
+      return streamDest;
+    },
+    isActive() {
+      return active;
+    },
+  };
+}
+
+export async function createBundledMusicForExport(trackId: string, duration: number): Promise<{ stream: MediaStream; stop: () => void }> {
+  const track = BUNDLED_TRACKS.find(t => t.id === trackId);
+  const audio = new Audio(track?.file || "");
+  audio.loop = true;
+  audio.crossOrigin = "anonymous";
+
+  await new Promise<void>((resolve, reject) => {
+    audio.addEventListener("canplaythrough", () => resolve(), { once: true });
+    audio.addEventListener("error", () => reject(new Error("Failed to load music")), { once: true });
+    audio.load();
+  });
+
+  const ctx = new AudioContext();
+  const streamDest = ctx.createMediaStreamDestination();
+  const source = ctx.createMediaElementSource(audio);
+  const gainNode = ctx.createGain();
+  gainNode.gain.setValueAtTime(0.6, ctx.currentTime);
+  gainNode.gain.setValueAtTime(0.6, ctx.currentTime + duration - 1);
+  gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+  source.connect(gainNode);
+  gainNode.connect(streamDest);
+  audio.play().catch(() => {});
+
+  return {
+    stream: streamDest.stream,
+    stop() {
+      audio.pause();
+      audio.src = "";
+      ctx.close();
+    },
   };
 }

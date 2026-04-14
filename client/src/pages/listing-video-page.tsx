@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { createMusicPlayer, createMusicForExport } from "@/lib/music-synthesizer";
+import { createMusicPlayer, createMusicForExport, createBundledMusicPlayer, createBundledMusicForExport, isBundledTrack, BUNDLED_TRACKS } from "@/lib/music-synthesizer";
 import type { MusicPlayer } from "@/lib/music-synthesizer";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -87,12 +87,13 @@ const MOTION_TYPES = [
 ];
 
 const MUSIC_TRACKS = [
-  { value: "none", label: "No Music" },
-  { value: "elegant", label: "Elegant Piano" },
-  { value: "modern", label: "Modern Ambient" },
-  { value: "upbeat", label: "Upbeat & Bright" },
-  { value: "cinematic", label: "Cinematic" },
-  { value: "acoustic", label: "Acoustic Guitar" },
+  { value: "none", label: "No Music", group: "" },
+  ...BUNDLED_TRACKS.map(t => ({ value: t.id, label: `${t.label}`, group: "Royalty-Free" })),
+  { value: "elegant", label: "Elegant Piano", group: "Generated" },
+  { value: "modern", label: "Modern Ambient", group: "Generated" },
+  { value: "upbeat", label: "Upbeat & Bright", group: "Generated" },
+  { value: "cinematic", label: "Cinematic", group: "Generated" },
+  { value: "acoustic", label: "Acoustic Guitar", group: "Generated" },
 ];
 
 const TEXT_TEMPLATES = [
@@ -905,7 +906,9 @@ function VideoComposer({
       musicPlayerRef.current = null;
     }
     if (settings.musicTrack && settings.musicTrack !== "none") {
-      const player = createMusicPlayer(settings.musicTrack, totalDuration);
+      const player = isBundledTrack(settings.musicTrack)
+        ? createBundledMusicPlayer(settings.musicTrack, totalDuration)
+        : createMusicPlayer(settings.musicTrack, totalDuration);
       player.start();
       musicPlayerRef.current = player;
     }
@@ -963,7 +966,15 @@ function VideoComposer({
       if (settings.musicTrack && settings.musicTrack !== "none") {
         const photosDur = photos.length * (settings.photoDuration + settings.transitionDuration);
         const totalDur = photosDur + closingSlideDuration;
-        musicExport = createMusicForExport(settings.musicTrack, totalDur);
+        if (isBundledTrack(settings.musicTrack)) {
+          try {
+            musicExport = await createBundledMusicForExport(settings.musicTrack, totalDur);
+          } catch {
+            musicExport = createMusicForExport("elegant", totalDur);
+          }
+        } else {
+          musicExport = createMusicForExport(settings.musicTrack, totalDur);
+        }
         combinedStream = new MediaStream([
           ...videoStream.getVideoTracks(),
           ...musicExport.stream.getAudioTracks(),
@@ -2090,7 +2101,20 @@ export default function ListingVideoPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {MUSIC_TRACKS.map(t => (
+                          <SelectItem value="none">No Music</SelectItem>
+                          {BUNDLED_TRACKS.length > 0 && (
+                            <>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Royalty-Free Tracks</div>
+                              {BUNDLED_TRACKS.map(t => (
+                                <SelectItem key={t.id} value={t.id}>
+                                  {t.label}
+                                  <span className="text-xs text-muted-foreground ml-1">— {t.artist}</span>
+                                </SelectItem>
+                              ))}
+                            </>
+                          )}
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Generated Tracks</div>
+                          {MUSIC_TRACKS.filter(t => t.group === "Generated").map(t => (
                             <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                           ))}
                         </SelectContent>
