@@ -16060,6 +16060,54 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  const renderAssetTokens = new Map<string, { expiresAt: number }>();
+
+  setInterval(() => {
+    const now = Date.now();
+    for (const [token, data] of renderAssetTokens) {
+      if (now > data.expiresAt) renderAssetTokens.delete(token);
+    }
+  }, 60 * 1000);
+
+  app.get("/api/listing-videos/render-asset/:token/:filename", async (req, res) => {
+    const tokenData = renderAssetTokens.get(req.params.token);
+    if (!tokenData || Date.now() > tokenData.expiresAt) {
+      return res.status(403).json({ error: "Invalid or expired token" });
+    }
+    const filename = req.params.filename;
+    if (!filename || filename.includes("..") || filename.includes("/")) {
+      return res.status(400).json({ error: "Invalid filename" });
+    }
+    try {
+      const fs = await import("fs");
+      const pathMod = await import("path");
+      const os = await import("os");
+      const filePath = pathMod.join(os.tmpdir(), "render-clips", filename);
+      if (!fs.existsSync(filePath)) return res.status(404).json({ error: "Not found" });
+      const stat = fs.statSync(filePath);
+      res.set("Content-Type", "video/mp4");
+      res.set("Content-Length", String(stat.size));
+      fs.createReadStream(filePath).pipe(res);
+    } catch {
+      res.status(500).json({ error: "Failed to serve render asset" });
+    }
+  });
+
+  function cleanupRenderClips(photos: any[], renderClipsDir: string) {
+    try {
+      const fs = require("fs");
+      const pathMod = require("path");
+      for (const p of photos) {
+        if (p.videoClipUrl && p.videoClipUrl.includes("/render-asset/")) {
+          const filename = p.videoClipUrl.split("/").pop();
+          if (filename) {
+            try { fs.unlinkSync(pathMod.join(renderClipsDir, filename)); } catch {}
+          }
+        }
+      }
+    } catch {}
+  }
+
   const remotionRenderJobs = new Map<string, { status: string; progress: number; userId: number; error?: string; updatedAt: number }>();
 
   setInterval(() => {
@@ -16090,9 +16138,54 @@ export function registerRoutes(app: Express): Server {
 
       (async () => {
         try {
+          const fs = await import("fs");
+          const pathMod = await import("path");
+          const os = await import("os");
+          const renderClipsDir = pathMod.join(os.tmpdir(), "render-clips");
+          if (!fs.existsSync(renderClipsDir)) fs.mkdirSync(renderClipsDir, { recursive: true });
+
+          const assetToken = `rt-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+          renderAssetTokens.set(assetToken, { expiresAt: Date.now() + 15 * 60 * 1000 });
+
+          const port = process.env.PORT || "5000";
+          const resolvedPhotos = await Promise.all(photos.map(async (photo: any) => {
+            if (!photo.videoClipUrl) return photo;
+            try {
+              let clipBuffer: Buffer | null = null;
+              const clipUrl = photo.videoClipUrl as string;
+
+              if (clipUrl.startsWith("/api/listing-videos/serve-clip/clips/")) {
+                const filename = clipUrl.split("/").pop()!;
+                const localPath = pathMod.join(os.tmpdir(), "listing-clips", filename);
+                if (fs.existsSync(localPath)) {
+                  clipBuffer = fs.readFileSync(localPath);
+                } else {
+                  const { Client: ObjStorageClient } = await import("@replit/object-storage");
+                  const objClient = new ObjStorageClient({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID });
+                  const result = await objClient.downloadAsBytes(`clips/${filename}`);
+                  if (result.ok) clipBuffer = Buffer.from(result.value);
+                }
+              } else if (clipUrl.startsWith("https://")) {
+                const resp = await fetch(clipUrl);
+                if (resp.ok) clipBuffer = Buffer.from(await resp.arrayBuffer());
+              }
+
+              if (clipBuffer) {
+                const assetFilename = `render_${photo.id}_${Date.now()}.mp4`;
+                fs.writeFileSync(pathMod.join(renderClipsDir, assetFilename), clipBuffer);
+                return { ...photo, videoClipUrl: `http://localhost:${port}/api/listing-videos/render-asset/${assetToken}/${assetFilename}` };
+              }
+              console.warn(`[Remotion] Job ${jobId}: Could not resolve clip for photo ${photo.id}, using Ken Burns fallback`);
+              return { ...photo, videoClipUrl: undefined };
+            } catch (err: any) {
+              console.warn(`[Remotion] Job ${jobId}: Clip download failed for photo ${photo.id}: ${err.message}`);
+              return { ...photo, videoClipUrl: undefined };
+            }
+          }));
+
           const { renderListingVideo } = await import("./remotion-render");
           await renderListingVideo(
-            { photos, settings, propertyDetails, propertyAddress, agentBranding },
+            { photos: resolvedPhotos, settings, propertyDetails, propertyAddress, agentBranding },
             outputPath,
             (progress) => {
               remotionRenderJobs.set(jobId, { status: "processing", progress: Math.round(progress * 100), userId, updatedAt: Date.now() });
@@ -16101,10 +16194,14 @@ export function registerRoutes(app: Express): Server {
           const stats = (await import("fs")).statSync(outputPath);
           console.log(`[Remotion] Job ${jobId}: Render complete (${Math.round(stats.size / 1024 / 1024)}MB)`);
           remotionRenderJobs.set(jobId, { status: "complete", progress: 100, userId, updatedAt: Date.now() });
+          renderAssetTokens.delete(assetToken);
+          cleanupRenderClips(resolvedPhotos, renderClipsDir);
         } catch (err: any) {
           console.error(`[Remotion] Job ${jobId}: Render failed:`, err?.message);
           remotionRenderJobs.set(jobId, { status: "failed", progress: 0, userId, error: err?.message || "Unknown error", updatedAt: Date.now() });
           try { (await import("fs")).unlinkSync(outputPath); } catch {}
+          renderAssetTokens.delete(assetToken);
+          cleanupRenderClips(resolvedPhotos, renderClipsDir);
         }
       })();
     } catch (err: any) {
