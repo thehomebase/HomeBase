@@ -67,7 +67,10 @@ const MOTION_TYPES = [
   { value: "rise-up", label: "Rise Up", icon: ArrowUp },
   { value: "pan-right", label: "Pan Right", icon: ArrowRight },
   { value: "pan-left", label: "Pan Left", icon: ArrowLeft },
+  { value: "pan-up", label: "Pan Up", icon: ArrowUp },
+  { value: "pan-down", label: "Pan Down", icon: ArrowDown },
   { value: "zoom-in", label: "Zoom In", icon: ZoomIn },
+  { value: "zoom-out", label: "Zoom Out", icon: ZoomOut },
 ];
 
 const MUSIC_TRACKS = [

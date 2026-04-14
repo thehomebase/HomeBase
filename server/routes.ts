@@ -15881,7 +15881,10 @@ export function registerRoutes(app: Express): Server {
      * "rise-up" - subtle upward float with zoom, like looking up as you enter (good for: tall ceilings, staircases, grand entries)
      * "pan-right" - classic pan right (use sparingly, only when other motions don't fit)
      * "pan-left" - classic pan left (use sparingly)
+     * "pan-up" - tilts camera upward (good for: tall ceilings, chandeliers, two-story foyers)
+     * "pan-down" - tilts camera downward (good for: looking down at pools, patios, floor details)
      * "zoom-in" - direct zoom toward focal point (good for: detail shots, unique features)
+     * "zoom-out" - pulls lens back to show wider view (good for: revealing full room scope, panoramic views)
    - caption: a short, elegant one-line description for this room (e.g., "Sun-drenched living room with vaulted ceilings")
    - focusPoint: where the camera should focus/move toward as {x: 0-100, y: 0-100} percentage. Pick the most visually interesting element.
    - depthZones: analyze where foreground, midground, and background regions are in the image for parallax depth effect. Return 3 zones as an array. Each zone has:
