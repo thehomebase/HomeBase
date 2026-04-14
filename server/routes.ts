@@ -16108,7 +16108,7 @@ export function registerRoutes(app: Express): Server {
     } catch {}
   }
 
-  const remotionRenderJobs = new Map<string, { status: string; progress: number; userId: number; error?: string; updatedAt: number }>();
+  const remotionRenderJobs = new Map<string, { status: string; progress: number; userId: number; error?: string; updatedAt: number; outputUrl?: string }>();
 
   setInterval(() => {
     const now = Date.now();
@@ -16129,11 +16129,10 @@ export function registerRoutes(app: Express): Server {
       }
 
       const jobId = `remotion-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const outputPath = `/tmp/${jobId}.mp4`;
       const userId = req.user!.id;
 
       remotionRenderJobs.set(jobId, { status: "processing", progress: 0, userId, updatedAt: Date.now() });
-      console.log(`[Remotion] Job ${jobId}: Starting render for user ${userId}`);
+      console.log(`[Remotion Lambda] Job ${jobId}: Starting render for user ${userId}`);
       res.json({ jobId });
 
       (async () => {
@@ -16141,13 +16140,7 @@ export function registerRoutes(app: Express): Server {
           const fs = await import("fs");
           const pathMod = await import("path");
           const os = await import("os");
-          const renderClipsDir = pathMod.join(os.tmpdir(), "render-clips");
-          if (!fs.existsSync(renderClipsDir)) fs.mkdirSync(renderClipsDir, { recursive: true });
 
-          const assetToken = `rt-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-          renderAssetTokens.set(assetToken, { expiresAt: Date.now() + 15 * 60 * 1000 });
-
-          const port = process.env.PORT || "5000";
           const resolvedPhotos = await Promise.all(photos.map(async (photo: any) => {
             if (!photo.videoClipUrl) return photo;
             try {
@@ -16166,42 +16159,46 @@ export function registerRoutes(app: Express): Server {
                   if (result.ok) clipBuffer = Buffer.from(result.value);
                 }
               } else if (clipUrl.startsWith("https://")) {
-                const resp = await fetch(clipUrl);
-                if (resp.ok) clipBuffer = Buffer.from(await resp.arrayBuffer());
+                return photo;
               }
 
               if (clipBuffer) {
-                const assetFilename = `render_${photo.id}_${Date.now()}.mp4`;
-                fs.writeFileSync(pathMod.join(renderClipsDir, assetFilename), clipBuffer);
-                return { ...photo, videoClipUrl: `http://localhost:${port}/api/listing-videos/render-asset/${assetToken}/${assetFilename}` };
+                const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
+                const s3 = new S3Client({ region: process.env.REMOTION_AWS_REGION || "us-east-1" });
+                const clipKey = `render-clips/${jobId}/${photo.id}.mp4`;
+                const bucketMatch = (process.env.REMOTION_SERVE_URL || "").match(/\/\/(remotionlambda-[^.]+)\./);
+                const bucketName = bucketMatch?.[1] || "remotionlambda-useast1-dkoz0smins";
+                await s3.send(new PutObjectCommand({
+                  Bucket: bucketName,
+                  Key: clipKey,
+                  Body: clipBuffer,
+                  ContentType: "video/mp4",
+                }));
+                const publicUrl = `https://${bucketName}.s3.${process.env.REMOTION_AWS_REGION || "us-east-1"}.amazonaws.com/${clipKey}`;
+                console.log(`[Remotion Lambda] Uploaded clip for photo ${photo.id} to S3: ${publicUrl}`);
+                return { ...photo, videoClipUrl: publicUrl };
               }
-              console.warn(`[Remotion] Job ${jobId}: Could not resolve clip for photo ${photo.id}, using Ken Burns fallback`);
+              console.warn(`[Remotion Lambda] Job ${jobId}: Could not resolve clip for photo ${photo.id}, using Ken Burns fallback`);
               return { ...photo, videoClipUrl: undefined };
             } catch (err: any) {
-              console.warn(`[Remotion] Job ${jobId}: Clip download failed for photo ${photo.id}: ${err.message}`);
+              console.warn(`[Remotion Lambda] Job ${jobId}: Clip resolution failed for photo ${photo.id}: ${err.message}`);
               return { ...photo, videoClipUrl: undefined };
             }
           }));
 
-          const { renderListingVideo } = await import("./remotion-render");
-          await renderListingVideo(
+          const { renderListingVideoOnLambda } = await import("./remotion-render");
+          const result = await renderListingVideoOnLambda(
             { photos: resolvedPhotos, settings, propertyDetails, propertyAddress, agentBranding },
-            outputPath,
             (progress) => {
               remotionRenderJobs.set(jobId, { status: "processing", progress: Math.round(progress * 100), userId, updatedAt: Date.now() });
             }
           );
-          const stats = (await import("fs")).statSync(outputPath);
-          console.log(`[Remotion] Job ${jobId}: Render complete (${Math.round(stats.size / 1024 / 1024)}MB)`);
-          remotionRenderJobs.set(jobId, { status: "complete", progress: 100, userId, updatedAt: Date.now() });
-          renderAssetTokens.delete(assetToken);
-          cleanupRenderClips(resolvedPhotos, renderClipsDir);
+
+          console.log(`[Remotion Lambda] Job ${jobId}: Render complete, output: ${result.outputUrl}`);
+          remotionRenderJobs.set(jobId, { status: "complete", progress: 100, userId, updatedAt: Date.now(), outputUrl: result.outputUrl });
         } catch (err: any) {
-          console.error(`[Remotion] Job ${jobId}: Render failed:`, err?.message);
+          console.error(`[Remotion Lambda] Job ${jobId}: Render failed:`, err?.message);
           remotionRenderJobs.set(jobId, { status: "failed", progress: 0, userId, error: err?.message || "Unknown error", updatedAt: Date.now() });
-          try { (await import("fs")).unlinkSync(outputPath); } catch {}
-          renderAssetTokens.delete(assetToken);
-          cleanupRenderClips(resolvedPhotos, renderClipsDir);
         }
       })();
     } catch (err: any) {
@@ -16223,6 +16220,33 @@ export function registerRoutes(app: Express): Server {
     const job = remotionRenderJobs.get(req.params.jobId);
     if (!job) return res.status(404).json({ error: "Job not found or expired" });
     if (job.userId !== req.user!.id) return res.status(403).json({ error: "Forbidden" });
+
+    if (job.outputUrl) {
+      try {
+        const s3Resp = await fetch(job.outputUrl);
+        if (!s3Resp.ok) throw new Error(`S3 fetch failed: ${s3Resp.status}`);
+        const contentLength = s3Resp.headers.get("content-length");
+        res.setHeader("Content-Type", "video/mp4");
+        if (contentLength) res.setHeader("Content-Length", contentLength);
+        res.setHeader("Content-Disposition", `attachment; filename="listing-video-${Date.now()}.mp4"`);
+        const reader = s3Resp.body?.getReader();
+        if (!reader) throw new Error("No response body");
+        const pump = async () => {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            res.write(value);
+          }
+          res.end();
+        };
+        await pump();
+        setTimeout(() => remotionRenderJobs.delete(req.params.jobId), 60000);
+      } catch (err: any) {
+        if (!res.headersSent) res.status(500).json({ error: "Download failed: " + err.message });
+      }
+      return;
+    }
+
     const outputPath = `/tmp/${req.params.jobId}.mp4`;
     try {
       const fs = await import("fs");

@@ -88,6 +88,9 @@ DROPBOX_APP_KEY = "7khj7bsfopn6hwk"
 DROPBOX_APP_SECRET = "bxli0hpqyl790fa"
 VITE_RECAPTCHA_SITE_KEY = "6Leem4osAAAAACcfmuBGkRtWENNNjcKLKJq334lQ"
 SENDGRID_FROM_EMAIL = "Thehomebase.io@gmail.com"
+REMOTION_AWS_REGION = "us-east-1"
+REMOTION_SERVE_URL = "https://remotionlambda-useast1-dkoz0smins.s3.us-east-1.amazonaws.com/sites/homebase-listing-video/index.html"
+REMOTION_FUNCTION_NAME = "remotion-render-4-0-434-mem2048mb-disk2048mb-240sec"
 
 [agent]
 integrations = ["stripe:1.0.0", "javascript_gemini_ai_integrations:2.0.0"]

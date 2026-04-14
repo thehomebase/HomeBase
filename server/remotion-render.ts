@@ -1,47 +1,6 @@
-import { bundle } from "@remotion/bundler";
-import { renderMedia, selectComposition, ensureBrowser } from "@remotion/renderer";
+import { renderMediaOnLambda, getRenderProgress } from "@remotion/lambda/client";
 import path from "path";
 import fs from "fs";
-import { execSync } from "child_process";
-
-let bundleLocation: string | null = null;
-let bundlePromise: Promise<string> | null = null;
-
-export async function getBundle(): Promise<string> {
-  if (bundleLocation && fs.existsSync(bundleLocation)) {
-    return bundleLocation;
-  }
-
-  if (bundlePromise) return bundlePromise;
-
-  bundlePromise = (async () => {
-    console.log("[Remotion] Bundling compositions...");
-    const start = Date.now();
-
-    const entryPoint = path.resolve(process.cwd(), "client/src/remotion/index.tsx");
-    const result = await bundle({
-      entryPoint,
-      webpackOverride: (config) => {
-        return {
-          ...config,
-          resolve: {
-            ...config.resolve,
-            alias: {
-              ...(config.resolve?.alias || {}),
-            },
-          },
-        };
-      },
-    });
-
-    bundleLocation = result;
-    const elapsed = Math.round((Date.now() - start) / 1000);
-    console.log(`[Remotion] Bundle ready in ${elapsed}s: ${result}`);
-    return result;
-  })();
-
-  return bundlePromise;
-}
 
 export interface RenderOptions {
   photos: Array<{
@@ -93,57 +52,17 @@ export interface RenderOptions {
   };
 }
 
-function findSystemChromium(): string | null {
-  const candidates = [
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser",
-    "/usr/bin/google-chrome",
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
-  }
-  try {
-    const result = execSync("which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome 2>/dev/null", { encoding: "utf-8" }).trim();
-    if (result) return result;
-  } catch {}
-  try {
-    const nixResult = execSync("ls /nix/store/*/bin/chromium 2>/dev/null | head -1", { encoding: "utf-8" }).trim();
-    if (nixResult) return nixResult;
-  } catch {}
-  return null;
-}
-
-const CHROME_LOW_MEM_FLAGS = [
-  "--disable-gpu",
-  "--disable-dev-shm-usage",
-  "--disable-software-rasterizer",
-  "--no-sandbox",
-  "--disable-extensions",
-  "--disable-background-networking",
-  "--disable-default-apps",
-  "--disable-sync",
-  "--disable-translate",
-  "--metrics-recording-only",
-  "--no-first-run",
-  "--js-flags=--max-old-space-size=256",
-];
-
-export async function renderListingVideo(
+export async function renderListingVideoOnLambda(
   options: RenderOptions,
-  outputPath: string,
   onProgress?: (progress: number) => void
-): Promise<void> {
-  const systemChromium = findSystemChromium();
-  if (systemChromium) {
-    console.log(`[Remotion] Using system Chromium: ${systemChromium}`);
-  } else {
-    console.log("[Remotion] No system Chromium found, using Remotion's bundled browser");
+): Promise<{ outputUrl: string; bucketName: string; renderId: string }> {
+  const region = (process.env.REMOTION_AWS_REGION || "us-east-1") as "us-east-1";
+  const functionName = process.env.REMOTION_FUNCTION_NAME;
+  const serveUrl = process.env.REMOTION_SERVE_URL;
+
+  if (!functionName || !serveUrl) {
+    throw new Error("Missing REMOTION_FUNCTION_NAME or REMOTION_SERVE_URL environment variables");
   }
-
-  const browserExecutable = systemChromium || undefined;
-
-  await ensureBrowser({ browserExecutable });
-  const bundlePath = await getBundle();
 
   const inputProps = {
     photos: options.photos,
@@ -153,34 +72,51 @@ export async function renderListingVideo(
     agentBranding: options.agentBranding,
   };
 
-  const composition = await selectComposition({
-    serveUrl: bundlePath,
-    id: "ListingVideo",
+  console.log(`[Remotion Lambda] Starting render with function ${functionName}`);
+  const renderStart = Date.now();
+
+  const { renderId, bucketName } = await renderMediaOnLambda({
+    region,
+    functionName,
+    serveUrl,
+    composition: "ListingVideo",
     inputProps,
-    browserExecutable,
-    chromiumOptions: {
-      args: CHROME_LOW_MEM_FLAGS,
-    },
-  });
-
-  console.log(`[Remotion] Rendering ${composition.durationInFrames} frames (${composition.width}x${composition.height}) at ${composition.fps}fps`);
-
-  await renderMedia({
-    composition,
-    serveUrl: bundlePath,
     codec: "h264",
-    outputLocation: outputPath,
-    inputProps,
     videoBitrate: "4M",
-    browserExecutable,
-    concurrency: 1,
-    chromiumOptions: {
-      args: CHROME_LOW_MEM_FLAGS,
-    },
-    onProgress: ({ progress }) => {
-      onProgress?.(progress);
-    },
+    maxRetries: 1,
+    privacy: "no-acl",
+    downloadBehavior: { type: "download", fileName: "listing-video.mp4" },
   });
 
-  console.log(`[Remotion] Render complete: ${outputPath}`);
+  console.log(`[Remotion Lambda] Render started: renderId=${renderId}, bucket=${bucketName}`);
+
+  while (true) {
+    const progress = await getRenderProgress({
+      renderId,
+      bucketName,
+      functionName,
+      region,
+    });
+
+    if (progress.done) {
+      const elapsed = Math.round((Date.now() - renderStart) / 1000);
+      console.log(`[Remotion Lambda] Render complete in ${elapsed}s: ${progress.outputFile}`);
+      onProgress?.(1);
+      return {
+        outputUrl: progress.outputFile!,
+        bucketName,
+        renderId,
+      };
+    }
+
+    if (progress.fatalErrorEncountered) {
+      throw new Error(`Lambda render failed: ${progress.errors?.[0]?.message || "Unknown error"}`);
+    }
+
+    if (progress.overallProgress !== null) {
+      onProgress?.(progress.overallProgress);
+    }
+
+    await new Promise((r) => setTimeout(r, 2000));
+  }
 }
