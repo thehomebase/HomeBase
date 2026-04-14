@@ -15754,7 +15754,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid image data" });
       }
 
-      const validMotions = ["push-in","pull-out","truck-right","truck-left","drift-right","drift-left","pan-right","pan-left","tilt-up","tilt-down","pedestal-up","zoom-in","zoom-out",
+      const validMotions = ["push-in","pull-out","truck-right","truck-left","drift-right","drift-left","pan-right","pan-left","tilt-up","tilt-down","pedestal-up","orbit-right","orbit-left","zoom-in","zoom-out",
         "walk-forward","walk-right","walk-left","reveal","rise-up","pan-up","pan-down"];
       const safeMotion = validMotions.includes(motionType) ? motionType : "push-in";
 
@@ -15770,6 +15770,8 @@ export function registerRoutes(app: Express): Server {
         "tilt-up": "[Tilt up]",
         "tilt-down": "[Tilt down]",
         "pedestal-up": "[Pedestal up]",
+        "orbit-right": "[Truck right, Pan left]",
+        "orbit-left": "[Truck left, Pan right]",
         "zoom-in": "[Zoom in]",
         "zoom-out": "[Zoom out]",
         "walk-forward": "[Push in]",
@@ -16005,6 +16007,8 @@ export function registerRoutes(app: Express): Server {
      * "tilt-up" - camera tilts upward (good for: tall ceilings, chandeliers, two-story foyers, grand entries)
      * "tilt-down" - camera tilts downward (good for: looking down at pools, patios, floor details)
      * "pedestal-up" - camera physically rises upward (good for: tall ceilings, staircases, grand entries)
+     * "orbit-right" - camera arcs around the subject to the right, keeping center in focus (good for: kitchen islands, dining tables, featured furniture, statement pieces)
+     * "orbit-left" - camera arcs around the subject to the left, keeping center in focus (good for: fireplaces, bathtubs, accent walls, unique architectural elements)
      * "zoom-in" - lens zooms toward focal point (good for: detail shots, unique features, fireplaces)
      * "zoom-out" - lens pulls back to show wider view (good for: revealing full room scope, panoramic views)
    - caption: a short, elegant one-line description for this room (e.g., "Sun-drenched living room with vaulted ceilings")
@@ -16067,7 +16071,7 @@ Return ONLY valid JSON in this exact format:
       const text = response.text || "";
       const analysis = JSON.parse(text);
 
-      const validMotions = new Set(["walk-forward","walk-right","walk-left","reveal","drift-right","drift-left","push-in","pull-out","rise-up","pan-right","pan-left","zoom-in","zoom-out","pan-up","pan-down"]);
+      const validMotions = new Set(["walk-forward","walk-right","walk-left","reveal","drift-right","drift-left","push-in","pull-out","rise-up","pan-right","pan-left","orbit-right","orbit-left","zoom-in","zoom-out","pan-up","pan-down"]);
       const validRegions = new Set(["foreground", "midground", "background"]);
       if (analysis.analyses && Array.isArray(analysis.analyses)) {
         for (const a of analysis.analyses) {

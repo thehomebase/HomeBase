@@ -19,7 +19,7 @@ import {
   Upload, Video, Sparkles, Play, Download, Trash2, GripVertical,
   ArrowLeft, ArrowRight, ArrowUp, ArrowDown, ZoomIn, ZoomOut,
   Music, Type, Image, Settings, Plus, X, Loader2, Eye, Layers,
-  RotateCcw, Square
+  RotateCcw, RotateCw, Square
 } from "lucide-react";
 
 interface PhotoItem {
@@ -86,6 +86,8 @@ const MOTION_TYPES = [
   { value: "tilt-up", label: "Tilt Up", icon: ArrowUp },
   { value: "tilt-down", label: "Tilt Down", icon: ArrowDown },
   { value: "pedestal-up", label: "Pedestal Up", icon: ArrowUp },
+  { value: "orbit-right", label: "Orbit Right", icon: RotateCw },
+  { value: "orbit-left", label: "Orbit Left", icon: RotateCcw },
   { value: "zoom-in", label: "Zoom In", icon: ZoomIn },
   { value: "zoom-out", label: "Zoom Out", icon: ZoomOut },
 ];
@@ -282,6 +284,10 @@ function VideoComposer({
       case "pedestal-up":
       case "rise-up":
         return { scale: 1.25 + ease * 0.2, x: 0, y: -ease * 0.12 };
+      case "orbit-right":
+        return { scale: 1.25 + ease * 0.15, x: ease * 0.15, y: Math.sin(ease * Math.PI) * -0.04 };
+      case "orbit-left":
+        return { scale: 1.25 + ease * 0.15, x: -ease * 0.15, y: Math.sin(ease * Math.PI) * -0.04 };
       case "zoom-in":
         return { scale: 1.0 + ease * 0.5, x: (fpX - 0.5) * ease * 0.12, y: (fpY - 0.5) * ease * 0.08 };
       case "zoom-out":
