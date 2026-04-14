@@ -149,7 +149,7 @@ function ClipPreviewModal({
               autoPlay
               loop
               className="w-full rounded-lg"
-              crossOrigin="anonymous"
+              {...(photo.videoClipUrl.startsWith("https://") ? { crossOrigin: "anonymous" as const } : {})}
             />
           ) : (
             <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
@@ -225,7 +225,9 @@ function VideoComposer({
         const resolvedUrl = resolveClipUrl(photo.videoClipUrl);
         if (!existing || existing.getAttribute("data-clip-url") !== photo.videoClipUrl) {
           const video = document.createElement("video");
-          video.crossOrigin = "anonymous";
+          if (resolvedUrl.includes("proxy-clip")) {
+            video.crossOrigin = "anonymous";
+          }
           video.src = resolvedUrl;
           video.muted = true;
           video.playsInline = true;
@@ -1102,7 +1104,7 @@ function VideoComposer({
       }
       ctx.save();
       ctx.globalAlpha = alpha;
-      try { ctx.drawImage(source, dx, dy, dw, dh); } catch {}
+      try { ctx.drawImage(source, dx, dy, dw, dh); } catch (e) { console.warn("[DrawFrame] drawImage failed:", e); }
       ctx.restore();
     };
 

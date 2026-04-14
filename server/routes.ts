@@ -16054,7 +16054,7 @@ export function registerRoutes(app: Express): Server {
     upload.single("video")(req, res, async (err) => {
       if (err) return res.status(400).json({ error: "Upload failed: " + err.message });
       if (!req.file) return res.status(400).json({ error: "No video file provided" });
-      const { execFile } = await import("child_process");
+      const { exec } = await import("child_process");
       const fs = await import("fs");
       const os = await import("os");
       const path = await import("path");
@@ -16063,22 +16063,15 @@ export function registerRoutes(app: Express): Server {
       const outputPath = path.join(tmpDir, `output_${req.user!.id}_${Date.now()}.mp4`);
       try {
         fs.writeFileSync(inputPath, req.file.buffer);
+        console.log(`[FFmpeg] Starting conversion: ${inputPath} (${Math.round(req.file.buffer.length / 1024)}KB)`);
         await new Promise<void>((resolve, reject) => {
-          execFile("ffmpeg", [
-            "-i", inputPath,
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "18",
-            "-c:a", "aac",
-            "-b:a", "192k",
-            "-movflags", "+faststart",
-            "-y",
-            outputPath,
-          ], { timeout: 120000 }, (error, _stdout, stderr) => {
+          const cmd = `ffmpeg -i "${inputPath}" -c:v libx264 -preset fast -crf 18 -c:a aac -b:a 192k -movflags +faststart -y "${outputPath}" 2>&1`;
+          exec(cmd, { timeout: 180000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout) => {
             if (error) {
-              console.error("[FFmpeg] Conversion error:", stderr);
+              console.error("[FFmpeg] Conversion error:", stdout?.slice(-500));
               reject(new Error("Video conversion failed"));
             } else {
+              console.log("[FFmpeg] Conversion complete");
               resolve();
             }
           });
