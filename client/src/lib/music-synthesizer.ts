@@ -228,6 +228,13 @@ export const BUNDLED_TRACKS: BundledTrack[] = [
     artist: "The_Mountain",
     source: "Pixabay",
   },
+  {
+    id: "pixabay-real-estate",
+    label: "Real Estate",
+    file: "/music/real-estate-132405.mp3",
+    artist: "The_Mountain",
+    source: "Pixabay",
+  },
 ];
 
 export function isBundledTrack(trackId: string): boolean {
