@@ -44,6 +44,7 @@ interface VideoSettings {
   showCaptions: boolean;
   brandingPosition: string;
   transitionStyle: string;
+  textTemplate: string;
 }
 
 interface PropertyDetails {
@@ -76,6 +77,14 @@ const MUSIC_TRACKS = [
   { value: "upbeat", label: "Upbeat & Bright" },
   { value: "cinematic", label: "Cinematic" },
   { value: "acoustic", label: "Acoustic Guitar" },
+];
+
+const TEXT_TEMPLATES = [
+  { value: "classic", label: "Classic", description: "Clean centered text with dark overlay" },
+  { value: "bold", label: "Bold Cinematic", description: "Large bold headers with staggered fade-in, property bar at bottom" },
+  { value: "minimal", label: "Modern Minimal", description: "Bottom-left text with accent bar, subtle fade" },
+  { value: "elegant", label: "Elegant", description: "Serif font with gradient overlay, refined feel" },
+  { value: "none", label: "No Text", description: "Video only, no text overlays" },
 ];
 
 const ASPECT_RATIOS: Record<string, { width: number; height: number; label: string }> = {
@@ -263,6 +272,9 @@ function VideoComposer({
     ctx.restore();
   };
 
+  const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+  const easeInOut = (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
   const drawKeywordOverlay = (
     ctx: CanvasRenderingContext2D,
     w: number,
@@ -270,32 +282,87 @@ function VideoComposer({
     keyword: string,
     photoProgress: number,
   ) => {
-    if (!keyword) return;
+    if (!keyword || settings.textTemplate === "none") return;
+    const tmpl = settings.textTemplate || "classic";
     const fadeIn = Math.min(1, photoProgress * 4);
     const fadeOut = Math.min(1, (1 - photoProgress) * 4);
     const alpha = Math.min(fadeIn, fadeOut);
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    const fontSize = Math.max(18, w * 0.045);
-    ctx.font = `700 ${fontSize}px "Inter", system-ui, sans-serif`;
-    const metrics = ctx.measureText(keyword.toUpperCase());
-    const textW = metrics.width;
-    const padding = fontSize * 0.7;
-    const boxW = textW + padding * 2;
-    const boxH = fontSize * 2;
-    const boxX = (w - boxW) / 2;
-    const boxY = h * 0.12;
 
-    ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
-    ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, 8);
-    ctx.fill();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(keyword.toUpperCase(), w / 2, boxY + boxH / 2);
+    if (tmpl === "bold") {
+      const slideIn = easeOut(Math.min(1, photoProgress * 3));
+      ctx.globalAlpha = alpha;
+      const fontSize = Math.max(22, w * 0.055);
+      const fontFamily = '"Inter", system-ui, sans-serif';
+      ctx.font = `900 ${fontSize}px ${fontFamily}`;
+      const barW = 4;
+      const margin = w * 0.05;
+      const textX = margin + barW + fontSize * 0.5;
+      const textY = h - h * 0.1;
+      const offsetX = (1 - slideIn) * -40;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(margin + offsetX, textY - fontSize * 0.8, barW, fontSize * 1.2);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,0.7)";
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      ctx.fillText(keyword.toUpperCase(), textX + offsetX, textY);
+    } else if (tmpl === "minimal") {
+      const slideUp = easeOut(Math.min(1, photoProgress * 3));
+      const fontSize = Math.max(16, w * 0.04);
+      const fontFamily = '"Inter", system-ui, sans-serif';
+      ctx.font = `600 ${fontSize}px ${fontFamily}`;
+      const margin = w * 0.05;
+      const baseY = h - h * 0.08;
+      const offsetY = (1 - slideUp) * 20;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(margin, baseY - fontSize * 0.6 + offsetY, 3, fontSize * 0.9);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 6;
+      ctx.fillText(keyword.toUpperCase(), margin + 12, baseY + offsetY);
+    } else if (tmpl === "elegant") {
+      const fontSize = Math.max(18, w * 0.045);
+      const fontFamily = '"Georgia", "Times New Roman", serif';
+      ctx.font = `italic 400 ${fontSize}px ${fontFamily}`;
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = 10;
+      const letterSpaced = keyword.toUpperCase().split("").join(" ");
+      ctx.fillText(letterSpaced, w / 2, h * 0.88);
+      const lineW = Math.min(ctx.measureText(letterSpaced).width * 0.6, w * 0.3);
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(w / 2 - lineW / 2, h * 0.88 + fontSize * 0.8);
+      ctx.lineTo(w / 2 + lineW / 2, h * 0.88 + fontSize * 0.8);
+      ctx.stroke();
+    } else {
+      const fontSize = Math.max(18, w * 0.045);
+      ctx.font = `700 ${fontSize}px "Inter", system-ui, sans-serif`;
+      const metrics = ctx.measureText(keyword.toUpperCase());
+      const textW = metrics.width;
+      const padding = fontSize * 0.7;
+      const boxW = textW + padding * 2;
+      const boxH = fontSize * 2;
+      const boxX = (w - boxW) / 2;
+      const boxY = h * 0.12;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 8);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(keyword.toUpperCase(), w / 2, boxY + boxH / 2);
+    }
     ctx.restore();
   };
 
@@ -306,46 +373,63 @@ function VideoComposer({
     caption: string,
     photoProgress: number
   ) => {
-    if (!caption || !settings.showCaptions) return;
+    if (!caption || !settings.showCaptions || settings.textTemplate === "none") return;
+    const tmpl = settings.textTemplate || "classic";
     const fadeIn = Math.min(1, photoProgress * 5);
     const fadeOut = Math.min(1, (1 - photoProgress) * 5);
     const alpha = Math.min(fadeIn, fadeOut);
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    const fontSize = Math.max(14, w * 0.032);
-    ctx.font = `500 ${fontSize}px "Inter", system-ui, sans-serif`;
-    const metrics = ctx.measureText(caption);
-    const textW = metrics.width;
-    const padding = fontSize * 0.8;
-    const boxW = textW + padding * 2;
-    const boxH = fontSize * 2.2;
-    const boxX = (w - boxW) / 2;
-    const boxY = h - boxH - h * 0.08;
 
-    ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
-    ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, boxH / 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(caption, w / 2, boxY + boxH / 2);
+    if (tmpl === "bold" || tmpl === "minimal") {
+      ctx.restore();
+      return;
+    } else if (tmpl === "elegant") {
+      const fontSize = Math.max(12, w * 0.026);
+      ctx.font = `300 ${fontSize}px "Georgia", "Times New Roman", serif`;
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 6;
+      ctx.fillText(caption, w / 2, h * 0.93);
+    } else {
+      const fontSize = Math.max(14, w * 0.032);
+      ctx.font = `500 ${fontSize}px "Inter", system-ui, sans-serif`;
+      const metrics = ctx.measureText(caption);
+      const textW = metrics.width;
+      const padding = fontSize * 0.8;
+      const boxW = textW + padding * 2;
+      const boxH = fontSize * 2.2;
+      const boxX = (w - boxW) / 2;
+      const boxY = h - boxH - h * 0.08;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, boxH / 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(caption, w / 2, boxY + boxH / 2);
+    }
     ctx.restore();
   };
 
   const drawBrandingOverlay = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    if (!user) return;
+    if (!user || settings.textTemplate === "none") return;
     ctx.save();
     ctx.globalAlpha = 0.85;
     const name = `${user.firstName || ""} ${user.lastName || ""}`.trim();
     const phone = user.profilePhone || "";
     if (!name) { ctx.restore(); return; }
+    const tmpl = settings.textTemplate || "classic";
+    const isSerif = tmpl === "elegant";
+    const fontFamily = isSerif ? '"Georgia", "Times New Roman", serif' : '"Inter", system-ui, sans-serif';
     const fontSize = Math.max(11, w * 0.025);
-    ctx.font = `600 ${fontSize}px "Inter", system-ui, sans-serif`;
+    ctx.font = `600 ${fontSize}px ${fontFamily}`;
     const nameW = ctx.measureText(name).width;
-    ctx.font = `400 ${fontSize * 0.8}px "Inter", system-ui, sans-serif`;
+    ctx.font = `400 ${fontSize * 0.8}px ${fontFamily}`;
     const phoneW = phone ? ctx.measureText(phone).width : 0;
     const maxTextW = Math.max(nameW, phoneW);
     const padding = fontSize * 0.6;
@@ -365,44 +449,219 @@ function VideoComposer({
     ctx.fill();
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "left";
-    ctx.font = `600 ${fontSize}px "Inter", system-ui, sans-serif`;
+    ctx.font = `600 ${fontSize}px ${fontFamily}`;
     ctx.fillText(name, boxX + padding, boxY + padding + fontSize * 0.4);
     if (phone) {
-      ctx.font = `400 ${fontSize * 0.8}px "Inter", system-ui, sans-serif`;
+      ctx.font = `400 ${fontSize * 0.8}px ${fontFamily}`;
       ctx.fillText(phone, boxX + padding, boxY + padding + fontSize * 1.4);
     }
     ctx.restore();
   };
 
   const drawPropertyInfo = (ctx: CanvasRenderingContext2D, w: number, h: number, globalProgress: number) => {
+    if (settings.textTemplate === "none") return;
     if (!propertyAddress && !propertyDetails.price) return;
     if (globalProgress > 0.15) return;
-    const alpha = globalProgress < 0.02 ? globalProgress / 0.02 : globalProgress > 0.12 ? (0.15 - globalProgress) / 0.03 : 1;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    const fontSize = Math.max(16, w * 0.04);
-    const padding = fontSize;
-    const lineHeight = fontSize * 1.5;
-    let lines: string[] = [];
-    if (propertyAddress) lines.push(propertyAddress);
-    const details: string[] = [];
-    if (propertyDetails.price) details.push(propertyDetails.price);
-    if (propertyDetails.beds) details.push(`${propertyDetails.beds} Bed`);
-    if (propertyDetails.baths) details.push(`${propertyDetails.baths} Bath`);
-    if (propertyDetails.sqft) details.push(`${propertyDetails.sqft} Sq Ft`);
-    if (details.length > 0) lines.push(details.join(" • "));
-    const boxH = padding * 2 + lines.length * lineHeight;
-    const boxY = (h - boxH) / 2;
-    ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-    ctx.fillRect(0, boxY, w, boxH);
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    lines.forEach((line, i) => {
-      ctx.font = i === 0 ? `700 ${fontSize}px "Inter", system-ui, sans-serif` : `400 ${fontSize * 0.75}px "Inter", system-ui, sans-serif`;
-      ctx.fillText(line, w / 2, boxY + padding + i * lineHeight + lineHeight / 2);
-    });
-    ctx.restore();
+    const tmpl = settings.textTemplate || "classic";
+
+    if (tmpl === "bold") {
+      const segDuration = 0.15;
+      const headerDelay = 0.005;
+      const priceDelay = 0.025;
+      const addrDelay = 0.045;
+      const detailDelay = 0.065;
+
+      const staggerAlpha = (delay: number) => {
+        const t = Math.max(0, globalProgress - delay);
+        const fadeIn = easeOut(Math.min(1, t * 15));
+        const fadeOutStart = segDuration - 0.03;
+        const fadeOut = globalProgress > fadeOutStart ? easeInOut(Math.max(0, 1 - (globalProgress - fadeOutStart) / 0.03)) : 1;
+        return Math.min(fadeIn, fadeOut);
+      };
+      const staggerSlide = (delay: number) => {
+        const t = Math.max(0, globalProgress - delay);
+        return easeOut(Math.min(1, t * 12)) * 20;
+      };
+
+      ctx.save();
+      const sansFont = '"Inter", system-ui, sans-serif';
+
+      const headerSize = Math.max(28, w * 0.08);
+      let yPos = h * 0.22;
+      ctx.globalAlpha = staggerAlpha(headerDelay);
+      ctx.font = `900 ${headerSize}px ${sansFont}`;
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,0.8)";
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 3;
+      const slideY1 = staggerSlide(headerDelay);
+      ctx.fillText("JUST LISTED", w / 2, yPos + (20 - slideY1));
+
+      if (propertyDetails.price) {
+        yPos += headerSize * 1.2;
+        ctx.globalAlpha = staggerAlpha(priceDelay);
+        const priceSize = Math.max(22, w * 0.055);
+        ctx.font = `700 ${priceSize}px ${sansFont}`;
+        const slideY2 = staggerSlide(priceDelay);
+        ctx.fillText(propertyDetails.price, w / 2, yPos + (20 - slideY2));
+      }
+
+      if (propertyAddress) {
+        yPos += (propertyDetails.price ? Math.max(22, w * 0.055) : headerSize) * 1.4;
+        ctx.globalAlpha = staggerAlpha(addrDelay);
+        const addrSize = Math.max(14, w * 0.03);
+        ctx.font = `600 ${addrSize}px ${sansFont}`;
+        ctx.shadowBlur = 6;
+        const slideY3 = staggerSlide(addrDelay);
+        ctx.fillText(propertyAddress.toUpperCase(), w / 2, yPos + (20 - slideY3));
+      }
+
+      const detailItems: { icon: string; text: string }[] = [];
+      if (propertyDetails.beds) detailItems.push({ icon: "🛏", text: `${propertyDetails.beds} BEDS` });
+      if (propertyDetails.baths) detailItems.push({ icon: "🚿", text: `${propertyDetails.baths} BATHS` });
+      if (propertyDetails.sqft) detailItems.push({ icon: "📐", text: `${propertyDetails.sqft} SQ FT` });
+
+      if (detailItems.length > 0) {
+        ctx.globalAlpha = staggerAlpha(detailDelay);
+        const barH = Math.max(36, h * 0.06);
+        const barY = h - barH;
+        const slideY4 = staggerSlide(detailDelay);
+        const barAlphaOffset = (20 - slideY4) / 20;
+
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.92 * barAlphaOffset})`;
+        ctx.fillRect(0, barY + (20 - slideY4), w, barH);
+
+        const segW = w / detailItems.length;
+        const detailSize = Math.max(12, w * 0.024);
+        ctx.font = `700 ${detailSize}px ${sansFont}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#1a1a1a";
+        detailItems.forEach((item, i) => {
+          const cx = segW * i + segW / 2;
+          ctx.fillText(item.text, cx, barY + barH / 2 + (20 - slideY4));
+          if (i < detailItems.length - 1) {
+            ctx.fillStyle = "rgba(0,0,0,0.15)";
+            ctx.fillRect(segW * (i + 1) - 0.5, barY + barH * 0.2 + (20 - slideY4), 1, barH * 0.6);
+            ctx.fillStyle = "#1a1a1a";
+          }
+        });
+      }
+      ctx.restore();
+    } else if (tmpl === "minimal") {
+      const alpha = globalProgress < 0.02 ? globalProgress / 0.02 : globalProgress > 0.12 ? (0.15 - globalProgress) / 0.03 : 1;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const margin = w * 0.05;
+      const sansFont = '"Inter", system-ui, sans-serif';
+      const slideIn = easeOut(Math.min(1, globalProgress * 10));
+      const offsetX = (1 - slideIn) * -30;
+
+      let yPos = h * 0.35;
+      if (propertyDetails.price) {
+        const priceSize = Math.max(20, w * 0.055);
+        ctx.font = `800 ${priceSize}px ${sansFont}`;
+        ctx.fillStyle = "#ffffff";
+        ctx.textAlign = "left";
+        ctx.shadowColor = "rgba(0,0,0,0.7)";
+        ctx.shadowBlur = 8;
+        ctx.fillText(propertyDetails.price, margin + offsetX, yPos);
+        yPos += priceSize * 1.3;
+      }
+      if (propertyAddress) {
+        const addrSize = Math.max(12, w * 0.028);
+        ctx.font = `500 ${addrSize}px ${sansFont}`;
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.shadowBlur = 4;
+        ctx.fillText(propertyAddress, margin + offsetX, yPos);
+        yPos += addrSize * 1.6;
+      }
+      const details: string[] = [];
+      if (propertyDetails.beds) details.push(`${propertyDetails.beds} Bed`);
+      if (propertyDetails.baths) details.push(`${propertyDetails.baths} Bath`);
+      if (propertyDetails.sqft) details.push(`${propertyDetails.sqft} Sq Ft`);
+      if (details.length > 0) {
+        const detSize = Math.max(11, w * 0.024);
+        ctx.font = `400 ${detSize}px ${sansFont}`;
+        ctx.fillStyle = "rgba(255,255,255,0.75)";
+        ctx.fillText(details.join("  •  "), margin + offsetX, yPos);
+      }
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(margin + offsetX - 10, h * 0.35 - Math.max(20, w * 0.055) * 0.7, 3, yPos - (h * 0.35 - Math.max(20, w * 0.055) * 0.7) + 5);
+      ctx.restore();
+    } else if (tmpl === "elegant") {
+      const alpha = globalProgress < 0.02 ? globalProgress / 0.02 : globalProgress > 0.12 ? (0.15 - globalProgress) / 0.03 : 1;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const serifFont = '"Georgia", "Times New Roman", serif';
+
+      const grad = ctx.createLinearGradient(0, h * 0.55, 0, h);
+      grad.addColorStop(0, "rgba(0,0,0,0)");
+      grad.addColorStop(1, "rgba(0,0,0,0.6)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, h * 0.55, w, h * 0.45);
+
+      let yPos = h * 0.68;
+      if (propertyDetails.price) {
+        const priceSize = Math.max(22, w * 0.06);
+        ctx.font = `400 ${priceSize}px ${serifFont}`;
+        ctx.fillStyle = "#ffffff";
+        ctx.textAlign = "center";
+        ctx.fillText(propertyDetails.price, w / 2, yPos);
+        yPos += priceSize * 1.4;
+      }
+      if (propertyAddress) {
+        const addrSize = Math.max(12, w * 0.028);
+        ctx.font = `400 ${addrSize}px ${serifFont}`;
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        const letterSpaced = propertyAddress.toUpperCase().split("").join(" ");
+        ctx.fillText(letterSpaced, w / 2, yPos);
+        yPos += addrSize * 1.8;
+      }
+      const details: string[] = [];
+      if (propertyDetails.beds) details.push(`${propertyDetails.beds} Beds`);
+      if (propertyDetails.baths) details.push(`${propertyDetails.baths} Baths`);
+      if (propertyDetails.sqft) details.push(`${propertyDetails.sqft} Sq Ft`);
+      if (details.length > 0) {
+        const detSize = Math.max(11, w * 0.024);
+        ctx.font = `300 ${detSize}px ${serifFont}`;
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.fillText(details.join("   ·   "), w / 2, yPos);
+      }
+      ctx.restore();
+    } else {
+      const alpha = globalProgress < 0.02 ? globalProgress / 0.02 : globalProgress > 0.12 ? (0.15 - globalProgress) / 0.03 : 1;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const fontSize = Math.max(16, w * 0.04);
+      const padding = fontSize;
+      const lineHeight = fontSize * 1.5;
+      let lines: string[] = [];
+      if (propertyAddress) lines.push(propertyAddress);
+      const details: string[] = [];
+      if (propertyDetails.price) details.push(propertyDetails.price);
+      if (propertyDetails.beds) details.push(`${propertyDetails.beds} Bed`);
+      if (propertyDetails.baths) details.push(`${propertyDetails.baths} Bath`);
+      if (propertyDetails.sqft) details.push(`${propertyDetails.sqft} Sq Ft`);
+      if (details.length > 0) lines.push(details.join(" • "));
+      const boxH = padding * 2 + lines.length * lineHeight;
+      const boxY = (h - boxH) / 2;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+      ctx.fillRect(0, boxY, w, boxH);
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      lines.forEach((line, i) => {
+        ctx.font = i === 0 ? `700 ${fontSize}px "Inter", system-ui, sans-serif` : `400 ${fontSize * 0.75}px "Inter", system-ui, sans-serif`;
+        ctx.fillText(line, w / 2, boxY + padding + i * lineHeight + lineHeight / 2);
+      });
+      ctx.restore();
+    }
   };
 
   const drawFrameVideoClip = useCallback((photoIdx: number, photoProgress: number, globalProgress: number = 0) => {
@@ -742,6 +1001,7 @@ export default function ListingVideoPage() {
     showCaptions: true,
     brandingPosition: "bottom-right",
     transitionStyle: "cinematic",
+    textTemplate: "bold",
   });
   const [activeTab, setActiveTab] = useState("upload");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -779,7 +1039,7 @@ export default function ListingVideoPage() {
       setPhotos(videoPhotos);
       setTitle(data.title);
       setPropertyAddress(data.propertyAddress || "");
-      if (data.settings) setSettings(data.settings);
+      if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
       setActiveTab("photos");
     },
     onError: (error: Error) => {
@@ -995,7 +1255,7 @@ export default function ListingVideoPage() {
       setTitle(data.title);
       setPropertyAddress(data.propertyAddress || "");
       setPropertyDetails(data.propertyDetails || {});
-      if (data.settings) setSettings(data.settings);
+      if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
       setActiveTab("photos");
     } catch {
       toast({ title: "Failed to load video", variant: "destructive" });
@@ -1406,6 +1666,61 @@ export default function ListingVideoPage() {
               </TabsContent>
 
               <TabsContent value="settings" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Text Overlay Template</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 gap-2">
+                      {TEXT_TEMPLATES.map((tmpl) => (
+                        <button
+                          key={tmpl.value}
+                          onClick={() => setSettings(s => ({ ...s, textTemplate: tmpl.value }))}
+                          className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-all ${
+                            settings.textTemplate === tmpl.value
+                              ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                              : "border-border hover:border-muted-foreground/40 hover:bg-accent/50"
+                          }`}
+                        >
+                          <div className={`w-16 h-10 rounded flex-shrink-0 flex items-center justify-center text-[9px] font-bold overflow-hidden ${
+                            tmpl.value === "bold" ? "bg-gradient-to-br from-gray-900 to-gray-700 text-white" :
+                            tmpl.value === "minimal" ? "bg-gradient-to-br from-slate-800 to-slate-600 text-white" :
+                            tmpl.value === "elegant" ? "bg-gradient-to-br from-amber-900 to-amber-700 text-amber-100" :
+                            tmpl.value === "none" ? "bg-muted text-muted-foreground" :
+                            "bg-gradient-to-br from-blue-900 to-blue-700 text-white"
+                          }`}>
+                            {tmpl.value === "bold" && (
+                              <div className="leading-tight text-center">
+                                <div className="text-[7px] opacity-60">JUST LISTED</div>
+                                <div>$450K</div>
+                              </div>
+                            )}
+                            {tmpl.value === "minimal" && (
+                              <div className="flex items-center gap-0.5">
+                                <div className="w-[2px] h-3 bg-white rounded-full" />
+                                <span className="text-[8px]">$450K</span>
+                              </div>
+                            )}
+                            {tmpl.value === "elegant" && (
+                              <div className="italic text-[8px] tracking-wider">$450K</div>
+                            )}
+                            {tmpl.value === "classic" && (
+                              <div className="bg-black/50 px-1.5 py-0.5 rounded text-[8px]">$450K</div>
+                            )}
+                            {tmpl.value === "none" && (
+                              <span className="text-[8px]">OFF</span>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{tmpl.label}</p>
+                            <p className="text-xs text-muted-foreground">{tmpl.description}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Video Settings</CardTitle>
