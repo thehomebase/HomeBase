@@ -1381,6 +1381,17 @@ export default function ListingVideoPage() {
           title: "Video Clips Generated!",
           description: `${successCount} of ${total} clips ready. Preview now uses AI-generated video.`,
         });
+        if (selectedVideoId) {
+          try {
+            await apiRequest("PUT", `/api/listing-videos/${selectedVideoId}`, {
+              photos: updatedPhotos,
+              settings,
+            });
+            queryClient.invalidateQueries({ queryKey: ["/api/listing-videos"] });
+          } catch (e) {
+            console.error("Auto-save after clip generation failed:", e);
+          }
+        }
       }
     } catch (error: any) {
       console.error("Video generation error:", error);
@@ -1419,6 +1430,14 @@ export default function ListingVideoPage() {
       updatedPhotos[photoIndex] = { ...updatedPhotos[photoIndex], videoClipUrl: data.videoUrl };
       setPhotos(updatedPhotos);
       toast({ title: "Clip re-animated!", description: `Photo ${photoIndex + 1} has a new animation.` });
+      if (selectedVideoId) {
+        try {
+          await apiRequest("PUT", `/api/listing-videos/${selectedVideoId}`, { photos: updatedPhotos });
+          queryClient.invalidateQueries({ queryKey: ["/api/listing-videos"] });
+        } catch (e) {
+          console.error("Auto-save after re-animate failed:", e);
+        }
+      }
     } catch (err: any) {
       const msg = err?.name === "AbortError" ? "Timed out" : (err?.message || "Failed");
       toast({ title: "Re-animate failed", description: msg, variant: "destructive" });
