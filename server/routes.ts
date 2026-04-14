@@ -16060,6 +16060,18 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  const remotionRenderJobs = new Map<string, { status: string; progress: number; userId: number; error?: string; updatedAt: number }>();
+
+  setInterval(() => {
+    const now = Date.now();
+    const TTL_MS = 30 * 60 * 1000;
+    for (const [jobId, job] of remotionRenderJobs) {
+      if (now - job.updatedAt > TTL_MS) {
+        remotionRenderJobs.delete(jobId);
+      }
+    }
+  }, 5 * 60 * 1000);
+
   app.post("/api/listing-videos/render-remotion", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
@@ -16070,12 +16082,9 @@ export function registerRoutes(app: Express): Server {
 
       const jobId = `remotion-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const outputPath = `/tmp/${jobId}.mp4`;
-      const statusKey = `mp4-jobs/status_${jobId}.json`;
-
-      const { Client: ObjClient } = await import("@replit/object-storage");
-      const objClient = new ObjClient();
       const userId = req.user!.id;
-      await objClient.uploadFromText(statusKey, JSON.stringify({ status: "processing", progress: 0, userId }));
+
+      remotionRenderJobs.set(jobId, { status: "processing", progress: 0, userId, updatedAt: Date.now() });
       console.log(`[Remotion] Job ${jobId}: Starting render for user ${userId}`);
       res.json({ jobId });
 
@@ -16085,18 +16094,16 @@ export function registerRoutes(app: Express): Server {
           await renderListingVideo(
             { photos, settings, propertyDetails, propertyAddress, agentBranding },
             outputPath,
-            async (progress) => {
-              try {
-                await objClient.uploadFromText(statusKey, JSON.stringify({ status: "processing", progress: Math.round(progress * 100), userId }));
-              } catch {}
+            (progress) => {
+              remotionRenderJobs.set(jobId, { status: "processing", progress: Math.round(progress * 100), userId, updatedAt: Date.now() });
             }
           );
           const stats = (await import("fs")).statSync(outputPath);
           console.log(`[Remotion] Job ${jobId}: Render complete (${Math.round(stats.size / 1024 / 1024)}MB)`);
-          await objClient.uploadFromText(statusKey, JSON.stringify({ status: "complete", userId }));
+          remotionRenderJobs.set(jobId, { status: "complete", progress: 100, userId, updatedAt: Date.now() });
         } catch (err: any) {
           console.error(`[Remotion] Job ${jobId}: Render failed:`, err?.message);
-          await objClient.uploadFromText(statusKey, JSON.stringify({ status: "failed", error: err?.message || "Unknown error", userId }));
+          remotionRenderJobs.set(jobId, { status: "failed", progress: 0, userId, error: err?.message || "Unknown error", updatedAt: Date.now() });
           try { (await import("fs")).unlinkSync(outputPath); } catch {}
         }
       })();
@@ -16108,33 +16115,17 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/listing-videos/render-status/:jobId", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    try {
-      const { Client: ObjClient } = await import("@replit/object-storage");
-      const objClient = new ObjClient();
-      const statusKey = `mp4-jobs/status_${req.params.jobId}.json`;
-      const result = await objClient.downloadAsText(statusKey);
-      if (!result.ok) return res.status(404).json({ error: "Job not found" });
-      const parsed = JSON.parse(result.value);
-      if (parsed.userId && parsed.userId !== req.user!.id) return res.status(403).json({ error: "Forbidden" });
-      const { userId: _u, ...safeStatus } = parsed;
-      res.json(safeStatus);
-    } catch {
-      res.status(500).json({ error: "Status check failed" });
-    }
+    const job = remotionRenderJobs.get(req.params.jobId);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    if (job.userId !== req.user!.id) return res.status(403).json({ error: "Forbidden" });
+    res.json({ status: job.status, progress: job.progress, error: job.error });
   });
 
   app.get("/api/listing-videos/render-download/:jobId", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    try {
-      const { Client: ObjClient } = await import("@replit/object-storage");
-      const objClient = new ObjClient();
-      const statusKey = `mp4-jobs/status_${req.params.jobId}.json`;
-      const result = await objClient.downloadAsText(statusKey);
-      if (result.ok) {
-        const parsed = JSON.parse(result.value);
-        if (parsed.userId && parsed.userId !== req.user!.id) return res.status(403).json({ error: "Forbidden" });
-      }
-    } catch {}
+    const job = remotionRenderJobs.get(req.params.jobId);
+    if (!job) return res.status(404).json({ error: "Job not found or expired" });
+    if (job.userId !== req.user!.id) return res.status(403).json({ error: "Forbidden" });
     const outputPath = `/tmp/${req.params.jobId}.mp4`;
     try {
       const fs = await import("fs");
@@ -16146,7 +16137,10 @@ export function registerRoutes(app: Express): Server {
       const stream = fs.createReadStream(outputPath);
       stream.pipe(res);
       stream.on("end", () => {
-        setTimeout(() => { try { fs.unlinkSync(outputPath); } catch {} }, 60000);
+        setTimeout(() => {
+          try { fs.unlinkSync(outputPath); } catch {}
+          remotionRenderJobs.delete(req.params.jobId);
+        }, 60000);
       });
     } catch {
       res.status(500).json({ error: "Download failed" });

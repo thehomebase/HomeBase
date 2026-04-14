@@ -205,14 +205,66 @@ function VideoComposer({
   const totalDuration = Math.max(1, photos.length) * segmentDuration + closingSlideDuration;
   const durationInFrames = Math.ceil(totalDuration * 30);
 
+  const [clipBlobUrls, setClipBlobUrls] = useState<Record<string, string>>({});
+  const clipCacheRef = useRef<Record<string, { sourceUrl: string; blobUrl: string }>>({});
+
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      Object.values(clipCacheRef.current).forEach(entry => {
+        try { URL.revokeObjectURL(entry.blobUrl); } catch {}
+      });
     };
   }, []);
 
+  useEffect(() => {
+    const currentPhotoIds = new Set(photos.map(p => p.id));
+    for (const [id, entry] of Object.entries(clipCacheRef.current)) {
+      if (!currentPhotoIds.has(id)) {
+        try { URL.revokeObjectURL(entry.blobUrl); } catch {}
+        delete clipCacheRef.current[id];
+        setClipBlobUrls(prev => { const next = { ...prev }; delete next[id]; return next; });
+      }
+    }
+
+    const photosNeedingFetch = photos.filter(p => {
+      if (!p.videoClipUrl) return false;
+      const cached = clipCacheRef.current[p.id];
+      return !cached || cached.sourceUrl !== p.videoClipUrl;
+    });
+    if (photosNeedingFetch.length === 0) return;
+
+    photosNeedingFetch.forEach(async (photo) => {
+      const sourceUrl = photo.videoClipUrl!;
+      const resolveUrl = (url: string) => {
+        if (url.startsWith("https://")) {
+          return `/api/listing-videos/proxy-clip?url=${encodeURIComponent(url)}`;
+        }
+        return url.startsWith("/") ? url : `/${url}`;
+      };
+      const fetchUrl = resolveUrl(sourceUrl);
+      try {
+        const resp = await fetch(fetchUrl, { credentials: "include" });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const old = clipCacheRef.current[photo.id];
+        if (old) { try { URL.revokeObjectURL(old.blobUrl); } catch {} }
+        clipCacheRef.current[photo.id] = { sourceUrl, blobUrl };
+        setClipBlobUrls(prev => ({ ...prev, [photo.id]: blobUrl }));
+      } catch (err: any) {
+        console.warn(`[VideoClip] Failed to pre-fetch clip for ${photo.id}: ${err.message}`);
+      }
+    });
+  }, [photos]);
+
+  const photosWithBlobClips = photos.map(p => ({
+    ...p,
+    videoClipUrl: clipBlobUrls[p.id] || p.videoClipUrl,
+  }));
+
   const inputProps = {
-    photos,
+    photos: photosWithBlobClips,
     settings,
     propertyDetails,
     propertyAddress,
