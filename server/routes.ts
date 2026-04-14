@@ -15836,7 +15836,30 @@ export function registerRoutes(app: Express): Server {
       }
 
       console.log(`[Hailuo] Generated successfully: ${videoUrl}`);
-      res.json({ videoUrl });
+
+      const fs = await import("fs");
+      const path = await import("path");
+      const clipFilename = `clip_${req.user!.id}_${Date.now()}.mp4`;
+      const clipDir = path.default.join(process.cwd(), "public", "clips");
+      if (!fs.existsSync(clipDir)) fs.mkdirSync(clipDir, { recursive: true });
+      const clipPath = path.default.join(clipDir, clipFilename);
+
+      try {
+        const clipResp = await fetch(videoUrl);
+        if (clipResp.ok) {
+          const arrayBuffer = await clipResp.arrayBuffer();
+          fs.writeFileSync(clipPath, Buffer.from(arrayBuffer));
+          const localUrl = `/clips/${clipFilename}`;
+          console.log(`[Hailuo] Clip saved locally: ${localUrl} (${Math.round(arrayBuffer.byteLength / 1024)}KB)`);
+          res.json({ videoUrl: localUrl });
+        } else {
+          console.warn(`[Hailuo] Could not download clip for local storage, using CDN URL`);
+          res.json({ videoUrl });
+        }
+      } catch (dlErr: any) {
+        console.warn(`[Hailuo] Download to local failed: ${dlErr.message}, using CDN URL`);
+        res.json({ videoUrl });
+      }
     } catch (error: any) {
       console.error("[Hailuo] Error:", error?.message || error);
       res.status(500).json({ error: error?.message || "AI video clip generation failed" });
