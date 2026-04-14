@@ -1271,7 +1271,7 @@ export default function ListingVideoPage() {
       if (successCount > 0) {
         toast({
           title: "AI Video Clips Generated!",
-          description: `${successCount} of ${total} clips ready (~$0.20 each). Preview now uses AI-generated video.`,
+          description: `${successCount} of ${total} clips ready (~$0.19 each, 6s clips). Preview now uses AI-generated video.`,
         });
       }
     } catch (error: any) {
@@ -1484,7 +1484,7 @@ export default function ListingVideoPage() {
                           ) : (
                             <Sparkles className="h-4 w-4 mr-1" />
                           )}
-                          {isGenerating3D ? "Generating..." : "AI Video (~$0.20/clip)"}
+                          {isGenerating3D ? "Generating..." : "AI Video (~$0.19/clip)"}
                         </Button>
                       </div>
                     </div>
