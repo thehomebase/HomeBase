@@ -100,10 +100,10 @@ export function ListingVideo({
 }
 
 const BUNDLED_TRACK_MAP: Record<string, string> = {
-  "fashion-luxury": "fashion-luxury.mp3",
-  "fun-exciting-travel": "fun-exciting-travel.mp3",
-  "luxury-electronic": "luxury-electronic.mp3",
-  "real-estate": "real-estate.mp3",
+  "pixabay-fashion-luxury": "fashion-luxury.mp3",
+  "pixabay-fun-travel": "fun-exciting-travel.mp3",
+  "pixabay-luxury-electronic": "luxury-electronic.mp3",
+  "pixabay-real-estate": "real-estate.mp3",
 };
 
 function isBundledTrack(track: string): boolean {
