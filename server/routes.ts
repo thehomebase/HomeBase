@@ -16140,13 +16140,11 @@ export function registerRoutes(app: Express): Server {
           const fs = await import("fs");
           const pathMod = await import("path");
           const os = await import("os");
-          const { S3Client, PutObjectCommand, GetObjectCommand } = await import("@aws-sdk/client-s3");
-          const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+          const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
           const s3Region = process.env.REMOTION_AWS_REGION || "us-east-1";
           const s3 = new S3Client({ region: s3Region });
           const bucketMatch = (process.env.REMOTION_SERVE_URL || "").match(/\/\/(remotionlambda-[^.]+)\./);
           const bucketName = bucketMatch?.[1] || "remotionlambda-useast1-dkoz0smins";
-          const presignedExpiry = 3600;
 
           const resolvedPhotos = await Promise.all(photos.map(async (photo: any) => {
             const resolved = { ...photo };
@@ -16165,7 +16163,7 @@ export function registerRoutes(app: Express): Server {
                     Body: imageBuffer,
                     ContentType: contentType,
                   }));
-                  resolved.dataUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: bucketName, Key: imageKey }), { expiresIn: presignedExpiry });
+                  resolved.dataUrl = `https://${bucketName}.s3.${s3Region}.amazonaws.com/${imageKey}`;
                   console.log(`[Remotion Lambda] Uploaded image for photo ${photo.id} to S3`);
                 }
               } catch (err: any) {
@@ -16201,9 +16199,9 @@ export function registerRoutes(app: Express): Server {
                   Body: clipBuffer,
                   ContentType: "video/mp4",
                 }));
-                const signedClipUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: bucketName, Key: clipKey }), { expiresIn: presignedExpiry });
-                console.log(`[Remotion Lambda] Uploaded clip for photo ${photo.id} to S3 (presigned)`);
-                return { ...resolved, videoClipUrl: signedClipUrl };
+                const clipPublicUrl = `https://${bucketName}.s3.${s3Region}.amazonaws.com/${clipKey}`;
+                console.log(`[Remotion Lambda] Uploaded clip for photo ${photo.id} to S3: ${clipPublicUrl}`);
+                return { ...resolved, videoClipUrl: clipPublicUrl };
               }
               console.warn(`[Remotion Lambda] Job ${jobId}: Could not resolve clip for photo ${photo.id}, using Ken Burns fallback`);
               return { ...resolved, videoClipUrl: undefined };
@@ -16219,7 +16217,7 @@ export function registerRoutes(app: Express): Server {
             if (!m) return dataUrl;
             const buf = Buffer.from(m[2], "base64");
             await s3.send(new PutObjectCommand({ Bucket: bucketName, Key: key, Body: buf, ContentType: m[1] }));
-            return getSignedUrl(s3, new GetObjectCommand({ Bucket: bucketName, Key: key }), { expiresIn: presignedExpiry });
+            return `https://${bucketName}.s3.${s3Region}.amazonaws.com/${key}`;
           };
           if (resolvedBranding.agentPhotoUrl?.startsWith("data:")) {
             resolvedBranding.agentPhotoUrl = await uploadBase64ToS3(resolvedBranding.agentPhotoUrl, `render-assets/${jobId}/agent-photo.png`);

@@ -86,6 +86,7 @@ export async function renderListingVideoOnLambda(
     maxRetries: 1,
     privacy: "no-acl",
     framesPerLambda: 300,
+    timeoutInMilliseconds: 180000,
     downloadBehavior: { type: "download", fileName: "listing-video.mp4" },
   });
 
@@ -129,9 +130,9 @@ export async function renderListingVideoOnLambda(
         lastProgressUpdate = Date.now();
       }
 
-      if (Date.now() - lastProgressUpdate > 90000) {
-        console.warn(`[Remotion Lambda] No progress update for 90s, render may have stalled`);
-        throw new Error("Lambda render stalled — no progress for 90 seconds");
+      if (Date.now() - lastProgressUpdate > 180000) {
+        console.warn(`[Remotion Lambda] No progress update for 180s, render may have stalled`);
+        throw new Error("Lambda render stalled — no progress for 180 seconds");
       }
     } catch (pollErr: any) {
       if (pollErr.message.includes("Lambda render")) throw pollErr;
