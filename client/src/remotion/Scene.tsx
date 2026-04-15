@@ -1,5 +1,4 @@
 import { AbsoluteFill, Img, interpolate, useCurrentFrame, useVideoConfig, Video } from "remotion";
-import { useState } from "react";
 import type { PhotoItem } from "./types";
 
 function getMotionStyle(motionType: string, progress: number, focusPoint?: { x: number; y: number }) {
@@ -84,23 +83,14 @@ function PhotoOrClip({
   motionProgress: number;
   style?: React.CSSProperties;
 }) {
-  const [videoFailed, setVideoFailed] = useState(false);
-
-  if (photo.videoClipUrl && !videoFailed) {
+  if (photo.videoClipUrl) {
     return (
-      <>
-        <FallbackImage photo={photo} motionProgress={motionProgress} style={style} />
-        <AbsoluteFill style={style}>
-          <Video
-            src={photo.videoClipUrl}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            onError={() => {
-              console.warn(`[Scene] Video load failed for ${photo.id}, falling back to image`);
-              setVideoFailed(true);
-            }}
-          />
-        </AbsoluteFill>
-      </>
+      <AbsoluteFill style={style}>
+        <Video
+          src={photo.videoClipUrl}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      </AbsoluteFill>
     );
   }
 
