@@ -1055,12 +1055,7 @@ export default function ListingVideoPage() {
                                   {photo.roomType.replace(/_/g, " ")}
                                 </Badge>
                               )}
-                              {photo.videoClipUrl && clipBlobUrls[photo.id] === "__failed__" && (
-                                <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800">
-                                  <Layers className="h-3 w-3 mr-0.5" />Clip Corrupt — Re-animate
-                                </Badge>
-                              )}
-                              {photo.videoClipUrl && clipBlobUrls[photo.id] !== "__failed__" && (
+                              {photo.videoClipUrl && (
                                 <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
                                   <Layers className="h-3 w-3 mr-0.5" />Animated
                                 </Badge>
