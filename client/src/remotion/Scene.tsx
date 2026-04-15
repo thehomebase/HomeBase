@@ -134,7 +134,7 @@ export function Scene({
       />
 
       {isTransitioning && nextPhoto && (
-        <PhotoOrClip
+        <FallbackImage
           photo={nextPhoto}
           motionProgress={transProgress * 0.1}
           style={{ opacity: nextOpacity }}
