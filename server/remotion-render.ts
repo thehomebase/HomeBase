@@ -85,6 +85,7 @@ export async function renderListingVideoOnLambda(
     videoBitrate: "4M",
     maxRetries: 1,
     privacy: "no-acl",
+    framesPerLambda: 300,
     downloadBehavior: { type: "download", fileName: "listing-video.mp4" },
   });
 

@@ -1,4 +1,5 @@
 import { AbsoluteFill, Img, interpolate, useCurrentFrame, useVideoConfig, Video } from "remotion";
+import { useState } from "react";
 import type { PhotoItem } from "./types";
 
 function getMotionStyle(motionType: string, progress: number, focusPoint?: { x: number; y: number }) {
@@ -56,26 +57,7 @@ function getMotionStyle(motionType: string, progress: number, focusPoint?: { x: 
   };
 }
 
-function PhotoOrClip({
-  photo,
-  motionProgress,
-  style,
-}: {
-  photo: PhotoItem;
-  motionProgress: number;
-  style?: React.CSSProperties;
-}) {
-  if (photo.videoClipUrl) {
-    return (
-      <AbsoluteFill style={style}>
-        <Video
-          src={photo.videoClipUrl}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-      </AbsoluteFill>
-    );
-  }
-
+function FallbackImage({ photo, motionProgress, style }: { photo: PhotoItem; motionProgress: number; style?: React.CSSProperties }) {
   return (
     <AbsoluteFill style={{ overflow: "hidden", ...style }}>
       <Img
@@ -90,6 +72,39 @@ function PhotoOrClip({
       />
     </AbsoluteFill>
   );
+}
+
+
+function PhotoOrClip({
+  photo,
+  motionProgress,
+  style,
+}: {
+  photo: PhotoItem;
+  motionProgress: number;
+  style?: React.CSSProperties;
+}) {
+  const [videoFailed, setVideoFailed] = useState(false);
+
+  if (photo.videoClipUrl && !videoFailed) {
+    return (
+      <>
+        <FallbackImage photo={photo} motionProgress={motionProgress} style={style} />
+        <AbsoluteFill style={style}>
+          <Video
+            src={photo.videoClipUrl}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            onError={() => {
+              console.warn(`[Scene] Video load failed for ${photo.id}, falling back to image`);
+              setVideoFailed(true);
+            }}
+          />
+        </AbsoluteFill>
+      </>
+    );
+  }
+
+  return <FallbackImage photo={photo} motionProgress={motionProgress} style={style} />;
 }
 
 export function Scene({

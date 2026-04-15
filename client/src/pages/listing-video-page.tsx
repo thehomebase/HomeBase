@@ -243,10 +243,13 @@ function VideoComposer({
         return url.startsWith("/") ? url : `/${url}`;
       };
       const fetchUrl = resolveUrl(sourceUrl);
+      console.log(`[VideoClip] Pre-fetching clip for ${photo.id}: ${fetchUrl.substring(0, 100)}`);
       try {
         const resp = await fetch(fetchUrl, { credentials: "include" });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
         const blob = await resp.blob();
+        console.log(`[VideoClip] Fetched clip for ${photo.id}: ${blob.size} bytes, type=${blob.type}`);
+        if (blob.size < 1000) throw new Error(`Clip too small (${blob.size} bytes), likely invalid`);
         const blobUrl = URL.createObjectURL(blob);
         const old = clipCacheRef.current[photo.id];
         if (old) { try { URL.revokeObjectURL(old.blobUrl); } catch {} }
@@ -260,7 +263,9 @@ function VideoComposer({
 
   const photosWithBlobClips = photos.map(p => ({
     ...p,
-    videoClipUrl: clipBlobUrls[p.id] || p.videoClipUrl,
+    videoClipUrl: p.videoClipUrl
+      ? (clipBlobUrls[p.id] || (p.videoClipUrl.startsWith("/") ? p.videoClipUrl : undefined))
+      : undefined,
   }));
 
   const inputProps = {
