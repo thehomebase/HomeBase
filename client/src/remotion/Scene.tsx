@@ -73,7 +73,6 @@ function FallbackImage({ photo, motionProgress, style }: { photo: PhotoItem; mot
   );
 }
 
-
 function PhotoOrClip({
   photo,
   motionProgress,
@@ -101,49 +100,49 @@ function PhotoOrClip({
 
 export function Scene({
   photo,
-  nextPhoto,
   transitionDuration,
   photoDuration,
+  isFirst,
+  isLast,
 }: {
   photo: PhotoItem;
-  nextPhoto?: PhotoItem;
   transitionDuration: number;
   photoDuration: number;
+  isFirst: boolean;
+  isLast: boolean;
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const segmentFrames = (photoDuration + transitionDuration) * fps;
-  const transitionFrames = transitionDuration * fps;
-  const photoFrames = segmentFrames - transitionFrames;
+  const transitionFrames = Math.round(transitionDuration * fps);
+  const photoFrames = Math.round(photoDuration * fps);
+  const segmentFrames = photoFrames + transitionFrames;
 
-  const motionProgress = Math.min(frame / photoFrames, 1);
+  const fadeInEnd = isFirst ? 0 : transitionFrames;
+  const fadeOutStart = isLast ? segmentFrames : photoFrames;
 
-  const hasClip = !!photo.videoClipUrl;
-  const nextHasClip = !!nextPhoto?.videoClipUrl;
-  const skipTransition = hasClip || nextHasClip;
+  let opacity = 1;
+  if (!isFirst && frame < fadeInEnd) {
+    opacity = interpolate(frame, [0, fadeInEnd], [0, 1], { extrapolateRight: "clamp" });
+  }
+  if (!isLast && frame >= fadeOutStart) {
+    opacity = interpolate(frame, [fadeOutStart, segmentFrames], [1, 0], { extrapolateLeft: "clamp" });
+  }
 
-  const isTransitioning = !skipTransition && frame >= photoFrames;
-  const transProgress = isTransitioning ? (frame - photoFrames) / transitionFrames : 0;
-
-  const currentOpacity = isTransitioning ? interpolate(transProgress, [0, 1], [1, 0]) : 1;
-  const nextOpacity = isTransitioning ? interpolate(transProgress, [0, 1], [0, 1]) : 0;
+  const contentStart = isFirst ? 0 : transitionFrames;
+  const contentEnd = isLast ? segmentFrames : photoFrames;
+  const contentDuration = contentEnd - contentStart;
+  const motionProgress = contentDuration > 0
+    ? Math.max(0, Math.min((frame - contentStart) / contentDuration, 1))
+    : 0;
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       <PhotoOrClip
         photo={photo}
         motionProgress={motionProgress}
-        style={{ opacity: currentOpacity }}
+        style={{ opacity }}
       />
-
-      {isTransitioning && nextPhoto && (
-        <FallbackImage
-          photo={nextPhoto}
-          motionProgress={transProgress * 0.1}
-          style={{ opacity: nextOpacity }}
-        />
-      )}
     </AbsoluteFill>
   );
 }

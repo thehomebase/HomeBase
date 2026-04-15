@@ -15,30 +15,33 @@ export function ListingVideo({
   const { fps, width, height, durationInFrames } = useVideoConfig();
   const frame = useCurrentFrame();
 
-  const segmentDuration = settings.photoDuration + settings.transitionDuration;
-  const segmentFrames = Math.round(segmentDuration * fps);
-  const photosDuration = photos.length * segmentDuration;
+  const photoFrames = Math.round(settings.photoDuration * fps);
+  const transitionFrames = Math.round(settings.transitionDuration * fps);
+  const segmentFrames = photoFrames + transitionFrames;
+  const photosFrames = photos.length > 0
+    ? (photos.length - 1) * photoFrames + segmentFrames
+    : 0;
   const closingSlideDuration = agentBranding.showClosingSlide ? 4 : 0;
-  const totalDuration = photosDuration + closingSlideDuration;
   const closingSlideFrames = Math.round(closingSlideDuration * fps);
-  const photosFrames = photos.length * segmentFrames;
 
   const globalProgress = frame / durationInFrames;
 
   const elapsed = frame / fps;
-  const currentPhotoIdx = Math.min(Math.floor(elapsed / segmentDuration), photos.length - 1);
-  const photoProgress = (elapsed - currentPhotoIdx * segmentDuration) / segmentDuration;
+  const effectiveSegment = settings.photoDuration;
+  const currentPhotoIdx = Math.min(Math.floor(elapsed / effectiveSegment), photos.length - 1);
+  const photoProgress = (elapsed - currentPhotoIdx * effectiveSegment) / effectiveSegment;
   const propertyInfoVisible = globalProgress <= 0.15 && (!!propertyAddress || !!propertyDetails.price);
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
       {photos.map((photo, i) => (
-        <Sequence key={photo.id} from={i * segmentFrames} durationInFrames={segmentFrames}>
+        <Sequence key={photo.id} from={i * photoFrames} durationInFrames={segmentFrames}>
           <Scene
             photo={photo}
-            nextPhoto={i < photos.length - 1 ? photos[i + 1] : undefined}
             transitionDuration={settings.transitionDuration}
             photoDuration={settings.photoDuration}
+            isFirst={i === 0}
+            isLast={i === photos.length - 1}
           />
         </Sequence>
       ))}

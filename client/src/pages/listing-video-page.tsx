@@ -202,7 +202,11 @@ function VideoComposer({
 
   const segmentDuration = settings.photoDuration + settings.transitionDuration;
   const closingSlideDuration = agentBranding.showClosingSlide ? 4 : 0;
-  const totalDuration = Math.max(1, photos.length) * segmentDuration + closingSlideDuration;
+  const photoCount = Math.max(1, photos.length);
+  const photosDuration = photoCount > 1
+    ? (photoCount - 1) * settings.photoDuration + segmentDuration
+    : segmentDuration;
+  const totalDuration = photosDuration + closingSlideDuration;
   const durationInFrames = Math.ceil(totalDuration * 30);
 
   const [clipBlobUrls, setClipBlobUrls] = useState<Record<string, string>>({});
@@ -1578,7 +1582,7 @@ export default function ListingVideoPage() {
                 <CardContent className="pt-6">
                   <div className="text-center space-y-2">
                     <p className="text-sm text-muted-foreground">
-                      Total duration: ~{Math.round(photos.length * (settings.photoDuration + settings.transitionDuration) + (agentBranding.showClosingSlide ? 4 : 0))}s
+                      Total duration: ~{Math.round(totalDuration)}s
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {photos.length} photos • {ASPECT_RATIOS[settings.aspectRatio]?.label}
