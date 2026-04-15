@@ -15942,6 +15942,10 @@ export function registerRoutes(app: Express): Server {
       if (!clipResp.ok) return res.status(502).json({ error: "Failed to download clip from CDN" });
       const arrayBuffer = await clipResp.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
+      if (buffer.byteLength < 10000) {
+        console.error(`[PersistClip] Downloaded clip is too small (${buffer.byteLength} bytes), CDN may have returned empty/error response`);
+        return res.status(502).json({ error: "Downloaded clip is empty or corrupt — CDN may have expired. Please re-animate this photo." });
+      }
       await objClient.uploadFromBytes(clipFilename, buffer);
       const persistentUrl = `/api/listing-videos/serve-clip/${clipFilename}`;
       console.log(`[Hailuo] Clip persisted via explicit request: ${persistentUrl} (${Math.round(buffer.byteLength / 1024)}KB)`);
@@ -15991,11 +15995,15 @@ export function registerRoutes(app: Express): Server {
       const localPath = pathMod.join(os.tmpdir(), "listing-clips", filename);
       if (fs.existsSync(localPath)) {
         const stat = fs.statSync(localPath);
-        res.set("Content-Type", "video/mp4");
-        res.set("Content-Length", String(stat.size));
-        res.set("Cache-Control", "public, max-age=604800");
-        fs.createReadStream(localPath).pipe(res);
-        return;
+        if (stat.size < 1000) {
+          fs.unlinkSync(localPath);
+        } else {
+          res.set("Content-Type", "video/mp4");
+          res.set("Content-Length", String(stat.size));
+          res.set("Cache-Control", "public, max-age=604800");
+          fs.createReadStream(localPath).pipe(res);
+          return;
+        }
       }
 
       const key = `clips/${filename}`;
@@ -16006,6 +16014,10 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Clip not found" });
       }
       const buf = Buffer.from(result.value);
+      if (buf.byteLength < 1000) {
+        console.warn(`[ServeClip] Clip ${filename} is corrupt (${buf.byteLength} bytes)`);
+        return res.status(404).json({ error: "Clip is corrupt (empty). Please re-animate this photo." });
+      }
       res.set("Content-Type", "video/mp4");
       res.set("Content-Length", String(buf.byteLength));
       res.set("Cache-Control", "public, max-age=604800");
@@ -16194,6 +16206,9 @@ export function registerRoutes(app: Express): Server {
               if (clipBuffer) {
                 const clipSizeKB = Math.round(clipBuffer.byteLength / 1024);
                 console.log(`[Remotion Lambda] Clip for photo ${photo.id}: ${clipSizeKB}KB`);
+                if (clipBuffer.byteLength < 10000) {
+                  throw new Error(`Video clip for photo ${photo.id} is corrupt (${clipSizeKB}KB). Please re-animate this photo to generate a new clip.`);
+                }
                 const clipKey = `render-clips/${jobId}/${photo.id}.mp4`;
                 await s3.send(new PutObjectCommand({
                   Bucket: bucketName,
@@ -16205,11 +16220,10 @@ export function registerRoutes(app: Express): Server {
                 console.log(`[Remotion Lambda] Uploaded clip for photo ${photo.id} to S3: ${clipPublicUrl}`);
                 return { ...resolved, videoClipUrl: clipPublicUrl };
               }
-              console.warn(`[Remotion Lambda] Job ${jobId}: Could not resolve clip for photo ${photo.id}, using Ken Burns fallback`);
-              return { ...resolved, videoClipUrl: undefined };
+              throw new Error(`Video clip for photo ${photo.id} could not be loaded. Please re-animate this photo.`);
             } catch (err: any) {
-              console.warn(`[Remotion Lambda] Job ${jobId}: Clip resolution failed for photo ${photo.id}: ${err.message}`);
-              return { ...resolved, videoClipUrl: undefined };
+              console.error(`[Remotion Lambda] Job ${jobId}: Clip resolution failed for photo ${photo.id}: ${err.message}`);
+              throw err;
             }
           }));
 

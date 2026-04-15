@@ -257,6 +257,7 @@ function VideoComposer({
         setClipBlobUrls(prev => ({ ...prev, [photo.id]: blobUrl }));
       } catch (err: any) {
         console.warn(`[VideoClip] Failed to pre-fetch clip for ${photo.id}: ${err.message}`);
+        setClipBlobUrls(prev => ({ ...prev, [photo.id]: "__failed__" }));
       }
     });
   }, [photos]);
@@ -264,7 +265,7 @@ function VideoComposer({
   const photosWithBlobClips = photos.map(p => ({
     ...p,
     videoClipUrl: p.videoClipUrl
-      ? (clipBlobUrls[p.id] || (p.videoClipUrl.startsWith("/") ? p.videoClipUrl : undefined))
+      ? (clipBlobUrls[p.id] && clipBlobUrls[p.id] !== "__failed__" ? clipBlobUrls[p.id] : (!clipBlobUrls[p.id] && p.videoClipUrl.startsWith("/") ? p.videoClipUrl : undefined))
       : undefined,
   }));
 
@@ -1054,7 +1055,12 @@ export default function ListingVideoPage() {
                                   {photo.roomType.replace(/_/g, " ")}
                                 </Badge>
                               )}
-                              {photo.videoClipUrl && (
+                              {photo.videoClipUrl && clipBlobUrls[photo.id] === "__failed__" && (
+                                <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800">
+                                  <Layers className="h-3 w-3 mr-0.5" />Clip Corrupt — Re-animate
+                                </Badge>
+                              )}
+                              {photo.videoClipUrl && clipBlobUrls[photo.id] !== "__failed__" && (
                                 <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
                                   <Layers className="h-3 w-3 mr-0.5" />Animated
                                 </Badge>
