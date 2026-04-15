@@ -16194,10 +16194,6 @@ export function registerRoutes(app: Express): Server {
               if (clipBuffer) {
                 const clipSizeKB = Math.round(clipBuffer.byteLength / 1024);
                 console.log(`[Remotion Lambda] Clip for photo ${photo.id}: ${clipSizeKB}KB`);
-                if (clipBuffer.byteLength < 50000) {
-                  console.warn(`[Remotion Lambda] Job ${jobId}: Clip for photo ${photo.id} is too small (${clipSizeKB}KB), likely corrupt — skipping`);
-                  return { ...resolved, videoClipUrl: undefined };
-                }
                 const clipKey = `render-clips/${jobId}/${photo.id}.mp4`;
                 await s3.send(new PutObjectCommand({
                   Bucket: bucketName,
