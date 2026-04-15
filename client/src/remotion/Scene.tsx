@@ -1,4 +1,4 @@
-import { AbsoluteFill, Img, interpolate, useCurrentFrame, useVideoConfig, OffthreadVideo } from "remotion";
+import { AbsoluteFill, Img, interpolate, useCurrentFrame, useVideoConfig, Video } from "remotion";
 import type { PhotoItem } from "./types";
 
 function getMotionStyle(motionType: string, progress: number, focusPoint?: { x: number; y: number }) {
@@ -86,9 +86,11 @@ function PhotoOrClip({
   if (photo.videoClipUrl) {
     return (
       <AbsoluteFill style={style}>
-        <OffthreadVideo
+        <Video
           src={photo.videoClipUrl}
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          delayRenderTimeoutInMilliseconds={120000}
+          delayRenderRetries={2}
         />
       </AbsoluteFill>
     );
