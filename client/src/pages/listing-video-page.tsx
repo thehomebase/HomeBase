@@ -1582,7 +1582,12 @@ export default function ListingVideoPage() {
                 <CardContent className="pt-6">
                   <div className="text-center space-y-2">
                     <p className="text-sm text-muted-foreground">
-                      Total duration: ~{Math.round(totalDuration)}s
+                      Total duration: ~{Math.round(
+                        (photos.length > 1
+                          ? (photos.length - 1) * settings.photoDuration + settings.photoDuration + settings.transitionDuration
+                          : settings.photoDuration + settings.transitionDuration)
+                        + (agentBranding.showClosingSlide ? 4 : 0)
+                      )}s
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {photos.length} photos • {ASPECT_RATIOS[settings.aspectRatio]?.label}
