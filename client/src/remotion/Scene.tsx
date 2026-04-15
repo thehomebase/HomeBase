@@ -119,7 +119,11 @@ export function Scene({
 
   const motionProgress = Math.min(frame / photoFrames, 1);
 
-  const isTransitioning = frame >= photoFrames;
+  const hasClip = !!photo.videoClipUrl;
+  const nextHasClip = !!nextPhoto?.videoClipUrl;
+  const skipTransition = hasClip || nextHasClip;
+
+  const isTransitioning = !skipTransition && frame >= photoFrames;
   const transProgress = isTransitioning ? (frame - photoFrames) / transitionFrames : 0;
 
   const currentOpacity = isTransitioning ? interpolate(transProgress, [0, 1], [1, 0]) : 1;
