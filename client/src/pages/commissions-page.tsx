@@ -110,7 +110,7 @@ function SummaryCards({ summary, isLoading }: { summary?: CommissionSummary; isL
 
   const cards = [
     {
-      label: "Total Earned (YTD)",
+      label: "GCI (YTD)",
       value: formatUSD(summary?.ytd_earned || 0),
       icon: DollarSign,
       accent: "text-emerald-600",
@@ -326,6 +326,35 @@ function CommissionsTable({
                   );
                 })
               )}
+              {commissions.length > 0 && (() => {
+                const totals = commissions.reduce(
+                  (acc, c) => {
+                    acc.contractPrice += c.contract_price || 0;
+                    acc.commission += c.commissionAmount || 0;
+                    acc.expenses += (c.expenses || []).reduce((s: number, e: any) => s + (e.amount || 0), 0);
+                    acc.net += netAmount(c);
+                    return acc;
+                  },
+                  { contractPrice: 0, commission: 0, expenses: 0, net: 0 }
+                );
+                return (
+                  <TableRow className="bg-muted/40 font-semibold border-t-2">
+                    <TableCell colSpan={3}>Totals</TableCell>
+                    <TableCell className="text-right">
+                      {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totals.contractPrice)}
+                    </TableCell>
+                    <TableCell />
+                    <TableCell className="text-right">{formatUSD(totals.commission)}</TableCell>
+                    <TableCell />
+                    <TableCell className="text-right text-muted-foreground">
+                      {totals.expenses > 0 ? formatUSD(totals.expenses) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">{formatUSD(totals.net)}</TableCell>
+                    <TableCell />
+                    <TableCell />
+                  </TableRow>
+                );
+              })()}
             </TableBody>
           </Table>
         </div>
