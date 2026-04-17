@@ -1061,15 +1061,15 @@ export class DatabaseStorage implements IStorage {
       // Create SET clause for SQL update
       const setColumns = Object.entries(cleanData).map(([key, value]) => {
         if (value === null) {
-          return sql`${sql.identifier([key])} = NULL`;
+          return sql`${sql.identifier(key)} = NULL`;
         }
         if (key === 'participants') {
-          return sql`${sql.identifier([key])} = ${value}::jsonb`;
+          return sql`${sql.identifier(key)} = ${value}::jsonb`;
         }
         if (['list_date', 'closing_date', 'contract_execution_date', 'option_period_expiration'].includes(key)) {
-          return sql`${sql.identifier([key])} = ${value}::timestamptz`;
+          return sql`${sql.identifier(key)} = ${value}::timestamptz`;
         }
-        return sql`${sql.identifier([key])} = ${value}`;
+        return sql`${sql.identifier(key)} = ${value}`;
       });
 
       const result = await db.execute(sql`
@@ -2768,9 +2768,9 @@ export class DatabaseStorage implements IStorage {
           
 
           if (value === null) {
-            updateParts.push(sql`${sql.identifier([snakeKey])} = NULL`);
+            updateParts.push(sql`${sql.identifier(snakeKey)} = NULL`);
           } else {
-            updateParts.push(sql`${sql.identifier([snakeKey])} = ${value}`);
+            updateParts.push(sql`${sql.identifier(snakeKey)} = ${value}`);
           }
         }
       });
@@ -3092,7 +3092,7 @@ export class DatabaseStorage implements IStorage {
         .filter(([_, value]) => value !== undefined)
         .map(([key, value]) => {
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-          return sql`${sql.identifier([snakeKey])} = ${value}`;
+          return sql`${sql.identifier(snakeKey)} = ${value}`;
         });
 
       const result = await db.execute(sql`
@@ -3203,7 +3203,7 @@ export class DatabaseStorage implements IStorage {
         .filter(([key, value]) => value !== undefined && key !== 'id')
         .map(([key, value]) => {
           const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-          return sql`${sql.identifier([snakeKey])} = ${value}`;
+          return sql`${sql.identifier(snakeKey)} = ${value}`;
         });
 
       if (columns.length === 0) {
