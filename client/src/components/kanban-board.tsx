@@ -411,14 +411,11 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
       if (city !== undefined) body.city = city;
       if (state !== undefined) body.state = state;
       if (zipCode !== undefined) body.zipCode = zipCode;
-      const response = await apiRequest(
+      await apiRequest(
         "PATCH",
         `/api/transactions/${id}`,
         body
       );
-      if (!response.ok) {
-        throw new Error("Failed to update transaction");
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -427,10 +424,10 @@ export function KanbanBoard({ transactions, onDeleteTransaction, onTransactionCl
         description: "Transaction status updated",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "Failed to update transaction status",
+        description: error?.message || "Failed to update transaction status",
         variant: "destructive",
       });
       setLocalTransactions(transactions);
